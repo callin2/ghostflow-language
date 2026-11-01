@@ -1,0 +1,28 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName Helvetica
+skinparam defaultFontSize 13
+title Operator property event (approved design, not implemented)
+
+start
+:Operator submits one action\n(one or more property values);
+:Validate the whole event:
+identity join (stale program identity?)
+and every value (type, finite, min/max/step);
+if (Stale or any value invalid?) then (yes)
+  :Reject the whole event;\nno mutation; prior values kept;
+  stop
+else (all valid)
+  :Apply at its effective\nevent position;
+  :New settings revision /\neffective position;
+endif
+note right
+Unchanged: program/source/bytecode,
+run identity, deployment package.
+No recompile, repackage, or
+controller-wide maintenance stop.
+Open: durability and failure ordering.
+end note
+:Active logic responds\nunder existing rules;
+stop
+@enduml

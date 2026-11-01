@@ -1,17 +1,42 @@
 # GF-COMPOSE R5: composition contracts and diagnostics
 
+This research note proposes a first contract profile for composing behaviors:
+which properties are checked, in which phase, what each check can honestly
+claim, and how a failure is reported to farmers and engineers.
+
+In this document:
+
+- **User problem** — why composition needs specific, evidence-backed reasons.
+- **Evidence at examined revision** — what current tools, docs, and runtime
+  code establish, and the four evidence classes.
+- **Tables and examples** — the proposed profile, exactly four diagnostic
+  examples, and the valve-switch counterexample.
+- **Recommendation**, **Unresolved questions and owners**, and
+  **Verification**.
+
 ## User problem
 
 A farmer needs a clear reason when behaviors cannot coexist. Engineers need the
-conflicting requirement, affected identities, and evidence without an
-unsupported blanket “safe” result. This document defines a proposed first
-contract profile for composition. It is research/design, not implementation.
+conflicting requirement, the affected identities, and the evidence — without an
+unsupported blanket “safe” result.
 
-The profile covers type, dependency, parameter bounds, exclusive output
-ownership, and installation-constraint compatibility. Broader shared-actuator
-resource arbitration remains #95. Canonical `.ghost.md` source owns executable rules;
-the Rust core owns execution; installation context and deployment remain
-external authority boundaries.
+This document defines a proposed first contract profile for composition. It is
+research/design, not implementation.
+
+The profile covers five properties:
+
+- type;
+- dependency;
+- parameter bounds;
+- exclusive output ownership; and
+- installation-constraint compatibility.
+
+Out of scope and authority boundaries:
+
+- Broader shared-actuator resource arbitration remains #95.
+- Canonical `.ghost.md` source owns executable rules.
+- The Rust core owns execution.
+- Installation context and deployment remain external authority boundaries.
 
 ## Evidence at examined revision
 
@@ -21,39 +46,44 @@ and evidence summaries; their unresolved choices remain unresolved here.
 
 Current evidence establishes the following:
 
-- `compileConstraints` accepts `exclusive`, bounded `require` forms, the
-  standalone `allow(enter/apply)` forms, `limit on_time`, `once`, and
-  non-blocking `check pump_capacity`; unsupported expressions fail compilation
-  ([`tools/constraints.mjs`](../../tools/constraints.mjs)).
-- This is historical standalone-compiler evidence. The language reference
-  retains `allow enter(...)` for the `ghostrules` parser and says the earlier
+- **Constraint compiler.** `compileConstraints` accepts `exclusive`, bounded
+  `require` forms, the standalone `allow(enter/apply)` forms, `limit on_time`,
+  `once`, and non-blocking `check pump_capacity`; unsupported expressions fail
+  compilation ([`tools/constraints.mjs`](../../tools/constraints.mjs)).
+- **Historical status of `allow apply`.** This is historical
+  standalone-compiler evidence. The language reference retains
+  `allow enter(...)` for the `ghostrules` parser and says the earlier
   `allow apply(settings) ... Configure` rule is superseded by the approved live
   property event decision; see [Reference §4.10](../reference/04-sensors-constraints-control.md#410-mode와-live-settings).
-- Constraint phase is significant. Output relations apply to final output
+- **Constraint phase matters.** Output relations apply to final output
   candidates; enter/apply rules apply at request entry; capacity checks apply
   to a new-work authorization path ([`docs/CONSTRAINTS.md`](../CONSTRAINTS.md)).
-- `prepare_start_batch` selects the lowest request ID from one same-tick
-  snapshot. It does not establish universal composition arbitration
-  ([`station.rs`](../../crates/ghostflow-core/src/station.rs)).
-- `authorize_output` requires the active session and validates valve ownership,
-  valve count, and pump-with-valve safety. A station owns one physical pump;
-  this is a bounded station policy, not a general behavior-composition proof.
-- Integration v1 requires exact logical-name bindings with matching direction
-  and semantic type. Its independent host, hardware, and physical gates use
-  `unknown` when evidence cannot establish a result; a validator pass is not
-  physical acceptance ([`contracts/integration-v1/README.md`](../../contracts/integration-v1/README.md)).
-- Source trace joins source identity, bindings, constraint indexes, and runtime
-  observations. Missing fields remain unobserved; the trace does not infer
-  electrical or mechanical operation
+- **Station start selection.** `prepare_start_batch` selects the lowest request
+  ID from one same-tick snapshot. It does not establish universal composition
+  arbitration ([`station.rs`](../../crates/ghostflow-core/src/station.rs)).
+- **Station output authorization.** `authorize_output` requires the active
+  session and validates valve ownership, valve count, and pump-with-valve
+  safety. A station owns one physical pump; this is a bounded station policy,
+  not a general behavior-composition proof.
+- **Integration v1.** It requires exact logical-name bindings with matching
+  direction and semantic type. Its independent host, hardware, and physical
+  gates use `unknown` when evidence cannot establish a result; a validator pass
+  is not physical acceptance ([`contracts/integration-v1/README.md`](../../contracts/integration-v1/README.md)).
+- **Source trace.** It joins source identity, bindings, constraint indexes, and
+  runtime observations. Missing fields remain unobserved; the trace does not
+  infer electrical or mechanical operation
   ([`docs/SOURCE-SAFETY-TRACE.md`](../SOURCE-SAFETY-TRACE.md)).
-- R2 system-memory #68 is a fixed boundary for this document: conversational
-  memory is provenance/authoring context, not execution-rule or binding
-  authority ([R2: authority and identity](GF-COMPOSE-R2-AUTHORITY-IDENTITY.md)).
+- **Fixed and open R2 boundaries.** R2 system-memory #68 is a fixed boundary
+  for this document: conversational memory is provenance/authoring context,
+  not execution-rule or binding authority ([R2: authority and identity](GF-COMPOSE-R2-AUTHORITY-IDENTITY.md)).
   Installation-constraint authority under system #62 remains open. See also
   [R3: composition execution](GF-COMPOSE-R3-EXECUTION.md) for the related
   execution proposal and its limits.
 
 ### Evidence classes
+
+A diagnostic must say how strong its evidence is. The profile distinguishes
+four classes:
 
 | Class | Meaning in this profile | Example |
 |---|---|---|
@@ -62,14 +92,19 @@ Current evidence establishes the following:
 | Statically established property | Compiler or validator proves a bounded structural fact | A required output has matching direction and semantic type |
 | Runtime-enforced constraint | The execution path rejects or blocks the invalid request/output | `authorize_output` rejects a pump-on/no-valve output |
 
-The profile may report all four classes. It must not promote an assumption or
-structural match into physical safety. A missing installation gate is
-`unknown`, not `pass`. Source trace identity improves traceability but does not
-prove that a device applied the command.
+The profile may report all four classes, with these limits:
+
+- It must not promote an assumption or structural match into physical safety.
+- A missing installation gate is `unknown`, not `pass`.
+- Source trace identity improves traceability but does not prove that a device
+  applied the command.
 
 ## Tables and examples
 
 ### Proposed first contract profile
+
+The table lists, for each property, its inputs, check phase, the claim it can
+support, and what stays unsupported or unknown.
 
 | Property | Required inputs | Check phase | Supported claim | Unsupported or unknown case |
 |---|---|---|---|---|
@@ -79,17 +114,29 @@ prove that a device applied the command.
 | Exclusive owner | Logical output IDs, explicit endpoint bindings, owner/claim IDs | Compile-time logical authority check; separate binding validation; station authorization where applicable | One authoritative definition per output channel; duplicate direct writers fail compilation and cannot be deployed | No automatic resolver; existing declared station resource arbitration remains separate |
 | Installation-constraint compatibility | Pinned board/profile and installation revisions; independent gate evidence; constraint artifact or authority decision | Pre-activation compatibility gate; runtime only for constraints actually lowered/enforced | Matching identities and explicit compatible constraints can be reported | #62 has not selected artifact/overlay/enforcement authority; absent evidence is unknown |
 
-“Compatible” is deliberately scoped. It means the checked requirement is
+The diagram maps each property to the phase or phases that check it.
+
+![Each composition property mapped to its check phases: compile/static, pre-activation, and runtime authorization](../diagrams/gf-compose-r5-contracts/check-phases.svg)
+
+**“Compatible” is deliberately scoped.** It means the checked requirement is
 supported by the named input and phase. It does not mean the whole installation
 is safe. Constraint/source identity should use the existing source trace
 fields, including source and bytecode digests, rather than an invented identity.
-Instantaneous expression cycles are rejected; this is an existing invariant,
-not an open policy choice. State feedback crosses the prior-state/next-state
-boundary. All transitions use one input/old-state snapshot; next references are
-allowed only in output expressions, never other next transitions or lets.
-Logical commit is simultaneous. Composition must preserve these rules.
+
+**Existing execution invariants that composition must preserve:**
+
+- Instantaneous expression cycles are rejected. This is an existing invariant,
+  not an open policy choice.
+- State feedback crosses the prior-state/next-state boundary.
+- All transitions use one input/old-state snapshot.
+- Next references are allowed only in output expressions, never in other next
+  transitions or lets.
+- Logical commit is simultaneous.
 
 ### Exactly four diagnostic examples
+
+Each example has a proposed stable reason code, a farmer message, affected IDs,
+evidence, and a required outcome or corrective option.
 
 1. **Two exclusive pump owners.**
 
@@ -149,41 +196,58 @@ Logical commit is simultaneous. Composition must preserve these rules.
 
 ### Valve-switch counterexample and station boundary
 
-Counterexample (hand-worked, not execution evidence): behavior A owns a pump
-session and turns the pump OFF briefly while changing from `ValveA` to
-`ValveB`. Behavior B sees `pump=false` and requests the same physical pump. A
-local rule such as “pump is off, therefore B may start” would break the session
-ownership invariant. The existing station policy explicitly retains the
+This counterexample is hand-worked, not execution evidence. It shows why a
+local check is not a composition guarantee.
+
+1. Behavior A owns a pump session.
+2. While changing from `ValveA` to `ValveB`, A turns the pump OFF briefly.
+3. Behavior B sees `pump=false` and requests the same physical pump.
+
+A local rule such as “pump is off, therefore B may start” would break the
+session ownership invariant. The existing station policy explicitly retains the
 session across valve cleanup and says an inactive control cannot stop the
-owner. `prepare_start_batch` and `authorize_output` therefore support this
+owner.
+
+![Sequence of the valve-switch counterexample: the station retains A's session during the valve change, so B's request does not take the pump](../diagrams/gf-compose-r5-contracts/valve-switch.svg)
+
+The diagram shows the station behavior; at the examined revision,
+`prepare_start` rejects a new start with `AlreadyOwned` while a session is
+active. `prepare_start_batch` and `authorize_output` therefore support this
 bounded station claim, when the host supplies the station request and session
 state. They do not prove that arbitrary composed behaviors share resources
 correctly.
 
-Issue #95 may define additional shared-actuator arbitration and fallback. This
-does not reopen the single-authoritative-definition rule for an output
-channel. This document does not add an arbiter or a temporal/theorem-proving
-engine. R2/#62 must decide where installation
-constraints are authoritative and how their evidence is supplied. Until both
-decisions are reviewed, the profile reports compatibility only for supported
-inputs and phases.
+What remains for other owners:
+
+- Issue #95 may define additional shared-actuator arbitration and fallback.
+  This does not reopen the single-authoritative-definition rule for an output
+  channel.
+- This document does not add an arbiter or a temporal/theorem-proving engine.
+- R2/#62 must decide where installation constraints are authoritative and how
+  their evidence is supplied.
+
+Until both decisions are reviewed, the profile reports compatibility only for
+supported inputs and phases.
 
 ## Recommendation
 
-Adopt this as a review hypothesis: reject composition before activation when a
-supported type, dependency, bound, or exclusive-owner check fails; preserve
-the exact requirement and evidence references in the diagnostic. Use
-`unknown` for absent installation evidence. Reuse existing source-trace
-identity and station enforcement where their scope matches. Do not claim a
-global safe result, physical acceptance, priority, or arbitration from local
-checks.
+Adopt this as a review hypothesis:
+
+- Reject composition before activation when a supported type, dependency,
+  bound, or exclusive-owner check fails.
+- Preserve the exact requirement and evidence references in the diagnostic.
+- Use `unknown` for absent installation evidence.
+- Reuse existing source-trace identity and station enforcement where their
+  scope matches.
+- Do not claim a global safe result, physical acceptance, priority, or
+  arbitration from local checks.
 
 ## Unresolved questions and owners
 
 - **Language/compiler owner:** define the composed dependency representation
-  that preserves the existing cycle rule, and define the stable reason-code registry.
-  Preserve old/next and
-  single-writer rules; cross-module same-scan lowering remains unresolved.
+  that preserves the existing cycle rule, and define the stable reason-code
+  registry. Preserve old/next and single-writer rules; cross-module same-scan
+  lowering remains unresolved.
 - **Language/runtime ABI owner:** define the diagnostic envelope and how
   instance IDs, endpoint IDs, source nodes, constraint indexes, and evidence
   references join without changing the current ABI implicitly.

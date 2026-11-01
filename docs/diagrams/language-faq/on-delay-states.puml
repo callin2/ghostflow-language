@@ -1,0 +1,14 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontSize 13
+skinparam stateBorderColor #4A6FA5
+skinparam stateBackgroundColor #F7F9FC
+title OnDelay (question 5): enabled is true only in Active
+
+[*] --> Idle
+Idle --> Waiting : request && !stop
+Waiting --> Idle : stop || !request
+Waiting --> Active : age >= delay
+Active --> Idle : !request || stop
+note "Healthy stop or invalid delay: any phase -> Idle.\nUnknown request/stop: phase is kept.\nage = elapsed(phase) restarts on every phase change." as N
+@enduml

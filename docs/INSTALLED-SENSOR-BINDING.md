@@ -1,24 +1,79 @@
 # Installed sensor binding reference host
 
-`InstalledControlHost` admits a fixed compiled Program against a pinned installation declaration, then runs it through `ControlRuntime.instantiateFramed`. This covers [REF-06-009 sensor replacement](https://github.com/callin2/ghostflow-language/issues/297) and [REF-04-039 strategy profile replacement](https://github.com/callin2/ghostflow-language/issues/243). It performs no device discovery, Driver installation, polling, or physical verification.
+`InstalledControlHost` is a reference host that runs a compiled Program on a
+specific installation. It first *admits* a fixed compiled Program against a
+pinned installation declaration (it checks that they fit together), then runs it
+through the existing `ControlRuntime.instantiateFramed`.
+
+It is the host contract for
+[REF-06-009 sensor replacement](https://github.com/callin2/ghostflow-language/issues/297)
+and [REF-04-039 strategy profile replacement](https://github.com/callin2/ghostflow-language/issues/243).
+It performs no device discovery, Driver installation, polling, or physical
+verification.
+
+**In this document**
+
+- **Pinned profile contract**: what the board profile and installation declare, and what is checked.
+- **Running and replacement**: how to step the host and how to replace a sensor binding.
+- **Strategy activation**: how sensor capabilities select a Program strategy.
+- **Installed composed execution**: the profile for composed programs with instances and settings.
 
 ## Pinned profile contract
 
-Snapshots, accepted steps, and successful binding replacements include the same
-owned `assessment` from [metadata-only installation admission](../contracts/integration-v1/README.md).
-Its identity pins the admitted source, bytecode, manifest, release, profile, and mapping.
-`assessment.physical.status` remains `unknown` even when a Bool output matches
-the declared direction, type, polarity, and `safeLevel`. These declarations supply
-no independent electrical, fail-safe, load, or wiring observation. Unknown physical
-suitability leaves valid host execution available. Replacement recomputes the
-assessment before publication; rejected or tampered candidates retain the live
-assessment and trace. Returned assessments are detached from host state.
+**Assessment.** Snapshots, accepted steps, and successful binding replacements
+all include the same owned `assessment` from
+[metadata-only installation admission](../contracts/integration-v1/README.md).
 
-The existing `GhostFlow/board-profile-v1` shape remains unchanged. The new `GhostFlow/board-profile-v2` uses the same board identity and endpoint map. A v2 Bool output retains `direction`, `type`, `driver`, `address`, `activeLevel`, and `safeLevel`. A v2 Number or Bool input has `direction`, `type`, `driver`, `address`, and `sensor` instead of output polarity fields.
+- Its identity pins the admitted source, bytecode, manifest, release, profile,
+  and mapping.
+- `assessment.physical.status` remains `unknown`, even when a Bool output
+  matches the declared direction, type, polarity, and `safeLevel`. These
+  declarations supply no independent electrical, fail-safe, load, or wiring
+  observation.
+- Unknown physical suitability does not block valid host execution.
+- Replacement recomputes the assessment before publication. Rejected or
+  tampered candidates keep the live assessment and trace.
+- Returned assessments are detached from host state.
 
-`sensor` contains `format: "GhostFlow/sensor-observation-v1"`, `canonicalUnit`, and a positive safe integer `maxInterSampleGapMs`. A Number input also declares finite ordered `minValue` and `maxValue`. The observation contract means that the acquisition owner supplies actual samples with source epoch, sample ID, capture timestamp, payload, and one of `Good`, `NotReady`, `Disconnected`, `Stale`, or `Invalid`. A fault is a fault, including when its carried placeholder value is zero. The profile and installation are pinned by the existing release SHA-256 references. These are declared capabilities, not authenticated measurements of a physical sensor or Driver binary.
+**Board profiles.** The existing `GhostFlow/board-profile-v1` shape remains
+unchanged. The new `GhostFlow/board-profile-v2` uses the same board identity and
+endpoint map.
 
-For a bound sensor, `validateIntegration` checks direction, type, canonical unit, Number measurement range covering the Program's explicit `valid` range, the observation contract, and `maxInterSampleGapMs < staleMs`. Equality fails because a reading becomes stale at the limit. The source `sample` interval remains descriptive metadata; this check does not turn it into a polling command or a second hard deadline. A v2 sensor binding without explicit `stale_after`, or a Number sensor without an explicit `valid` range, is outside this bounded host profile and is rejected. Existing v1 validation keeps its previous shape and behavior.
+| v2 endpoint | Fields |
+| --- | --- |
+| Bool output | `direction`, `type`, `driver`, `address`, `activeLevel`, `safeLevel` |
+| Number or Bool input | `direction`, `type`, `driver`, `address`, `sensor` (instead of the output polarity fields) |
+
+**The `sensor` contract.** `sensor` contains:
+
+- `format: "GhostFlow/sensor-observation-v1"`;
+- `canonicalUnit`;
+- a positive safe integer `maxInterSampleGapMs`;
+- for a Number input only: finite, ordered `minValue` and `maxValue`.
+
+The observation contract means that the acquisition owner supplies actual
+samples. Each sample has a source epoch, a sample ID, a capture timestamp, a
+payload, and one quality out of `Good`, `NotReady`, `Disconnected`, `Stale`, or
+`Invalid`. A fault is a fault, even when its carried placeholder value is zero.
+
+The profile and the installation are pinned by the existing release SHA-256
+references. They are declared capabilities, not authenticated measurements of a
+physical sensor or a Driver binary.
+
+**Integration checks.** For a bound sensor, `validateIntegration` checks:
+
+- direction and type;
+- canonical unit;
+- that the Number measurement range covers the Program's explicit `valid` range;
+- the observation contract;
+- `maxInterSampleGapMs < staleMs`. Equality fails, because a reading becomes
+  stale exactly at the limit.
+
+The source `sample` interval remains descriptive metadata. This check does not
+turn it into a polling command or a second hard deadline. This bounded host
+profile rejects a v2 sensor binding without an explicit `stale_after`, and a
+Number sensor without an explicit `valid` range. Existing v1 validation keeps
+its previous shape and behavior.
 
 ## Running and replacement
 
@@ -36,76 +91,176 @@ const result = host.step({ bindingRevision: installation.revision, nowMs: 1000,
 });
 ```
 
-The caller attaches binding revision and endpoint ID at sample capture. The host rejects packets from an older revision or another endpoint before passing their sample to `ControlRuntime`. Those caller labels are not hardware authentication. A scan without a new sample passes an empty `samples` object, allowing the existing conditioner to decide freshness. Runtime output remains requested/safe control intent, not physical output proof.
+**Stepping.** Start the host with
+`InstalledControlHost.instantiate(wasmBytes, compiled, { runId, release, boardProfile, installation })`.
+Each `step` passes the current `bindingRevision`, `nowMs` and `samples`.
 
-`replaceBinding({ runId, release, boardProfile, installation })` validates a complete candidate against the **same source and bytecode**, prepares a fresh `ControlRuntime`, and publishes it between completed steps. An invalid candidate leaves the previous run, binding, conditioner state, and latest trace usable. A successful candidate needs an unused binding revision and run ID; it starts a fresh run with `NotReady` sensor state. The new acquisition source must issue its own source epoch and sample IDs. A new run boundary prevents old filter/freshness state from being reused; it does not promise uninterrupted state or output continuity. The host retains at most 128 run and binding revisions and rejects further replacements instead of forgetting IDs and allowing reuse. A previously used profile revision cannot acquire different content.
+- The caller attaches the binding revision and endpoint ID when it captures a
+  sample. Each sample therefore carries `bindingRevision`, `endpointId` and
+  `{ epoch, id, timestampMs, quality, value }`.
+- The host rejects packets from an older revision or from another endpoint
+  before it passes their sample to `ControlRuntime`. These caller labels are not
+  hardware authentication.
+- A scan without a new sample passes an empty `samples` object, so the existing
+  conditioner decides freshness.
+- Runtime output remains requested/safe control intent. It is not proof of
+  physical output.
 
-This operation changes sensor bindings only. It rejects changes to board ID or model, output wiring, installation ID, compiler/runtime/protocol metadata, or firmware digest. Migrating to another physical board requires a separate installation workflow. `step` returns the accepted outcome with its run, source, bytecode, profile, and binding identity attached; snapshots and results are detached from caller-owned objects.
+**Replacing a binding.** `replaceBinding({ runId, release, boardProfile, installation })`
+validates a complete candidate against the **same source and bytecode**,
+prepares a fresh `ControlRuntime`, and publishes it between completed steps.
+
+![replaceBinding validates a candidate; success starts a fresh run, rejection keeps the previous run](diagrams/installed-sensor-binding/replace-binding.svg)
+
+- An invalid candidate leaves the previous run, binding, conditioner state, and
+  latest trace usable.
+- A successful candidate needs an unused binding revision and run ID. It starts
+  a fresh run with `NotReady` sensor state.
+- The new acquisition source must issue its own source epoch and sample IDs.
+- The new run boundary prevents old filter/freshness state from being reused.
+  It does not promise uninterrupted state or output continuity.
+- The host retains at most 128 run and binding revisions. After that it rejects
+  further replacements instead of forgetting IDs and allowing reuse.
+- A previously used profile revision cannot acquire different content.
+
+This operation changes sensor bindings only. It rejects changes to the board ID
+or model, output wiring, installation ID, compiler/runtime/protocol metadata,
+or firmware digest. Migrating to another physical board requires a separate
+installation workflow. `step` returns the accepted outcome with its run, source,
+bytecode, profile, and binding identity attached. Snapshots and results are
+detached from caller-owned objects.
 
 ## Strategy activation
 
-The bounded Program profile also accepts compiler-generated `adaptPolicy` and `strategies` metadata. The host recompiles the canonical source and compares the complete manifest and bytecode before admission, including strategy matches, priorities and policy identity. Caller-edited metadata fails that comparison.
+The bounded Program profile also accepts compiler-generated `adaptPolicy` and
+`strategies` metadata. Before admission, the host recompiles the canonical
+source and compares the complete manifest and bytecode, including strategy
+matches, priorities and policy identity. Metadata edited by the caller fails
+this comparison.
 
-After integration validation confirms every required sensor binding and endpoint type, the host supplies an explicit capability for each bound sensor to `ControlRuntime`. The existing Rust runtime selects the strategy during activation. Capability presence comes from the validated installation, independently of sample quality. `NotReady`, `Stale` and other sensor faults remain Result observations under the selected strategy. They never remove a capability or select `match always` automatically.
+**How a strategy is selected.**
 
-A replacement validates the complete candidate and activates its strategy before publication. For example, if `WithReading` matches a required Number sensor and the current reading is Stale, a candidate binding that sensor to a Bool endpoint fails with `type_mismatch`. The old profile, run, binding, state and latest trace remain available. Subsequent steps still execute `WithReading` and its explicit fault branch. A compatible candidate publishes a fresh run whose sensor starts `NotReady` and whose Program state starts from its source initializer.
+1. Integration validation confirms every required sensor binding and endpoint type.
+2. The host then supplies an explicit capability for each bound sensor to
+   `ControlRuntime`.
+3. The existing Rust runtime selects the strategy during activation.
 
-The standalone Program profile has source-verified `control-v1` or `control-v4` bytes, at least one nonoptional Number/Bool sensor, Bool outputs, and no schedules, timers, signals, configs, imports, or scalar inputs. Optional sensor bindings and arbitrary caller-supplied capabilities remain outside this host profile. Validated Bool outputs remain available as actuator capabilities for strategy matching. Other profiles fail before publication. Device binding application, actual Driver guarantees, and physical load behavior remain separate evidence.
+Capability presence comes from the validated installation, independently of
+sample quality. `NotReady`, `Stale` and other sensor faults remain Result
+observations under the selected strategy. They never remove a capability or
+select `match always` automatically.
+
+**Replacement and strategies.** A replacement validates the complete candidate
+and activates its strategy before publication. For example, suppose
+`WithReading` matches a required Number sensor and the current reading is
+Stale. A candidate that binds that sensor to a Bool endpoint fails with
+`type_mismatch`.
+
+- The old profile, run, binding, state and latest trace remain available.
+- Subsequent steps still execute `WithReading` and its explicit fault branch.
+- A compatible candidate publishes a fresh run. Its sensor starts `NotReady`,
+  and its Program state starts from the source initializer.
+
+**Standalone Program profile.** The standalone profile requires:
+
+- source-verified `control-v1` or `control-v4` bytes;
+- at least one nonoptional Number/Bool sensor;
+- Bool outputs;
+- no schedules, timers, signals, configs, imports, or scalar inputs.
+
+Optional sensor bindings and arbitrary caller-supplied capabilities remain
+outside this host profile. Validated Bool outputs remain available as actuator
+capabilities for strategy matching. Other profiles fail before publication.
+Device binding application, actual Driver guarantees, and physical load
+behavior require separate evidence.
 
 ## Installed composed execution
 
-The composed profile accepts `control-v10` with a canonical pinned source closure,
-an Interaction Schema, private instance states, configs and timers, required
-Number/Bool sensors and Bool outputs. Pass `context`, actor `grants` and optionally
-`historyCapacity` at activation. The host privately owns one framed
-`TemporarySettingsHost`, which owns the only controller. Settings, observations
-and explanations come from that same actual scan.
+**What the composed profile accepts.** The composed profile accepts
+`control-v10` with:
 
-The root contains only port declarations, instances and direct root input to
-instance input or instance output to root output connections. Nested instances,
-instance-to-instance routes, root computations, schedules and signals are
-rejected. Routes come from the compiler-replayed canonical AST, `sourceClosure`
-and `sourceMap`, and agree with the typed `sensorInstances` input mapping.
-Every root and instance sensor is checked against its actual admitted endpoint,
-including unit, measurement range and sample-gap/stale limit. Generated runtime
-names do not define routes.
+- a canonical pinned source closure;
+- an Interaction Schema;
+- private instance states, configs and timers;
+- required Number/Bool sensors;
+- Bool outputs.
 
-Call `step(frame, settingsEvent)` with acquired packets and an extra `contextFacts`
-field. The existing temporary-settings event contract uses current identity from
-`snapshot().execution`. Endpoint, binding revision and acquisition shape checks
-precede entry to the settings owner. Valid `Invalid` or `Disconnected` observations
-reach the conditioner as faults; epoch, sample ID and timestamp keep the shared
-runtime's sample identity rules.
+Pass `context`, actor `grants` and, optionally, `historyCapacity` at
+activation. The host privately owns one framed `TemporarySettingsHost`, which
+owns the only controller. Settings, observations and explanations all come from
+that same actual scan.
 
-An accepted result includes the actual settings-owner `execution` and
-`provenance` binding its run, scan, logical time, committed settings revision,
-admission digests and instance routes. `explainOutput('output.east_on', result)`
-accepts only the owner's current completed result. It joins the actual proof and
-observation and returns the descriptor, instance's effective settings, input
-routes and output endpoint. Old results, swapped routes, settings or revisions
-reject. A `ready` join validates the association; `proof.status` separately says
-whether the expression explanation is available. State-based Bool proofs are
-available; config/timer generated-rail expressions remain unavailable. These
-receipts do not authenticate a physical Driver or prove state transitions,
-safety outputs, applied outputs or physical effects.
+**Allowed root structure.** The root may contain only port declarations,
+instances, and direct connections of two kinds: root input to instance input,
+or instance output to root output.
 
-`snapshot().latest` retains the last accepted completion as history. Separately,
-`currentFrameCompletion` identifies the actual runtime's current completed scan.
-Dispatch clears that identity before execution and publishes a new identity only
-after completion. A failed dispatch, including a settings-return failure reported
-as `accepted: false`, therefore makes current output explanations unavailable.
-Acquisition, settings and context preflight rejections that never dispatch retain
-the current identity. Historical proofs are unchanged and cannot be presented as
-current through `explainOutput` after a dispatch failure.
+- Nested instances, instance-to-instance routes, root computations, schedules
+  and signals are rejected.
+- Routes come from the compiler-replayed canonical AST, `sourceClosure` and
+  `sourceMap`. They must agree with the typed `sensorInstances` input mapping.
+- Every root and instance sensor is checked against its actual admitted
+  endpoint, including unit, measurement range and the sample-gap/stale limit.
+- Generated runtime names do not define routes.
 
-Replacement prepares the complete new owner before publication. Rejected
-candidates preserve settings, overlays, history, state, timers, conditioners,
-latest completion and assessment. Success starts fresh state, settings and
-conditioners in a new run and clears previous completions. This bounded path
-completes the specified REF-06-002 east-state/settings isolation case together with
-the native/WASM config/timer checks. Nested routes and independent hot binding
-migration are outside this profile. REF-06-016 checks each instance's output explanation
-against its exact source node, span, revision, settings and installed endpoint route.
-The broader section 6.7 requested-to-safe constraint chain remains incomplete.
+**Stepping.** Call `step(frame, settingsEvent)` with acquired packets and an
+extra `contextFacts` field.
+
+- The existing temporary-settings event contract uses the current identity from
+  `snapshot().execution`.
+- Endpoint, binding revision and acquisition shape checks happen before the
+  settings owner is entered.
+- Valid `Invalid` or `Disconnected` observations reach the conditioner as
+  faults. Epoch, sample ID and timestamp follow the shared runtime's sample
+  identity rules.
+
+**Results and output explanations.** An accepted result includes the actual
+settings-owner `execution`, and a `provenance` that binds its run, scan,
+logical time, committed settings revision, admission digests and instance
+routes.
+
+`explainOutput('output.east_on', result)` accepts only the owner's current
+completed result. It joins the actual proof and observation, and returns the
+descriptor, the instance's effective settings, the input routes and the output
+endpoint.
+
+- Old results, and swapped routes, settings or revisions, are rejected.
+- A `ready` join means the association is valid. `proof.status` says separately
+  whether the expression explanation is available.
+- State-based Bool proofs are available. Config/timer generated-rail
+  expressions remain unavailable.
+- These receipts do not authenticate a physical Driver. They do not prove state
+  transitions, safety outputs, applied outputs or physical effects.
+
+**Current versus historical completion.** `snapshot().latest` keeps the last
+accepted completion as history. Separately, `currentFrameCompletion` identifies
+the actual runtime's current completed scan.
+
+- Dispatch clears that identity before execution and publishes a new identity
+  only after completion.
+- A failed dispatch therefore makes current output explanations unavailable.
+  This includes a settings-return failure reported as `accepted: false`.
+- Acquisition, settings and context preflight rejections never dispatch, so
+  they keep the current identity.
+- Historical proofs are unchanged. After a dispatch failure they cannot be
+  presented as current through `explainOutput`.
+
+**Replacement.** Replacement prepares the complete new owner before
+publication.
+
+- Rejected candidates preserve settings, overlays, history, state, timers,
+  conditioners, latest completion and assessment.
+- Success starts fresh state, settings and conditioners in a new run and clears
+  previous completions.
+
+**Coverage and limits.**
+
+- Together with the native/WASM config/timer checks, this bounded path
+  completes the specified REF-06-002 east-state/settings isolation case.
+- Nested routes and independent hot binding migration are outside this profile.
+- REF-06-016 checks each instance's output explanation against its exact source
+  node, span, revision, settings and installed endpoint route.
+- The broader section 6.7 requested-to-safe constraint chain remains incomplete.
+
 `tests/installed-composition.test.mjs` exercises actual WASM execution,
-same-time east/west isolation, joined provenance, tampering, faults and replacement.
+same-time east/west isolation, joined provenance, tampering, faults and
+replacement.

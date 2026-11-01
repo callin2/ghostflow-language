@@ -3,12 +3,17 @@
 
 # Allowing sunrise schedules through shared settings observations
 
-Sunrise is an event calculated for the declared location and timezone. Its
-permission setting is a separate typed Result observation. This virtual example
-reads the same observation in ordinary outputs and the sunrise predicate. A
-settings fault prevents new admission. Recovery establishes a baseline rather
-than starting an event that has already passed. Outputs are requested intent;
-they do not establish physical operation or an installation.
+Sunrise is an event calculated for the declared location and timezone. The
+setting that permits it to run (`enabled`) is something else: a separate typed
+`Result` observation. This virtual example reads that same observation in two
+places, the ordinary outputs and the sunrise schedule's `when` condition.
+
+- If the setting has a fault, no new sunrise event is admitted.
+- When the setting recovers, that moment becomes a baseline. An event that has
+  already passed is not started.
+
+The outputs are requested intent. They do not establish physical operation or
+an installation.
 
 ```ghost
 control SolarLiveConfig {
@@ -33,6 +38,6 @@ control SolarLiveConfig {
 ```
 
 Location, timezone and event definition are fixed in the program. The host
-supplies clock/solar facts and authenticated settings observations; Rust commits
-the settings Results and admission together. An occurrence is consumed once,
-and rejected evaluation rolls both back.
+supplies clock and solar facts plus authenticated settings observations. Rust
+commits the settings `Result`s and the event admission together. Each
+occurrence is consumed only once, and a rejected evaluation rolls both back.

@@ -1,0 +1,28 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontSize 13
+start
+:poll({nowMs, wallMs, trusted});
+if (trusted?) then (no)
+  :due = false\nUntrustedClock;
+  stop
+endif
+if (first trusted sample\n(boot or recovery)?) then (yes)
+  :due = false\nBootBaseline / ClockRecoveryBaseline\n(no catch-up);
+  stop
+endif
+if (wallMs <= high-water mark?) then (yes)
+  :due = false\nAlreadyObserved\n(rollback / duplicate);
+  stop
+endif
+if (wall or monotonic gap > 60 s?) then (yes)
+  :due = false\nClockGapSkipped;
+  stop
+endif
+if (event + offset in\n(previousWall, currentWall]?) then (yes)
+  :due = true\nwith occurrence identity;
+else (no)
+  :due = false\n(event unavailable or not crossed);
+endif
+stop
+@enduml

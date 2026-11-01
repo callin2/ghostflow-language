@@ -1,0 +1,19 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName Helvetica
+skinparam defaultFontSize 13
+skinparam componentStyle rectangle
+package "Live timeline (origin)" {
+  component "Live framed core" as L
+  component "Live sink" as S
+  component "AccountingRuntime" as A
+  database "FileLedger" as F
+}
+package "Ghost branch" {
+  component "Separate framed core" as B
+}
+L --> S : safe Bool intent
+A --> F : persist / acknowledge
+L ..> B : immutable accepted prefix\n(reexecuted and verified)
+note bottom of B : No live sink, storage,\naccounting or live runtime handle
+@enduml

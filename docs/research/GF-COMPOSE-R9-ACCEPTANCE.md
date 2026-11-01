@@ -7,48 +7,72 @@ or participant study is claimed.
 Research completion does not authorize implementation. The recommendations and
 milestone handoffs require architecture-owner review before dependent work begins.
 
+This note turns the R1–R8 findings into proposed acceptance criteria and three
+proposed implementation handoffs. It contains: an acceptance matrix of
+scenarios, three milestone handoffs (M1–M3), a recommendation, and the owner
+decisions that gate each dependent slice. Everything here is a specification
+to be reviewed, not a measured or executed result.
+
 ## User problem
 
-The first composition slice must reduce the decisions needed to apply a prepared
-behavior, explain a blocked or failed result, and connect that explanation to
-engineer evidence. The farmer journey is apply, add, and investigate. The
-engineer journey is the same incident viewed through exact source, instance,
-binding, run, and available device evidence. These are acceptance specifications,
-not measured outcomes.
+The first composition slice must reduce the decisions a farmer needs to:
+
+- apply a prepared behavior;
+- understand a blocked or failed result;
+- connect that explanation to engineer evidence.
+
+There are two journeys:
+
+- **Farmer journey:** apply, add, and investigate.
+- **Engineer journey:** the same incident, viewed through exact source,
+  instance, binding, run, and available device evidence.
+
+These are acceptance specifications, not measured outcomes.
 
 ## Evidence at examined revision
 
 The examined language revision is `ffdbc96461eca67908252507fb851fa4dabd9a2c`.
-R1–R8 were read as the dependency set. Current evidence includes one canonical
-`.ghost.md` compiler input, explicit host test registration in
-[`tools/verify-language.mjs`](../../tools/verify-language.mjs), the native/WASM
-scan-tape contract in [`SCAN-TAPE-PARITY.md`](../SCAN-TAPE-PARITY.md), and
-independent host, hardware, and physical evidence rules in
-[`integration-v1`](../../contracts/integration-v1/README.md). Existing checks
-are host/conformance evidence only. No test or user-study result below is
-presented as executed.
+R1–R8 were read as the dependency set.
 
-R1 supplies the effort and explanation measures. R2 separates canonical source,
-definition revision, instance, logical port, physical binding, settings, and
-run/scan identities. R3 prefers static composition for review but leaves the
-lowering/ABI decision open and requires ordering-independent snapshots while
-preserving established old/next-state semantics. The semantic rule is fixed;
-the mechanism by which a composition lowering preserves it remains open. R4 keeps
-existing bindings and distinguishes physical DI from explicit software inputs.
-R5 bounds the first profile to type, dependency, parameter, and exclusive-owner
-checks. R6 separates import parameters, operator settings, dependency changes,
-and binding changes. R7 recommends a pinned source closure, while its package
-verification choice remains open. R8 requires one incident context and keeps
-requested, safe, application, and physical stages separate.
+Current evidence includes:
+
+- one canonical `.ghost.md` compiler input;
+- explicit host test registration in
+  [`tools/verify-language.mjs`](../../tools/verify-language.mjs);
+- the native/WASM scan-tape contract in
+  [`SCAN-TAPE-PARITY.md`](../SCAN-TAPE-PARITY.md);
+- independent host, hardware, and physical evidence rules in
+  [`integration-v1`](../../contracts/integration-v1/README.md).
+
+Existing checks are host/conformance evidence only. No test or user-study
+result below is presented as executed.
+
+What each earlier research note contributes:
+
+| Note | Contribution used here |
+|---|---|
+| R1 | Supplies the effort and explanation measures. |
+| R2 | Separates canonical source, definition revision, instance, logical port, physical binding, settings, and run/scan identities. |
+| R3 | Prefers static composition for review but leaves the lowering/ABI decision open. Requires ordering-independent snapshots while preserving established old/next-state semantics. The semantic rule is fixed; the mechanism by which a composition lowering preserves it remains open. |
+| R4 | Keeps existing bindings and distinguishes physical DI from explicit software inputs. |
+| R5 | Bounds the first profile to type, dependency, parameter, and exclusive-owner checks. |
+| R6 | Separates import parameters, operator settings, dependency changes, and binding changes. |
+| R7 | Recommends a pinned source closure, while its package verification choice remains open. |
+| R8 | Requires one incident context and keeps requested, safe, application, and physical stages separate. |
 
 ## Tables and examples
 
 ### Acceptance matrix
 
-Expected results and measures are proposed specifications, not executed results
-or approved implementation scope. Prerequisites identify research inputs; the
-decision gates below apply to dependent implementation slices. “Hand-worked”
-means reasoning from the reviewed contracts, not execution evidence.
+How to read the matrix:
+
+- Expected results and measures are **proposed specifications**, not executed
+  results or approved implementation scope.
+- The **Prerequisite** column identifies research inputs. The decision gates in the
+  “Unresolved questions and owners” section apply to
+  dependent implementation slices.
+- “Hand-worked” means reasoning from the reviewed contracts, not execution
+  evidence.
 
 | Scenario | Input assumptions | Expected result/rejection | Evidence chain | Effort / explainability / traceability measure | Verification layer | Responsible owner | Prerequisite |
 |---|---|---|---|---|---|---|---|
@@ -75,50 +99,79 @@ The DI 2 / RO 7 case is one capacity result under the wired-input assumption.
 It does not prove physical commissioning or that a farmer can apply the behavior.
 The low-water negative case belongs in the same first milestone.
 
+The live-property and restart rows define how identities behave over time. The
+diagram below summarizes them: a valid live property event advances only the
+settings revision within the same run, an invalid one changes nothing, and a
+real restart starts a new run with the accepted settings persisted.
+
+![State diagram: within one run, a valid live property event advances the settings revision while source/program hashes and runId stay unchanged; an invalid multi-property event is rejected whole; a real restart starts a new runId with accepted settings persisted and an authored GhostFlow response](../diagrams/gf-compose-r9-acceptance/live-property-identity.svg)
+
 ### Three proposed milestone handoffs
 
 The following order and minimum scope are proposals subject to architecture-owner
 review. Each dependent slice requires the relevant decisions listed below.
 
-1. **Apply a prepared behavior.** Minimum language change: expose the bounded
-   contract descriptors needed for typed requirements, explicit input kind,
-   exclusive ownership, stable logical-port identity, and a traceable accepted
-   or rejected result. Consumer handoff: API presents a proposal and confirmed
-   installation/binding revision; Device supplies profile/applied evidence;
-   frontend presents the farmer blocker and the low-water negative explanation.
-   Physical acceptance remains separate.
+![Architecture-owner review precedes M1 (apply), M2 (add), and M3 (investigate); owner decision gates apply only to the slices that use them](../diagrams/gf-compose-r9-acceptance/milestone-handoffs.svg)
 
-2. **Add another behavior while preserving existing behavior/bindings.** Minimum
-   language change: instance-qualified composition with isolated state/timers,
-   deterministic input snapshots, stable identity ordering, and the first-profile
-   rejection of shared exclusive outputs. Consumer handoff: API records instance
-   and binding joins; Device confirms unchanged and new mappings; host replay
-   checks the wired/software resource cases. The proposed composition slice
-   rejects competing direct writers. It does not implement a runtime-settings
-   overlay as part of M2; this scope limit does not reject the separately
-   approved live-property event behavior or require those events to stop the
-   controller or start a new run. If a slice uses live property events, retain
-   the unchanged source/program hashes and run identity, settings/effective-
-   position joins, active-operation consequence, atomic rejection, and restart
-   persistence behavior specified in the acceptance matrix.
+1. **M1 — Apply a prepared behavior.**
+   - *Minimum language change:* expose the bounded contract descriptors needed
+     for typed requirements, explicit input kind, exclusive ownership, stable
+     logical-port identity, and a traceable accepted or rejected result.
+   - *Consumer handoff:* API presents a proposal and confirmed
+     installation/binding revision; Device supplies profile/applied evidence;
+     frontend presents the farmer blocker and the low-water negative
+     explanation.
+   - Physical acceptance remains separate.
 
-3. **Investigate an unexpected result from farmer explanation to engineer
-   evidence.** Minimum language change: join instance-qualified source/constraint
-   trace to the existing run/scan context while retaining requested versus safe
-   output. Consumer handoff: #88/#74 define wording/application-result events;
-   API joins settings and binding revisions; Device #28 defines boot/history and
-   gap evidence. A missing physical observation stays unknown.
+2. **M2 — Add another behavior while preserving existing behavior/bindings.**
+   - *Minimum language change:* instance-qualified composition with isolated
+     state/timers, deterministic input snapshots, stable identity ordering, and
+     the first-profile rejection of shared exclusive outputs.
+   - *Consumer handoff:* API records instance and binding joins; Device confirms
+     unchanged and new mappings; host replay checks the wired/software resource
+     cases.
+   - *Scope limits:* the proposed composition slice rejects competing direct
+     writers. It does not implement a runtime-settings overlay as part of M2.
+     This scope limit does not reject the separately approved live-property
+     event behavior, and it does not require those events to stop the
+     controller or start a new run.
+   - *If a slice uses live property events,* retain everything specified in the
+     acceptance matrix: unchanged source/program hashes and run identity,
+     settings/effective-position joins, active-operation consequence, atomic
+     rejection, and restart persistence behavior.
+
+3. **M3 — Investigate an unexpected result from farmer explanation to engineer
+   evidence.**
+   - *Minimum language change:* join instance-qualified source/constraint trace
+     to the existing run/scan context while retaining requested versus safe
+     output.
+   - *Consumer handoff:* #88/#74 define wording/application-result events; API
+     joins settings and binding revisions; Device #28 defines boot/history and
+     gap evidence.
+   - A missing physical observation stays unknown.
 
 ## Recommendation
 
-Propose the three handoffs above for architecture-owner review. The preferred
-research direction is static composition with a pinned source bundle, explicit
-instance IDs, stable authored ports, preserved bindings, and exclusive-owner
-rejection. The execution and package alternatives remain undecided until their
-owners resolve the gates below. Proposed results carry R8's identity chain.
-Host, API, Device, physical, and usability acceptance remain separate. Capacity,
-matching replay, and a valid integration record establish only their stated scope.
-Accepting this research document approves neither an architecture nor implementation.
+**Propose the three handoffs above for architecture-owner review.**
+
+The preferred research direction is static composition with:
+
+- a pinned source bundle;
+- explicit instance IDs;
+- stable authored ports;
+- preserved bindings;
+- exclusive-owner rejection.
+
+The execution and package alternatives remain undecided until their owners
+resolve the gates below. Proposed results carry R8's identity chain.
+
+Scope limits:
+
+- Host, API, Device, physical, and usability acceptance remain separate.
+- Capacity, matching replay, and a valid integration record establish only
+  their stated scope.
+- Accepting this research document approves neither an architecture nor
+  implementation.
 
 ## Unresolved questions and owners
 
@@ -135,15 +188,20 @@ handoffs above. The cited R1–R8 findings are the evidence for these open decis
 | Binding evidence (R4, R8) | API/Device/profile owners define proposal/confirmation records, stable endpoint ordering, and observed applied-binding identity; physical owner defines commissioning evidence | M1 installation application; M2 allocation/preservation; M3 equipment-target claims. Host capacity checks remain separately scoped |
 | Incident evidence contract (R1, R3, R8) | Language/runtime and #74/#88 owners define instance-qualified trace joins, farmer explanation, application-result fields, and absence semantics; Device #28 owner defines boot/event-to-run/binding joins, available feedback, and gap representation | M1 low-water/blocker projection; M3 corresponding logical, application, or restart/history slice. Device journal fields are needed only for the device-history slice |
 
-#95 is a dependency only if arbitration beyond the existing station manager is
-selected. The first profile rejects competing direct writers while preserving
-explicit station-request arbitration through the existing single-writer manager.
-#89/#90 own live-property mechanism/ABI/verification and reconciliation of older
-stopped-Configure text; the user decision for live properties is settled. #89
-gates only slices that use live settings, not unrelated R1–R8 implementation
-work. Import-time specialization remains distinct. Memory and
-retention stay with their existing API/system and Device owners; this handoff adds
-no storage or retention work. Missing evidence remains explicit.
+Related issue scope:
+
+- **#95** is a dependency only if arbitration beyond the existing station
+  manager is selected. The first profile rejects competing direct writers while
+  preserving explicit station-request arbitration through the existing
+  single-writer manager.
+- **#89/#90** own live-property mechanism/ABI/verification and reconciliation
+  of older stopped-Configure text. The user decision for live properties is
+  settled. #89 gates only slices that use live settings, not unrelated R1–R8
+  implementation work.
+- Import-time specialization remains distinct.
+- Memory and retention stay with their existing API/system and Device owners;
+  this handoff adds no storage or retention work.
+- Missing evidence remains explicit.
 
 ## Verification
 

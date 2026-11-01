@@ -1,0 +1,15 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontSize 12
+skinparam rectangleBorderColor #4A6FA5
+skinparam rectangleBackgroundColor #F7F9FC
+left to right direction
+title GF-COMPOSE research waves (parent #99)
+rectangle "Wave 1\n#100 user outcomes\n#101 authority/identity" as W1
+rectangle "Wave 2\n#102 execution\n#103 bindings\n#105 overrides" as W2
+rectangle "Wave 3\n#104 contracts\n#106 packages\n#107 incident evidence" as W3
+rectangle "Wave 4\n#108 acceptance/handoff" as W4
+W1 --> W2 : #101 research handoff
+W2 --> W3 : explicit dependencies available
+W3 --> W4 : #100–#107 outputs reviewed
+@enduml

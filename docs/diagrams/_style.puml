@@ -1,0 +1,15 @@
+' Shared style for every documentation diagram. Include it from
+' docs/diagrams/<doc-slug>/<name>.puml with: !include ../_style.puml
+' SansSerif is a Java logical font with CJK fallback, so Korean, Chinese and
+' Japanese labels are measured correctly; browsers fall back to a CJK-capable
+' sans-serif font when they display the SVG.
+skinparam defaultFontName SansSerif
+skinparam defaultFontSize 14
+skinparam backgroundColor #FFFFFF
+skinparam shadowing false
+skinparam roundCorner 8
+skinparam ArrowColor #444444
+skinparam RectangleBorderColor #444444
+skinparam RectangleBackgroundColor #F5F7FA
+skinparam NoteBackgroundColor #FFF8DC
+skinparam NoteBorderColor #B8A26A

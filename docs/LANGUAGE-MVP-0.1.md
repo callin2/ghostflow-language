@@ -1,11 +1,15 @@
 # GhostFlow language contract, MVP 0.1
 
+This document is the contract for the first minimal version (MVP 0.1) of the GhostFlow language. It lists the design rules every program and runtime must respect, the program elements, and how device selection, ticks, replay, hot replacement and errors work.
+
 ## Design invariants
 
-1. Hardware is addressed by semantic capability, not board, pin, or product.
-2. A tick is deterministic and atomic.
+These rules always hold:
+
+1. Hardware is addressed by semantic capability (what it can do), not by board, pin, or product.
+2. A tick — one evaluation step of the program — is deterministic and atomic.
 3. Feedback crosses an explicit state boundary.
-4. Every effect is an intent interpreted by a host renderer and safety kernel.
+4. Every effect is an intent. A host renderer and the safety kernel interpret it.
 5. Every active strategy is uniquely selected from a device profile.
 6. Every accepted module has statically bounded state and expression cost.
 7. Replay never invokes a physical effect sink.
@@ -16,65 +20,80 @@
 - `version`: unsigned schema version.
 - `input`: a named boolean or number stream sample.
 - `state`: a named boolean or number retained between ticks.
-- `strategy`: device query plus state transitions and intents.
-- `next`: simultaneous state transition expression.
-- `intent`: desired actuator output after transitions are computed.
+- `strategy`: a device query plus state transitions and intents.
+- `next`: a state transition expression; all of them are evaluated simultaneously.
+- `intent`: the desired actuator output, after transitions are computed.
 - `requires`, `mutex`: native safety constraints.
 
-Names are ASCII identifiers containing letters, digits, `_`, `-`, and `.`.
-Duplicate names are errors. References are checked by the compiler and again by
-the bytecode verifier.
+Naming rules:
+
+- Names are ASCII identifiers containing letters, digits, `_`, `-`, and `.`.
+- Duplicate names are errors.
+- References are checked twice: by the compiler, and again by the bytecode verifier.
 
 ## Device-query semantics
 
-A device profile is a set of `(kind, name, type)` capabilities. A strategy
-matches when its query evaluates true. The matching strategy with the greatest
-integer priority is selected. No match is an activation error. Multiple matches
-at the winning priority are an ambiguity error.
+A device profile is a set of `(kind, name, type)` capabilities. A strategy matches when its query evaluates true.
 
-Selection is stable during a tick. Adding, removing, failing, or recovering a
-device creates a candidate profile that must be activated at a safe boundary.
-The host may shadow-run the candidate before committing it.
+Selection rules:
 
-This deliberately borrows progressive enhancement from CSS media queries but
-does not borrow CSS cascade or source-order precedence.
+| Situation | Result |
+|---|---|
+| One or more strategies match | The matching strategy with the greatest integer priority is selected. |
+| No strategy matches | Activation error. |
+| Several strategies match at the winning priority | Ambiguity error. |
+
+Selection is stable during a tick. Adding, removing, failing, or recovering a device creates a *candidate profile*. The candidate must be activated at a safe boundary. The host may shadow-run the candidate before committing it.
+
+This deliberately borrows *progressive enhancement* from CSS media queries. It does not borrow the CSS cascade or source-order precedence.
 
 ## Tick semantics
 
-1. Missing inputs are rejected; hosts must submit an explicit fault/status
-   input if absence is meaningful.
-2. All `next` expressions read the same old state and input snapshot.
-3. All next-state expressions produce one candidate state; none commits early.
-4. In intent expressions, unprimed state reads the old snapshot; explicit next-state references read candidate state.
-5. Safety constraints transform intents into safe outputs.
-6. When evaluation finishes without error, even if constraints block an output,
-   candidate state and requested/safe intents commit together; the journal records input, old/new state, both intents, strategy, and faults.
+Every tick follows these steps:
 
-`next.NAME` (modern `NAME'`) is valid only in intent expressions. This prevents
-transition order from leaking into semantics. See [Reference §2.8](reference/02-types-expressions-state.md#28-tick과-상태-snapshot).
+1. Missing inputs are rejected. If absence is meaningful, the host must submit an explicit fault/status input.
+2. All `next` expressions read the same old state and the same input snapshot.
+3. Together, all next-state expressions produce one candidate state. None of them commits early.
+4. In intent expressions, unprimed state reads the old snapshot, and explicit next-state references read candidate state.
+5. Safety constraints transform the requested intents into safe outputs.
+6. If evaluation finishes without error, the candidate state and the requested/safe intents commit together — even if constraints block an output. The journal records the input, old and new state, both intents, the strategy, and faults.
+
+The flowchart below shows the same steps in order.
+
+![Tick steps: reject missing input, compute candidate state, evaluate intents, apply safety, commit and journal](diagrams/language-mvp-0-1/tick-steps.svg)
+
+`next.NAME` (written `NAME'` in modern syntax) is valid only in intent expressions. This keeps the order in which transitions are written from leaking into their meaning. See [Reference §2.8](reference/02-types-expressions-state.en.md#28-tick-and-state-snapshot).
 
 ## Time travel and ghost execution
 
-The journal stores initial state and bounded tick records. Rewind restores a
-prior recorded state without executing intents. Replay creates an isolated VM,
-feeds recorded input snapshots, and captures a shadow trace. A replacement
-module or device profile can be used for branch comparison.
+The journal stores the initial state and a bounded set of tick records. With it you can:
 
-Wall-clock time is ordinary input data. The runtime uses monotonically
-increasing logical tick numbers for ordering, so clock correction cannot rewrite
-causal order.
+- **Rewind** — restore an earlier recorded state, without executing any intents.
+- **Replay** — create an isolated VM, feed it the recorded input snapshots, and capture a shadow trace.
+- **Compare branches** — replay with a replacement module or device profile.
+
+Wall-clock time is ordinary input data. The runtime orders ticks by monotonically increasing logical tick numbers, so a clock correction cannot rewrite causal order.
 
 ## Hot replacement
 
-`Runtime::hot_swap` is transactional: parse and verify the candidate, select a
-unique strategy for the current capability profile, migrate compatible state,
-then commit. Same-name/same-type state values migrate automatically. New states
-receive declared defaults. Removed states disappear. A type change requires an
-explicit future migration module and is rejected by the MVP.
+`Runtime::hot_swap` replaces a running module transactionally:
+
+1. Parse and verify the candidate module.
+2. Select a unique strategy for the current capability profile.
+3. Migrate compatible state.
+4. Commit.
+
+State migration rules:
+
+| Change | Result |
+|---|---|
+| Same name and same type | Value migrates automatically. |
+| New state | Receives its declared default. |
+| Removed state | Disappears. |
+| Type changed | Rejected by the MVP. A future explicit migration module will be required. |
 
 ## Error model
 
-The VM does not throw language exceptions. Public operations return a status
-and diagnostic. Hardware failure, stale data, timeout, and disconnected sensors
-must be represented by typed inputs in future revisions; the MVP represents
-them through explicit boolean status inputs.
+The VM does not throw language exceptions. Public operations return a status and a diagnostic.
+
+Hardware failure, stale data, timeouts and disconnected sensors must be represented by typed inputs in future revisions. The MVP represents them with explicit boolean status inputs.

@@ -1,0 +1,22 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName Helvetica
+start
+:Host sends fact packet\n(clock, observations, calendars,\nrows, settings event);
+:Rust validates packet and bindings;
+if (packet valid?) then (no)
+  :Reject packet;
+  :Nothing consumed\n(settings events, occurrence IDs);
+  stop
+endif
+:Clone context engines;
+:Stage provider validation, settings,\nprotected Results, schedule\npredicates and transitions;
+:Run VM tick on staged values;
+if (VM tick succeeded?) then (yes)
+  :Commit staged context and trace;
+else (no)
+  :Discard staged copy;
+  :Nothing consumed;
+endif
+stop
+@enduml

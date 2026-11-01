@@ -1,0 +1,24 @@
+@startuml
+skinparam defaultFontName Helvetica
+skinparam shadowing false
+skinparam rectangleBorderColor #4A6FA5
+skinparam rectangleBackgroundColor #F7F9FC
+left to right direction
+title From inputs to confirmed state
+rectangle "inputs +\nprevious state" as IN
+rectangle "requested\nintent" as REQ
+rectangle "arbitration\n+ constraints" as ARB
+rectangle "safe / effective\nintent" as SAFE
+rectangle "applied\n(output renderer)" as APP
+rectangle "confirmed\n(feedback)" as CONF
+IN --> REQ : output <- expr
+REQ --> ARB
+ARB --> SAFE : Bool constraints only\nturn true -> false
+SAFE --> APP : device\napplication
+APP --> CONF : encoder, limit switch,\nvision, ...
+note bottom of SAFE
+Each stage has its own provenance
+and quality. Evidence at one stage
+does not prove the next stage.
+end note
+@enduml

@@ -1,0 +1,31 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName Helvetica
+skinparam defaultFontSize 13
+skinparam rectangleRoundCorner 8
+rectangle "Phase 0\nIntegrate and rebaseline" as P0
+rectangle "Phase 1\nScalar semantics and\nGFB execution foundations" as P1
+rectangle "Phase 2\nBounded signal\nvertical slices" as P2
+rectangle "Phase 3\nSchedules and accounting" as P3
+rectangle "Phase 4\nConstraints, resources and\ncontinuous control" as P4
+rectangle "Phase 5\nImports, composition\nand macros" as P5
+rectangle "Phase 6\nSettings, observation,\nreplay, hot replacement" as P6
+rectangle "Phase 7\nExternal boundary audit\n(23 cases)" as P7
+rectangle "Phase 8\nFinal acceptance" as P8
+P0 --> P1
+P1 --> P2 : Duration/Result types
+P1 ..> P3
+P1 ..> P4
+P1 ..> P5
+P3 ..> P4 : accounting
+P1 --> P6
+P2 --> P6
+P3 --> P6
+P4 --> P6
+P5 --> P6 : stable descriptors
+P6 --> P7 : stable manifests and\nobservation schemas
+P7 --> P8
+note right of P3 : Also needs Date/Time,\nsettings events, ledger
+note right of P4 : Also needs settings
+note right of P5 : Needs stable type/manifest/\nsource identity
+@enduml

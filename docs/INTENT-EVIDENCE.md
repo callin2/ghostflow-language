@@ -2,20 +2,77 @@
 
 [한국어](INTENT-EVIDENCE.ko.md)
 
-Implementation of the shared [intent responsibility contract](INTENT-CONSISTENCY-CONTRACT.en.md), tracked in [#565](https://github.com/callin2/ghostflow-language/issues/565).
-The compiler can validate and retain an external interpretation/decision/condition record. It checks structure, exact source identity, authored links and internal revision consistency. It does not interpret natural language, authenticate decision authority, run conditions, or observe a device.
+This API implements the shared [intent responsibility contract](INTENT-CONSISTENCY-CONTRACT.en.md). It is tracked in [#565](https://github.com/callin2/ghostflow-language/issues/565).
+
+An *intent evidence record* is an external record of how someone interpreted a request, what they decided, and which code conditions follow from it. You can pass such a record to the compiler. The compiler then validates it and keeps it with the compilation.
+
+What the compiler **does** check:
+
+- the record's structure;
+- the exact identity of the source document;
+- the authored links between anchors and compiler nodes;
+- that revisions and digests inside the record are consistent.
+
+What the compiler **does not** do:
+
+- interpret natural language;
+- authenticate who had the authority to decide;
+- run or evaluate conditions;
+- observe a device.
+
+In this document:
+
+- [Public entry points](#public-entry-points) — how to pass a record and what happens on error.
+- [Record schema](#record-schema) — fields, limits, decision kinds and external checks.
+- [Reading the result](#reading-the-result) — what the report contains.
+- [Runnable authoring example](#runnable-authoring-example) — an end-to-end Node script and CLI request.
+- [Persistence and supported boundary](#persistence-and-supported-boundary) — saving, restoring and packaging limits.
+
+The diagram below shows the parts of a record and where the compiler fits. The caller supplies all records; the compiler only checks them and reports.
+
+![Intent evidence record parts and compiler flow](diagrams/intent-evidence/record-flow.svg)
 
 ## Public entry points
 
-Both `tools/toolchain.mjs` (Node) and `tools/browser-toolchain.mjs` (browser/Worker) accept `compileSource(source, { filename, intentEvidence })`. The optional record adds `compilation.intentEvidence`, a `GhostFlow/intent-evidence-report-v1` report. Without the option, existing compilation output is unchanged. GFB bytes and the control manifest are unchanged with or without valid evidence.
+Two entry points accept the record:
 
-Both entries export `intentInterpretationDigest`, `intentConditionDigest` and `INTENT_EVIDENCE_LIMITS`. Digests use canonical JSON with sorted object keys and preserved array order. An interpretation digest includes `id`, `revision`, `original`, `text`, and `anchorIds`, excluding its decision. A condition digest includes its entire record.
+- `tools/toolchain.mjs` (Node)
+- `tools/browser-toolchain.mjs` (browser or Worker)
 
-Invalid supplied metadata throws `GF_INTENT_EVIDENCE` with a structured diagnostic and `evidencePath`. A valid assumption, undecided item, missing external check, or partially confirmed interpretation does not cause a compilation error. This validates the optional authoring request; it adds no runtime or deployment gate.
+Both accept `compileSource(source, { filename, intentEvidence })`. The `intentEvidence` option is optional:
+
+- **With the option**, the compilation gains `compilation.intentEvidence`, a report in the `GhostFlow/intent-evidence-report-v1` format.
+- **Without the option**, compilation output is exactly as before.
+- **In both cases**, the GFB bytes and the control manifest are identical. Valid evidence never changes them.
+
+Both entry points also export `intentInterpretationDigest`, `intentConditionDigest` and `INTENT_EVIDENCE_LIMITS`. The digests are computed over canonical JSON: object keys are sorted, and array order is preserved.
+
+| Digest | Covers | Excludes |
+|---|---|---|
+| Interpretation digest | `id`, `revision`, `original`, `text`, `anchorIds` | the `decision` |
+| Condition digest | the entire condition record | — |
+
+If the supplied metadata is invalid, the compiler throws `GF_INTENT_EVIDENCE`. The error carries a structured diagnostic and an `evidencePath` that points to the faulty field.
+
+A record that is valid but incomplete is **not** an error. These cases compile normally:
+
+- a valid assumption;
+- an undecided item;
+- a missing external check;
+- a partially confirmed interpretation.
+
+This feature validates an optional authoring request only. It adds no runtime gate and no deployment gate.
 
 ## Record schema
 
-All fields listed below are required unless explicitly optional. Unknown fields, duplicate identifiers, invalid enum values and mismatched references are rejected. This is a provenance record, not an executable conditions DSL.
+Every field listed below is required unless it is explicitly marked optional. The compiler rejects:
+
+- unknown fields;
+- duplicate identifiers;
+- invalid enum values;
+- references that do not match.
+
+The record is a provenance record — a history of where intent came from. It is not an executable conditions DSL.
 
 | Record | Fields |
 |---|---|
@@ -25,26 +82,58 @@ All fields listed below are required unless explicitly optional. Unknown fields,
 | Condition reference | `id`, `revision`, `sha256` from `intentConditionDigest` |
 | External check | `id`, `judgment`, `conditions[]` of condition references, `result`, `producer`, `evidenceRef`, `scope`, `at`, `context` |
 
-IDs and revision names match `[A-Za-z][A-Za-z0-9._:-]{0,127}`. Compiler node IDs are the numeric IDs returned in `sourceMap`/`intentLinks`; copy them from the compilation, never generate them from a source line or name. Every condition node must have an existing authored link to one of its interpretation's anchors. Empty node lists are allowed and reported as unlinked. Only anchors present in the compilation's intent metadata may be selected; this does not infer links for imported documents or unannotated code.
+**Identifiers.** IDs and revision names must match `[A-Za-z][A-Za-z0-9._:-]{0,127}`.
 
-The original reference is an external immutable-record locator supplied by the caller. The compiler retains it without fetching or authenticating it. `statement` and `scope` remain uninterpreted text, including the externally chosen units, timing, assumptions and observation range. Array order participates in the record hash. The record can cover part of a program; unrepresented active anchors remain visible in coverage.
+**Node IDs.** Compiler node IDs are the numeric IDs returned in `sourceMap`/`intentLinks`. Copy them from the compilation. Never generate them from a source line or a name.
 
-Limits: 262,144 canonical UTF-8 bytes, 128 entries in each array, 8,192 characters per general text field, and canonical JSON nesting depth 16. Sparse arrays, non-finite numbers, unsafe integers, malformed Unicode and non-JSON objects are rejected. The CLI additionally bounds the raw file size. Timestamps are valid UTC ISO strings with `Z` and either whole seconds or three millisecond digits. Time validity is syntactic; no wall clock or policy age is inferred.
+**Links.** Every node in a condition must already have an authored link to one of the anchors of that condition's interpretation. An empty node list is allowed; it is reported as unlinked. You may select only anchors that appear in the compilation's intent metadata. The compiler does not infer links for imported documents or for unannotated code.
+
+**Uninterpreted text.** The `original.reference` is a locator for an external, immutable record, supplied by the caller. The compiler keeps it but does not fetch or authenticate it. `statement` and `scope` stay plain, uninterpreted text. That includes any units, timing, assumptions and observation range the caller chose.
+
+**Ordering and partial coverage.** Array order is part of the record hash. A record may cover only part of a program. Active anchors that the record does not represent remain visible in the coverage report.
+
+**Limits:**
+
+| Limit | Value |
+|---|---|
+| Canonical size | 262,144 UTF-8 bytes |
+| Entries per array | 128 |
+| Characters per general text field | 8,192 |
+| Canonical JSON nesting depth | 16 |
+
+The compiler also rejects sparse arrays, non-finite numbers, unsafe integers, malformed Unicode and non-JSON objects. The CLI additionally limits the raw file size.
+
+**Timestamps** must be valid UTC ISO strings ending in `Z`, with either whole seconds or exactly three millisecond digits. This check is syntactic only. The compiler does not consult a wall clock or infer a policy age.
 
 ### Decision variants
 
+Each interpretation has one `decision`. Its `kind` selects one of four variants.
+
 | `decision.kind` | Additional fields | Meaning |
 |---|---|---|
-| `confirmed` | `actor`, `authorityRef`, `recordRef`, `at`, `interpretationSha256`, `conditions[]` of exact condition references | A supplied confirmation record for the hashed interpretation and listed conditions. Its authority remains unauthenticated. |
-| `policy-derived` | All confirmed fields plus `policy: { id, revision, reference }`, `applicationRef`, `validity: current/expired/unknown` | Retains policy/application evidence. `current` is the provider's assertion; the compiler does not establish it. Expired/unknown applicability is surfaced as `policy-not-current`. |
-| `assumption` | `actor`, `reason` | LLM proposal; linked anchors must be `kind=assumption status=unconfirmed origin=ai`. |
-| `undecided` | `question`, `owner` (nonempty text or `null`) | Unresolved external decision; linked anchors, if any, must be unconfirmed. No new anchor enum is introduced. |
+| `confirmed` | `actor`, `authorityRef`, `recordRef`, `at`, `interpretationSha256`, `conditions[]` of exact condition references | A supplied confirmation record that covers the hashed interpretation and the listed conditions. The authority behind it is not authenticated. |
+| `policy-derived` | All confirmed fields plus `policy: { id, revision, reference }`, `applicationRef`, `validity: current/expired/unknown` | Keeps the policy and its application as evidence. `current` is only the provider's claim; the compiler does not establish it. If validity is `expired` or `unknown`, the condition is reported as `policy-not-current`. |
+| `assumption` | `actor`, `reason` | A proposal made by an LLM. Linked anchors must be `kind=assumption status=unconfirmed origin=ai`. |
+| `undecided` | `question`, `owner` (nonempty text or `null`) | An external decision that is still open. Linked anchors, if any, must be unconfirmed. No new anchor enum value is introduced. |
 
-Confirmed/policy-derived records require existing confirmed intent/premise anchors, if anchors are supplied. They cannot silently confirm an authored assumption. Superseded anchors are rejected. One active anchor cannot have multiple current interpretations in this record. Conditions outside a confirmation's explicit list remain `outside-confirmed-scope`; an empty list confirms no code condition. Changing interpretation text or a listed condition while retaining old confirmation digests fails. Hashes detect inconsistent reuse, not a forged confirmation that has been consistently rewritten.
+Rules for confirmation:
+
+- A `confirmed` or `policy-derived` record that lists anchors requires those anchors to be existing confirmed intent/premise anchors. It cannot silently confirm an authored assumption.
+- Superseded anchors are rejected.
+- In one record, an active anchor cannot have more than one current interpretation.
+- A condition that is not in the confirmation's explicit list stays `outside-confirmed-scope`. An empty list confirms no code condition at all.
+- If you change the interpretation text or a listed condition but keep the old confirmation digests, validation fails.
+
+The hashes detect *inconsistent* reuse. They cannot detect a forged confirmation that someone has rewritten consistently.
 
 ### External check context
 
-`judgment` is `requirements-consistency`, `code-compliance`, or `device-compliance`. `result` is `satisfied`, `violated`, or `unknown`. Every check references at least one exact condition revision/digest and supplies:
+An external check reports a judgment made outside the compiler.
+
+- `judgment` is `requirements-consistency`, `code-compliance`, or `device-compliance`.
+- `result` is `satisfied`, `violated`, or `unknown`.
+
+Every check references at least one exact condition revision and digest. It also supplies a `context` with these fields:
 
 | Context field | Rule |
 |---|---|
@@ -54,17 +143,39 @@ Confirmed/policy-derived records require existing confirmed intent/premise ancho
 | `run` | Required for scenario/physical, forbidden for static: `{ id, scanId, logicalTimeMs }`. Scan/time are nonnegative safe integers. |
 | `device` | Required only for physical and `device-compliance`: `{ id, installationRef, commandRef, observationRef, clockRef, stage, quality }`. |
 
-Device `stage` is `requested`, `safe`, `applied`, `readback`, or `confirmed`; `quality` is `ok`, `unknown`, or `fault`. These are reported evidence stages. An ACK or a caller's `satisfied` result does not become physical proof. A check's run/time/device fields are retained and shape-checked; this compiler has no trusted current runtime sample to join against. Consumers must validate those identities and evidence at their observation boundary. Contradictory external claims remain visible as reported claims, not newly certified judgments.
+For a device:
+
+- `stage` is `requested`, `safe`, `applied`, `readback`, or `confirmed`.
+- `quality` is `ok`, `unknown`, or `fault`.
+
+These are *reported* evidence stages. An ACK, or a caller's `satisfied` result, does not become physical proof.
+
+The compiler keeps the `run`, time and `device` fields and checks their shape. It has no trusted, current runtime sample to compare them with. Consumers must therefore validate these identities and the evidence at their own observation boundary. If external claims contradict each other, they stay visible as reported claims. The compiler never turns them into newly certified judgments.
 
 ## Reading the result
 
-`validation` reports successful structure/source/link consistency. `decisions` preserves each decision classification and confirmation scope, with `authority: not-authenticated`. `conditions` lists node/check IDs and `recorded`, `outside-confirmed-scope`, `policy-not-current`, `unconfirmed`, or `undecided` confirmation state. `coverage` lists unrepresented anchors and unlinked conditions.
+The report has these parts:
 
-`externalChecks` exposes `reportedResult` with `trust: external-report`. All four `judgments` remain `not-evaluated`: the metadata checker does not itself perform intent, requirement, program or device judgment. It makes the necessary records available to their actual owners. No overall intent-compliant Boolean is produced. The report includes the detached validated `record`, its `recordSha256`, source digest and bytecode digest.
+| Part | Contents |
+|---|---|
+| `validation` | Confirms that structure, source and link consistency checks passed. |
+| `decisions` | Each decision's classification and confirmation scope, with `authority: not-authenticated`. |
+| `conditions` | Node and check IDs, plus a confirmation state: `recorded`, `outside-confirmed-scope`, `policy-not-current`, `unconfirmed`, or `undecided`. |
+| `coverage` | Anchors the record does not represent, and conditions with no links. |
+| `externalChecks` | Each check's `reportedResult`, marked `trust: external-report`. |
+
+All four `judgments` remain `not-evaluated`. The metadata checker does not judge intent, requirements, the program, or a device. Its job is to make the necessary records available to the people and tools who actually own those judgments. The report has no single "intent-compliant" Boolean.
+
+The report also includes:
+
+- the detached, validated `record`;
+- its `recordSha256`;
+- the source digest;
+- the bytecode digest.
 
 ## Runnable authoring example
 
-Run the following JavaScript from the repository root with Node's module input mode. It uses the existing fictional pump fixture; the confirmation below is example data, not an actual operating approval. The second condition deliberately remains outside confirmation scope.
+Run the JavaScript below from the repository root, using Node's module input mode. It uses the existing fictional pump fixture. The confirmation is example data, not a real operating approval. The second condition is deliberately left outside the confirmation scope.
 
 ```js
 import fs from 'node:fs';
@@ -102,7 +213,14 @@ fs.mkdirSync('build/intent-evidence', { recursive: true });
 fs.writeFileSync('build/intent-evidence/record.json', JSON.stringify(evidence, null, 2));
 ```
 
-Expected states are `C-PERMIT: recorded` and `C-RESTART: outside-confirmed-scope`. No scenario has been run; `checks` is empty. In a structured CLI request, add the optional file path:
+Expected states:
+
+- `C-PERMIT: recorded`
+- `C-RESTART: outside-confirmed-scope`
+
+No scenario has been run, so `checks` is empty.
+
+To use the record from the CLI, add the optional evidence file path to a structured CLI request:
 
 ```toon
 format: GhostFlow/cli-request-v1
@@ -114,12 +232,34 @@ source:
 intentEvidencePath: build/intent-evidence/record.json
 ```
 
-Save that request as `build/intent-evidence/request.toon` and run `node tools/ghostc.mjs --request build/intent-evidence/request.toon --format json`. The CLI returns the report in `intentEvidence`; the default output format is TOON. For `operation: compile`, also supply `artifactPath`. Missing/malformed/oversized evidence files and inconsistent records produce nonzero exit with `GF_INTENT_EVIDENCE`; existing artifact files are not replaced.
+Save the request as `build/intent-evidence/request.toon` and run `node tools/ghostc.mjs --request build/intent-evidence/request.toon --format json`.
+
+- The CLI returns the report in `intentEvidence`. The default output format is TOON.
+- For `operation: compile`, also supply `artifactPath`.
+- A missing, malformed or oversized evidence file, or an inconsistent record, makes the CLI exit nonzero with `GF_INTENT_EVIDENCE`. Existing artifact files are not replaced.
 
 ## Persistence and supported boundary
 
-`writeArtifact` stores the validated record in the optional `intentEvidence` field of the standalone `.map.json` companion. `restoreArtifactSourceMap` recompiles the canonical source, validates the record and returns a freshly derived report. It does not trust a saved verdict. Callers requiring a specific record pass `expectedIntentEvidenceSha256: report.recordSha256` alongside `expectedSourceSha256`; a missing or altered record is then rejected. Without an expected digest, absence remains compatible with ordinary artifacts that carry no record. An unsigned map and hashes do not authenticate authorship or prevent coordinated replacement.
+**Saving.** `writeArtifact` stores the validated record in the optional `intentEvidence` field of the standalone `.map.json` companion file.
 
-`portable-package-v1` has a separate strict, signed source-map profile. It does not transport this external authoring record. Its builder explicitly rejects evidence-bearing compilations with `unsupported-intent-evidence`, preventing silent loss. Keep the external record and deliberately compile without the option when using that package profile. This implementation does not change the signed package format, firmware, runtime, approval service or deployment policy. Future transport through a signed package must retain the same evidence boundaries and define consumer compatibility explicitly.
+**Restoring.** `restoreArtifactSourceMap` recompiles the canonical source, validates the record again and returns a freshly derived report. It never trusts a saved verdict.
 
-The executable regression suite is `tests/intent-evidence.test.mjs`, registered in full verification and coverage. It covers partial decisions, revision mismatch with unchanged GFB, invalid links, external/physical claim limits, browser operation, persistence and CLI artifact preservation. Existing anchor/CLI and package tests continue to cover the surrounding contracts.
+**Requiring a specific record.** Pass `expectedIntentEvidenceSha256: report.recordSha256` together with `expectedSourceSha256`. A missing or altered record is then rejected. Without an expected digest, a missing record is accepted, so ordinary artifacts that carry no record stay compatible.
+
+An unsigned map and its hashes do not authenticate authorship. They also do not prevent a coordinated replacement of both source and record.
+
+**Portable packages.** `portable-package-v1` has its own strict, signed source-map profile, and it does not carry this external authoring record. To prevent silent loss, its builder explicitly rejects compilations that carry evidence, with `unsupported-intent-evidence`. When you use that package profile, keep the external record separately and deliberately compile without the `intentEvidence` option.
+
+This implementation does not change the signed package format, firmware, runtime, approval service or deployment policy. Any future transport through a signed package must keep the same evidence boundaries and define consumer compatibility explicitly.
+
+**Tests.** The executable regression suite is `tests/intent-evidence.test.mjs`. It is registered in full verification and in coverage. It covers:
+
+- partial decisions;
+- revision mismatch with unchanged GFB;
+- invalid links;
+- limits on external and physical claims;
+- browser operation;
+- persistence;
+- CLI artifact preservation.
+
+Existing anchor, CLI and package tests continue to cover the surrounding contracts.

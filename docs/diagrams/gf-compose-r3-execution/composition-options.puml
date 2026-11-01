@@ -1,0 +1,21 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName Helvetica
+skinparam defaultFontSize 13
+skinparam rectangleRoundCorner 8
+title Two compared options (both proposals)
+
+package "Option A: compiler composition into one module" {
+  rectangle "east + west\n(qualified names)" as A1
+  rectangle "One GFB1 module\none clock per tick\none safety pass" as A2
+  A1 --> A2 : import / qualification\nlowering
+}
+
+package "Option B: multiple VM instances + coordinator" {
+  rectangle "Coordinator\n(supplies clocks, ingress,\nfault fan-out policy)" as C
+  rectangle "VM: east\nown module, state" as VE
+  rectangle "VM: west\nown module, state" as VW
+  C --> VE
+  C --> VW
+}
+@enduml

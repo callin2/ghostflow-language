@@ -1,10 +1,12 @@
 # Temporal replay through the WASM adapters
 
-Static temporal resource planning is specified in
-[TEMPORAL-RESOURCES.md](TEMPORAL-RESOURCES.md).
+Temporal replay re-executes already recorded ticks in a separate "ghost"
+instance, so you can inspect execution evidence without disturbing the live
+run. Static temporal resource planning (how much memory a replay will need) is
+specified in [TEMPORAL-RESOURCES.md](TEMPORAL-RESOURCES.md).
 
-`GhostFlowRuntime` and `FramedGhostFlowRuntime` expose the low-level adapter
-operation synchronously:
+`GhostFlowRuntime` and `FramedGhostFlowRuntime` both expose this low-level
+adapter operation as a synchronous call:
 
 ```js
 const replay = runtime.replayTemporal({
@@ -16,10 +18,11 @@ const replay = runtime.replayTemporal({
 const lastSuccessfulReplay = runtime.replay;
 ```
 
-The profile and both budgets are explicit caller inputs. The adapter validates
-positive safe u32 count and budget values. The replay envelope preserves the
-recorded inputs, logical ticks, sample identities, and temporal epoch. The
-initial replay getter is `null`.
+The caller must pass the profile and both budgets explicitly; there are no
+defaults. The adapter checks that `count` and both budgets are positive safe
+u32 values. The replay envelope preserves the recorded inputs, logical ticks,
+sample identities, and temporal epoch. Before any successful replay, the
+`replay` getter returns `null`.
 
 The envelope has this shape:
 
@@ -31,33 +34,46 @@ The envelope has this shape:
                           scanId, logicalTimeMs, trace: TickRecord }] }
 ```
 
-The legacy adapter uses the runtime's recorded tick history. The framed adapter
-uses records from the `ScanDriver` run that created it. Its first recorded tick
-is scan ID zero, even when the wrapped runtime had already executed ticks. Each
-later record uses `scanId = tick - firstScanTick`; logical time comes from the
-recorded clock input. Replay selects the oldest eligible prefix and starts at
-the checkpoint immediately before that prefix. Counts are not clamped.
+**Where the records come from.**
 
-Replay runs in a separate ghost instance. It does not dispatch effects or alter
-live pending inputs, state, journal, intents, trace/outcome, frame sequence,
-clock, or last outcome. A rejected request preserves the previous replay and
-live execution. Successful replay replaces only the separate replay result.
+- The **legacy** adapter uses the runtime's recorded tick history.
+- The **framed** adapter uses records from the `ScanDriver` run that created
+  it. Its first recorded tick is scan ID zero, even if the wrapped runtime had
+  already executed ticks. Each later record uses
+  `scanId = tick - firstScanTick`. Logical time comes from the recorded clock
+  input.
 
-`maxPeakTemporalBytes` covers the core temporal arena, checkpoint, proof, and
-trace accounting. Scalar/module clones and allocator metadata are outside that
-temporal budget. `maxJsonBytes` covers the retained replay plus candidate JSON
-buffers. The adapter must count escaped UTF-8 bytes before allocation and avoid
-unbounded intermediate strings. JavaScript parsed objects and copied text remain
-caller-owned allocations.
+Replay selects the oldest eligible prefix of records. It starts from the
+checkpoint immediately before that prefix. `count` is not clamped: it is never
+silently reduced to fit.
 
-The low-level WASM exports are `gf_replay_temporal` and
-`gf_frame_replay_temporal`. Their successful results are exposed through
-`gf_replay_ptr/len` and `gf_frame_replay_ptr/len`; they do not overwrite live
+**Isolation from the live run.** Replay runs in a separate ghost instance, as
+the diagram shows. It does not dispatch effects. It does not change live
+pending inputs, state, journal, intents, trace/outcome, frame sequence, clock,
+or last outcome. A rejected request keeps both the previous replay and the live
+execution unchanged. A successful replay replaces only the separate replay
+result.
+
+![Replay runs in a separate ghost instance and only replaces the replay result](diagrams/temporal-replay/live-and-ghost.svg)
+
+**Memory budgets.**
+
+| Budget | Covers | Does not cover |
+| --- | --- | --- |
+| `maxPeakTemporalBytes` | core temporal arena, checkpoint, proof, and trace accounting | scalar/module clones and allocator metadata |
+| `maxJsonBytes` | the retained replay plus candidate JSON buffers | JavaScript parsed objects and copied text (caller-owned allocations) |
+
+The adapter must count escaped UTF-8 bytes before it allocates, and it must
+avoid unbounded intermediate strings.
+
+**Low-level WASM exports.** The exports are `gf_replay_temporal` and
+`gf_frame_replay_temporal`. Successful results are exposed through
+`gf_replay_ptr/len` and `gf_frame_replay_ptr/len`. They never overwrite live
 trace or framed outcome data.
 
-This operation supplies installed-program execution evidence. It does not by
-itself establish Reference §6.8 durable Program/source-closure/settings/binding/
-run identities, candidate-program what-if replay, foreign checkpoint restore,
-environment simulation, or durable continuity. Full durable and what-if replay
-remain outside this API. Hardware and physical I/O evidence are also outside
-this document.
+**Scope.** This operation supplies execution evidence for the installed
+program. By itself it does not establish Reference §6.8 durable
+Program/source-closure/settings/binding/run identities, candidate-program
+what-if replay, foreign checkpoint restore, environment simulation, or durable
+continuity. Full durable and what-if replay remain outside this API. Hardware
+and physical I/O evidence are also outside this document.

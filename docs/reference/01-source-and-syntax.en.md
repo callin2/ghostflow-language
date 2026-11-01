@@ -5,37 +5,56 @@
 
 [Complete contents](../LANGUAGE-REFERENCE.en.md) · [Next: Types, expressions, and state](02-types-expressions-state.en.md)
 
-The canonical GhostFlow program is one `.ghost.md` document containing both explanation and executable rules. The language's representative surface is the **control syntax**, using `control Name { ... }`, braces, semicolons, expressions, explicit next state, and output connections. This chapter defines the rules for selecting executable source from documents, vocabulary, name scope, and declaration structure.
+A canonical GhostFlow program is a single `.ghost.md` document. It holds both the explanation and the executable rules. The language's representative surface is the **control syntax**: `control Name { ... }` with braces, semicolons, expressions, explicit next state, and output connections.
+
+This chapter defines:
+
+- how executable source is selected from a document (§1.1);
+- how original text, locations, and intent links are preserved (§1.2);
+- the vocabulary: identifiers, reserved words, comments, and symbols (§1.3);
+- the grammar notation and the declaration forms (§1.4);
+- the representative declaration structure and name-resolution rules (§1.5);
+- rejected historical notation (§1.6) and which chapter owns which syntax (§1.7).
 
 The `ghost` fragments in this chapter illustrate syntax and semantics.
 
-Rationale: [Selected syntax](../LANGUAGE-SURFACE.md), [Common language contract](../LANGUAGE.md), [Literate source](../LITERATE.md), [Intent anchors](../INTENT-ANCHOR-MAP.md), [Source preservation](../SOURCE-MAP.md), [Design notes](../DESIGN-NOTES.md). The [complete language reference](../LANGUAGE-REFERENCE.md) indexes this chapter and the other detailed chapters.
+Rationale: [Selected syntax](../LANGUAGE-SURFACE.en.md), [Common language contract](../LANGUAGE.en.md), [Literate source](../LITERATE.en.md), [Intent anchors](../INTENT-ANCHOR-MAP.md), [Source preservation](../SOURCE-MAP.md), [Design notes](../DESIGN-NOTES.md). The [complete language reference](../LANGUAGE-REFERENCE.en.md) indexes this chapter and the other detailed chapters.
 
-Canonical external declarations use `input` and read as `Result<T, SensorFault>`.
-The exact reserved `restart_reason: RestartReason` and `restart_event: Bool`
-declarations are runtime-owned lifecycle inputs, an explicit exception to external
-acquisition. They read directly as `RestartReason` and `Bool`; optional markers,
-conditioning settings and caller-provided values are forbidden. See
+**External inputs.** The canonical declaration for an external input is `input`. Reading an input yields `Result<T, SensorFault>`.
+
+**Restart inputs are the one exception.** The exact reserved declarations
+`restart_reason: RestartReason` and `restart_event: Bool` are runtime-owned
+lifecycle inputs, not externally acquired ones. They read directly as
+`RestartReason` and `Bool`. Optional markers, conditioning settings, and
+caller-provided values are forbidden for them. See
 [the restart contract](05-settings-and-observation.en.md).
-The examples here explicitly choose false for a failed start and true for a failed stop;
-these are illustrative author policies, never implicit defaults. The former `sensor`
-declaration is rejected; preserve old documents and create explicit reviewed revisions.
-See [the migration contract](../INPUT-MIGRATION.md) for acquisition and compatibility.
+
+The examples in this chapter explicitly choose `false` when reading `start` fails
+and `true` when reading `stop` fails. These are illustrative author policies, never
+implicit defaults.
+
+The former `sensor` declaration is rejected. Preserve old documents and create
+explicit, reviewed revisions. See [the migration contract](../INPUT-MIGRATION.md)
+for acquisition and compatibility.
 
 ## 1.1 Why one document is the source
 
-Keeping only control rules separates them from the reasons for conditions and field premises. Keeping only explanations makes it impossible to mechanically verify which rules execute. GhostFlow preserves explanation, comments, intent, and executable code as one revision, providing one starting point for review.
+If you keep only the control rules, you lose the reasons behind each condition and the field premises. If you keep only the explanation, no one can mechanically check which rules actually execute. GhostFlow therefore keeps explanation, comments, intent, and executable code together in one revision. Review has a single starting point.
 
 - Product input is one complete `.ghost.md` document.
-- An ordinary `.ghost` file is neither executable input nor alternative input.
-- Editors, forms, and graphs may be different views of this document, but do not create an independent control source.
-- Document revision and executable-structure identity are distinct. Changing only explanation changes the document revision, but identical executable token structure retains the same computational meaning.
+- An ordinary `.ghost` file is not executable input, and it is not an alternative input either.
+- Editors, forms, and graphs may be different views of this document. They never create an independent control source.
+- Document revision and executable-structure identity are different things. Editing only the explanation creates a new document revision. If the executable token structure is unchanged, the computation keeps the same meaning.
 
 ### Executable block extraction
 
-From a CommonMark document, extract only **top-level fenced code blocks** whose info string is exactly `ghost`, in document order. Both backtick and tilde fences are permitted. Place a newline at the end of each block body and one blank line between blocks. Do not synthesize headings or explanations into code comments.
+Parse the document as CommonMark. Extract only the **top-level fenced code blocks** whose info string is exactly `ghost`, in document order. Both backtick and tilde fences are permitted. End each block body with a newline and put one blank line between blocks. Headings and explanations are never turned into code comments.
 
-The following displays a complete `.ghost.md` example.
+The extraction steps are summarized below.
+
+![Extraction of executable source from a .ghost.md document](../diagrams/reference-01-source-and-syntax/extraction.svg)
+
+Here is a complete `.ghost.md` document as an example.
 
 ````markdown
 # 펌프 요청
@@ -56,9 +75,9 @@ control PumpRequest {
 ```
 ````
 
-The two `ghost` blocks form one `control`. Blocks do not each create a separate execution or state commit. Braces or statements are not automatically supplied. Put block boundaries at the ends of declarations or statements; do not split a token, string, comment, or expression in the middle.
+The two `ghost` blocks together form one `control`. A block does not create its own execution or its own state commit. Missing braces or statements are never supplied automatically. Place block boundaries at the end of a declaration or statement. Never split a token, string, comment, or expression across blocks.
 
-The following are not executable code.
+The following are **not** executable code:
 
 - Ordinary paragraphs, tables, links, images, and front matter
 - Indented code blocks and fences with other info strings, such as `text`
@@ -66,75 +85,101 @@ The following are not executable code.
 - `ghost` fences written as text inside a longer display fence
 - Tags that do not match exactly, such as `ghost-python` or `ghost` with attributes
 
-Unclosed executable fences, documents without executable code, and excluded nested blocks that look executable are diagnostic subjects. Do not emulate Markdown structure with regular expressions and execute nested blocks.
+The following produce diagnostics: an unclosed executable fence, a document with no executable code, and an excluded nested block that looks executable. Implementations must not imitate Markdown structure with regular expressions and then execute nested blocks.
 
 ### Hardware front matter
 
-The reserved top-level YAML `hardware` field declares pinned dependencies,
-configuration and logical bindings for input drivers and output renderers.
-Compilation exposes a derived plan bound to the exact source SHA-256 and locations
-without changing executable GFB bytes. Invalid schemas, duplicate keys, missing
-references and role mismatches fail at canonical locations. Ordinary front matter
-retains its non-executable behavior. See [Hardware declarations](../HARDWARE-FRONT-MATTER.md)
-for structure, examples and provider validation boundaries.
-Why: installation intent and control rules are reviewed in one revision while Device owns board behavior.
+The reserved top-level YAML field `hardware` declares, for input drivers and
+output renderers, their pinned dependencies, configuration, and logical bindings.
 
-Compact authoring reserves root `profile`, optional `devices`, and `bindings`.
-Supplying a pinned `hardwareProfiles` closure to `compileSource`/`compileSourceSync`
-validates inheritance, explicit default connections, parameters, communication
-conditions, address conflicts, and channel types. Every logical input/output needs
-a binding. The returned `hardwarePlan` has format `GhostFlow/profile-resolution-v1`,
-not an unresolved declaration. Missing profiles are never guessed. Follow the
-[design and staged scope](../PROFILE-FRONT-MATTER.en.md). The purpose is to avoid
-making customers repeat facts already known by the board and driver.
+- Compilation returns a derived plan bound to the exact source SHA-256 and source
+  locations. The executable GFB bytes do not change.
+- Invalid schemas, duplicate keys, missing references, and role mismatches fail
+  at their canonical locations.
+- Other front matter stays non-executable, as before.
+
+See [Hardware declarations](../HARDWARE-FRONT-MATTER.md) for structure, examples,
+and provider validation boundaries.
+Why: installation intent and control rules are reviewed in one revision, while Device owns board behavior.
+
+The compact authoring form reserves the root fields `profile`, `devices`
+(optional), and `bindings`.
+
+- Supply a pinned `hardwareProfiles` closure to `compileSource`/`compileSourceSync`.
+  The compiler then validates inheritance, explicit default connections, parameters,
+  communication conditions, address conflicts, and channel types.
+- Every logical input and output needs a binding.
+- The returned `hardwarePlan` has format `GhostFlow/profile-resolution-v1`. It is a
+  resolved plan, not an unresolved declaration.
+- Missing profiles are never guessed.
+
+Follow the [design and staged scope](../PROFILE-FRONT-MATTER.en.md). The purpose
+of this form is that customers do not have to repeat facts the board and driver
+already know.
 
 ## 1.2 Original source, locations, and intent links
 
-The original document's prose, `//` comments, Unicode, line endings, and final newline are language assets to preserve exactly. Syntax and type diagnostics refer to the file, line, and column of the original `.ghost.md`, rather than merged temporary text. If a closing brace is missing across several fences, the diagnostic must be able to identify both the declaration start and the document end.
+The original document's prose, `//` comments, Unicode text, line endings, and final newline are language assets. They must be preserved exactly. Syntax and type diagnostics point to the file, line, and column in the original `.ghost.md`, not to the merged temporary text. If a closing brace is missing across several fences, the diagnostic must be able to point to both the start of the declaration and the end of the document.
 
-Node identity is not derived from Markdown line numbers. Adding explanation at the beginning may move a location, but the same executable structure must remain identifiable as the same computation. Locations always belong to a specific document revision. Digests of the original source and executable artifact prevent mixing different revisions. This preservation does not independently prove the authenticity of the original source.
+Node identity is not derived from Markdown line numbers. Adding explanation at the top may move a location, but the same executable structure must still be identifiable as the same computation. A location always belongs to a specific document revision. Digests of the original source and of the executable artifact prevent mixing different revisions. This preservation does not, on its own, prove that the original source is authentic.
 
 ### Intent anchors
 
 The design record for this contract links to [#31](https://github.com/callin2/ghostflow-language/issues/31) and [#60](https://github.com/callin2/ghostflow-language/issues/60).
 
-An anchor is a non-executable top-level Markdown HTML comment that identifies the immediately following top-level paragraph or quotation block as its original text. One blank line is allowed.
+An **anchor** is a non-executable, top-level Markdown HTML comment. It marks the top-level paragraph or quotation block that immediately follows it as its original text. One blank line between the comment and that block is allowed.
+
+The diagram shows how anchors and executable links (described below) refer to each other.
+
+![An anchor marks its original text; a link in a ghost fence marks one statement and refers to an anchor id](../diagrams/reference-01-source-and-syntax/anchor-link.svg)
 
 ```markdown
 <!-- ghostflow:anchor id=GF-INT-PUMP-001 kind=intent status=confirmed origin=user -->
 > 급수 요청이 있고 정지가 없을 때 펌프를 요청한다.
 ```
 
-Field order and values are fixed.
+Field order and the allowed values are fixed:
 
-- `id`: `[A-Za-z][A-Za-z0-9._:-]{0,127}`, unique within the document and stable for the same intent.
+- `id`: `[A-Za-z][A-Za-z0-9._:-]{0,127}`. It is unique within the document and stays stable for the same intent.
 - `kind`: `intent | premise | assumption`
 - `status`: `confirmed | unconfirmed | superseded`
 - `origin`: `user | operator | engineer | ai | imported`
-- An `assumption` cannot be `confirmed`. Once confirmed, reclassify it as `intent` or `premise`.
+- An `assumption` cannot be `confirmed`. Once it is confirmed, reclassify it as `intent` or `premise`.
 
-A heading, list, nested block, code fence, another anchor, or document end is not an anchor body. Split multi-block explanations across multiple anchors.
+A heading, list, nested block, code fence, another anchor, or the end of the document cannot be an anchor body. To anchor an explanation that spans several blocks, use several anchors.
 
 ### Executable node links
 
-The following whole-line comment inside an executable `ghost` fence identifies exactly one immediately following traceable statement.
+Inside an executable `ghost` fence, a whole-line comment of the following form identifies exactly one traceable statement: the one immediately after it.
 
 ```ghost
 // ghostflow:link id=GF-INT-PUMP-001 relation=implements
 pump <- request;
 ```
 
-`relation` is one of `implements | constrains | fallback | assumes`. `assumes` refers only to an `unconfirmed assumption`; other relations do not refer to assumptions. A `superseded` anchor cannot link to a current node. Several consecutive link lines may refer to the same next statement. Encountering a blank line, ordinary comment, nested expression, `control` header, or fence end creates an orphan link.
+Rules for links:
 
-Link targets are `input`, `output`, `state`, `config`, `let`, enum, function, `sensor`, `signal`, `schedule`, `timer`, `require`, `mutex`, next-state definitions, and output connections. Links do not interpret natural language or discover tacit knowledge. They preserve the written classifications and relations and do not turn unconfirmed relations into proof or approval.
+- `relation` is one of `implements | constrains | fallback | assumes`.
+- `assumes` may refer only to an `unconfirmed assumption`. The other relations never refer to assumptions.
+- A `superseded` anchor cannot be linked to a current node.
+- Several consecutive link lines may refer to the same next statement.
+- If a blank line, an ordinary comment, a nested expression, a `control` header, or the end of the fence comes next instead of a target, the link is an orphan link.
+
+Link targets are `input`, `output`, `state`, `config`, `let`, enum, function, `sensor`, `signal`, `schedule`, `timer`, `require`, `mutex`, next-state definitions, and output connections.
+
+Links do not interpret natural language or discover tacit knowledge. They preserve the classifications and relations exactly as written. They never turn an unconfirmed relation into proof or approval.
 
 ## 1.3 Vocabulary
 
 ### Identifiers and case sensitivity
 
-Identifiers are `[A-Za-z_][A-Za-z0-9_]*` and are case-sensitive. `start` and `Start` are different names. `.` is a settled path separator, as in `starts.due`, `Alias.name`, and `instance.port`, rather than an identifier character. Inputs and previous state are read directly as `start` and `running`; the old aliases `input.start`, `state.running`, and `next.running` are rejected. Likewise, `'` is next-state notation in `running'`, rather than an identifier character.
+Identifiers match `[A-Za-z_][A-Za-z0-9_]*` and are case-sensitive: `start` and `Start` are different names.
 
-The following language words cannot be user-defined names.
+- `.` is not an identifier character. It is the settled path separator, as in `starts.due`, `Alias.name`, and `instance.port`.
+- Inputs and previous state are read directly by name, as `start` and `running`. The old aliases `input.start`, `state.running`, and `next.running` are rejected.
+- `'` is not an identifier character either. It is next-state notation, as in `running'`.
+
+**Reserved words.** The following language words cannot be user-defined names.
 
 ```text
 control fn input output state config let type sensor signal schedule timer
@@ -142,19 +187,23 @@ calendar provider event require mutex if then else case in true false
 div ok fault syntax adapt constraints check limit quote instance connect elapsed
 ```
 
-`purefn`, `enum`, `next`, `ifthenelse`, `not`, `and`, `or`, `is`, and `isnt` are also reserved and rejected with migration diagnostics so that removed notation is not reinterpreted with another meaning. `Bool`, `Int`, `Number`, `Percent`, `Duration`, `Result`, `SensorFault`, `Expr`, `Date`, `TimeOfDay`, `DateTime`, `TimeSlots`, `WorkCalendar`, `HolidayCalendar`, `TidePredictions`, `LunarEphemeris`, `BoolActuator`, `Event`, `ClockFault`, `CalendarFault`, `TemporalContextFault`, `AccountingFault`, and the physical-quantity types in Chapter 2 are the built-in type namespace. `number`, `int_exact`, `int_floor`, `int_ceil`, `int_trunc`, `int_nearest_even`, `elapsed`, `median`, `hysteresis`, `date`, `time`, `datetime`, `cron5`, `sun`, `tide`, `day`, `moon`, `continuous_true`, `instant`, `civil`, `on_time`, `count_events`, `local_day_is`, `calendar_is`, `tide_is`, `moon_is`, `used`, `rolling`, `local_day`, and the Result conversion names are the built-in callable namespace. User declarations cannot shadow these names. The internal `__gf_` prefix and discard pattern `_` also cannot be declaration names.
+**Removed notation.** `purefn`, `enum`, `next`, `ifthenelse`, `not`, `and`, `or`, `is`, and `isnt` are also reserved. They are rejected with migration diagnostics, so that removed notation can never be reinterpreted with a different meaning.
 
-The `.due`, `.open`, `.active`, and `.count` supplied by schedules and accounts are projections of their respective built-in types. A schedule's `.missed` is also a projection. Do not infer members with these names on other types or redefine them as user projections. For `.missed` semantics, see [§3.5](03-time-and-schedules.md#35-schedule의-공통-의미).
+**Built-in namespaces.** `Bool`, `Int`, `Number`, `Percent`, `Duration`, `Result`, `SensorFault`, `Expr`, `Date`, `TimeOfDay`, `DateTime`, `TimeSlots`, `WorkCalendar`, `HolidayCalendar`, `TidePredictions`, `LunarEphemeris`, `BoolActuator`, `Event`, `ClockFault`, `CalendarFault`, `TemporalContextFault`, `AccountingFault`, and the physical-quantity types in Chapter 2 are the built-in type namespace. `number`, `int_exact`, `int_floor`, `int_ceil`, `int_trunc`, `int_nearest_even`, `elapsed`, `median`, `hysteresis`, `date`, `time`, `datetime`, `cron5`, `sun`, `tide`, `day`, `moon`, `continuous_true`, `instant`, `civil`, `on_time`, `count_events`, `local_day_is`, `calendar_is`, `tide_is`, `moon_is`, `used`, `rolling`, `local_day`, and the Result conversion names are the built-in callable namespace. User declarations cannot shadow these names. Names with the internal prefix `__gf_` and the discard pattern `_` cannot be declared either.
 
-`parameter`, `resource`, `account`, `import`, `from`, `revision`, `sha256`, `timezone`, `selected`, `basis`, `when`, `clock`, `gap`, `recovery`, `fallback`, `dst_missing`, `dst_repeated`, `sample`, `valid`, `filter`, `stale_after`, `recover_after`, `samples`, `min`, `max`, `step`, `access`, and `label` are special **contextual words** only in their respective syntax positions. They do not globally reserve identifiers in other positions. The context of `has` is defined in [Chapter 4](04-sensors-constraints-control.md). `adapt`, `constraints`, `check`, `limit`, `quote`, `instance`, and `connect` are reserved regardless of syntax position.
+**Built-in projections.** `.due`, `.open`, `.active`, and `.count`, supplied by schedules and accounts, are projections of those built-in types. A schedule's `.missed` is also a projection. Do not assume members with these names exist on other types, and do not redefine them as user projections. For the semantics of `.missed`, see §3.5 in [Chapter 3](03-time-and-schedules.en.md).
+
+**Contextual words.** `parameter`, `resource`, `account`, `import`, `from`, `revision`, `sha256`, `timezone`, `selected`, `basis`, `when`, `clock`, `gap`, `recovery`, `fallback`, `dst_missing`, `dst_repeated`, `sample`, `valid`, `filter`, `stale_after`, `recover_after`, `samples`, `min`, `max`, `step`, `access`, and `label` are **contextual words**: they are special only in their own syntax positions. Elsewhere they are ordinary identifiers. The context of `has` is defined in [Chapter 4](04-sensors-constraints-control.en.md). By contrast, `adapt`, `constraints`, `check`, `limit`, `quote`, `instance`, and `connect` are reserved in every position.
 
 ### Whitespace, statement endings, and comments
 
-Whitespace and indentation separate tokens and help people read structure, but do not create blocks. Tabs or a particular number of columns are not semantic rules of the representative control syntax. Declarations and expression definitions generally end with `;`; line breaks do not replace it.
+Whitespace and indentation separate tokens and help people read the structure. They never create blocks. Tabs and column counts carry no meaning in the representative control syntax. Declarations and expression definitions normally end with `;`. A line break does not replace it.
 
-`input`, `output`, `state`, `config`, `let`, next-state definitions, output connections, `require`, `mutex`, `signal`, `timer`, `type X = ...`, and entries in settings blocks require `;`. The semicolon may be omitted after a function's final result expression, closing `}`, or a `case` branch.
+**`;` is required after:** `input`, `output`, `state`, `config`, `let`, next-state definitions, output connections, `require`, `mutex`, `signal`, `timer`, `type X = ...`, and each entry in a settings block.
 
-A code comment extends from `//` to the end of the line. `#` comments and `/* ... */` comments are not comments in the representative control syntax. Write document explanations in the Markdown body.
+**`;` may be omitted after:** a function's final result expression, a function's closing `}`, and a `case` branch.
+
+A code comment runs from `//` to the end of the line. `#` comments and `/* ... */` comments are not comments in the representative control syntax. Write explanations for readers in the Markdown body.
 
 ### Symbols and delimiters
 
@@ -173,18 +222,18 @@ A code comment extends from `//` to the end of the line. `#` comments and `/* ..
 | `?` | Optional sensor capability declaration |
 | `..` | Sensor valid range |
 
-`=>` is not a logical operator used in ordinary expressions.
+`=>` is not a logical operator. It cannot be used in ordinary expressions.
 
 ## 1.4 Grammar notation
 
-The grammar summaries in this reference use the following metanotation.
+The grammar summaries in this reference use the following metanotation:
 
 - Characters inside single quotes are literal tokens.
 - Non-italic lowercase names such as `name` are other grammar items.
 - `[ item ]` means optional; `{ item }` means zero or more repetitions.
-- `(a | b)` selects one of two alternatives. Actual GhostFlow `{}`, `[]`, and `|` tokens are written in single quotes.
+- `(a | b)` selects one of the alternatives. Actual GhostFlow `{}`, `[]`, and `|` tokens are written in single quotes.
 
-This is a summary that explains this chapter's rules unambiguously, rather than a generation specification replacing the entire parser grammar.
+These summaries state this chapter's rules unambiguously. They are not a complete generative grammar and do not replace the parser grammar.
 
 ```text
 document       ::= Markdown containing one or more top-level ghost fences
@@ -202,9 +251,16 @@ declaration    ::= input_decl | output_decl | config_decl
                  | schedule_decl | timer_decl
 ```
 
-A program has exactly one `control` execution root. Document-scope imports pin a complete `.ghost.md` definition revision and digest; imported functions and types are referenced only as `Alias.name`. `instance` and `connect` inside the control compose imported controls. There is no wildcard import, implicit export, or second root control. Exact import, parameter, instance, connect, and typed expression macro syntax is defined in [Chapter 6](06-composition-and-replay.md#64-import와-연결의-문법).
+A program has exactly one `control` as its execution root.
 
-The declaration forms established by the selected syntax are below. Detailed rules for `expr`, `type`, and `pattern` are covered in the [next chapter](02-types-expressions-state.md).
+- A document-scope import pins one complete `.ghost.md` definition by revision and digest.
+- Imported functions and types are referenced only as `Alias.name`.
+- Inside the control, `instance` and `connect` compose imported controls.
+- There is no wildcard import, no implicit export, and no second root control.
+
+The exact syntax of import, parameter, instance, connect, and typed expression macros is defined in §6.4 of [Chapter 6](06-composition-and-replay.en.md).
+
+The declaration forms of the selected syntax are listed below. Detailed rules for `expr`, `type`, and `pattern` are in the [next chapter](02-types-expressions-state.en.md).
 
 ```text
 input_decl       ::= 'input' input_names ':' payload_type
@@ -231,14 +287,14 @@ parameter_list   ::= Identifier ':' type { ',' Identifier ':' type }
 ```
 
 `input` declares names and types only. An initializer such as `input x: Bool = false;`
-is a compile error at the source location of `=`. The host supplies input values;
-the declaration introduces no implicit default or fallback. Declare `input x: Bool;`
-and supply its value from the host. Use `state` for internal program memory that
-needs an initial value.
+is a compile error, reported at the source location of `=`. The host supplies input
+values, and the declaration introduces no implicit default or fallback. Declare
+`input x: Bool;` and supply the value from the host. For internal program memory
+that needs an initial value, use `state`.
 
-**Why**: An unused initializer must not appear to provide an executable fallback.
+**Why**: An initializer that is never used must not look like an executable fallback.
 
-Unlike the general declaration structure, `schedule` has settings blocks specific to each type. The settled daily-slot form is below.
+`schedule` does not follow the general declaration structure. Each schedule type has its own settings block. The settled daily-slot form is:
 
 ```ghost
 schedule starts: DailySlots<15min> {
@@ -255,7 +311,7 @@ schedule starts: DailySlots<15min> {
 }
 ```
 
-`timezone`, `selected`, times, and lists are syntax in this schedule position. Do not extrapolate them into general strings, general lists, or arbitrary generic type syntax.
+`timezone`, `selected`, the time literals, and the list are syntax that exists only in this schedule position. Do not read them as general strings, general lists, or arbitrary generic type syntax.
 
 ## 1.5 Representative declaration structure
 
@@ -279,22 +335,25 @@ control Example {
 }
 ```
 
-Different keywords separate roles because external inputs, operating settings, memory, temporary computation, and output requests have different change and observation semantics. `let` creates no memory; an `output` declaration creates neither a value nor a safe default.
+Each role has its own keyword because external inputs, operating settings, memory, temporary computation, and output requests change and are observed in different ways. `let` creates no memory. An `output` declaration creates neither a value nor a safe default.
 
 ### Name scope and resolution
 
-- Function parameters exist only inside their function and are unique within one parameter list. Because pure functions do not capture control values, they may use the same spelling as a control value, but do not shadow other functions, types, enum cases, or built-in names.
-- Functions receive required control values and state through parameters. They do not implicitly capture outer inputs or state.
-- The document's control, functions, types, enum cases, import aliases, syntax names, and control value names must be unambiguous. `input`, `output`, `state`, `config`, `parameter`, `let`, `sensor`, `signal`, `schedule`, `timer`, functions, and instances share one value namespace; names cannot be reused even across declaration kinds. Enum cases are also unique within the document. Imported internal names remain under `Alias.name`.
-- Each output has exactly one direct connection expression or `connect`.
-- The source order of `let` does not establish dependency order. It is interpreted as an acyclic dependency graph; mutually dependent cycles are errors.
+- A function parameter exists only inside its function and must be unique within its parameter list. Pure functions do not capture control values, so a parameter may have the same spelling as a control value. It must not shadow another function, type, enum case, or built-in name.
+- A function receives the control values and state it needs through parameters. It never implicitly captures outer inputs or state.
+- The document's control, functions, types, enum cases, import aliases, syntax names, and control value names must be unambiguous.
+  - `input`, `output`, `state`, `config`, `parameter`, `let`, `sensor`, `signal`, `schedule`, `timer`, functions, and instances share **one value namespace**. A name cannot be reused, even by a different kind of declaration.
+  - Enum cases are also unique within the document.
+  - Imported internal names stay under `Alias.name`.
+- Each output has exactly one direct connection expression or one `connect`.
+- The source order of `let` declarations does not define dependency order. The `let` declarations form an acyclic dependency graph; a cycle of mutual dependencies is an error.
 - Local computation does not shadow function names or reserved namespaces.
 
-Conflicts produce compile diagnostics rather than being resolved through declaration order or kind-specific shadowing.
+Conflicts are reported as compile diagnostics. They are never resolved by declaration order or by kind-specific shadowing.
 
 ## 1.6 Representative notation, reference aliases, and historical alternatives
 
-New documents use only the following representative notation. The older notation on the right is historical information for reading and migration diagnostics, rather than syntax aliases, and is rejected as executable input.
+New documents use only the representative notation in the left column. The older notation in the right column is not a syntax alias. It is listed as history, to help readers and to drive migration diagnostics, and it is rejected as executable input.
 
 | Representative notation | Rejected older notation |
 |---|---|
@@ -305,17 +364,17 @@ New documents use only the following representative notation. The older notation
 | `start`, `running` | `input.start`, `state.running` |
 | `if c then a else b` | `ifthenelse(c, a, b)` |
 
-The compiler does not automatically convert the right-hand notation or execute it under a separate profile. If a conversion tool is needed, explicitly revise the original into a new canonical `.ghost.md` revision and review it again.
+The compiler does not automatically convert the right-hand notation, and it does not run it under a separate profile. If you use a conversion tool, explicitly revise the original into a new canonical `.ghost.md` revision and review it again.
 
-The YAML hierarchical notation, CoffeeScript-style indentation and `not/and/or`, and Cypher-style `MATCH/WHERE/WITH/NEXT/EMIT` from the initial A/B/C comparison are design history. They are not permitted aliases of the selected control syntax. Individual reference aliases described in the table do not imply that the complete block structures and operators of the initial alternatives can be used together.
+The initial A/B/C comparison considered a YAML hierarchical notation, a CoffeeScript-style notation (indentation and `not/and/or`), and a Cypher-style notation (`MATCH/WHERE/WITH/NEXT/EMIT`). These are design history, not permitted aliases of the selected control syntax. The individual notations listed in the table do not mean that the block structures and operators of those initial alternatives can be mixed in.
 
 ## 1.7 Chapter boundaries for source rules
 
-This chapter defines canonical document extraction, vocabulary, namespaces, and root program structure. Detailed feature syntax belongs to the following chapters of the same reference.
+This chapter defines canonical document extraction, vocabulary, namespaces, and the root program structure. The detailed syntax of each feature belongs to another chapter of this reference:
 
-- Values, Result, expressions, and state: [Chapter 2](02-types-expressions-state.md)
-- Time values and schedules: [Chapter 3](03-time-and-schedules.md)
-- `adapt`, `has`, capabilities, and constraints: [Chapter 4](04-sensors-constraints-control.md)
-- Immutable import, parameter, instance, connect, and typed expression macro: [Chapter 6](06-composition-and-replay.md)
+- Values, Result, expressions, and state: [Chapter 2](02-types-expressions-state.en.md)
+- Time values and schedules: [Chapter 3](03-time-and-schedules.en.md)
+- `adapt`, `has`, capabilities, and constraints: [Chapter 4](04-sensors-constraints-control.en.md)
+- Immutable import, parameter, instance, connect, and typed expression macro: [Chapter 6](06-composition-and-replay.en.md)
 
-Each syntax combines only at its explicitly declared position in the respective chapter. There is no implicit import, wildcard export, compatibility alias fallback, runtime macro execution, or runtime search for files outside the document.
+Each piece of syntax may appear only at the position its chapter explicitly declares. There is no implicit import, no wildcard export, no compatibility-alias fallback, no runtime macro execution, and no runtime search for files outside the document.

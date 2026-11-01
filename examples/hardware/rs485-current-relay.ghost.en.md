@@ -32,19 +32,57 @@ bindings:
 
 [Korean original](rs485-current-relay.ghost.md) · [Design purpose](../../docs/PROFILE-FRONT-MATTER.en.md)
 
-This canonical example extends the preceding design example with two current meters by adding an output device. It shows that logical inputs and outputs can bind to different drivers sharing the same RS485 connection. It does not mean the physical installation of either current meter has been verified.
+This canonical example extends the earlier two-current-meter design example by
+adding an output device. It shows that logical inputs and outputs can bind to
+different drivers that share one RS485 connection. It does not mean that the
+physical installation of either current meter has been verified.
 
-The user-confirmed relay model is **RYR408B**, with 8 channels, address 3, and 9600 bps. The attached material shows 9600 8 N 1. Because the board's default RS485 connection and the device profile both provide 9600/8N1, the customer YAML does not repeat `bus` or the communication settings. A speed mismatch produces an error during interpretation. Addresses 1 and 2 are assigned to the current meters, and address 3 to the relay.
+The diagram shows the three devices on the shared RS485 connection and which
+logical names flow in each direction.
 
-RYR408B's address and baud rate are physically set by the board's DIP switches. YAML `address: 3` and the profile's `9600bps` configure communication to match those DIP settings. The actual DIP values and declarations must agree; compilation checks agreement among the supplied contracts.
+![Three devices on one RS485 connection](../../docs/diagrams/rs485-current-relay/bus.svg)
 
-The profile IDs and `RO1`–`RO8` shown here are **design/verification contract names**, not profiles published for an actual product. The relay fixture is checked against an RS485/Modbus RTU contract. `ryr408b@1` is the proposed profile ID for the confirmed model. Before publishing a driver/profile, the protocol specification, per-channel registers, ON/OFF values, responses, and output-failure handling must be confirmed. The photograph's initial example using address 1 is not an instruction to change the current address 3. This document does not send commands to physical equipment.
+The relay model, confirmed by the user, is the **RYR408B**: 8 channels, address
+3, 9600 bps. The attached material shows 9600 8 N 1. The board's default RS485
+connection and the device profile both provide 9600/8N1, so the customer YAML
+does not repeat `bus` or the communication settings. A speed mismatch produces
+an error during interpretation. Address assignment:
+
+| Address | Device |
+|---|---|
+| 1 | `meter1` (current meter; profile default) |
+| 2 | `meter2` (current meter) |
+| 3 | `relay` (RYR408B) |
+
+The RYR408B's address and baud rate are set physically by the DIP switches on
+the board. The YAML `address: 3` and the profile's `9600bps` configure
+communication to match those DIP settings. The actual DIP values and the
+declarations must agree. Compilation checks only that the supplied contracts
+agree with each other.
+
+The profile IDs and `RO1`–`RO8` shown here are **design and verification
+contract names**. They are not profiles published for an actual product:
+
+- The relay fixture is checked against an RS485/Modbus RTU contract.
+- `ryr408b@1` is the proposed profile ID for the confirmed model.
+- Before a driver or profile is published, the following must be confirmed:
+  the protocol specification, per-channel registers, ON/OFF values, responses,
+  and output-failure handling.
+- The photograph's initial example uses address 1. That is not an instruction
+  to change the current address 3.
+
+This document sends no commands to physical equipment.
 
 <!-- ghostflow:anchor id=CURRENT-RELAY kind=assumption status=unconfirmed origin=ai -->
-This example assumes that if a motor's phase-A current is at least 0.1 A, it requests the corresponding relay output 1 or 2 ON; if the current is below that threshold or the input has an error, it requests OFF. This is example behavior to demonstrate the bindings, not a user-approved control policy.
+This example assumes the following behavior: if a motor's phase-A current is
+at least 0.1 A, the control requests the matching relay output (1 or 2) ON. If
+the current is below that threshold, or the input has an error, it requests
+OFF. This is example behavior that demonstrates the bindings. It is not a
+user-approved control policy.
 
 <!-- ghostflow:anchor id=UNUSED-RELAYS kind=assumption status=unconfirmed origin=ai -->
-This example assumes that unused relay outputs 3–8 are always requested OFF. Output requests are distinct from confirmation of physical contacts.
+This example assumes that the unused relay outputs 3–8 are always requested
+OFF. An output request is not the same as confirmation of a physical contact.
 
 ```ghost
 control CurrentRelayExample {

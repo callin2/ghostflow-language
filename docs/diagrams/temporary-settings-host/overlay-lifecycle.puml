@@ -1,0 +1,21 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName Helvetica
+skinparam defaultFontSize 13
+hide empty description
+
+state "Ordinary value only" as Ordinary
+state "Temporary overlay active\n(ordinary value kept underneath)" as Overlay
+state "Return applied" as Returned
+state "Superseded by ordinary event" as Superseded
+state "Return completed as fault emission" as Fault
+
+[*] --> Ordinary
+Ordinary --> Overlay : temporary event\n(lifetime Run or Until)
+Overlay --> Returned : cancel / Until expiry /\nendRun or new run (Run)
+Overlay --> Superseded : ordinary event for\naffected targets
+Overlay --> Fault : return emits fault\n(never labeled success)
+Returned --> Ordinary
+Superseded --> Ordinary
+Fault --> Ordinary
+@enduml

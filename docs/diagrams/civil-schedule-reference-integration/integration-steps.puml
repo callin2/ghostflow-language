@@ -1,0 +1,16 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontSize 13
+skinparam activity {
+  BackgroundColor #F8F8F8
+  BorderColor #555555
+}
+start
+:Done: structural pulse slice\n(parse, type check, checker descriptor);
+:1. Civil occurrence facts\n(provider supplies facts, never .due);
+:2. Portable admission descriptor\nbeyond Solar;
+:3. Verified bytecode, WASM/native\nactivation, prelude execution;
+:4. Prove source -> artifact -> execution;\nremove emission rejection and host .due;
+:5. Extend policy to Window/Run,\ncancellation, held clocks;
+stop
+@enduml

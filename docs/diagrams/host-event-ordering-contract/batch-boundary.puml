@@ -1,0 +1,44 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName Helvetica
+skinparam defaultFontSize 13
+scale 1 as 70 pixels
+hide time-axis
+
+concise "Receipts" as R
+concise "Batch" as B
+concise "Instance" as I
+
+@0
+R is "r1"
+B is "open (batch N)"
+I is "idle"
+
+@1
+R is "r2"
+
+@2
+R is "latch"
+B is "N closed"
+I is "evaluate N"
+
+@3
+R is "r3"
+
+@4
+I is "commit + dispatch N"
+
+@5
+R is "r4"
+
+@6
+R is "latch"
+B is "N+1 closed: r3, r4"
+I is "evaluate N+1"
+
+@7
+R is "-"
+I is "idle"
+
+B@2 <-> @6 : r3 and r4 arrive after latch -> they wait for N+1
+@enduml

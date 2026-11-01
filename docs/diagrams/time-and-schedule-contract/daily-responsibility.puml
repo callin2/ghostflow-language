@@ -1,0 +1,16 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName Helvetica
+skinparam defaultFontSize 13
+
+rectangle "RTC / NTP / platform\nclock provider" as Clock
+rectangle "GhostFlow runtime" as Runtime {
+  rectangle "Daily occurrence crossing,\nadmission, missed occurrences,\nduplicate suppression" as Calc
+  rectangle "Schedule ledger" as Ledger
+}
+database "Host storage" as Store
+
+Clock --> Calc : per evaluation:\nwall + monotonic snapshots,\nwall-clock trust status
+Calc --> Ledger : manages
+Ledger <--> Store : persisted across\nruntime restarts
+@enduml

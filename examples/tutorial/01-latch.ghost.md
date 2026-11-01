@@ -1,11 +1,11 @@
 # Latching pump tutorial
 
-This document is the canonical small control; `01-latch.ghost` is retained only
-as non-executable historical evidence. The Markdown
-prose is not executable; only the top-level `ghost` fence is the source.
+This file is the canonical source of the small latching-pump control. Only the
+top-level `ghost` fence below is compiled; the Markdown prose is not executable.
+`01-latch.ghost` is kept only as non-executable historical evidence.
 
-The `watering` state holds its previous value when there is no new start. A stop
-request has priority over start, including when both inputs are true in one tick.
+`watering` is a latch: when there is no new start request, it keeps its previous
+value. A stop request beats a start request, even when both are true in one tick.
 
 ```ghost
 control LatchingPump {
@@ -33,14 +33,25 @@ control LatchingPump {
 }
 ```
 
-The new revision `issue531-approved-fault-restart-v1` explicitly handles faults.
-A START fault inhibits new starts; an active run may continue with healthy,
-released STOP. A STOP fault releases the run. After a fault stops or blocks a
-run, healthy START must turn off then on before restarting. START is a logical
-request; this example does not require a physical button. The exact previous
-source is retained under tests/fixtures/history/issue531.
+The revision `issue531-approved-fault-restart-v1` makes the input fault policy
+explicit in the source:
 
-Expected healthy trace for the unchanged companion CSV:
+- **START fault.** New starts are inhibited. A run that is already active may
+  continue while STOP is healthy and released.
+- **STOP fault.** The run is released (the pump and valve turn off).
+- **Restart after a fault.** Once a fault has stopped or blocked a run, START
+  must be healthy and must go off and then on again before the pump can restart.
+
+START is a logical request. This example does not require a physical button.
+The exact previous source is retained under tests/fixtures/history/issue531.
+
+The diagram below shows the combined `watering` and `restart_blocked` states and
+the per-tick conditions that move between them.
+
+![Latch states with the restart block: Stopped, Running, Running with restart blocked, and Stopped with restart blocked](../../docs/diagrams/tutorial-01-latch/latch-fault-states.svg)
+
+Expected healthy trace for the unchanged companion CSV ([01-latch.csv](01-latch.csv)).
+Tick 3 shows STOP winning when both inputs are true:
 
 | tick | start | stop | watering' | pump / valve |
 |---:|:---:|:---:|:---:|:---:|

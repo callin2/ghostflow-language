@@ -1,0 +1,19 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontSize 13
+skinparam componentStyle rectangle
+title Literate document: only top-level ghost blocks execute
+
+file "follow-switch.ghost.md\n(editable original)" as doc
+rectangle "Prose paragraphs,\nother info strings,\nnested fences" as prose
+rectangle "Top-level ```ghost blocks\n(in document order)" as blocks
+component "Compiler joins blocks\ninto one root control" as cc
+file "GFB + manifest + source map\n(derived artifacts)" as out
+
+doc --> prose
+doc --> blocks
+prose ..> cc : not executed\n(changes revision only)
+blocks --> cc
+cc --> out
+out ..> doc : error locations\npoint back here
+@enduml

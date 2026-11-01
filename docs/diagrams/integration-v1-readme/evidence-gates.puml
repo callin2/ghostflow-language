@@ -1,0 +1,31 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName Helvetica
+skinparam defaultFontSize 13
+skinparam ArrowColor #526d76
+skinparam rectangle {
+  BackgroundColor #f1f6f5
+  BorderColor #6d858b
+}
+hide stereotype
+
+rectangle "host-tests\ninjected-fixture" as HS
+rectangle "device-status\ngpio-readback\nregister-readback" as HWS
+rectangle "physical-observation" as PS
+rectangle "host gate" as H
+rectangle "hardware gate" as HW
+rectangle "physical gate" as P
+
+HS --> H
+HWS --> HW
+PS --> P
+H -[hidden]right- HW
+HW -[hidden]right- P
+H ..> HW : never fills in
+HW ..> P : readback is never\na physical pass
+note bottom of P
+  No aggregate pass.
+  Each gate: not_run | pass | fail | unknown.
+  Source "none" allows only not_run / unknown.
+end note
+@enduml

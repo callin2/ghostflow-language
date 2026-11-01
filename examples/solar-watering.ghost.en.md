@@ -4,14 +4,23 @@
 
 # Watering timed to sunrise and sunset
 
-Water according to each day's sunrise and sunset using Seoul's **test
-coordinates**. For installation, use verified farm coordinates and timezone.
+This example waters according to each day's sunrise and sunset, using Seoul's
+**test coordinates**. For a real installation, write in the verified farm
+coordinates and timezone.
 
-For an 8DI/8RO layout, name RO1 as the pump and RO2–RO5 as valves. Request
-RO2 and RO3 together for five minutes, 30 minutes after sunrise. Request RO4
-and RO5 together for five minutes, 30 minutes before sunset. This example runs
-each pair of valves simultaneously. If it is unclear whether the user wants
-simultaneous or sequential operation, clarify before authoring.
+The example uses an 8DI/8RO layout (eight digital inputs, eight relay outputs)
+and names the relays as follows:
+
+| Relay | Role | Requested |
+|---|---|---|
+| RO1 | Pump | whenever either pair runs |
+| RO2, RO3 | Valve pair | together, for 5 minutes, starting 30 minutes after sunrise |
+| RO4, RO5 | Valve pair | together, for 5 minutes, starting 30 minutes before sunset |
+| RO6–RO8 | Unused | always off |
+
+This example runs the two valves of each pair at the same time. If it is
+unclear whether the user wants simultaneous or sequential operation, clarify
+that before authoring.
 
 ```ghost
 control SolarWateringFixture {
@@ -67,6 +76,7 @@ control SolarWateringFixture {
 }
 ```
 
-`dawn_active` and `dusk_active` have independent Bool states and elapsed timers.
-Therefore, even if `skip` on an untrusted solar event does not create a new start
-signal, the five-minute elapsed-time check for each run already started continues.
+`dawn_active` and `dusk_active` each have their own Bool state and elapsed
+timer. When `skip` handling of an untrusted solar event creates no new start
+signal, the five-minute elapsed-time check of each run that has already started
+still continues.

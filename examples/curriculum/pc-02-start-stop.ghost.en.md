@@ -2,31 +2,37 @@
 [Korean original](pc-02-start-stop.ghost.md)
 > Reading translation. Compile the linked original `.ghost.md` file.
 
-# PC-02 — START / STOP latching and fresh-start permission
+# PC-02 — START/STOP latching and fresh-start permission
 
 <!-- ghostflow:anchor id=GF-INT-PC02-START-STOP-REARM-V1 kind=intent status=confirmed origin=imported -->
-> Learning scenario: Press START to begin operation and stop immediately when
-> STOP is asserted. After STOP clears, operation may restart only after START
-> has been released and pressed again, even if it was held during the stop.
+> Learning scenario: Press START to begin operation, and stop immediately when
+> STOP is asserted. When STOP clears, operation may restart only after START
+> is released and pressed again, even if START was held during the stop.
 
-The linked original is the sole executable source for PC-02. The basic latching behavior and
-the requirement that `pump` implies `valve` are preserved in lesson
-[E03](../../docs/ProgrammingInGhostflow.md#ch03). This example adds the stop
-path, a fresh-start event, and restart inhibition.
+The linked Korean original is the only executable source for PC-02. Lesson
+[E03](../../docs/ProgrammingInGhostflow.en.md#ch03) already covers the basic
+latch and the rule that `pump` requires `valve`. This example builds on it and
+makes three things explicit: the stop path, a fresh-start event, and restart
+inhibition.
 
-`stop_ok` is a logical input indicating that the stop path permits operation.
-It is supplied as `false` while STOP is active. The NO/NC polarity of the actual
-STOP contact and the electrical safety circuit belong to the device adapter's
-input semantics; this virtual example receives a normalized Bool payload and
-acquisition quality.
+`stop_ok` is a logical input that is `true` when the stop path permits
+operation; it is supplied as `false` while STOP is active. The NO/NC polarity of
+the real STOP contact and the electrical safety circuit belong to the device
+adapter's input semantics. This virtual example receives only a normalized Bool
+payload together with its acquisition quality.
 
-This explicit new source revision preserves the existing healthy START/STOP scenario.
-A START acquisition fault prevents a new start but retains an active run while
-STOP is healthy and permits operation. A STOP acquisition fault clears running
-and requests OFF. A fault on either input clears `armed`. Restart then requires
-observing a healthy released START while STOP is healthy and permits operation,
-followed by another press. An acquisition fault never counts as a healthy release
-for rearming. The predecessor is retained in
+This is an explicit new source revision. It keeps the existing healthy
+START/STOP scenario unchanged and adds these rules for acquisition faults:
+
+- A START fault prevents a new start. An active run continues while STOP is
+  healthy and permits operation.
+- A STOP fault clears `running` and requests OFF.
+- A fault on either input clears `armed`.
+- To restart, the control must observe a healthy, released START while STOP is
+  healthy and permits operation, followed by another press. An acquisition
+  fault never counts as a healthy release for rearming.
+
+The previous revision is kept in
 `tests/fixtures/history/issue531/pc-02-start-stop.ghost.en.md.pre-input.txt`.
 
 ```ghost
@@ -56,12 +62,20 @@ control StartStopPump {
 }
 ```
 
-`running` is the previous operating state; `running'` is the next state for
-this tick. `armed` remembers whether START was last observed released. Thus
-`start_event` is false even if START is already pressed on a new runtime's first
-input, and operation remains inhibited after STOP clears until START is released.
+`running` is the operating state from the previous tick; `running'` is its next
+state, computed in this tick. `armed` remembers whether START was released at
+the last observation. As a result:
+
+- On a new runtime's first input, `start_event` is false even if START is
+  already pressed.
+- After STOP clears, operation stays inhibited until START is released.
+
+The state diagram below shows the three combinations of `running` and `armed`
+that the control can reach, and what moves it between them.
+
+![PC-02 states: Idle, Armed and Running, with the transitions between them](../../docs/diagrams/pc-02-start-stop/start-stop-states.svg)
 
 This example does not verify physical relay contacts, motor rotation, or a
-wired safety circuit. Its focused checker compares `stateBefore`, `stateAfter`,
-`requested`, and `safe` frames using the actual GhostFlow compiler and existing
-WASM `ControlRuntime`.
+wired safety circuit. Its dedicated checker uses the actual GhostFlow compiler
+and the existing WASM `ControlRuntime` to compare the `stateBefore`,
+`stateAfter`, `requested`, and `safe` frames.

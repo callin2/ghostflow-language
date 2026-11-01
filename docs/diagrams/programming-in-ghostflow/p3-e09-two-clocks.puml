@@ -1,0 +1,17 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName Helvetica
+
+rectangle "Civil clock\n(time zone, DST, trusted clock)" as civil
+rectangle "schedule starts:\nDailySlots<15min>\n06:00, 18:45" as sched
+rectangle "starts.due\n(true on the tick\nan occurrence arrives)" as due
+rectangle "phase: Idle -> Watering" as start
+rectangle "Monotonic clock\nage = elapsed(phase)" as mono
+rectangle "age >= 5min:\nWatering -> Idle" as stop
+
+civil --> sched : wall time
+sched --> due : admitted occurrence
+due --> start
+start --> mono : age restarts at 0
+mono --> stop : first tick at or past 5min
+@enduml

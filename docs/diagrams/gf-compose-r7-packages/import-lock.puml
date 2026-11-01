@@ -1,0 +1,21 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName Helvetica
+skinparam defaultFontSize 13
+title Conceptual import lock (illustrative, not an accepted schema)
+
+rectangle "root composition\nfarm-irrigation@composition-rev-17\nsha256:ROOT...17" as ROOT
+rectangle "instance east-zone-01\n(own state, timers, ports,\nsettings, binding, provenance)" as E
+rectangle "instance west-zone-02\n(own state, timers, ports,\nsettings, binding, provenance)" as W
+rectangle "definition\nirrigation-controller@rev-42\nsha256:DEF...42" as DEF
+rectangle "rain-policy@rev-8\nsha256:RAIN...08" as RAIN
+
+ROOT --> E
+ROOT --> W
+E --> DEF : pins
+W --> DEF : pins (same digest)
+DEF --> RAIN : import (transitive)
+note bottom of RAIN
+transitive closure: ROOT...17, DEF...42, RAIN...08
+end note
+@enduml

@@ -1,0 +1,18 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontSize 13
+hide empty description
+state "Not pending" as Consumed
+
+[*] --> Pending : host reports\nboot event pending
+[*] --> Consumed : host reports\nno pending event
+Pending --> Pending : scan rejected\n(event retained)
+Pending --> Consumed : first successfully\ncommitted scan\n(restart_event = true)
+Consumed --> Consumed : later scans\n(restart_event = false)
+Consumed --> Consumed : program replacement\n(no new boot event)
+
+note bottom of Pending
+  restart_reason stays fixed for the run
+  (Unknown when the host has no evidence).
+end note
+@enduml

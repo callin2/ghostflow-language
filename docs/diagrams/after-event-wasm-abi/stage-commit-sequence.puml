@@ -1,0 +1,29 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontSize 13
+participant "Host (JS)" as H
+participant "WASM adapter" as W
+participant "Rust AfterEvent<32>" as R
+H -> W : stage(batch)
+W -> W : encode GFAE v1 packet
+W -> R : stage(packet)
+R -> R : expire, acknowledge,\nadd starts, apply predicate
+alt staging succeeds
+  R --> W : staged (not committed)
+  H -> W : stagedAny() / stagedAll()
+  note over H : results still shows\ncommitted state only
+  alt commit
+    H -> W : commit()
+    W -> R : commit
+    note over R : staged state\nbecomes committed
+  else rollback
+    H -> W : rollback()
+    W -> R : rollback
+    note over R : previous results\npreserved
+  end
+else decode or staging fails
+  R --> W : error
+  W --> H : throws
+  note over R : nothing consumed;\nearlier staged batch\nstill commit/rollback-able
+end
+@enduml

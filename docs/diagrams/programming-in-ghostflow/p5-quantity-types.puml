@@ -1,0 +1,23 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontSize 13
+skinparam rectangleBorderColor #4A6FA5
+skinparam rectangleBackgroundColor #F7F9FC
+title Units choose a spelling; the type carries the meaning
+
+rectangle "25°C   77°F   298.15K" as TL
+rectangle "Temperature\n(canonical K)" as T
+rectangle "5Δ°C   9Δ°F" as DL
+rectangle "TemperatureDelta\n(canonical ΔK)" as TD
+rectangle "Irradiance\n(W/m2, radiant power)" as IR
+rectangle "PPFD\n(umol/m2/s, photons)" as PP
+rectangle "Lux sensor reading\n(no Lux type)" as LX
+rectangle "Validated conversion\nat binding/preprocessing" as CV
+
+TL --> T : same type,\nconverted to canonical unit
+DL --> TD : same type
+T ..> TD : Temperature - Temperature
+IR -[#B03A2E]- PP : <color:#B03A2E>no direct comparison</color>
+LX --> CV : spectrum, calibration, optics
+CV --> PP : only if verified
+@enduml

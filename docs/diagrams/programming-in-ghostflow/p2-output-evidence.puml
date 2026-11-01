@@ -1,0 +1,27 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontSize 13
+skinparam ActivityBackgroundColor #F7F9FC
+skinparam ActivityBorderColor #4A6FA5
+title From requested intent to physical evidence (E05 last row)
+
+start
+:Requested intent\n(<- connections)\npump=true, valve=false;
+:Output constraints\nrequire pump => valve;
+:Safe intent\n("final output" in this chapter)\npump=false, valve=false;
+note right
+  Constraints only lower
+  true to false. The runtime
+  never turns the valve on
+  to satisfy the rule.
+end note
+:Applied\n(renderer evidence:\ncommand was written);
+:Confirmed\n(feedback evidence:\nlimit, encoder, ...);
+note right
+  Applied and confirmed are
+  outside the language's
+  output intent. Safe=true
+  does not prove the pump ran.
+end note
+stop
+@enduml

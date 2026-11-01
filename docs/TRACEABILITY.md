@@ -1,8 +1,12 @@
 # Language implementation and checks
 
-Use the current checkout's [verification report](VERIFICATION.md) to determine
-which checks ran and passed. This table locates retained tests; it does not carry
-forward completion or hardware claims from the source workspace.
+This page maps each language contract to the code that implements it and to
+the tests that check it.
+
+It only tells you **where** the retained tests live. It does not tell you
+whether they passed. To see which checks ran and passed, read the current
+checkout's [verification report](VERIFICATION.md). This table also does not
+carry forward any completion or hardware claims from the source workspace.
 
 | Contract | Implementation | Verification |
 |---|---|---|
@@ -17,6 +21,9 @@ forward completion or hardware claims from the source workspace.
 | Same generated input trace on native/WASM | `tools/tutorial.mjs`, core native runner | Tutorial assertions and generated traces |
 | Release identity versus execution evidence | `tools/integration-contract.mjs`, `contracts/integration-v1` | `tests/integration-contract.test.mjs` (fictional fixture) |
 
-Cross-project release provenance and Device/API/frontend checks are owned by the
-integration and consumer projects. The private migration workspace retains the
-original task and conversation history.
+Two kinds of checks live outside this repository:
+
+- Cross-project release provenance, and Device/API/frontend checks, belong to
+  the integration and consumer projects.
+- The original task and conversation history stay in the private migration
+  workspace.

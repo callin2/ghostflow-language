@@ -1,0 +1,19 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontSize 13
+skinparam ActivityBackgroundColor #F8F8F8
+start
+:step(packet, proposal);
+:Copy arguments privately;
+:Check identities, time,\nprovenance, authority, capacity;
+:Check each change: type, grid/range,\nallowed range, maxStep, rolling maxChange;
+if (Every check passes?) then (yes)
+  :Submit ONE atomic\ncore settings event;
+  :Record history after\ncore acceptance;
+  :Return core outcome\n+ new revision;
+else (any failure)
+  :Return outcome: null\n+ adaptation trace;
+  note right: No tick, clock, history\nor revision is committed
+endif
+stop
+@enduml

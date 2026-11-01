@@ -1,0 +1,27 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName Helvetica
+skinparam ArrowColor #555555
+skinparam ActivityBorderColor #555555
+
+start
+:Retrieve Reference §1.2, §1.5, §4.7
+(citation + digest);
+:Check rev-1-input-v1
+of build/authoring/pump.ghost.md;
+:Check fails: diagnostic span points to
+pump <- start && ;  in the original document;
+:Edit the same document
+(rev-2-input-v1: pump <- requested';);
+:Check rev-2, then compile
+(GFB + source map);
+:Simulate scans at 0, 1, 2 ms
+(virtual requested / safe intents);
+:Ask the user the open question
+(maximum run duration?);
+note right
+  No timer is added
+  until the user answers.
+end note
+stop
+@enduml

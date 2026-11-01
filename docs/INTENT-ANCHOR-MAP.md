@@ -1,55 +1,91 @@
 # Literate intent anchor map
 
-Status: Main implementation contract for LS-1c, 2026-09-15. Tracking:
+Status: main implementation contract for LS-1c, 2026-09-15. Tracking:
 language issue #60 / integration issue #17 / local TASK-112.
 
-This is a deliberately small, additive source-provenance layer. It does not add
-an executable GhostFlow construct, change GFB1 bytes, change the strict control
-manifest, or make metadata affect runtime output. The authored `.ghost.md`
-document remains the only canonical product source. A generated map is never an
-editable second source.
+This contract adds a small, additive **source-provenance layer**: a way to record
+*why* a piece of GhostFlow code exists. It is deliberately limited:
+
+- It adds no executable GhostFlow construct.
+- It does not change GFB1 bytes or the strict control manifest.
+- Metadata never affects runtime output.
+- The authored `.ghost.md` document remains the only canonical product source.
+  A generated map is never an editable second source.
+
+In this document:
+
+- [Why this exists](#why-this-exists) — the gap this layer fills.
+- [Minimal authored form](#minimal-authored-form) — how to write anchors and links.
+- [Derived metadata](#derived-metadata) — what the compiler records and how it is verified.
+- [Imported intent provenance](#imported-intent-provenance) — anchors and links across pinned imports.
+- [Extraction and compatibility](#extraction-and-compatibility) — what counts as a directive; what stays unchanged.
+- [Diagnostics and acceptance vectors](#diagnostics-and-acceptance-vectors) — warnings and errors.
+- [Compiler constraint derivations](#compiler-constraint-derivations-31-bounded-acceptance) — provenance for lowered `require` statements.
+- [Deliberate non-goals](#deliberate-non-goals).
 
 ## Why this exists
 
-The exact literate document and compiler node locations are already preserved.
-That answers “where is this output calculated?” but not “which stated intent or
-premise led to this calculation?” LS-1c adds an explicit link. The compiler only
-validates what the author supplied; it does not infer intent, discover tacit
-knowledge, or approve an AI assumption.
+GhostFlow already preserves exact literate-document and compiler-node locations.
+That answers “where is this output calculated?” It does not answer “which stated
+intent or premise led to this calculation?”
+
+LS-1c adds an explicit link between the two. The compiler only validates what
+the author supplied. It does not infer intent, discover tacit knowledge, or
+approve an AI assumption.
 
 ## Minimal authored form
 
-An anchor is a standalone top-level Markdown HTML comment immediately followed
-by one top-level paragraph or block quote:
+You write two things: an **anchor** in the Markdown prose, and a **link** inside
+an executable `ghost` fence. The link points at the anchor by `id`, and attaches
+to the statement that follows it.
+
+![An anchor in prose and a link in code feed the compiler, which records locations in the source-trace companion without changing bytecode](diagrams/intent-anchor-map/anchor-link-flow.svg)
+
+The diagram shows the authored pieces on the left and what the compiler produces
+on the right. Only the source-trace companion gains new data.
+
+**Anchors.** An **anchor** is a standalone top-level Markdown HTML comment immediately
+followed by one top-level paragraph or block quote:
 
 ```markdown
 <!-- ghostflow:anchor id=GF-INT-PUMP-001 kind=intent status=confirmed origin=user -->
 > 급수 요청 스위치를 켜면 펌프를 켜 주세요.
 ```
 
-The comment is non-rendering metadata. The following block is the anchored
-original text. A blank line between the comment and the block is allowed because
-CommonMark separates both as top-level blocks. A heading, list, nested block,
-code fence, another anchor, or end of document is not an anchor body. One block
-keeps source ranges and review units unambiguous; longer explanations use
-multiple anchors or ordinary unanchored prose.
+- The comment is non-rendering metadata.
+- The block after it is the **anchored original text** (the anchor body).
+- A blank line between the comment and the block is allowed, because CommonMark
+  treats both as separate top-level blocks.
+- A heading, list, nested block, code fence, another anchor, or the end of the
+  document is **not** an anchor body.
 
-The fields and their order are exact in v1:
+One block per anchor keeps source ranges and review units unambiguous. For a
+longer explanation, use multiple anchors or ordinary unanchored prose.
 
-- `id`: `[A-Za-z][A-Za-z0-9._:-]{0,127}`; unique in one document and stable
-  across wording revisions when the same intent remains.
-- `kind`: `intent`, `premise`, or `assumption`.
-- `status`: `confirmed`, `unconfirmed`, or `superseded`.
-- `origin`: `user`, `operator`, `engineer`, `ai`, or `imported`.
+In v1 the fields and their order are exact:
 
-`assumption` may be `unconfirmed` or `superseded`, but never `confirmed`. Once a person confirms it, the
-canonical source reclassifies it as `intent` or `premise`; the old assumption
-may remain as `superseded` prose without a current executable link. A
-`superseded` anchor cannot link to a current node. These checks prevent an AI
-guess from silently becoming confirmed intent. They do not define a product
-approval workflow.
+| Field | Allowed values | Notes |
+|---|---|---|
+| `id` | `[A-Za-z][A-Za-z0-9._:-]{0,127}` | Unique within one document. Keep it stable across wording revisions while the same intent remains. |
+| `kind` | `intent`, `premise`, `assumption` | |
+| `status` | `confirmed`, `unconfirmed`, `superseded` | |
+| `origin` | `user`, `operator`, `engineer`, `ai`, `imported` | |
 
-A link is an exact whole-line comment inside an executable `ghost` fence:
+An `assumption` may be `unconfirmed` or `superseded`, but **never** `confirmed`.
+Once a person confirms it, the canonical source reclassifies it as `intent` or
+`premise`. The old assumption may remain as `superseded` prose without a current
+executable link. A `superseded` anchor cannot link to a current node.
+
+These checks prevent an AI guess from silently becoming confirmed intent. They
+do not define a product approval workflow.
+
+![Lifecycle of an anchor classification: an unconfirmed assumption is either reclassified as intent or premise when a person confirms it, or kept as superseded prose](diagrams/intent-anchor-map/anchor-classification.svg)
+
+The diagram summarizes which anchors each relation may reference. An `intent`
+or `premise` may also be `unconfirmed`; it then accepts the same relations as a
+confirmed one.
+
+**Links.** A **link** is an exact whole-line comment inside an executable `ghost` fence:
 
 ```ghost
 // ghostflow:link id=GF-INT-PUMP-001 relation=implements
@@ -58,20 +94,25 @@ pump <- request;
 
 The fields and their order are exact. `relation` is one of:
 
-- `implements`: this node implements stated behavior.
-- `constrains`: this node restricts behavior for an intent or premise.
-- `fallback`: this node implements an explicit degraded-time/data policy.
-- `assumes`: this candidate node currently relies on an unconfirmed assumption.
+| `relation` | Meaning |
+|---|---|
+| `implements` | This node implements stated behavior. |
+| `constrains` | This node restricts behavior for an intent or premise. |
+| `fallback` | This node implements an explicit degraded-time/data policy. |
+| `assumes` | This candidate node currently relies on an unconfirmed assumption. |
 
-One or more consecutive link lines may target the same statement. The target is
-the immediately following traceable top-level declaration or statement. A blank
-line, ordinary comment, nested expression, control header, or end of fence makes
-the link orphaned and is an error. The supported v1 target kinds are the parser's
-top-level declarations and statements: `input`, `output`, `state`, `config`,
-`let`, `enum`, `function`, `sensor`, `signal`, `schedule`, `timer`, `require`,
-`mutex`, `next`, and `connection`.
+**Link target.** One or more consecutive link lines may target the same
+statement. The target is the immediately following traceable top-level
+declaration or statement. Any of the following between the link and its target
+makes the link **orphaned**, which is an error: a blank line, an ordinary
+comment, a nested expression, a control header, or the end of the fence.
 
-Relation/classification checks are intentionally narrow:
+The supported v1 target kinds are the parser's top-level declarations and
+statements: `input`, `output`, `state`, `config`, `let`, `enum`, `function`,
+`sensor`, `signal`, `schedule`, `timer`, `require`, `mutex`, `next`, and
+`connection`.
+
+**Relation/classification checks** are intentionally narrow:
 
 - `assumes` must reference an `assumption` with `status=unconfirmed`.
 - Other relations cannot reference an `assumption`.
@@ -83,146 +124,184 @@ does not silently allow or deny a release.
 
 ## Derived metadata
 
-For a literate source containing anchors or links, the existing
+For a literate source that contains anchors or links, the existing
 `GhostFlow/source-trace-v1` companion gains two optional arrays. Sources without
 this feature keep the existing shape and behavior.
 
 `intentAnchors[]` contains:
 
-- `id`, `kind`, `status`, and `origin` exactly as authored;
-- `directiveSource`: original Markdown location of the anchor directive;
-- `source`: original Markdown range of the following paragraph or block quote.
+- `id`, `kind`, `status`, and `origin`, exactly as authored;
+- `directiveSource`: the original Markdown location of the anchor directive;
+- `source`: the original Markdown range of the following paragraph or block quote.
 
 `intentLinks[]` contains:
 
-- `anchorId` and `relation` exactly as authored;
+- `anchorId` and `relation`, exactly as authored;
 - `nodeId` and `nodeKind` from the authoritative compiler AST;
-- `directiveSource`: original Markdown location of the link comment;
+- `directiveSource`: the original Markdown location of the link comment;
 - `source`: the authoritative target node location;
-- `extractedDirectiveSource` and `extractedSource` only for literate compilation,
-  retaining the code-fence coordinate system as the existing trace does.
+- `extractedDirectiveSource` and `extractedSource`, only for literate compilation.
+  These keep the code-fence coordinate system, as the existing trace does.
 
-The arrays never copy or normalize the anchored prose. A consumer obtains exact
-text by slicing the already verified `sourceDocument.text` at the recorded
-range. This avoids creating a second maintained text copy.
+The arrays never copy or normalize the anchored prose. To get the exact text, a
+consumer slices the already verified `sourceDocument.text` at the recorded range.
+This avoids creating a second text copy that someone would have to maintain.
 
-The companion continues to carry `sourceDocumentSha256` and `bytecodeSha256`.
-Strict recovery validates both revision identities, every anchor and link shape,
-unique IDs, relation/classification compatibility, target node ID/kind/location,
-and directive/source locations inside the selected document. It rejects unknown
-fields or enum values, duplicate anchors or duplicate identical links, missing
-anchors, orphan links, a metadata node/location that disagrees with the supplied
-source map, mixed revisions, and out-of-range locations. No verifier reconstructs
-or guesses a missing link.
+**Verification.** The companion still carries `sourceDocumentSha256` and `bytecodeSha256`.
+Strict recovery validates:
 
-This local recovery API proves internal consistency, not authenticity. An attacker
-who can replace the whole source map can replace both a node and its matching
-metadata. Authenticity requires either the existing portable package verifier,
-whose signed payload covers the source-map digest, or a trusted deterministic
-compiler replay from the verified source document. LS-1c must not claim that an
-unsigned standalone map detects coordinated replacement.
+- both revision identities;
+- every anchor and link shape, and unique IDs;
+- relation/classification compatibility;
+- the target node ID, kind, and location;
+- that directive and source locations lie inside the selected document.
+
+It rejects:
+
+- unknown fields or enum values;
+- duplicate anchors, or duplicate identical links;
+- missing anchors and orphan links;
+- a metadata node/location that disagrees with the supplied source map;
+- mixed revisions and out-of-range locations.
+
+No verifier reconstructs or guesses a missing link.
+
+**Consistency is not authenticity.** This local recovery API proves **internal consistency, not authenticity**. An
+attacker who can replace the whole source map can replace both a node and its
+matching metadata. Authenticity requires one of:
+
+- the existing portable package verifier, whose signed payload covers the
+  source-map digest; or
+- a trusted deterministic compiler replay from the verified source document.
+
+LS-1c must not claim that an unsigned standalone map detects coordinated
+replacement.
 
 ## Imported intent provenance
 
 Pinned composition preserves authored intent for each instantiated definition.
-The root `intentAnchors` and `intentLinks` remain scoped to the root document.
-The compiler adds `traceMetadata.compositionIntent` when an imported instance
-has anchors or links. This container has these fields:
+The root `intentAnchors` and `intentLinks` stay scoped to the root document.
+When an imported instance has anchors or links, the compiler adds
+`traceMetadata.compositionIntent`. This container has these fields:
 
 - `format` is `GhostFlow/composition-intent-v1`.
 - `sourceClosureSha256` is SHA-256 of `canonicalJson(sourceClosure)`.
 - `instances` contains groups in deterministic traversal order. Each group has
-  the authored `instance` path, such as `east` or `outer.inside`, and `definition`
-  with the pinned `filename`, `revision`, and exact document `sha256`.
+  the authored `instance` path, such as `east` or `outer.inside`, and a
+  `definition` with the pinned `filename`, `revision`, and exact document `sha256`.
 - Each group's `anchors` preserves the original anchor fields. Its `links`
-  preserves the original link fields, with composed `nodeId` and original
+  preserves the original link fields, plus the composed `nodeId` and the original
   `definitionNodeId`.
 
-Anchor IDs are local to their document. The root, two definitions, and repeated
-instances may use the same ID. The group supplies the namespace; the compiler
-does not rewrite IDs or infer instance identity from generated variable names.
-An imported AI assumption remains `origin=ai`, `kind=assumption`, and
-`status=unconfirmed`. Importing it does not confirm it or change its origin.
+**Anchor IDs are local to their document.** The root, two definitions, and
+repeated instances may all use the same ID. The group supplies the namespace.
+The compiler does not rewrite IDs, and does not infer instance identity from
+generated variable names. An imported AI assumption stays `origin=ai`,
+`kind=assumption`, and `status=unconfirmed`. Importing it neither confirms it
+nor changes its origin.
 
-The compiler validates links against each definition's original AST before
-binding them to composed nodes. Original Markdown locations and extracted-code
-locations remain separate. Input and output declaration links survive even when
-composition removes the executable declaration. An unused imported document
-stays in the verified closure but contributes no instance group. Root revision
-identity is supplied by the caller where required; composition invents none.
+**Validation and binding.**
 
-Artifact restoration and signed portable-package verification recompile the
-exact closure and compare all provenance. They reject missing or modified groups,
-definition identities, closure digest, node IDs, locations, classifications, or
-relations. The standalone trace validator rejects a composition container.
-Prose-only definition edits change provenance and pins while unchanged executable
-tokens retain the same bytecode.
+- The compiler validates links against each definition's original AST before
+  binding them to composed nodes.
+- Original Markdown locations and extracted-code locations stay separate.
+- Links on `input` and `output` declarations survive even when composition
+  removes the executable declaration.
+- An unused imported document stays in the verified closure but contributes no
+  instance group.
+- Where root revision identity is required, the caller supplies it; composition
+  never invents one.
 
-Root `intentEvidence` can refer only to root anchors and root linked nodes.
-It cannot claim an imported node through an equal anchor ID. The current
-Interaction schema cannot represent imported intent groups and explicitly rejects
-a projection request containing them. Ordinary compilation and execution still
-accept those groups. Public profile and host explanation joins are separate work
-under [#290](https://github.com/callin2/ghostflow-language/issues/290) and
+**Restoration and package verification.** Artifact restoration and signed
+portable-package verification recompile the exact closure and compare all
+provenance. They reject missing or modified groups, definition identities,
+closure digest, node IDs, locations, classifications, or relations. The
+standalone trace validator rejects a composition container. A prose-only edit to
+a definition changes provenance and pins, while unchanged executable tokens keep
+the same bytecode.
+
+**Limits.** Root `intentEvidence` can refer only to root anchors and root linked
+nodes. It cannot claim an imported node through an equal anchor ID. The current
+Interaction schema cannot represent imported intent groups, and it explicitly
+rejects a projection request that contains them. Ordinary compilation and
+execution still accept those groups. Public profile and host explanation joins
+are separate work under
+[#290](https://github.com/callin2/ghostflow-language/issues/290) and
 [#302](https://github.com/callin2/ghostflow-language/issues/302).
 
 ## Extraction and compatibility
 
-- CommonMark determines top-level Markdown blocks. Text-looking directives in
-  fenced code, inline code, multi-line or enclosing HTML blocks, nested blocks,
-  or front matter are not Markdown anchors.
-- Only top-level `ghost` fences execute, exactly as before. Link comments remain
-  ordinary `//` comments to the GhostFlow lexer and produce no opcode.
-- Plain `.ghost` is historical evidence only and is rejected by the product
-  compiler. It cannot supply an anchor namespace or an executable fallback.
-- Documents without anchor/link directives produce the same code, GFB bytes,
-  node IDs, diagnostics, manifest, and runtime behavior as before.
-- Prose/comment-only changes alter `sourceDocument.sha256`. When executable token
-  structure is unchanged, GFB bytes and compiler node IDs remain unchanged;
-  original document locations may move and are revision-bound.
+- **CommonMark decides what a top-level Markdown block is.** Directive-like text
+  in fenced code, inline code, multi-line or enclosing HTML blocks, nested
+  blocks, or front matter is not a Markdown anchor.
+- **Only top-level `ghost` fences execute**, exactly as before. To the GhostFlow
+  lexer, link comments remain ordinary `//` comments and produce no opcode.
+- **Plain `.ghost` is historical evidence only** and the product compiler
+  rejects it. It cannot supply an anchor namespace or an executable fallback.
+- **No directives, no change.** Documents without anchor/link directives produce
+  the same code, GFB bytes, node IDs, diagnostics, manifest, and runtime behavior
+  as before.
+- **Prose and comment edits.** Prose/comment-only changes alter
+  `sourceDocument.sha256`. When the executable token structure is unchanged, GFB
+  bytes and compiler node IDs stay the same. Original document locations may
+  move; they are bound to a revision.
 
 ## Diagnostics and acceptance vectors
 
+<a id="default-behavior-coverage-warnings"></a>
 ### Default behavior coverage warnings (#553)
 
-The compiler, CLI, and package creation report intent-link coverage warnings by
-default. `GF_INTENT_LINK_MISSING` applies to each unlinked top-level `connection`, `next`, `require`, `mutex`, `let`,
-`function`, `signal`, `schedule`, or `timer` statement. A link covers only its
-own target statement; linking a declaration does not cover later behavior.
-Standalone `input`, `output`, `state`, `config`, `parameter`, and `enum`
-declarations are not counted. Coverage is structural and statement-local: the
-warning does not infer transitive behavior, prove an assertion, or determine
-whether an intent is correct or confirmed. Explicit active links satisfy this
-check even when they describe an unconfirmed assumption; that status remains
-unconfirmed.
+The compiler, the CLI, and package creation report intent-link **coverage
+warnings** by default. There are two warning codes.
 
-`GF_INTENT_LINK_COVERAGE_UNSUPPORTED` reports behavioral owners for which the
+**`GF_INTENT_LINK_MISSING`** applies to each unlinked top-level `connection`, `next`, `require`, `mutex`, `let`,
+`function`, `signal`, `schedule`, or `timer` statement.
+
+- A link covers only its own target statement. Linking a declaration does not
+  cover later behavior.
+- Standalone `input`, `output`, `state`, `config`, `parameter`, and `enum`
+  declarations are not counted.
+- Coverage is structural and statement-local. The warning does not infer
+  transitive behavior, prove an assertion, or decide whether an intent is correct
+  or confirmed.
+- Explicit active links satisfy this check even when they describe an
+  unconfirmed assumption. That status remains unconfirmed.
+
+**`GF_INTENT_LINK_COVERAGE_UNSUPPORTED`** reports behavioral owners for which the
 current contract has no link target: top-level `adapt`, `objective`, `account`,
 `account-constraints`, `local-constraints`, `shared-constraints`,
 `adapt-setting`, and `degraded`, plus nested `connection`, `connect`, `next`,
-`require`, and `mutex` statements. These warnings are emitted even when other
-statements have links. Their hints say not to insert an orphan link and explain
-that the copyable example shows standalone syntax, not an immediate repair;
-supporting these targets needs a separate contract change. Nonexecutable
-standalone resource-policy descriptors are exempt.
+`require`, and `mutex` statements.
 
-Warnings carry the original source span, a copyable anchor/link example, and an
-actionable hint. The example labels its policy as an unconfirmed AI assumption
-and includes `recover(false)` as an explicit example fault policy. Up to 20
-warning records are returned. When more than 20 are found, the collection marks
-`limit: 20` and `truncated: true`; exactly 20 does not imply truncation. For an
-imported definition, coverage is reported once per source statement when that
-definition is instantiated. Unused imports do not produce these warnings.
-An imported link covers only its own definition statement. The hint directs
-authors to that original document; a root link cannot cover an imported statement.
+- These warnings are emitted even when other statements have links.
+- Their hints say not to insert an orphan link. They explain that the copyable
+  example shows standalone syntax, not an immediate repair. Supporting these
+  targets needs a separate contract change.
+- Nonexecutable standalone resource-policy descriptors are exempt.
 
-These warnings cover supported linkable top-level behavior and known behavioral
-owners without link support; they do not claim semantic completeness. Existing
-malformed, orphaned, missing-anchor and interaction-schema diagnostics keep
-their existing behavior. The warnings add no executable construct, GFB bytes,
-or runtime behavior.
+**Warning content and limits.**
 
-Diagnostics identify the original filename, line, and column and cover:
+- Each warning carries the original source span, a copyable anchor/link example,
+  and an actionable hint. The example labels its policy as an unconfirmed AI
+  assumption and includes `recover(false)` as an explicit example fault policy.
+- Up to 20 warning records are returned. When more than 20 are found, the
+  collection marks `limit: 20` and `truncated: true`. Exactly 20 does not imply
+  truncation.
+- For an imported definition, coverage is reported once per source statement
+  when that definition is instantiated. Unused imports do not produce these
+  warnings.
+- An imported link covers only its own definition statement. The hint directs
+  authors to that original document; a root link cannot cover an imported
+  statement.
+
+**Scope.** These warnings cover supported linkable top-level behavior and known
+behavioral owners without link support. They do not claim semantic
+completeness. Existing malformed, orphaned, missing-anchor, and
+interaction-schema diagnostics keep their existing behavior. The warnings add no
+executable construct, GFB bytes, or runtime behavior.
+
+**Acceptance vectors.** Diagnostics identify the original filename, line, and column. The acceptance
+vectors cover:
 
 1. valid confirmed intent to output, premise to constraint, fallback to schedule,
    and unconfirmed assumption to candidate-node links;
@@ -235,53 +314,53 @@ Diagnostics identify the original filename, line, and column and cover:
 7. unchanged existing literate, plain-source, source-map, package, native, and
    WASM behavior.
 
-Acceptance is compiler/source-map evidence only. It is not frontend navigation,
-firmware integration, GPIO output, relay movement, or physical load evidence.
+Acceptance is compiler/source-map evidence only. It is not evidence of frontend
+navigation, firmware integration, GPIO output, relay movement, or a physical load.
 
 ## Compiler constraint derivations (#31, bounded acceptance)
 
-The compiler adds optional `traceMetadata.derivations` for every authored `require`.
-These records describe current constraint lowering. They do not change source,
-manifest, bytecode or runtime behavior. Authored `mutex` has no derivation record.
+The compiler adds optional `traceMetadata.derivations` for every authored
+`require`. These records describe how the constraint is currently lowered
+(translated into compiled constraints). They do not change source, manifest,
+bytecode, or runtime behavior. An authored `mutex` has no derivation record.
 
 Each record contains:
 
-- `id`: `require:<nodeId>`, identifying the authored require in this revision.
-- `nodeId` and sorted `originNodeIds`: the require and every original expression
-  node, including operators and output references removed or flattened by lowering.
-  These IDs join the unchanged source map and intent links. Source text and anchor
-  classification remain authoritative; an assumption remains unconfirmed.
-- `target`: compiled constraint `index`, `kind` and ordered `names`.
-- `rule`: `require-implication-to-requires-v1`,
-  `require-disjunction-to-requires-any-v1`, or
-  `require-negated-conjunction-to-mutex-v1`.
-- `scope`: `same-module-bool-output-constraint`; `relation`: `lowered-as`;
-  `status`: `compiler-derived`; `semanticVerification`: `not-proven`.
+| Field | Value |
+|---|---|
+| `id` | `require:<nodeId>`, identifying the authored require in this revision. |
+| `nodeId`, sorted `originNodeIds` | The require and every original expression node, including operators and output references removed or flattened by lowering. These IDs join the unchanged source map and intent links. Source text and anchor classification remain authoritative; an assumption remains unconfirmed. |
+| `target` | The compiled constraint `index`, `kind`, and ordered `names`. |
+| `rule` | `require-implication-to-requires-v1`, `require-disjunction-to-requires-any-v1`, or `require-negated-conjunction-to-mutex-v1`. |
+| `scope`, `relation`, `status`, `semanticVerification` | `scope`: `same-module-bool-output-constraint`; `relation`: `lowered-as`; `status`: `compiler-derived`; `semanticVerification`: `not-proven`. |
 
-The existing document SHA-256 and bytecode SHA-256 bind these records to exact
-source and compiled revisions. Source-map recovery and portable-package validation
-rederive and compare the complete records through canonical compiler replay.
-Missing, extra or altered records and unsupported proof/status claims are rejected.
-Replay establishes compiler consistency, never semantic equivalence or runtime
-evaluation, inferred satisfaction, output blocking or physical evidence.
+**Binding and replay.** The existing document SHA-256 and bytecode SHA-256 bind
+these records to exact source and compiled revisions. Source-map recovery and
+portable-package validation re-derive and compare the complete records through
+canonical compiler replay. Missing, extra, or altered records, and unsupported
+proof/status claims, are rejected. Replay establishes compiler consistency only.
+It never establishes semantic equivalence, runtime evaluation, inferred
+satisfaction, output blocking, or physical evidence.
 
-In particular, `require !(a && b && c)` currently lowers to `mutex(a,b,c)`.
-Ordinary Boolean not-all and at-most-one differ when exactly two outputs are true.
-This record must therefore remain `not-proven`, even after successful replay.
-The two-output case and flattened disjunction exercise provenance retention; this
-change does not decide or change the three-output language behavior.
+**Why `not-proven` matters.** `require !(a && b && c)` currently lowers to
+`mutex(a,b,c)`. Ordinary Boolean “not all” and “at most one” differ when exactly
+two outputs are true. This record must therefore remain `not-proven`, even after
+successful replay. The two-output case and the flattened disjunction exercise
+provenance retention; this change does not decide or change the three-output
+language behavior.
 
-#31's existing anchor acceptance and current lowering provenance are covered.
-Its additional eliminated-check/replacement-guarantee and merged-node proof
-acceptance remains open under #42. A future pass must supply independently
-validated semantic evidence before claiming a verified replacement relation.
-This metadata is not a CSE engine, SMT solver or proof framework.
+**What remains open.** #31's existing anchor acceptance and current lowering
+provenance are covered. Its additional eliminated-check/replacement-guarantee
+and merged-node proof acceptance remains open under #42. A future pass must
+supply independently validated semantic evidence before claiming a verified
+replacement relation. This metadata is not a CSE engine, SMT solver, or proof
+framework.
 
 ## Deliberate non-goals
 
 - Natural-language interpretation, tacit-premise discovery, confirmation UI,
   authorization, and deployment approval.
-- Per-expression execution-path causality or a claim that every static read
+- Per-expression execution-path causality, or a claim that every static read
   caused an output.
 - SMT/BDD optimization or proof generation. Issue #42 may later attach
   compiler-produced origin/proof records to the same stable anchor and node

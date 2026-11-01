@@ -5,60 +5,88 @@
 
 [Language Reference](../LANGUAGE-REFERENCE.en.md) · [Previous: Composition and replay](06-composition-and-replay.en.md) · [Next: Layer responsibilities](08-language-runtime-and-device-boundaries.en.md)
 
+**In this chapter**
+
+- [7.2](#72-invalid-programs-and-external-failures) — how to tell a broken program from a failure in the field.
+- [7.3](#73-false-absent-and-uncertain-are-different) — why `false`, "missing", and `Unknown` are never interchangeable.
+- [7.4](#74-transformations-that-preserve-meaning) — what any rewrite of a program must keep.
+- [7.5](#75-declaration-and-notation-index)–[7.7](#77-terms) — lookup tables for notation, symbols, and terms.
+- [7.8](#78-from-original-documents-to-the-reference) — where each design document is settled in this Reference.
+
 ## 7.1 Purpose of this chapter
 
-Knowing the syntax of one feature differs from preserving the same meaning when several features are combined. This chapter provides language-wide semantic preservation rules and index tables. The table's terms include keywords, settings keys, built-in operations, and design concepts together. The entire list is not a set of reserved words. Each item's syntax and applicable positions follow its linked chapter.
+Knowing the syntax of one feature is not the same as keeping its meaning when you combine it with others. This chapter gives two things:
+
+- **Semantic preservation rules** that apply to the whole language.
+- **Index tables** for finding where each notation or concept is defined.
+
+The index mixes keywords, settings keys, built-in operations, and design concepts. The entire list is not a set of reserved words. For the exact syntax of an item and where it may appear, follow its linked chapter.
 
 ## 7.2 Invalid programs and external failures
 
-**Why.** Treating an incorrect control expression and a failed sensor as the same thing makes it impossible to distinguish programs needing correction from field situations needing a response.
+**Why.** An incorrect control expression and a failed sensor are different problems. The first needs a program fix; the second needs a response in the field. If you treat them the same, you can no longer tell which one you have.
+
+The diagram below groups the categories in the table by what happens next. Program errors send you back to the source. Value computation errors stop the tick from succeeding. External data problems go through an explicit error flow. Settings problems split into rejection and payload errors. A known unmet condition is not an error at all.
+
+![Classification of failures and unmet conditions by their consequence](../diagrams/reference-07-semantic-rules-and-index/failure-classes.svg)
 
 | Category | Example | Meaning in the language |
 |---|---|---|
-| Name/syntax error | Undefined name, ambiguous declaration, isolated intent link | The rule cannot be uniquely interpreted. |
-| Type error | Implicit mixing of Int and Number variables, confusion between Duration and counts | Values with different meanings were treated as the same. |
-| Branch/definition error | Missing enum case, duplicate connections to one output | The result is not completely or uniquely defined. |
-| State-boundary error | Reading another next state in a next-state expression, combinational cycle | Hidden ordering or infinite dependency was created within one decision. |
-| Value computation error | Out-of-range integer operation, division by zero, invalid numeric conversion | No normal result can be produced. Do not partially commit as a successful tick. |
-| Sensor fault | Disconnected, Invalid, Stale, NotReady | Input data does not satisfy normal measurement conditions. Handle through explicit error flow. |
-| Schedule Unknown | Missing time, location, prediction, or calendar information | No evidence determines whether an occurrence happens. Do not disguise it as False or permission. |
-| Known unmet condition | Normal moisture value does not satisfy irrigation conditions | The decision completed normally; the condition result is False. |
-| Settings admission rejection | Malformed envelope, unknown target, different Program, stale base revision, or permission failure | Reject the event and preserve existing settings observations and revision. |
-| Settings payload error | Type, range, or increment violation in an identified, authorized bundle | Emit `fault(SettingsInvalid)` for every target together and advance the revision and effective position. Preserve settings outside the target set. Follow the atomic live event rules in [§5.2](05-settings-and-observation.en.md#atomic-live-event). |
-| Missing/mismatched observation | No value, snapshot from another source revision or execution | Do not merge it as a normal observation of the current program. |
+| Name/syntax error | Undefined name, ambiguous declaration, isolated intent link | The rule cannot be interpreted in exactly one way. |
+| Type error | Implicitly mixing Int and Number variables; confusing a Duration with a count | Values with different meanings were treated as the same. |
+| Branch/definition error | Missing enum case; two connections to the same output | The result is not completely or uniquely defined. |
+| State-boundary error | Reading another next state inside a next-state expression; combinational cycle | The program created a hidden ordering or an infinite dependency inside one decision. |
+| Value computation error | Out-of-range integer operation, division by zero, invalid numeric conversion | No normal result can be produced. Do not partially commit it as a successful tick. |
+| Sensor fault | Disconnected, Invalid, Stale, NotReady | The input does not meet the conditions of a normal measurement. Handle it through an explicit error flow. |
+| Schedule Unknown | Missing time, location, prediction, or calendar information | There is no evidence for whether an occurrence happens. Do not disguise it as False or as permission. |
+| Known unmet condition | A normal moisture reading does not satisfy the irrigation condition | The decision completed normally; the condition's result is False. |
+| Settings admission rejection | Malformed envelope, unknown target, different Program, stale base revision, or permission failure | Reject the event. Keep the existing settings observations and revision unchanged. |
+| Settings payload error | A type, range, or increment violation in a bundle that was identified and authorized | Emit `fault(SettingsInvalid)` for every target together, and advance the revision and effective position. Settings outside the target set stay unchanged. Follow the atomic live event rules in [§5.2](05-settings-and-observation.en.md#atomic-live-event). |
+| Missing/mismatched observation | No value; a snapshot from another source revision or another execution | Do not merge it as a normal observation of the current program. |
 
-Do not directly use sensor faults in arithmetic or logic as normal payloads. Expressions choosing substitutes must expose the meaning of the choice. A substitute does not erase the original error or origin. Settings request rejection and control tick computation failure are also different events.
+Rules that follow from this table:
+
+- Never feed a sensor fault into arithmetic or logic as if it were a normal payload.
+- An expression that chooses a substitute value must make the meaning of that choice visible.
+- A substitute does not erase the original error or its origin.
+- Rejecting a settings request and failing a control tick's computation are different events.
 
 ## 7.3 False, absent, and uncertain are different
 
-**Why.** Control permission needs evidence. Negating the absence of a value cannot create permission.
+**Why.** Permission to operate needs evidence. Negating the *absence* of a value cannot create permission.
 
 | Value or status | Interpretation |
 |---|---|
-| `false` | Normal Bool value |
-| `0` | Normally represented value of that type |
-| Missing optional capability | Installation configuration does not supply that capability |
-| sensor fault | Installed sensor cannot be read normally |
-| `Unknown(reason)` | Insufficient information for the decision |
-| Empty observation list | Program has no internal observation items to expose |
+| `false` | A normal Bool value |
+| `0` | A normally represented value of that type |
+| Missing optional capability | The installation does not provide that capability |
+| sensor fault | An installed sensor cannot be read normally |
+| `Unknown(reason)` | There is not enough information to decide |
+| Empty observation list | The program has no internal observation items to expose |
 
-Do not mix Bool computation, quality processing, and presence checks. For example, “no moisture sensor,” “moisture sensor failed,” and “moisture 0%” are three distinct conditions. Do not interpret `!Unknown` as operating permission.
+Keep Bool computation, quality handling, and presence checks separate. For example, these are three different conditions:
+
+1. "There is no moisture sensor."
+2. "The moisture sensor has failed."
+3. "Moisture is 0%."
+
+Do not read `!Unknown` as permission to operate.
 
 ## 7.4 Transformations that preserve meaning
 
-**Why.** If shortening expressions or combining common computations changes control results, the actual meaning differs from the program reviewed by the author.
+**Why.** Shortening expressions or merging common computations is only safe if control results stay the same. Otherwise the program that runs is no longer the program the author reviewed.
 
-Even when representation changes, preserve the following together.
+Whenever the representation changes, all of the following must be preserved together:
 
 1. Input and value types, and the boundary between previous and next state.
-2. The meaning of successful state transitions and requested/safe outputs.
-3. Error conditions and the meaning that errors prevent a successful decision.
+2. The meaning of successful state transitions and of requested/safe outputs.
+3. Error conditions, and the rule that an error prevents a successful decision.
 4. The order in which time, schedule occurrences, and settings events affect decisions.
-5. Trace relationships to original declarations and explanations.
+5. Trace links back to the original declarations and explanations.
 
-Even replacing `a * 0` with `0` is not justified by equal values alone. Also assess whether the transformation removes errors observed in the original expression or required dependencies. Static dependency lists are “inputs that may be read,” rather than the paths that actually supported results during execution.
+Equal values alone do not justify a rewrite, not even replacing `a * 0` with `0`. You must also check whether the rewrite removes an error that the original expression could raise, or a dependency that it requires. A static dependency list means "inputs that *may* be read". It is not the set of paths that actually supported a result during execution.
 
-Merging or removing expressions does not remove links to original intent, comments, or source revisions. The transformed representation does not become a new independent canonical source. Rationale: [Language design](../LANGUAGE.md), [Original source and safety observation](../SOURCE-SAFETY-TRACE.md), [#42 decisions on semantic equivalence and original-source preservation](https://github.com/callin2/ghostflow-language/issues/42).
+Merging or removing expressions does not remove their links to the original intent, comments, or source revision. The transformed representation never becomes a new, independent canonical source. Rationale: [Language design](../LANGUAGE.md), [Original source and safety observation](../SOURCE-SAFETY-TRACE.md), [#42 decisions on semantic equivalence and original-source preservation](https://github.com/callin2/ghostflow-language/issues/42).
 
 ## 7.5 Declaration and notation index
 
@@ -104,52 +132,58 @@ Merging or removing expressions does not remove links to original intent, commen
 | syntax/quote/splice, hygienic syntax extensions | [6. Composition and replay](06-composition-and-replay.md) |
 | checkpoint, replay, ghost, branch, program replacement | [6. Composition and replay](06-composition-and-replay.md) |
 
-Permitted positions and required fields follow the linked body sections. Removed aliases follow the rejection rules in §1.6. Do not infer source keywords from general concepts in the index.
+How to use this index:
+
+- Where a notation may appear, and which fields it requires, is defined in the linked body section.
+- Removed aliases are handled by the rejection rules in §1.6.
+- Do not infer source keywords from the general concepts listed here.
 
 ## 7.6 Symbol index
 
+The meaning of most symbols depends on context. This table lists each role a symbol can play.
+
 | Symbol | Contextual role |
 |---|---|
-| `{ }` | Scope, function, case, settings block, or finite set in `in` |
+| `{ }` | Scope, function, case, settings block, or the finite set after `in` |
 | `( )` | Call arguments or expression grouping |
-| `[ ]` | Lists permitted by declarations, such as selected schedule times |
+| `[ ]` | Lists that a declaration permits, such as the selected times of a schedule |
 | `:` | Type declaration or named argument |
-| `;` | Boundary of a declaration or expression definition |
-| `,` | Separates multiple names, arguments, set elements |
+| `;` | End of a declaration or expression definition |
+| `,` | Separates names, arguments, and set elements |
 | `=` | Definition, initial value, settings entry |
 | `'` | Next state |
 | `<-` | Output connection |
 | `->` | Function result type |
-| `=>` | Case branch or constraint relation; not an arbitrary operator in general expressions |
+| `=>` | Case branch or constraint relation; not a general-purpose operator in expressions |
 | `\|` | Enum alternatives |
 | `?` | Optional sensor |
-| `.` | Member/namespace reference defined by context |
-| `..` | Sensor valid range |
-| `_` | Unused fault pattern binding |
+| `.` | Member or namespace reference, as defined by context |
+| `..` | Valid range of a sensor |
+| `_` | Unused binding in a fault pattern |
 | `//` | Single-line code comment |
 
 ## 7.7 Terms
 
 | Term | Definition |
 |---|---|
-| Canonical source | Original document preserving explanation, intent, and executable rules together |
-| Program | Program with executable-rule identity |
-| Run | Identity of an execution started once and continued for that program |
-| Tick / scan | Unit receiving inputs and committing a logical decision. Read the contextual observation boundary together with it. |
-| Previous / candidate state | Committed state before a decision / next state computed during this decision |
-| Requested / safe intent | Output requested by a control expression / output intent after constraints |
-| Setting | Adjustment value whose changeability is declared by the program |
-| Occurrence | One identifiable occurrence produced by a schedule rule |
+| Canonical source | The original document that keeps explanation, intent, and executable rules together |
+| Program | A program identified by its executable rules |
+| Run | The identity of one execution of that program, from its start onward |
+| Tick / scan | The unit that receives inputs and commits one logical decision. Read it together with the observation boundary of its context. |
+| Previous / candidate state | The committed state before a decision / the next state computed during this decision |
+| Requested / safe intent | The output a control expression asks for / the output intent after constraints are applied |
+| Setting | An adjustable value that the program declares as changeable |
+| Occurrence | One identifiable event produced by a schedule rule |
 | Provenance | Links showing which original source and intent a value, decision, or explanation came from |
-| Logical port / physical binding | Meaningful control connection point / relationship connecting it to an actual installation |
-| Semantic DAG | Graph representing control meaning and dependencies. Distinct from a screen-layout graph. |
-| Driver | Input role producing logical inputs from physical signals |
-| Renderer | Output role applying logical output intentions to actual effects, including relay, motor, lamp and screen outputs |
-| Cabinet-view | Operator UI consuming descriptors and observations; `@ghostflow/cabinet-view` |
+| Logical port / physical binding | A meaningful control connection point / the relation that connects it to the actual installation |
+| Semantic DAG | A graph of control meaning and dependencies. It is not a screen-layout graph. |
+| Driver | The input role that turns physical signals into logical inputs |
+| Renderer | The output role that applies logical output intent to real effects, such as relays, motors, lamps, and screens |
+| Cabinet-view | The operator UI that consumes descriptors and observations; `@ghostflow/cabinet-view` |
 
 ## 7.8 From original documents to the reference
 
-This table locates design items. It does not indicate issue status or work progress.
+Use this table to find where each design item is settled in the Reference. It does **not** show issue status or work progress.
 
 | Design rationale | Reference location |
 |---|---|
@@ -167,6 +201,6 @@ This table locates design items. It does not indicate issue status or work progr
 | [SOURCE-SAFETY-TRACE](../SOURCE-SAFETY-TRACE.md), [#42](https://github.com/callin2/ghostflow-language/issues/42) | [5.3 Cabinet-view-independent observation model](05-settings-and-observation.md#53-cabinet-view-독립-관찰-모델), [7.4 Transformations that preserve meaning](07-semantic-rules-and-index.md#74-의미가-유지되는-변환) |
 | [Coding FAQ 1–41](../language_faq.md) | [Chapter 8 complete responsibility table](08-language-runtime-and-device-boundaries.md#83-faq-전체-책임표), [Language decisions and author policies](08-language-runtime-and-device-boundaries.md#86-언어-결정과-작성자가-정하는-정책) |
 
-When adding a new language decision, update the feature's body, Why, examples, and this index together.
+When you add a new language decision, update these together: the feature's body text, its Why, its examples, and this index.
 
 [Complete contents](../LANGUAGE-REFERENCE.md) · [Next: Layer responsibilities](08-language-runtime-and-device-boundaries.md)

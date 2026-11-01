@@ -1,0 +1,25 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName Helvetica
+skinparam ArrowColor #555555
+title WorkCalendar workday/offday decision order
+
+start
+if (Snapshot present, in coverage\nand before expiry?) then (no)
+  :Unknown\n(CalendarMissing or\nCalendarOutOfRange);
+  stop
+else (yes)
+endif
+if (Date-specific work exception?) then (yes)
+  :Use the exception\n(work or off);
+  stop
+else (no)
+endif
+if (Public holiday?) then (yes)
+  :Apply holiday work policy;
+  stop
+else (no)
+endif
+:Apply weekly pattern\n(weeklyWorkMask);
+stop
+@enduml

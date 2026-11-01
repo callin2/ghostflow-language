@@ -1,0 +1,15 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontSize 12
+rectangle "Engine foundations\ntemporal.rs Window, checkpoints" as A
+rectangle "GFB4 decoder/verifier\n(loading, not execution)" as B
+rectangle "GFB4 + native execution\nbatch11, REF-04-027/028/029" as C
+rectangle "WASM, host, source trace\nbatch12 whole gate" as D
+rectangle "Nested derived windows\nbatch13 (window-derived-design.md)" as E
+rectangle "Open: durable restore,\nhot-swap, estimated evidence" as F #FFE0B2
+A --> B
+B --> C
+C --> D
+D --> E
+E --> F
+@enduml

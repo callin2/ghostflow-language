@@ -1,0 +1,21 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName Helvetica
+skinparam defaultFontSize 13
+
+start
+:Package bytes + trustedKeys + revokedKeyIds\n+ host inputs + verifyBytecode callback;
+:1. Exact package/payload schema, supported versions;
+:2. Canonical payload digest,\n>= 1 active trusted signature;
+:3. Compiler revision, runtime semantics,\nruntime ABI, binding revision;
+:4. Manifest format, required capabilities\nvs host inputs;
+:5. Source / GFB / manifest / source-map\ndigests and cross-links;
+:6. Source-trace metadata vs\nsource and GFB identities;
+:7. Host verifyBytecode(GFB, frozen manifest,\nsource map, identity);
+if (Every check passed and\ncallback returned exactly true?) then (yes)
+  :Verified result\n(bytecode.copy() on each access);
+else (no)
+  :PortablePackageError with stable code\n(no bytecode exposed, no fallback);
+endif
+stop
+@enduml

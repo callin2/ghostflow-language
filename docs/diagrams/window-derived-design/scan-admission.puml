@@ -1,0 +1,18 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontSize 12
+start
+:Evaluate prelude once, in dependency order,\nagainst old authored state;
+:Consumer W stages highwater revision of\nEVERY declared upstream window\n(selected or not, successful or not);
+if (Selected upstream result successful\nAND its revision > saved highwater?) then (yes)
+  :Admit ONE derived event\nidentity (site, admissionRevision)\n+ owned proof tree;
+else (no)
+  :No new downstream point\n(expiry, reselection, reevaluation);
+endif
+if (Whole scan succeeds?) then (yes)
+  :Commit windows, proofs, highwaters;
+else (no: source, density,\narithmetic or intent error)
+  :Roll back everything;\nretry sees the same freshness;
+endif
+stop
+@enduml

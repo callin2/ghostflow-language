@@ -1,0 +1,20 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName Helvetica
+skinparam defaultFontSize 13
+
+title Proposed optimizer boundary (design only, not implemented)
+start
+:Parse, type check, resolve names /\nenums / next-state (existing mandatory checks);
+:1. Immutable typed semantic IR + source mapping\n+ constraint effects + validation results\n(original executable kept as fallback);
+:2. Optional typed SMT property checks\n(explicit domains and assumptions);
+:3. BDD candidate only for eligible\npure, total Boolean regions;
+:4. Independent equivalence and\ncertificate check;
+if (Obligation established?) then (yes)
+  :Use checked candidate\n+ transformation/proof relations;
+else (SAT mismatch, Unknown, timeout,\ninvalid certificate, ...)
+  :Keep unchanged original\n+ bounded skip reason / diagnostic;
+endif
+:5. Emit final bytecode, check resource bounds,\nvalidate provenance relations;
+stop
+@enduml

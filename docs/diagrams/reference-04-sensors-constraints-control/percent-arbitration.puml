@@ -1,0 +1,17 @@
+@startuml
+skinparam defaultFontName Helvetica
+skinparam shadowing false
+skinparam ActivityBackgroundColor #F7F9FC
+skinparam ActivityBorderColor #4A6FA5
+title Continuous Percent resource policy (example P)
+start
+:Evaluate all requests and ceilings\non one input snapshot + previous state;
+if (Any request or ceiling faulted?) then (yes)
+  #FFF4D6:candidate = authored `safe` (0%)\n(`on_unknown = safe`; conditionsKnown = false);
+else (no)
+  :candidate = `select` (max) of requests\ntemperature 70%, humidity 40% -> 70%;
+endif
+:Clamp to minimum known ceiling\n(wind 20%);
+:Final safe intent for vent_target\nno fault: 70% -> 20%; fault: 0%;
+stop
+@enduml

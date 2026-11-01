@@ -1,0 +1,24 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontSize 13
+title Verified WASM handoff: producer and consumer
+
+|CI workflow|
+start
+:Check out PR head or full source_sha;
+:Verify commit, tree, Cargo.lock hash;
+:Setup (network allowed):
+Node 22, Rust stable, npm ci, cargo fetch --locked;
+:CARGO_NET_OFFLINE=true npm test
+(the single WASM build);
+:tools/package-verified-wasm.mjs
+-> wasm + verification.json + manifest.json;
+:Upload artifact (14-day retention);
+|Consumer|
+:Download the three files;
+:Check formats, pins, tree, lockfile hash;
+:Recompute hashes and byte counts;
+:Check expected run, commit and workflow
+(the zip cannot authorize itself);
+stop
+@enduml

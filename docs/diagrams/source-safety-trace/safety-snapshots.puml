@@ -1,0 +1,16 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontSize 13
+start
+:Round 0: evaluate the requested output snapshot;
+repeat
+  :Evaluate each constraint\n(capture values BEFORE this round's updates);
+  if (first violation of this rule?) then (yes)
+    :store firstViolation\n{round, values, blocked};
+  endif
+repeat while (any output blocked this round?) is (yes: next round)
+->no;
+:store final {round, values, satisfied}\nfrom the terminating no-block round;
+note right: at most two snapshots\nper constraint
+stop
+@enduml

@@ -1,0 +1,18 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontSize 13
+title Verified WASM workflow routing (issue #357)
+
+start
+:Classify change;
+if (Manual dispatch?) then (yes)
+  :Full verification;
+elseif (Only allowlisted ordinary docs\n(exact-diff rules)?) then (yes)
+  :Documentation checks\n(no WASM build);
+else (no)
+  :Full verification:\nVerify WASM (current) /\nVerify WASM (frontend-pin);
+endif
+:Verification result
+(always runs; must be green to merge);
+stop
+@enduml

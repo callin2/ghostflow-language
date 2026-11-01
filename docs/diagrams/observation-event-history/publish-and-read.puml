@@ -1,0 +1,23 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontSize 12
+title Bounded event journal: publish, retain, read
+participant "Trusted producer" as P
+participant "Event journal\n(reference host)" as J
+participant "Consumer" as C
+P -> J: publish({completion, trace, settingsState?, events})
+alt any check fails
+  J --> P: reject; journal unchanged (retry allowed)
+else whole batch valid
+  J -> J: assign sequences N+1..N+k\n(none if events = [])
+  J -> J: keep newest `capacity` events
+  J -> J: replace latest snapshot
+  J --> P: published records + snapshot + nextCursor
+end
+C -> J: read({cursor: afterSequence = 10})
+J --> C: gaps [11..13, "retention"]\nevents from 14\nlatest snapshot (separate)\nnextCursor
+note right of C
+  No synthetic events for 11-13.
+  Save nextCursor only after processing.
+end note
+@enduml

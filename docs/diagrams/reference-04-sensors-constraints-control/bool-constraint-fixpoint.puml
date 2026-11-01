@@ -1,0 +1,17 @@
+@startuml
+skinparam defaultFontName Helvetica
+skinparam shadowing false
+skinparam ActivityBackgroundColor #F7F9FC
+skinparam ActivityBorderColor #4A6FA5
+title Evaluating Bool output constraints
+start
+:Candidate snapshot = requested outputs;
+repeat
+  :Evaluate every `require` / `mutex`\nagainst the same snapshot;
+  :Collect blocked targets;
+  :Set blocked targets to false\n(never false -> true);
+repeat while (Snapshot changed?) is (yes)
+->no;
+:Safe intent\n(independent of declaration order);
+stop
+@enduml

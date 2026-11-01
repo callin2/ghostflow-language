@@ -3,11 +3,21 @@
 
 # GhostFlow Language Reference
 
-GhostFlow is a reactive control language that describes **changes in state and output intentions for devices** from sensor and user inputs. This reference is the shared ground truth for the language's philosophy, syntax, semantics, type rules, usage constraints, and the rationale for each feature.
+GhostFlow is a reactive control language. From sensor readings and user inputs, a GhostFlow program describes **how state changes and which outputs it intends for devices**.
 
-For coding examples by behavior, see the [GhostFlow Coding FAQ](language_faq.md).
+This reference is the shared ground truth for the language. It covers the design philosophy, syntax, semantics, type rules, and usage constraints, and it explains why each feature exists. Other documents build on it; [Reading conventions](#reading-conventions) explains how to resolve conflicts between documents.
+
+How to use this page:
+
+- **Looking for a feature?** Pick a chapter from the [table of contents](#complete-contents) below.
+- **Looking for a notation or symbol?** Use the [§7.5 declaration and notation index](reference/07-semantic-rules-and-index.en.md).
+- **Wondering who implements a requirement** (language, compiler, runtime, Driver, binding, or UI)? See the [§8.3 FAQ responsibility table](reference/08-language-runtime-and-device-boundaries.en.md).
+- **Want working examples by behavior?** See the [GhostFlow Coding FAQ](language_faq.md).
+- **Want to know why the language looks the way it does?** Read the [design philosophy](#design-philosophy).
 
 ## Complete contents
+
+The reference has eight chapters. Each chapter is part of this one document; read the chapter you need directly.
 
 | Chapter | Contents |
 |---|---|
@@ -20,20 +30,32 @@ For coding examples by behavior, see the [GhostFlow Coding FAQ](language_faq.md)
 | [7. Semantic preservation rules and index](reference/07-semantic-rules-and-index.en.md) | Distinguishing errors, transformation equivalence, indexes of all notations, symbols, terms, and original documents |
 | [8. FAQ requirements and layer responsibilities](reference/08-language-runtime-and-device-boundaries.en.md) | Language, compiler, runtime, environment, Driver, binding, UI responsibilities across the FAQ, lifecycles and required contracts |
 
-Each chapter is part of this document. Read the relevant chapter directly from the contents for a particular feature. Use the [syntax index](reference/07-semantic-rules-and-index.md#75-선언과-표기-찾아보기) to find all notations. See the [Chapter 8 responsibility table](reference/08-language-runtime-and-device-boundaries.md#83-faq-전체-책임표) for what each layer needs to support the FAQ requirements.
+The diagram below shows where each chapter fits on the path from a source document to device outputs. It is a reading map, not a complete execution model; the chapters define the exact rules.
+
+![Map of the reference chapters along the path from literate source to device outputs](diagrams/language-reference/reference-map.svg)
+
+In short: you write a literate `.ghost.md` document (Chapter 1). The compiler checks types, units, and names, and rejects invalid programs (Chapters 2 and 7). On each tick, the program computes next state and output intents from inputs and previous state, including time-based values (Chapters 2 and 3). Sensor quality and constraints shape what may be output (Chapter 4), and operator settings feed in as effective values (Chapter 5). Programs can be composed and recorded ticks replayed (Chapter 6). The runtime, Drivers, and devices carry out the actual effects (Chapter 8).
+
+To find any notation, use the [syntax index (§7.5)](reference/07-semantic-rules-and-index.en.md). To see what each layer must provide to support the FAQ requirements, see the [Chapter 8 responsibility table (§8.3)](reference/08-language-runtime-and-device-boundaries.en.md).
 
 ## Reading conventions
 
-- **Syntax** explains the notation used in source and its meaning.
-- **Design notation** explains concepts from design documents and discussions. Do not arbitrarily mix it with settled notation.
-- **Rules** define the meaning of types, scope, evaluation, errors, time, and state.
-- **Why** explains why a feature is needed and which language principles it preserves.
-- An example **fragment** omits surrounding declarations for explanation. Distinguish it from a complete document example.
-- Technical syntax and semantic decisions follow the rules in each chapter. Field operating choices remain explicit arguments and are not filled with hidden policy.
+Each chapter labels its material with these terms:
 
-The syntax policy consolidation of 2026-09-22 is a normative decision of this Reference. Where earlier design sketches and notations conflict, follow the precise type, syntax, and evaluation rules in this document. [§8.6](reference/08-language-runtime-and-device-boundaries.md#86-언어-결정과-작성자가-정하는-정책) distinguishes user-selected operating values and external responsibilities.
+| Label | What it means |
+|---|---|
+| **Syntax** | The notation used in source, and its meaning. |
+| **Design notation** | A concept taken from design documents and discussions. Do not freely mix it with settled notation. |
+| **Rules** | The meaning of types, scope, evaluation, errors, time, and state. |
+| **Why** | Why the feature is needed and which language principles it preserves. |
+| **Fragment** | An example that omits surrounding declarations for brevity. It is not a complete document example. |
 
-When documents from different periods conflict, follow the subsequent decision that explicitly changes that scope. For example, operating settings follow the **atomic live event within the same program and the same execution** semantics of [#105](https://github.com/callin2/ghostflow-language/issues/105) and [#110](https://github.com/callin2/ghostflow-language/issues/110). This decision does not also change the meaning of installation mode transitions or arbitrary state writes.
+Technical syntax and semantic decisions follow the rules in each chapter. Operating choices made on site remain explicit arguments; the language never fills them in with hidden policy.
+
+**How conflicts are resolved:**
+
+- The syntax policy consolidation of 2026-09-22 is a normative decision of this Reference. Where earlier design sketches and notations conflict with it, follow the precise type, syntax, and evaluation rules in this document. [§8.6](reference/08-language-runtime-and-device-boundaries.en.md) separates operating values that users choose from responsibilities that lie outside the language.
+- When documents from different periods conflict, follow the later decision that explicitly changes that scope. For example, operating settings take effect with the semantics of an **atomic live event within the same program and the same execution**, as decided in [#105](https://github.com/callin2/ghostflow-language/issues/105) and [#110](https://github.com/callin2/ghostflow-language/issues/110). That decision does not change the meaning of installation mode transitions or arbitrary state writes.
 
 ## Design philosophy
 
@@ -63,7 +85,7 @@ The more code AI writes, the more important this distinction becomes. What a use
 
 Even if a program says to turn on a pump, the pump might not run if the power is disconnected or the device has a problem. When a screen says ON, we need to distinguish a request to turn it on from confirmation that it is actually running.
 
-GhostFlow takes inputs and computes which actions to request. Which ports and devices those requests connect to is written in the connection configuration, called binding, and input drivers supply facts and output renderers apply the actual hardware outputs. A rule like “stop the pump if there isn't enough water” doesn't need a particular board's pin numbers mixed into it.
+GhostFlow takes inputs and computes which actions to request. It does not drive hardware itself. The connection configuration, called *binding*, says which ports and devices those requests go to. Input drivers supply facts, and output renderers apply the actual hardware outputs. A rule like “stop the pump if there isn't enough water” doesn't need a particular board's pin numbers mixed into it.
 
 With these responsibilities separated, you can test the same rules with virtual switches and lamps, then connect them to real devices later. You can also design runs that compare behavior without sending any real outputs. But a request produced in a virtual run and equipment operating correctly in the field remain separate things to verify throughout.
 
@@ -71,7 +93,7 @@ With these responsibilities separated, you can test the same rules with virtual 
 
 For a motor to keep running after you release the start button, something has to remember that the button was pressed. A program that opens valves in sequence also needs to know which valve it is currently using.
 
-That memory belongs in `state`. Functions compute from the values they receive, while state carries the memory needed from one operation to the next. I don't want calling a function to secretly change a value somewhere else.
+That memory belongs in `state`. Functions compute only from the values they receive; state carries the memory needed from one tick to the next. Calling a function should never secretly change a value somewhere else.
 
 What matters to me is **a structure where you can read the next state directly from the current state and inputs**. If the reader has to run through the execution order several times in their head just to understand it, fixing it on site will be even harder. When a computed result is fed back into a decision, the state it passes through before the next computation should also be clear.
 
@@ -81,7 +103,7 @@ What matters to me is **a structure where you can read the next state directly f
 
 If you've recorded the inputs, previous state, effective settings, and time conditions from that moment, you should be able to get the same decision under the same conditions. That lets you investigate the cause without relying only on memory or guesswork. After changing the program, you can also supply the same conditions and compare what changes.
 
-To make this possible, a tick, which is one control computation, uses the same set of inputs and previous state throughout. The next states are committed together after computation finishes. The result shouldn't depend on which line of code ran first or whether a function secretly read the clock. You should also be able to tell which computation a settings change took effect from.
+To make this possible, a *tick* (one control computation) uses the same set of inputs and the same previous state from start to finish. All next states are committed together after the computation finishes. The result shouldn't depend on which line of code ran first or whether a function secretly read the clock. You should also be able to tell which computation a settings change took effect from.
 
 AI can help write a program, but I don't want each operating decision to depend on a new answer from AI. On site, the equipment should follow verified rules under defined execution conditions, and we should be able to retrace those decisions later. The device should also be able to keep carrying out its basic control locally without waiting for the internet or an AI response.
 
@@ -157,4 +179,7 @@ This section describes the design criteria GhostFlow aims for. How much of each 
 
 ## Rules for maintaining this reference
 
-When language semantics change, update the relevant chapter's **syntax, rules, examples, and Why** together. When a new requirement is added to the FAQ, connect it to the [Chapter 8 responsibility table and contract boundaries](reference/08-language-runtime-and-device-boundaries.md). Link design rationale to the relevant section and the [original-document index](reference/07-semantic-rules-and-index.md#78-원문에서-reference로-찾아가기). This reference is one document set. Do not split its meaning by creating independently maintained copies in other projects.
+- When language semantics change, update the relevant chapter's **syntax, rules, examples, and Why** together.
+- When a new requirement is added to the FAQ, connect it to the [Chapter 8 responsibility table and contract boundaries](reference/08-language-runtime-and-device-boundaries.en.md).
+- Link design rationale to the relevant section and to the [original-document index (§7.8)](reference/07-semantic-rules-and-index.en.md).
+- This reference is one document set. Do not split its meaning by creating independently maintained copies in other projects.

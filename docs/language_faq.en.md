@@ -4,19 +4,41 @@
 
 # GhostFlow Coding FAQ
 
-The 2026-10-05 external-input revision uses `input` for quality-bearing declarations. Existing conditioning and explicit `Result` fault branches are unchanged; prior `sensor` excerpts remain under `tests/fixtures/history/issue531/`.
+This FAQ answers one kind of question: “How do I code this behavior?”
+For each question you get working code, a description of how it behaves (including edge cases), and the reason it is written that way.
 
-The revised examples explicitly retain source-local observation and display memory when a producer is unknown. Initial memory is not a healthy producer sample. Quality guards prevent unknown requests from creating new transitions; healthy STOP and permission removal take precedence, and bounded active periods still expire. This does not infer physical equipment faults or require START on automatic controllers.
+- The rules of the language are defined by the [Language Reference](LANGUAGE-REFERENCE.md), not by this FAQ.
+- Which part of a requirement belongs to the language, the runtime, the Driver, the installation, or the UI is listed per question in
+  [Reference Chapter 8](reference/08-language-runtime-and-device-boundaries.md#83-faq-전체-책임표).
 
-This collection answers “How do I code this behavior?”
-Each question explains the code, behavior, and reasons for writing it that way.
-The [Language Reference](LANGUAGE-REFERENCE.md) defines the language rules.
-The language, runtime, Driver, installation, and UI responsibilities for each requirement are listed in
-[Reference Chapter 8](reference/08-language-runtime-and-device-boundaries.md#83-faq-전체-책임표).
+**In this document**
 
-Reviewed against dev on 2026-10-01: [`a7333e56bc25c73fd6167b1182269b96cb671d05`](https://github.com/callin2/ghostflow-language/tree/a7333e56bc25c73fd6167b1182269b96cb671d05).
-`[Undecided]` marks an unresolved language/contract decision; `[Partially unsupported]` marks the stated scope unavailable in this dev; `[Changed]` marks advice superseded by this dev. Each status note identifies the affected scope.
-An untagged question does not establish physical Device, API, or UI integration verification.
+- Questions 1–16: basic patterns — buttons, self-holding, timers, schedules, hysteresis, counters, settings, alarms, mutual exclusion, and functions.
+- Questions 17–23: interlocks, cancellation, calendar-based scheduling, and usage-based control.
+- Questions 24–31: operator-editable settings, calendars, daylight saving time, tides, and moon phase.
+- Question 32: behavior after a power outage.
+- Questions 33–40: replacing sensors, relays, GPIO pins, and expansion boards without changing control code.
+- Question 41: checking and compiling documents with the `ghostc` CLI.
+
+**About the input revision.** Since the 2026-10-05 external-input revision, every declaration that carries quality information uses `input`.
+Existing conditioning and explicit `Result` fault branches are unchanged. Earlier `sensor` excerpts are kept under `tests/fixtures/history/issue531/`.
+
+**About the revised examples.** When the producer of an input is in an unknown state (a fault), the examples explicitly keep two kinds of memory inside the source: the last observed value and the last displayed output.
+The initial value of that memory is *not* a healthy sample from the producer.
+Quality guards make sure that an unknown request never creates a new transition. A healthy STOP and the loss of a permission still take priority, and bounded run periods still expire.
+The examples do not infer physical equipment faults, and they do not require automatic controllers to press START.
+See [How to read the examples](#how-to-read-the-examples) for a walk-through of this pattern.
+
+**Review status.** Reviewed against dev on 2026-10-01: [`a7333e56bc25c73fd6167b1182269b96cb671d05`](https://github.com/callin2/ghostflow-language/tree/a7333e56bc25c73fd6167b1182269b96cb671d05).
+Some questions carry a status tag. Each tagged question has a status note that names the affected scope.
+
+| Tag | Meaning |
+|---|---|
+| `[Undecided]` | A language or contract decision is still open. |
+| `[Partially unsupported]` | The stated scope is not available in this dev. |
+| `[Changed]` | This dev supersedes the original advice. |
+
+A question without a tag has still not been verified against a physical Device, API, or UI integration.
 
 ## Questions
 
@@ -64,19 +86,40 @@ An untagged question does not establish physical Device, API, or UI integration 
 
 ## How to read the examples
 
-- Each `control` example is an independent program. Do not combine different examples verbatim into one control.
-- Place code in top-level `ghost` blocks in a `.ghost.md` document. The first question shows a complete document.
-- A **fragment** shows declarations or expressions to place inside an existing control.
-- **Design notation** is notation also identified as such in the Reference.
-- Each question defines the input names' meanings. A variable name does not automatically determine physical contact polarity or communication method.
-- Outputs are logical intent. If you need to confirm that a valve is open, express this with a feedback input separate from the output value.
-- Each answer's **Syntax basis** links directly to the Reference chapters and sections for its notation.
-  Common `control`, `input`, and `output` declarations follow [Reference §1.4 Syntax notation](reference/01-source-and-syntax.md#14-문법-표기법).
+- **Independent programs.** Each `control` example is a complete, independent program. Do not paste several examples into one control as they are.
+- **Where code goes.** Put code in top-level `ghost` blocks of a `.ghost.md` document. Question 1 shows a complete document.
+- **Fragments.** A *fragment* is a declaration or expression that you place inside an existing control.
+- **Design notation.** *Design notation* is notation that the Reference also marks as design notation; the current compiler may not accept it.
+- **Input meanings.** Each question states what its input names mean. A variable name does not decide the physical contact polarity or the communication method.
+- **Outputs are intent.** An output is a logical intent, not a confirmation. To know that a valve is really open, read a separate feedback input; do not reuse the output value.
+- **Syntax basis.** Every answer ends with a **Syntax basis** list that links to the Reference chapter and section for each notation used.
+  The common `control`, `input`, and `output` declarations follow [Reference §1.4 Syntax notation](reference/01-source-and-syntax.md#14-문법-표기법).
+
+**The recurring input-quality pattern.** Almost every example starts with the same four lines for each Bool input `x`:
+
+- `input observed_x: Bool;` declares the input. Reading it gives a `Result`: `ok(value)` for a healthy sample, or `fault(reason)` when the producer's state is unknown.
+- `let x_good = ...` is `true` only when this tick's sample is healthy.
+- `let x = ...` is the healthy value, or—on a fault—the last value remembered in `remembered_x`.
+- `remembered_x' = x;` updates that memory. Its initial value (`false`) is a source-local starting value, not a sample from the producer.
+
+The transition expressions then use these values in a fixed order:
+
+1. A healthy STOP, or a healthy loss of permission (for example `low_water_good && low_water`), turns operation off first.
+2. A bounded run whose time has expired ends, even if some inputs are faulty.
+3. A new transition is computed only when every input it depends on is `_good`.
+4. Otherwise the previous state is kept (`... else running`).
+
+Some examples also keep a `displayed_<output>` state. It holds the last output intent while inputs are unknown, using the same order.
+The comment `// Source-local display memory is initialized here; faults remain producer unknown.` marks this pattern in the code.
+
+![Data flow of the recurring input-quality pattern](diagrams/language-faq/input-quality-pattern.svg)
+
+The diagram shows how one input sample flows through the quality guard: a healthy sample updates the value and memory, and a fault keeps the remembered value but blocks new transitions.
 
 <a id="q01"></a>
 ## 1. How do I write a program file?
 
-Write a `.ghost.md` document containing both explanation and code.
+Write a `.ghost.md` document. It holds both the explanation and the code.
 
 ````markdown
 # 버튼으로 램프 켜기
@@ -100,11 +143,11 @@ control ButtonLamp {
 ```
 ````
 
-People read the Markdown explanation; `ghost` blocks contain the control rules.
-Even with several blocks among the explanations, they form one program in document order.
-Splitting blocks alone does not create execution stages or waiting periods.
+People read the Markdown explanation. The `ghost` blocks contain the control rules.
+A document can have several `ghost` blocks between paragraphs of explanation; together they form one program, in document order.
+Splitting code into blocks does not create execution stages or waiting periods.
 
-**Why write it this way?** To preserve the behavior and the reason for choosing it in the same document.
+**Why write it this way?** The behavior and the reason for choosing it stay together in one document.
 
 **Syntax basis**
 
@@ -115,8 +158,8 @@ Splitting blocks alone does not create execution stages or waiting periods.
 <a id="q02"></a>
 ## 2. How do I turn an output on only while a button is held?
 
-Connect the input to the output because no memory is needed.
-Here, `button = true` means pressed and `stop = true` means a stop request.
+No memory is needed, so connect the input straight to the output.
+Here, `button = true` means the button is pressed, and `stop = true` means a stop is requested.
 
 ```ghost
 control HoldToRun {
@@ -139,10 +182,10 @@ control HoldToRun {
 }
 ```
 
-Releasing the button or receiving a stop request turns the output intent off in that evaluation.
-Even when button and stop are both true, `!stop` makes the output false.
+When the button is released or a stop is requested, the output intent turns off in that same evaluation.
+If the button and stop are both true, `!stop` makes the output false.
 
-**Why is there no state?** Current inputs alone decide the result; no memory of a previous press is needed.
+**Why is there no state?** The current inputs alone decide the result. Nothing about an earlier press needs to be remembered.
 
 **Syntax basis**
 
@@ -153,8 +196,8 @@ Even when button and stop are both true, `!stop` makes the output false.
 <a id="q03"></a>
 ## 3. How do I keep running after releasing Start and stop with the Stop button?
 
-Remember whether operation is running in `state`. In this example, releasing Stop alone does not restart operation.
-The Start button must be released and pressed again.
+Remember in `state` whether the pump is running. In this example, releasing Stop does not restart operation by itself.
+To start again, the Start button must be released and then pressed again.
 
 ```ghost
 control StartStop {
@@ -181,12 +224,12 @@ control StartStop {
 }
 ```
 
-- `running` is the previous running state. It is retained when the button is released after starting.
-- `armed` remembers whether release of the Start button was observed while no stop was active.
-- A button held from initialization does not start operation. A new press is accepted after release.
-- Stop takes priority over self-holding and start requests.
+- `running` is the running state from the previous tick. It stays true when the button is released after starting.
+- `armed` remembers that a release of the Start button was seen while no stop was active.
+- A button already held down at initialization does not start operation. A new press is accepted only after a release.
+- Stop has priority over both self-holding and start requests.
 
-**Why use `running'` for the output?** To reflect a stop in the current evaluation immediately in the output too.
+**Why use `running'` for the output?** So that a stop in the current evaluation reaches the output immediately, in the same tick.
 
 **Syntax basis**
 
@@ -199,10 +242,10 @@ Related example: [START/STOP](../examples/curriculum/pc-02-start-stop.ghost.md).
 <a id="q04"></a>
 ## 4. How do I run for five minutes after starting and stop automatically? [Changed]
 
-> **Current dev status:** The duration setting now yields a Result. The age < duration comparison below does not compile without case handling of ok/fault. [Current contract](reference/05-settings-and-observation.md#기본값과-유효값).
+> **Current dev status:** The `duration` setting now yields a `Result`. The `age < duration` comparison below does not compile unless `case` handles `ok`/`fault`. [Current contract](reference/05-settings-and-observation.md#기본값과-유효값).
 
-Use the running state together with the time elapsed in that state.
-End operation when `stop` or `low_water` is true. Ignore new start requests while running.
+Combine the running state with the time spent in that state.
+End operation when `stop` or `low_water` is true. While running, ignore new start requests.
 
 ```ghost
 control FiveMinuteRun {
@@ -242,11 +285,11 @@ control FiveMinuteRun {
 }
 ```
 
-When `running` becomes true, `age` starts at zero. Operation ends at the first tick where `age >= duration`.
-Holding the button does not automatically start another five minutes.
-A new press is required to restart after expiry. After a stop or low-water condition, permission must recover and button release must be observed.
+When `running` becomes true, `age` starts from zero. Operation ends at the first tick where `age >= duration`.
+Holding the button down does not start another five minutes automatically.
+To restart after the time expires, press the button again. After a stop or a low-water condition, the permission must recover and a button release must be seen first.
 
-**Why not `sleep(5min)`?** Stop and low water must still be evaluated every tick while waiting.
+**Why not `sleep(5min)`?** Stop and low water must still be checked on every tick during the wait.
 
 **Syntax basis**
 
@@ -258,9 +301,9 @@ A new press is required to restart after expiry. After a stop or low-water condi
 <a id="q05"></a>
 ## 5. How do I turn on after a request persists for two seconds? [Changed]
 
-> **Current dev status:** The delay setting now yields a Result. Handle ok/fault with case before the age >= delay comparison below. [Current contract](reference/05-settings-and-observation.md#기본값과-유효값).
+> **Current dev status:** The `delay` setting now yields a `Result`. Handle `ok`/`fault` with `case` before the `age >= delay` comparison below. [Current contract](reference/05-settings-and-observation.md#기본값과-유효값).
 
-Distinguish the state of having received a request from the state of actually being on.
+Keep two situations apart: a request has been received, and the output is actually on.
 
 ```ghost
 control OnDelay {
@@ -292,10 +335,14 @@ control OnDelay {
 }
 ```
 
-Cancel if the request disappears while waiting. A new request starts a fresh two seconds.
-The exact transition occurs at the tick that observes the condition. One long tick does not pass through several stages at once.
+If the request disappears while waiting, the wait is cancelled. A new request starts a fresh two seconds.
+Each transition happens at the tick that observes its condition. One long tick does not jump through several stages at once.
 
-**Why are stages needed?** To make “waiting for a request,” “waiting two seconds,” and “on” explicit.
+![State machine of the OnDelay example](diagrams/language-faq/on-delay-states.svg)
+
+The diagram shows the three phases of `OnDelay`; `enabled` is true only in `Active`.
+
+**Why are stages needed?** They make “no request,” “waiting two seconds,” and “on” explicit and separate.
 
 **Syntax basis**
 
@@ -308,9 +355,9 @@ Related example: [Independent timer patterns](../examples/curriculum/pc-06-timer
 <a id="q06"></a>
 ## 6. How do I turn off three seconds after the request disappears? [Changed]
 
-> **Current dev status:** The delay setting now yields a Result. Handle ok/fault with case before the age >= delay comparison below. [Current contract](reference/05-settings-and-observation.md#기본값과-유효값).
+> **Current dev status:** The `delay` setting now yields a `Result`. Handle `ok`/`fault` with `case` before the `age >= delay` comparison below. [Current contract](reference/05-settings-and-observation.md#기본값과-유효값).
 
-Add a holding stage after the request is released. If the request returns while holding, stay on.
+Add a *holding* stage that begins when the request is released. If the request comes back during holding, stay on.
 
 ```ghost
 control OffDelay {
@@ -344,10 +391,14 @@ control OffDelay {
 }
 ```
 
-Count three seconds after entering `Holding`. Stop turns the output off without waiting for the delay.
-`elapsed(phase)` is elapsed time in the current stage, not accumulated time across several ON intervals.
+The three seconds are counted from entering `Holding`. A stop turns the output off at once, without waiting for the delay.
+`elapsed(phase)` is the time spent in the current stage. It is not a total across several ON intervals.
 
-**Why not share the ON-delay timer?** The start times of different conditions must be remembered separately.
+![State machine of the OffDelay example](diagrams/language-faq/off-delay-states.svg)
+
+The diagram shows the phases of `OffDelay`; `enabled` is true in `Active` and `Holding`.
+
+**Why not share the ON-delay timer?** Each condition needs its own remembered start time.
 
 **Syntax basis**
 
@@ -358,7 +409,7 @@ Count three seconds after entering `Holding`. Stop turns the output off without 
 <a id="q07"></a>
 ## 7. How do I irrigate every day at 6:00 AM and 6:45 PM?
 
-Use the schedule's `.due` as the start condition.
+Use the schedule's `.due` as the start condition. Use a timer for how long to run.
 
 ```ghost
 control DailyWatering {
@@ -390,10 +441,10 @@ control DailyWatering {
 }
 ```
 
-`DailySlots<15min>` does not mean run every 15 minutes. It occurs at selected times on a 15-minute grid.
-This example does not store schedules arriving while running. It also does not execute schedules that passed while stopped later.
+`DailySlots<15min>` does not mean “run every 15 minutes.” It means the start times are chosen from a 15-minute grid, and only the `selected` times occur.
+This example does not queue a scheduled start that arrives while it is already running. It also does not run, later, a start time that passed while it was stopped.
 
-**Why separate the schedule and timer?** Calendar time determines the start; monotonic elapsed time determines operation length.
+**Why separate the schedule and the timer?** Calendar time decides *when* to start; monotonic elapsed time decides *how long* to run.
 
 **Syntax basis**
 
@@ -404,11 +455,11 @@ This example does not store schedules arriving while running. It also does not e
 <a id="q08"></a>
 ## 8. How do I irrigate zone 1 and then zone 2? [Changed]
 
-> **Current dev status:** The watering_time and settle_time settings now yield Results. Handle ok/fault with case before the time comparisons below. [Current contract](reference/05-settings-and-observation.md#기본값과-유효값).
+> **Current dev status:** The `watering_time` and `settle_time` settings now yield `Result`s. Handle `ok`/`fault` with `case` before the time comparisons below. [Current contract](reference/05-settings-and-observation.md#기본값과-유효값).
 
-Write the sequence as an enum and connect the outputs permitted in each stage.
-This is an example of the normal operating sequence. Each zone proceeds through a two-second wait after requesting valve opening, five minutes of water supply,
-and two seconds of cleanup after requesting pump stop.
+Write the sequence as an enum, and connect each output to the stages in which it is allowed.
+This example shows the normal operating sequence. Each zone goes through three steps:
+request the valve to open and wait two seconds, supply water for five minutes, then request the pump to stop and wait two seconds to settle.
 
 ```ghost
 control TwoZones {
@@ -447,12 +498,16 @@ control TwoZones {
 }
 ```
 
-Requests during operation are not queued. After completion, the button must be released and pressed again to restart.
-The two-second wait in this code does not confirm actual valve opening.
-If opening/closing feedback and an interruption path are required, follow the
+![Phase sequence of the TwoZones example](diagrams/language-faq/two-zone-sequence.svg)
+
+The diagram shows the seven phases in order and which outputs each phase turns on.
+
+Requests that arrive during operation are not queued. After the sequence completes, release the button and press it again to restart.
+The two-second wait in this code does not confirm that the valve has actually opened.
+If you need open/close feedback and a way to interrupt the sequence, follow the
 [Sequential control example using feedback](../examples/curriculum/pc-09-sequential-water-supply.ghost.md).
 
-**Why not write a loop?** Each stage must remember the current stage while evaluating new inputs.
+**Why not write a loop?** In every stage, the program must remember where it is while it keeps evaluating new inputs.
 
 **Syntax basis**
 
@@ -464,7 +519,7 @@ If opening/closing feedback and an interruption path are required, follow the
 <a id="q09"></a>
 ## 9. How do I turn on at low moisture without switching repeatedly at the boundary?
 
-Use different thresholds for turning on and off. Handle sensor faults explicitly too.
+Use different thresholds for turning on and turning off (hysteresis). Also handle sensor faults explicitly.
 
 ```ghost
 control MoistureControl {
@@ -495,12 +550,12 @@ control MoistureControl {
 }
 ```
 
-Turn on when a healthy moisture value is below 30%; turn off when it exceeds 35%. At either boundary and between them, retain the previous decision.
-If filter readiness or recovery conditions are not met, follow the fault path and turn off too.
-The sampling interval and limits are choices for this program, not defaults for every sensor.
-When healthy measurements recover, operation resumes automatically based on a new moisture evaluation. Add separate state if manual restart is required.
+- A healthy moisture value below 30% turns the pump on. A value above 35% turns it off. At either boundary, and anywhere between them, the previous decision is kept.
+- If the filter is not ready yet, or the recovery conditions are not met, the value follows the fault path, and the pump also turns off.
+- The sampling interval and limits are choices made for this program. They are not defaults for every sensor.
+- When healthy measurements return, operation resumes automatically based on a fresh moisture evaluation. If a manual restart is required instead, add separate state for it.
 
-**Why not finish with just `moisture < 30%`?** To handle quality and boundary oscillation together.
+**Why not just write `moisture < 30%`?** That alone handles neither signal quality nor oscillation at the boundary.
 
 **Syntax basis**
 
@@ -511,8 +566,8 @@ When healthy measurements recover, operation resumes automatically based on a ne
 <a id="q10"></a>
 ## 10. How do I fill a tank below the lower limit and stop at the upper limit?
 
-Remember whether filling is in progress. `low_level_reached` means water has reached the lower level,
-and `high_level_reached` means it has reached the upper level.
+Remember whether filling is in progress. `low_level_reached` means the water has reached the lower level sensor,
+and `high_level_reached` means it has reached the upper level sensor.
 
 ```ghost
 control TankLevel {
@@ -544,10 +599,10 @@ control TankLevel {
 }
 ```
 
-Do not stop immediately when the water rises above the lower level again. Once filling, continue to the upper level.
-Turn off for the contradiction where only the upper-level input is true and the lower-level input is false. After the contradiction clears, pass through Idle once before evaluating again.
+- Filling does not stop as soon as the water rises past the lower level again. Once filling has started, it continues up to the upper level.
+- If only the upper-level input is true while the lower-level input is false, the sensors contradict each other. The pump turns off (`SensorConflict`). After the contradiction clears, the program passes through `Idle` once before it evaluates again.
 
-**Why not just invert one input?** Different start and end thresholds require the previous operating state.
+**Why not just invert one input?** Start and stop use different thresholds, so the previous operating state is needed.
 
 **Syntax basis**
 
@@ -560,7 +615,7 @@ Original example: [Tank hysteresis](../examples/curriculum/pc-07-tank-hysteresis
 <a id="q11"></a>
 ## 11. How do I emit a completion signal after three sensor detections?
 
-Count events changing from false to true, rather than ticks that are true.
+Count *events* where the input changes from false to true (rising edges), not ticks where it is true.
 This example uses the Reference's exact integer type `Int`.
 
 ```ghost
@@ -589,11 +644,12 @@ control CountThree {
 }
 ```
 
-A detection signal held true counts only once. This counter stops at three.
-If reset and detection occur in the same tick, reset wins. An initially true input counts as the first detection.
-When exposing the counter on screen, explicitly specify its counter meaning in the intent link rather than relying on its name.
+- A detection signal that stays true counts only once. The counter stops at three.
+- If reset and a detection arrive in the same tick, reset wins.
+- An input that is already true at startup counts as the first detection.
+- If you show the counter on screen, state what it counts explicitly in the intent link. Do not rely on its name.
 
-**Why Int rather than Number?** Counts do not permit approximate values or implicit rounding.
+**Why `Int` rather than `Number`?** A count must never be approximate or silently rounded.
 
 **Syntax basis**
 
@@ -604,10 +660,10 @@ When exposing the counter on screen, explicitly specify its counter meaning in t
 <a id="q12"></a>
 ## 12. How do I make “five minutes” an editable field on the screen? [Changed]
 
-> **Current dev status:** Setting declarations and live updates are supported. The age < duration advice below uses the earlier scalar-reading model; handle the current setting Result with case. [Current contract](reference/05-settings-and-observation.md#기본값과-유효값).
+> **Current dev status:** Setting declarations and live updates are supported. The `age < duration` advice below follows the earlier model, where a setting was read as a plain scalar. Handle the current setting `Result` with `case`. [Current contract](reference/05-settings-and-observation.md#기본값과-유효값).
 
 Declare an operational setting with its type, range, increment, permission, and display name.
-Replace the `duration` declaration in [example 4](#q04) with this **fragment**.
+Use this **fragment** in place of the `duration` declaration in [example 4](#q04).
 
 ```ghost
 config duration: Duration = 5min {
@@ -619,17 +675,17 @@ config duration: Duration = 5min {
 }
 ```
 
-The control expression continues to use `age < duration`.
-The screen receives the setting description and creates a time field accepting values from one to 20 minutes in one-minute increments.
-The screen chooses whether to use text input, a selection list, or a slider.
+The control expression still uses `age < duration`.
+The screen receives the setting's description and builds a time field that accepts 1 to 20 minutes in 1-minute steps.
+The screen decides whether to show a text field, a selection list, or a slider.
 
-An operational setting change is an atomic live event changing effective values in the same program and execution.
-When changing multiple values at once, validate all and apply them together. If any is invalid, change none.
-Do not reset a running timer to zero.
-If a run has already elapsed six minutes and its limit is reduced from ten to five minutes, `age < duration` becomes false in the evaluation reflecting the new value,
-and operation ends.
+Changing an operational setting is an *atomic live event*: it changes effective values within the same program and the same run.
 
-**Why not simply find the `5min` literal on screen?** Not every constant is an operator adjustment point.
+- When several values change at once, validate them all and apply them together. If any one is invalid, change none of them.
+- Do not reset a running timer to zero.
+- Example: a run has already lasted six minutes, and the limit is reduced from ten to five minutes. In the first evaluation that uses the new value, `age < duration` is false, and operation ends.
+
+**Why not just find the `5min` literal and show it on screen?** Not every constant is meant to be adjusted by an operator.
 
 **Syntax basis**
 
@@ -640,8 +696,8 @@ and operation ends.
 <a id="q13"></a>
 ## 13. How do I retain an alarm after the fault clears and release it with Reset?
 
-Separate the fault input's current value from the state remembering the fault.
-This example handles only alarm memory. `fault_active = true` means the cause remains present.
+Keep the fault input's current value separate from the state that remembers the fault.
+This example handles only the alarm memory. `fault_active = true` means the cause is still present.
 
 ```ghost
 control AlarmMemory {
@@ -667,10 +723,11 @@ control AlarmMemory {
 }
 ```
 
-`latched` remains even after the fault cause disappears. Clear it only after the cause disappears and reset is released and pressed again.
-If fault_active and reset are both true, fault_active wins. Reset is not an equipment restart command.
+- `latched` stays true after the fault cause disappears. It clears only when the cause is gone *and* Reset has been released and pressed again.
+- If `fault_active` and `reset` are both true, `fault_active` wins.
+- Reset is not a command to restart equipment.
 
-**Why is this different from `alarm <- fault_active`?** The current cause and memory of a past fault are different information.
+**Why is this different from `alarm <- fault_active`?** The current cause and the memory of a past fault are different pieces of information.
 For equipment cleanup, position feedback, and multiple fault causes, see the
 [Fault and reset example](../examples/curriculum/pc-10-fault-alarm-reset.ghost.md).
 
@@ -683,7 +740,7 @@ For equipment cleanup, position feedback, and multiple fault causes, see the
 <a id="q14"></a>
 ## 14. How do I prevent two outputs from turning on together?
 
-Express each request, then add a mutual exclusion constraint.
+Write each request on its own, then add a mutual exclusion constraint.
 
 ```ghost
 control ExclusiveDirections {
@@ -710,11 +767,11 @@ control ExclusiveDirections {
 }
 ```
 
-When both requests are true, both outputs after constraints are false. Writing order does not choose a winner.
-This constraint alone does not create a direction-change delay. If a delay is needed, use the
+When both requests are true, both outputs are false after the constraint is applied. The order in which outputs are written does not pick a winner.
+This constraint alone does not add a delay when the direction changes. If you need one, see the
 [Direction-change state and timer example](../examples/curriculum/pc-04-direction-interlock.ghost.md).
 
-**Why not secretly block one output inside the other's expression?** To make each request and the conflict rule independently readable and explainable.
+**Why not quietly block one output inside the other's expression?** So that each request and the conflict rule can be read and explained on their own.
 
 **Syntax basis**
 
@@ -724,7 +781,7 @@ This constraint alone does not create a direction-change delay. If a delay is ne
 <a id="q15"></a>
 ## 15. How do I start 30 minutes after sunrise?
 
-Declare a Solar schedule and use `.due` as the start condition.
+Declare a `Solar` schedule and use its `.due` as the start condition.
 This **fragment** replaces the `starts` declaration in [example 7](#q07).
 
 ```ghost
@@ -742,11 +799,11 @@ schedule starts: Solar {
 }
 ```
 
-Replace the example coordinates with the target location's coordinates. The existing `duration` and timer determine operating time after `starts.due`.
-If sunrise cannot be determined, this example skips a new run. It does not relabel that reason as the normal “not yet time to start.”
-`fallback = skip` does not automatically provide a rule canceling an already-started run.
+- Replace the example coordinates with those of the real site. The existing `duration` and timer decide how long to run after `starts.due`.
+- If sunrise cannot be determined, this example skips the new run. It does not disguise that reason as the normal “not time to start yet.”
+- `fallback = skip` does not add a rule that cancels a run that has already started.
 
-**Why specify location, time zone, and fallback?** Natural events depend on installation context, and decisions when information is unknown must also be explicit.
+**Why specify location, time zone, and fallback?** Natural events depend on where the system is installed, and what to do when that information is unknown must also be explicit.
 
 **Syntax basis**
 
@@ -757,7 +814,7 @@ If sunrise cannot be determined, this example skips a new run. It does not relab
 <a id="q16"></a>
 ## 16. How do I reuse the same calculation in several places?
 
-Extract a pure function and pass the needed values as arguments.
+Extract a pure function and pass in the values it needs as arguments.
 
 ```ghost
 fn permitted(request: Bool, stop: Bool, enabled: Bool) -> Bool {
@@ -797,11 +854,10 @@ control TwoRequests {
 }
 ```
 
-A function does not remember state between calls. Replicating behavior with timers or self-holding memory
-is different from reusing a pure calculation.
-Independent state, ports, settings, and connections for such behavior follow [Behavior composition](reference/06-composition-and-replay.md).
+A function does not remember anything between calls. Reusing a pure calculation is different from duplicating a *behavior* that has timers or self-holding memory.
+For such behaviors, independent state, ports, settings, and connections follow [Behavior composition](reference/06-composition-and-replay.md).
 
-**Why not let the function secretly read external state?** To obtain the same result from the same arguments and expose the call's dependencies.
+**Why not let the function quietly read external state?** The same arguments must always give the same result, and every dependency of a call must be visible at the call site.
 
 **Syntax basis**
 
@@ -812,14 +868,17 @@ Independent state, ports, settings, and connections for such behavior follow [Be
 <a id="q17"></a>
 ## 17. How do I implement an interlock?
 
-An interlock blocks operations with unmet conditions or mutually conflicting operations.
-Put operating permission conditions in state transition expressions. Express required relationships between outputs with `require`.
+An *interlock* blocks an operation whose conditions are not met, or operations that conflict with each other.
+Use two tools:
+
+- Put the conditions that permit operation into the state transition expressions.
+- Express required relationships between outputs with `require`.
 
 ### Run only when conditions are met
 
-Write “run the pump only when valve opening is confirmed and water is not low” as follows.
-`valve_open` is an input confirming actual opening, `low_water` detects low water,
-and `stop` is a stop request. Do not substitute the valve-opening output value for `valve_open`.
+Here is “run the pump only when the valve is confirmed open and the water is not low.”
+`valve_open` is an input that confirms the valve has actually opened. `low_water` detects low water,
+and `stop` is a stop request. Do not use the valve-open *output* value in place of `valve_open`.
 
 ```ghost
 control PumpInterlock {
@@ -857,14 +916,14 @@ control PumpInterlock {
 }
 ```
 
-Evaluate `permit` every tick even while running. If valve-open confirmation disappears or low water or stop occurs,
-turn off both `running'` and pump intent. Recovery of conditions alone does not restart operation.
-After permission recovers, release Start and press it again.
-This is the restart policy chosen by this example.
+`permit` is evaluated on every tick, even while running. If the valve-open confirmation disappears, or low water or a stop occurs,
+both `running'` and the pump intent turn off. The conditions coming back does not restart operation by itself.
+After permission returns, release Start and press it again.
+This is the restart policy chosen for this example.
 
 ### Prevent simultaneous operation of two outputs
 
-Add an output constraint to disallow simultaneous outputs, such as forward and reverse.
+To forbid two outputs from being on together, such as forward and reverse, add an output constraint.
 
 ```ghost
 control DirectionInterlock {
@@ -891,54 +950,56 @@ control DirectionInterlock {
 }
 ```
 
-If both requests are true, both constrained outputs are false. The first-written output does not win.
-The same mutual exclusion can also be expressed with `mutex(forward, reverse);`.
-Write a wait before changing direction with separate state and a timer.
+- If both requests are true, both constrained outputs are false. The output written first does not win.
+- You can express the same mutual exclusion with `mutex(forward, reverse);`.
+- To wait before changing direction, use separate state and a timer.
 
-`require pump => valve;` means “pump output intent requires valve output intent.”
-Confirm actual valve opening through a separate input, as in the first example.
-Output constraints also do not automatically reset state. If a new start is required after conditions clear,
-explicitly specify state transitions and restart conditions as in the first example.
+`require pump => valve;` means “the pump output intent requires the valve output intent.”
+Confirm that the valve has actually opened through a separate input, as in the first example.
+Output constraints also do not reset state automatically. If a new start must be required after conditions clear,
+write the state transitions and restart conditions explicitly, as in the first example.
 This software logic does not replace an emergency stop.
 
 ### Grouping local and shared resource constraints
 
-A control's Bool output constraints can form a named local group such as
-`constraints LocalRules { require pump => valve; }`. `mutex` can appear in the
-group too. Its name helps readers find the explanation; it does not expand the
-scope to other controls or an entire physical installation. All mandatory
-conditions combine as AND. Priority cannot bypass them; optional `check`
-analysis remains a separate nonblocking advisory.
+**Local groups.** You can collect a control's Bool output constraints into a named local group, such as
+`constraints LocalRules { require pump => valve; }`. A `mutex` can also go inside the group.
 
-When request paths share one logical resource, declare shared rules with
+- The name only helps readers find the explanation. It does not widen the scope to other controls or to a whole physical installation.
+- All mandatory conditions are combined with AND. A priority cannot bypass them.
+- Optional `check` analysis is separate: it is a nonblocking advisory.
+
+**Shared resources.** When several request paths use the same logical resource, declare shared rules with
 `constraints SharedRules for station`. The [complete execution example](../examples/bound-resource-execution.ghost.md)
-checks automatic, manual and fallback requests through the same Rust guard.
-`compileSourceSync` produces a checked non-executable descriptor. Pass exact
-source/artifact identities, stable resource IDs, mode/input and output mappings
-explicitly to `compileBoundResourceControl`, then execute through the reference
-host's actual Rust/WASM scan path. The example supplies the complete binding and
-recorded inputs.
+checks automatic, manual, and fallback requests through the same Rust guard. The steps are:
 
-A prestart violation denies new admission. A new claim conflicting with the
-incumbent preserves incumbent admission and previous safe outputs; it is not
-hidden in a retry queue. During execution, the example's authored response is
-`pump1 = false; valve1 = true;`, rather than a universal all-OFF rule. After a
-trip, affected exclusive groups need an all-claims-neutral observation and a
-fresh claim. Require-only groups observe requested values equal to authored
-safe values before checking a fresh request. Connected groups must recover
-together in the same scan.
+1. `compileSourceSync` produces a checked descriptor. This descriptor is not executable.
+2. Pass the exact source/artifact identities, stable resource IDs, and mode/input and output mappings
+   explicitly to `compileBoundResourceControl`.
+3. Execute through the reference host's actual Rust/WASM scan path.
 
-The executable subset is one Bool GFB1 v1/v3 control with every output explicitly
-protected. Writers in one installation share a registry that refuses additional
-active writers for the same stable ID. Context/PID, shared-policy import
-composition and cooperative multi-VM arbitration are outside this subset.
-Results are logical requested/safe intents, not evidence of renderer application,
-valve-open confirmation or field installation. See [Reference §4.8](reference/04-sensors-constraints-control.en.md#48-common-constraints-notation-and-operations)
-and [the constraint contract](CONSTRAINTS.en.md#shared-bool-execution) for rules
-and stages.
+The example supplies the complete binding and the recorded inputs.
 
-**Why separate these two approaches?** How to change operating state and which output combinations to permit
-are control rules that must each be explicit.
+**Violations and recovery.**
+
+- A violation before start denies the new admission.
+- A new claim that conflicts with the current holder (the incumbent) keeps the incumbent's admission and the previous safe outputs. The new claim is not hidden in a retry queue.
+- For a violation during execution, the example's authored response is
+  `pump1 = false; valve1 = true;`. Safety is not a universal “all OFF” rule.
+- After a trip, each affected exclusive group needs an observation in which all claims are neutral, followed by a fresh claim.
+- A require-only group must first observe requested values equal to the authored safe values; then it checks a fresh request.
+- Connected groups must recover together in the same scan.
+
+**Scope of the executable subset.** It covers one Bool GFB1 v1/v3 control in which every output is explicitly
+protected. Writers in one installation share a registry that refuses any additional
+active writer for the same stable ID. Context/PID, shared-policy import
+composition, and cooperative arbitration across several VMs are outside this subset.
+The results are logical requested/safe intents. They are not evidence that a renderer applied them, that a
+valve opened, or that the field installation is correct. For the rules and stages, see [Reference §4.8](reference/04-sensors-constraints-control.en.md#48-common-constraints-notation-and-operations)
+and [the constraint contract](CONSTRAINTS.en.md#shared-bool-execution).
+
+**Why separate these two approaches?** *How* the operating state changes and *which* output combinations are allowed
+are two different control rules, and each must be written explicitly.
 
 **Syntax basis**
 
@@ -951,8 +1012,8 @@ are control rules that must each be explicit.
 <a id="q18"></a>
 ## 18. Is self-holding supported?
 
-Yes. Remember the previous running state in `state` and reuse that value in the next-state expression.
-Basic self-holding that stays on after Start is released is as follows.
+Yes. Remember the previous running state in `state`, and use that value again in the next-state expression.
+Here is basic self-holding, which stays on after Start is released.
 
 ```ghost
 control SelfHolding {
@@ -976,16 +1037,16 @@ control SelfHolding {
 ```
 
 - When `start` is true, `running'` becomes true.
-- Even if `start` is false on the next tick, the previous `running` is true, so operation continues.
-- When `stop` is true, `running'` is false. Stop takes priority even if Start and Stop arrive together.
+- On the next tick, `start` may be false, but the previous `running` is true, so operation continues.
+- When `stop` is true, `running'` is false. Stop wins even if Start and Stop arrive together.
 - `pump` follows `running'` from the current evaluation.
 
-With this basic expression, releasing Stop while `start` remains true turns operation back on.
-If “release Start and press again” is required, also use
-[the restart permission state in question 3](#q03).
+With this basic expression, if `start` is still true when Stop is released, operation turns back on.
+If you need “release Start and press it again,” also use
+[the restart permission state from question 3](#q03).
 
-**Why include the previous state in the expression?** Explicit self-holding memory in `running`
-makes the start, hold, and release conditions readable in one expression.
+**Why include the previous state in the expression?** Keeping the self-holding memory explicit in `running`
+lets you read the start, hold, and release conditions in one expression.
 
 **Syntax basis**
 
@@ -996,9 +1057,9 @@ makes the start, hold, and release conditions readable in one expression.
 <a id="q19"></a>
 ## 19. Can I move a particular device when the user cancels partway through?
 
-Yes. On a cancel input, transition to a subsequent action stage and connect its outputs.
-This example proceeds through original task stop request → stop confirmation → return device operation → home-position confirmation.
-`stopped` and `home` are inputs confirming actual stopping and the home position.
+Yes. When a cancel input arrives, move to a follow-up stage and connect that stage's outputs.
+This example goes through four steps: request the original task to stop → confirm it stopped → run the return device → confirm the home position.
+`stopped` and `home` are inputs that confirm the actual stop and the home position.
 
 ```ghost
 control CancelAndReturn {
@@ -1042,14 +1103,18 @@ control CancelAndReturn {
 }
 ```
 
-`Stopping` waits for feedback that the original task has stopped without sending a new return command.
-Command the return device only in `Returning`. Returning continues until home-position confirmation even after cancel is released.
-Without stop or home-position confirmation, remain in that stage. This example has no timeout policy.
-It does not restart automatically after cancellation. Release Start and Cancel in the waiting state, then provide a new start request.
-This example is ordinary task cancellation. Do not use it as a rule permitting additional motion during an emergency stop.
+- `Stopping` waits for feedback that the original task has stopped. It does not send a return command yet.
+- The return device is commanded only in `Returning`. Returning continues until the home position is confirmed, even if cancel is released.
+- Without stop or home-position confirmation, the program stays in that stage. This example has no timeout policy.
+- It does not restart automatically after a cancellation. In the waiting state, release Start and Cancel, then give a new start request.
+- This example is an ordinary task cancellation. Do not use it as a rule that allows extra motion during an emergency stop.
 
-**Why return after stop confirmation?** To prevent the original task and return command from moving the device simultaneously,
-and to avoid confusing logical and physical states during cancellation.
+![State machine of the CancelAndReturn example](diagrams/language-faq/cancel-and-return.svg)
+
+The diagram shows the four phases and the feedback that moves the program from one phase to the next.
+
+**Why return only after the stop is confirmed?** So that the original task and the return command never move the device at the same time,
+and the logical state is not confused with the physical state during cancellation.
 
 **Syntax basis**
 
@@ -1061,7 +1126,7 @@ and to avoid confusing logical and physical states during cancellation.
 <a id="q20"></a>
 ## 20. How do I schedule an operation at sunrise?
 
-Use the `Solar` schedule's `.due` as the start condition. This fragment targets sunrise itself.
+Use the `Solar` schedule's `.due` as the start condition. This fragment targets the moment of sunrise itself.
 
 ```ghost
 schedule starts: Solar {
@@ -1078,12 +1143,12 @@ schedule starts: Solar {
 }
 ```
 
-Replace the coordinates and time zone with those of the target location. Admit a new occurrence when `starts.due` is true.
-The existing `duration` and control state determine operating time. If sunrise cannot be calculated,
-skip a new run. `fallback = skip` does not cancel an already-admitted run.
+Replace the coordinates and time zone with those of the real site. When `starts.due` is true, admit a new occurrence.
+The existing `duration` and control state decide how long to run. If sunrise cannot be calculated,
+the new run is skipped. `fallback = skip` does not cancel a run that was already admitted.
 
-**Why use `.due`?** To separate the occurrence of a natural event from operating state transitions,
-preserving the boundary between schedule evaluation and device control.
+**Why use `.due`?** It keeps the occurrence of a natural event separate from operating state transitions,
+which preserves the boundary between schedule evaluation and device control.
 
 **Syntax basis**
 
@@ -1094,22 +1159,22 @@ preserving the boundary between schedule evaluation and device control.
 <a id="q21"></a>
 ## 21. Can I schedule operations by day of the week? [Partially unsupported]
 
-> **Current dev status:** The day weekday-range filter mon..fri is unsupported. The workday/offday and installation-calendar alternative below is supported. [Current contract](reference/03-time-and-schedules.md#38-dst-자정과-work-calendar).
+> **Current dev status:** The weekday-range filter ``day`mon..fri` `` is unsupported. The alternative below—``day`workday` ``/``day`offday` `` with an installation calendar—is supported. [Current contract](reference/03-time-and-schedules.md#38-dst-자정과-work-calendar).
 
-Express weekday conditions in the schedule's `on` field. For example, to start at 6:00 AM Monday through Friday,
-combine the time condition with this weekday condition.
-The following is a fragment of selected syntax from the Reference. The current compiler's weekday-range filter does not yet support this notation.
-For executable schedules, use ``day`workday` `` or ``day`offday` `` with an installation calendar.
+Express a weekday condition in the schedule's `on` field. For example, to start at 6:00 AM Monday through Friday,
+combine the time condition with the weekday condition below.
+This fragment uses syntax selected in the Reference, but the current compiler's weekday-range filter does not support it yet.
+For a schedule that compiles and runs with the current compiler, use ``day`workday` `` or ``day`offday` `` with an installation calendar.
 
 ```ghost
 on = day`mon..fri`;
 ```
 
-Apply the weekday filter to the local date of the calculated scheduled start. Public holidays and site workdays follow rules different from weekdays,
-so do not interpret ``day`mon..fri` `` as a public holiday calendar.
-DST and midnight boundary policies also follow the schedule contract.
+The weekday filter applies to the local date of the calculated scheduled start. Public holidays and site workdays follow different rules from weekdays,
+so do not read ``day`mon..fri` `` as a public-holiday calendar.
+DST and midnight-boundary policies also follow the schedule contract.
 
-**Why separate weekday and time?** The same scheduled time must allow combinations with different date conditions such as weekdays, public holidays, or site workdays.
+**Why keep weekday and time separate?** The same start time must be combinable with different date conditions, such as weekdays, public holidays, or site workdays.
 
 **Syntax basis**
 
@@ -1121,21 +1186,21 @@ DST and midnight boundary policies also follow the schedule contract.
 <a id="q22"></a>
 ## 22. Can I control a device based on its accumulated operating time? [Partially unsupported]
 
-> **Current dev status:** The example consuming externally confirmed accumulated Duration is supported. Executable on_time accounts currently support durable applied evidence only; native account execution for requested/safe/confirmed stages is unsupported. [Current contract](../tools/control.mjs#L1521).
+> **Current dev status:** The example that consumes an externally confirmed accumulated `Duration` is supported. Executable `on_time` accounts currently support durable *applied* evidence only; native account execution for the requested, safe, and confirmed stages is unsupported. [Current contract](../tools/control.mjs#L1521).
 
-Receive accumulated operating time as a `Duration` value and use it in conditions.
-First decide **over which period, and what qualifies as operation for accumulation**.
+Receive the accumulated operating time as a `Duration` value and use it in conditions.
+First decide **over which period you accumulate, and what counts as operation**.
 
 | Desired criterion | Accumulation scope |
 |---|---|
-| Ten minutes total operation in this task | Sum of ON intervals since task start |
+| Ten minutes of total operation in this task | Sum of ON intervals since the task started |
 | Twenty minutes of operation in the last hour | A continuously moving one-hour window |
-| One hour total operation today | Today's date in the specified time zone |
-| One hundred hours total operation since maintenance | Since an explicit maintenance reset |
+| One hour of total operation today | Today's date in the specified time zone |
+| One hundred hours of total operation since maintenance | Since an explicit maintenance reset |
 
-This control example consumes an accumulated value. `used` is an input summing the same device's confirmed ON intervals
-over the chosen scope. `usage_valid` indicates that the aggregation is valid.
-This code does not include the declaration generating the accumulated value.
+This control example *consumes* an accumulated value. `used` is an input that sums the same device's confirmed ON intervals
+over the chosen scope. `usage_valid` says whether that sum is valid.
+The code does not include the declaration that produces the accumulated value.
 
 ```ghost
 control UsageLimit {
@@ -1168,19 +1233,19 @@ control UsageLimit {
 }
 ```
 
-Once the total reaches the limit, issue no additional run requests. Strict usage limits including the delay until physical stopping
-also require the reservation and settlement rules in Reference §3.10.
-`elapsed(running)` measures time since the last state change. It does not sum repeated ON/OFF intervals.
+Once the total reaches the limit, no further run requests are issued. A strict usage limit that also covers the delay until the device physically stops
+needs the reservation and settlement rules of Reference §3.10 as well.
+`elapsed(running)` measures time since the last state change. It does not add up repeated ON/OFF intervals.
 
-To include both automatic and manual operation, aggregate a common operation record for the same equipment instead of command-specific timers.
-Distinguish whether you count output requests, outputs passing constraints, applied commands, or actual feedback.
-Without feedback, do not call command application time actual operating time.
+To include both automatic and manual operation, aggregate one common operation record for the equipment instead of keeping a timer per command source.
+Decide whether you count output requests, outputs that passed constraints, applied commands, or actual feedback.
+Without feedback, do not call the time a command was applied “actual operating time.”
 
-Declare accumulated records with `account` and query the last 60 seconds with `used(account, rolling(60s))`.
-The `on_time` declaration specifies the target, evidence basis among requested/safe/applied/confirmed, and persistence.
-Do not automatically infer task-specific or post-maintenance reset and retention policies from this notation.
+Declare an accumulated record with `account`, and query, for example, the last 60 seconds with `used(account, rolling(60s))`.
+An `on_time` declaration specifies the target, the evidence basis (requested, safe, applied, or confirmed), and persistence.
+Do not assume that this notation implies per-task or post-maintenance reset and retention policies.
 
-**Why is separate accumulation semantics needed?** Checking only continuous operating time misses usage from many short runs.
+**Why are separate accumulation semantics needed?** Checking only continuous operating time misses usage spread over many short runs.
 
 **Syntax basis**
 
@@ -1194,16 +1259,16 @@ Do not automatically infer task-specific or post-maintenance reset and retention
 <a id="q23"></a>
 ## 23. Can I run cleaning based on the daily operation count regardless of automatic or manual mode?
 
-Combine count conditions with a cleaning sequence.
-Instead of counting automatic and manual start commands separately, **count the same device's operations in one place**.
-Changing from automatic to manual while the device continues operating does not count as a new operation.
+Combine a count condition with a cleaning sequence.
+Do not count automatic and manual start commands separately. Instead, **count the operations of the same device in one place**.
+Switching from automatic to manual while the device keeps running does not count as a new operation.
 
-For example, choose the policy “after ten normal-operation starts today in Seoul time, clean once after the current run ends.”
-Here, an OFF→ON transition in the operation confirmation signal counts as one operation.
-If only completed runs should count, aggregate completion events instead of starts.
+For example, choose this policy: “After ten normal-operation starts today (Seoul time), clean once when the current run ends.”
+Here, one OFF→ON transition of the operation-confirmation signal counts as one operation.
+If only completed runs should count, count completion events instead of starts.
 
-This **fragment** reads the daily aggregation. `Int` is the Reference's exact integer type.
-`today_starts` is today's combined count of automatic and manual normal operations; `count_valid` is aggregation validity.
+This **fragment** reads the daily count. `Int` is the Reference's exact integer type.
+`today_starts` is today's combined count of automatic and manual normal operations; `count_valid` says whether that count is valid.
 
 ```ghost
 input today_starts: Int;
@@ -1216,12 +1281,12 @@ let wash_due = case count_valid {
 };
 ```
 
-`today_starts` is not a built-in name. This fragment does not declare the daily counter itself.
-Declare daily aggregation with `account` and `count_events` from §3.10. Specify input event IDs,
-the evidence basis, and date boundaries. Count retransmissions of the same event only once.
-`on_time` sums time; `count_events` counts events. Do not interchange them.
+`today_starts` is not a built-in name, and this fragment does not declare the daily counter itself.
+Declare the daily count with `account` and `count_events` from §3.10. Specify the input event IDs,
+the evidence basis, and the date boundaries. A retransmission of the same event counts only once.
+`on_time` sums time; `count_events` counts events. Do not use one in place of the other.
 
-The cleaning sequence in the example above is as follows. This describes behavior rather than executable syntax.
+The cleaning sequence for the example above works as follows. This describes behavior; it is not executable syntax.
 
 ```text
 Reach ten normal operations today → remember cleaning is needed
@@ -1229,17 +1294,17 @@ Confirm the current normal operation has ended → start the cleaning stage
 Confirm cleaning completion → clear the request and remember cleaning completed for that date
 ```
 
-- Operations turning the same device on for cleaning are excluded from this example's normal-operation count.
-- No new normal operation starts during cleaning. Apply the same condition to automatic and manual requests.
-- Remember a cleaning request in state. A single-tick pulse can be lost when the device is busy.
-- This policy does not cancel an already-remembered cleaning request or cleaning in progress when the date changes.
-- Cleaning once daily and cleaning every ten operations are different policies. This example cleans once daily.
+- Turning the same device on *for cleaning* is not counted as a normal operation in this example.
+- No new normal operation starts during cleaning. The same condition applies to automatic and manual requests.
+- Remember the cleaning request in state. A one-tick pulse can be lost while the device is busy.
+- In this policy, a date change does not cancel a cleaning request that is already remembered, or cleaning that is in progress.
+- “Clean once a day” and “clean every ten operations” are different policies. This example cleans once a day.
 
-The actual daily aggregation contract must define time zone, date boundaries, restoration after restart, clock corrections, and unknown aggregation state.
-An ordinary `state count = 0` declaration alone does not create persistent per-date aggregation.
-Write the cleaning stages and outputs with enum state, as in [sequential control in question 8](#q08).
+A real daily-count contract must define the time zone, date boundaries, restoration after a restart, clock corrections, and what happens when the count is unknown.
+A plain `state count = 0` declaration does not create a persistent per-date count.
+Write the cleaning stages and outputs with enum state, as in [the sequential control of question 8](#q08).
 
-**Why count outside operating modes?** Cleaning needs depend on how much the device has been used, rather than who commanded it.
+**Why count independently of the operating mode?** The need for cleaning depends on how much the device was used, not on who commanded it.
 
 **Syntax basis**
 
@@ -1253,10 +1318,10 @@ Write the cleaning stages and outputs with enum state, as in [sequential control
 <a id="q24"></a>
 ## 24. Can I change just the operating time later without a firmware update? [Changed]
 
-> **Current dev status:** Live updates and TimeSlots connections are supported. The age < duration advice below uses the earlier scalar-reading model; handle the current setting Result with case. [Current contract](reference/05-settings-and-observation.md#기본값과-유효값).
+> **Current dev status:** Live updates and `TimeSlots` connections are supported. The `age < duration` advice below follows the earlier model, where a setting was read as a plain scalar. Handle the current setting `Result` with `case`. [Current contract](reference/05-settings-and-observation.md#기본값과-유효값).
 
-Yes. Declare **how long to operate** as an operator-editable `Duration` setting.
-This **fragment** replaces the `duration` declaration in [timed operation in question 4](#q04).
+Yes. Declare **how long to run** as a `Duration` setting that operators can edit.
+This **fragment** replaces the `duration` declaration in [the timed operation of question 4](#q04).
 
 ```ghost
 config duration: Duration = 5min {
@@ -1269,18 +1334,21 @@ config duration: Duration = 5min {
 ```
 
 Changing five minutes to ten minutes on screen changes the setting's effective value.
-No source edit, program recompilation, firmware update, or restart is required.
-This declaration defines the type and range. The screen uses that description to create a field.
-Accepted values of ordinary operational settings are preserved across device restarts.
+You do not need to edit the source, recompile the program, update firmware, or restart.
+The declaration defines the type and range; the screen uses that description to build a field.
+Accepted values of ordinary operational settings survive a device restart.
 
-Apply changes within the same execution without resetting elapsed time.
-When controlling with `age < duration`, increasing five minutes to ten after three minutes have elapsed evaluates against ten minutes total.
-Reducing the limit to five minutes after six have elapsed ends operation at the evaluation reflecting the new value.
-“Keep the current task unchanged and use the new time from the next task” requires an explicit control rule
-remembering the setting in separate state at task start. It is not the default change semantics of `config`.
+The change applies within the same run, and elapsed time is not reset.
+With `age < duration`:
 
-**What time to start** is a different setting from operating length.
-Connect a `TimeSlots` config instead of the fixed `selected` list in `DailySlots`.
+- If you increase five minutes to ten after three minutes have passed, the run is now compared against ten minutes in total.
+- If you reduce the limit to five minutes after six minutes have passed, operation ends at the first evaluation that uses the new value.
+
+“Keep the current task as it is and use the new time from the next task” needs an explicit control rule:
+copy the setting into separate state when the task starts. That is not the default change behavior of `config`.
+
+**When to start** is a different setting from how long to run.
+Instead of the fixed `selected` list in `DailySlots`, connect a `TimeSlots` config.
 This setting declaration fragment accepts up to eight times on a 15-minute grid.
 
 ```ghost
@@ -1291,10 +1359,10 @@ config watering_slots: TimeSlots<15min, 8> = [time`06:00`, time`18:45`] {
 ```
 
 Write `selected = watering_slots;` inside `DailySlots<15min>` in the same control.
-Changing times is also a live event without recompilation. Newly added past times are not executed,
-and removing a slot alone does not cancel an already-started run.
+Changing the times is also a live event and needs no recompilation. A newly added time that is already in the past does not run,
+and removing a slot does not, by itself, cancel a run that has already started.
 
-**Why identify adjustable values in advance?** So the language clearly defines the boundary between what operators may change and changes to program rules themselves.
+**Why mark adjustable values in advance?** So the language draws a clear line between what operators may change and what counts as changing the program's rules.
 
 **Syntax basis**
 
@@ -1308,8 +1376,8 @@ and removing a slot alone does not cancel an already-started run.
 <a id="q25"></a>
 ## 25. Can I change a setting field's label and UI component?
 
-Specify a label with the language's `label`. The cabinet-view creating the screen chooses the UI component.
-This **fragment** displays the setting from [question 24](#q24) as “Cleaning time.”
+Set the label with the language's `label` field. The cabinet-view creating the screen chooses the UI component.
+This **fragment** shows the setting from [question 24](#q24) as “Cleaning time.”
 
 ```ghost
 config duration: Duration = 5min {
@@ -1321,23 +1389,23 @@ config duration: Duration = 5min {
 }
 ```
 
-A screen using this declaration can choose an appropriate input method from the following.
+A screen that uses this declaration can pick a suitable input method, for example:
 
-| Screen input method | Setting semantics to preserve |
+| Screen input method | Setting semantics that must be kept |
 |---|---|
-| Time field | Read a Duration value and validate the 1–20-minute range and one-minute increments |
-| Selection list | Select allowed values from one to 20 minutes |
-| Slider | Apply the same range and increment |
+| Time field | Read a Duration value and check the 1–20-minute range and 1-minute steps |
+| Selection list | Offer only allowed values from 1 to 20 minutes |
+| Slider | Apply the same range and step |
 
-Changing the component still preserves the value's type, range, increment, and change permissions.
-`label` is a human-readable name; it does not change the setting ID or permissions.
+Whatever component is used, the value's type, range, step, and change permissions stay the same.
+`label` is a human-readable name. It does not change the setting ID or its permissions.
 
-GhostFlow does not have syntax such as `widget = slider` to specify a particular component.
-That choice belongs to the cabinet-view. Saying that the screen can choose does not mean
-the language also supplies a menu for operators to change component types directly.
+GhostFlow has no syntax such as `widget = slider` for choosing a specific component.
+That choice belongs to the cabinet-view. “The screen can choose” also does not mean
+the language gives operators a menu to switch component types themselves.
 
-**Why determine screen appearance outside the language?** To edit the same “Cleaning time” setting appropriately on phones and device screens
-while retaining identical control semantics and validation rules.
+**Why decide the screen's appearance outside the language?** So the same “Cleaning time” setting can be edited in a way that suits phones and device screens,
+while the control semantics and validation rules stay identical.
 
 **Syntax basis**
 
@@ -1348,8 +1416,8 @@ while retaining identical control semantics and validation rules.
 <a id="q26"></a>
 ## 26. Can I limit the range of editable setting values?
 
-Yes. `min` and `max` define an inclusive allowed range; `step` defines the change increment.
-This **fragment** permits operating times from one to 20 minutes in one-minute increments only.
+Yes. `min` and `max` define an inclusive allowed range, and `step` defines the increment.
+This **fragment** allows operating times from 1 to 20 minutes, in 1-minute steps only.
 
 ```ghost
 config duration: Duration = 5min {
@@ -1363,19 +1431,19 @@ config duration: Duration = 5min {
 
 | Input value | Result |
 |---|---|
-| One, five, or 20 minutes | Accepted |
-| 30 seconds or 21 minutes | Rejected as outside the range |
-| One minute 30 seconds | Within range, but rejected for not matching one-minute increments |
+| 1, 5, or 20 minutes | Accepted |
+| 30 seconds or 21 minutes | Rejected: outside the range |
+| 1 minute 30 seconds | Rejected: inside the range, but not on the 1-minute grid |
 
-`step` is a grid starting at `min`. For example, a one-minute minimum with a two-minute increment
-allows one, three, five minutes, and so on. Defaults must also satisfy the range and grid.
-Reject values with different units or types too. Do not automatically round values or clamp them to boundaries.
+`step` defines a grid that starts at `min`. For example, a 1-minute minimum with a 2-minute step
+allows 1, 3, 5 minutes, and so on. The default value must also be inside the range and on the grid.
+Values with a different unit or type are also rejected. Values are never rounded or clamped to a boundary automatically.
 
-Validation rules apply beyond the slider's displayed range. Other fields and setting requests
-follow the same rules. If any value is invalid in a multiple-setting change, apply none.
-Declare `access = designer` to disallow operator changes entirely.
+The validation rules apply everywhere, not only to the range a slider shows. Other fields and setting requests
+follow the same rules. If any value in a multi-setting change is invalid, none is applied.
+To forbid operator changes completely, declare `access = designer`.
 
-**Why specify the range in the language?** So every screen or request path uses only author-permitted values for control.
+**Why put the range in the language?** So that every screen and every request path can only feed author-approved values into control.
 
 **Syntax basis**
 
@@ -1385,15 +1453,15 @@ Declare `access = designer` to disallow operator changes entirely.
 <a id="q27"></a>
 ## 27. Can I use different settings for each day of the week? [Changed]
 
-> **Current dev status:** The duration selected by the conditional is also a Result. Handle ok/fault with case before comparing operating time. [Current contract](reference/05-settings-and-observation.md#기본값과-유효값).
+> **Current dev status:** The duration chosen by the conditional is also a `Result`. Handle `ok`/`fault` with `case` before comparing the operating time. [Current contract](reference/05-settings-and-observation.md#기본값과-유효값).
 
-Yes. Declare weekday-specific values individually as `config`, then select a value with a conditional expression.
-For example, configure five minutes on weekdays and ten on weekends.
+Yes. Declare each day-type value as its own `config`, then pick one with a conditional expression.
+For example, run five minutes on weekdays and ten on weekends.
 Each setting can have its own label and editable range.
 
-This is a **setting selection fragment**. `is_weekday` is an input that is true Monday through Friday
-in the specified site time zone. `calendar_valid` indicates that the date determination is valid.
-These inputs are not automatically created built-in variables. Their producer supplies the site date and validity.
+This is a **setting-selection fragment**. `is_weekday` is an input that is true Monday through Friday
+in the site's time zone. `calendar_valid` says whether that date decision is valid.
+Neither input is a built-in variable; whatever produces them supplies the site date and its validity.
 To restrict the schedule itself by weekday, use the `on = day` filter in Reference §3.8.
 
 ```ghost
@@ -1421,19 +1489,19 @@ let duration = case is_weekday {
 let can_start = case calendar_valid { ok(valid) => valid; fault(_) => false; };
 ```
 
-Check `can_start` as part of the start condition and use `duration` in the operating-time comparison.
-Do not select the weekend setting and start a new run merely because the date is unknown.
-This fragment alone does not operate the device. Connect start, stop, and outputs to operating rules.
+Check `can_start` as part of the start condition, and use `duration` in the operating-time comparison.
+If the date is unknown, do not fall back to the weekend setting and start a new run.
+This fragment does not operate the device on its own. Connect start, stop, and outputs through operating rules.
 
-For separate values Monday through Sunday, similarly define seven settings
-and select using an enum weekday input and exhaustive `case` branches.
-Public holidays and site workdays are separate conditions from weekdays.
+For a separate value for each day from Monday to Sunday, define seven settings in the same way,
+and select one with an enum weekday input and exhaustive `case` branches.
+Public holidays and site workdays are conditions separate from weekdays.
 
-If the `duration` expression above is continuously read during operation, a weekday or setting change makes evaluation use the new value.
-To finish the current run with the duration selected on its starting day, remember the selected value in state at start.
-Weekday-specific settings do not automatically determine the policy for tasks crossing midnight.
+If the `duration` expression above is read continuously during operation, a change of weekday or setting makes the evaluation use the new value.
+To finish the current run with the duration chosen on the day it started, copy the chosen value into state at the start.
+Day-specific settings do not decide what happens to tasks that cross midnight; that policy must be written separately.
 
-**Why separate settings and selection conditions?** Operators can change only weekday-specific durations while authored control rules retain which value is used on which day.
+**Why separate the settings from the selection condition?** Operators can change only the per-day durations, while the authored control rules keep deciding which value applies on which day.
 
 **Syntax basis**
 
@@ -1447,14 +1515,14 @@ Weekday-specific settings do not automatically determine the policy for tasks cr
 <a id="q28"></a>
 ## 28. Can I use different control logic only on public holidays?
 
-Yes. Use the public-holiday condition to select different control expressions.
-You can change operating conditions or sequences, as well as times or setting values.
+Yes. Use the public-holiday condition to choose between different control expressions.
+You can change not only times or setting values, but also operating conditions and sequences.
 
-This example ventilates on ordinary days when people are present or temperature is high,
-and on public holidays only when temperature is high.
-`is_holiday` is an input determined using the site time zone and chosen public holiday calendar.
-`calendar_valid` indicates that the holiday determination for that date is valid.
-Neither name is a built-in variable, and this code does not perform a holiday lookup.
+This example ventilates on ordinary days when people are present or the temperature is high,
+and on public holidays only when the temperature is high.
+`is_holiday` is an input decided from the site time zone and a chosen public-holiday calendar.
+`calendar_valid` says whether the holiday decision for that date is valid.
+Neither name is a built-in variable, and this code does not look up holidays itself.
 
 ```ghost
 control HolidayVentilation {
@@ -1495,22 +1563,22 @@ control HolidayVentilation {
 }
 ```
 
-Here, `stop` applies to both branches.
-The example explicitly chooses to turn ventilation off when the calendar determination is invalid.
-If equipment requires another mandatory action such as high-temperature protection, its unknown-calendar rule must meet that requirement too.
-Do not arbitrarily treat an unknown date as an ordinary date or public holiday.
+- `stop` applies to both branches.
+- When the calendar decision is invalid, this example explicitly chooses to turn ventilation off.
+- If the equipment needs another mandatory action, such as high-temperature protection, its rule for an unknown calendar must satisfy that need too.
+- Do not arbitrarily treat an unknown date as an ordinary day or as a public holiday.
 
-Public holidays are not the same as Saturdays and Sundays. Define the applicable region, whether substitute holidays are included,
-and the calendar validity period. Use a site work calendar instead of public holidays if the intended meaning is days the site is closed.
+Public holidays are not the same as Saturdays and Sundays. Define the region, whether substitute holidays are included,
+and the period for which the calendar is valid. If you mean “days the site is closed,” use a site work calendar instead of public holidays.
 To attach a holiday filter to a schedule, use ``on = day`holiday`;`` and `calendar = holidays;`.
 Declare the logical calendar provider with `calendar holidays: HolidayCalendar;`.
-This declaration does not automatically create the example's `is_holiday` Bool input.
+That declaration does not create the example's `is_holiday` Bool input automatically.
 
-The example selects a branch for the current date every evaluation. It is not an example of changing
-an ongoing sequential task to a different sequence when the date changes. To preserve a started task's sequence,
-remember the selected branch in state at start and use the new date's rule only for new tasks.
+The example picks a branch for the current date on every evaluation. It does not show how to switch
+an ongoing sequential task to a different sequence when the date changes. To keep a started task on its original sequence,
+store the chosen branch in state at the start, and apply the new date's rule only to new tasks.
 
-**Why separate holiday determination and control expressions?** Calendars vary by region, but the program must explicitly show and explain what to do on public holidays.
+**Why separate holiday detection from control expressions?** Calendars differ by region, but the program must still show and explain explicitly what to do on public holidays.
 
 **Syntax basis**
 
@@ -1522,11 +1590,11 @@ remember the selected branch in state at start and use the new date's rule only 
 <a id="q29"></a>
 ## 29. Can I account for daylight saving time in control?
 
-Yes. Specify an IANA time zone for **schedules based on local time**,
-and explicit policies for times disappearing or repeating during daylight saving transitions.
-**How long to operate** uses monotonic elapsed time, so daylight saving does not lengthen or shorten it.
+Yes. For **schedules based on local time**, specify an IANA time zone,
+together with explicit policies for times that disappear or repeat during a daylight saving (DST) transition.
+**How long to run** uses monotonic elapsed time, so DST never lengthens or shortens a run.
 
-This is a schedule declaration **fragment** specifying a time zone.
+This is a schedule declaration **fragment** with a time zone.
 
 ```ghost
 schedule starts: DailySlots<15min> {
@@ -1543,32 +1611,32 @@ schedule starts: DailySlots<15min> {
 }
 ```
 
-This schedule is based on 6:00 AM local time in New York. It differs from manually adding a fixed UTC offset.
-This declaration skips nonexistent times and selects the first occurrence of repeated times.
+This schedule fires at 6:00 AM local time in New York. That is different from adding a fixed UTC offset by hand.
+The declaration skips a time that does not exist and picks the first of two repeated times.
 Reference §3.8 defines these transition policies.
 
 | Transition situation | Policy | Meaning |
 |---|---|---|
-| Clock moves forward and the scheduled time does not exist | `skip` | Skip that schedule |
+| Clock jumps forward; the scheduled time does not exist | `skip` | Skip that occurrence |
 | Same situation | `next_valid` | Use the next valid time |
-| Clock moves back and the scheduled time occurs twice | `first` | Select only the first |
-| Same situation | `second` | Select only the second |
-| Same situation | `both` | Select each time as a separate schedule occurrence |
-| Same situation | `skip` | Skip that schedule |
+| Clock moves back; the scheduled time occurs twice | `first` | Use only the first |
+| Same situation | `second` | Use only the second |
+| Same situation | `both` | Use each one as a separate occurrence |
+| Same situation | `skip` | Skip that occurrence |
 
-Specify policies inside the schedule, such as `dst_missing = skip;` and `dst_repeated = first;`.
-Choose the actual policy to match the site's operating intent.
+Write the policies inside the schedule, for example `dst_missing = skip;` and `dst_repeated = first;`.
+Choose the actual policy to match how the site is meant to operate.
 With `both`, the two occurrences have different identifiers.
-Whether each actually starts operation depends on control rules such as handling requests while running.
-Do not count re-observation of the same schedule after a simple clock correction as a new schedule.
+Whether each one actually starts operation depends on control rules, such as how requests are handled while running.
+When the same occurrence is seen again only because the clock was corrected, it does not count as a new occurrence.
 
-Write operating length after a scheduled start as in [question 7](#q07).
-With `timer age = elapsed(running)` and `age < duration`, compare the same monotonic elapsed time
-even if the local clock changes during operation.
-Do not cancel an already-started run merely because the date or DST interval changes.
+Write how long to run after a scheduled start as in [question 7](#q07).
+With `timer age = elapsed(running)` and `age < duration`, the comparison uses the same monotonic elapsed time
+even if the local clock changes during the run.
+Do not cancel a run that has already started merely because the date or the DST period changes.
 
-**Why separate the two kinds of time?** “6:00 AM local time” means a daily timetable,
-whereas “turn the pump on for five minutes” means actual duration.
+**Why keep the two kinds of time separate?** “6:00 AM local time” describes a daily timetable,
+whereas “run the pump for five minutes” describes a real duration.
 
 **Syntax basis**
 
@@ -1581,40 +1649,40 @@ whereas “turn the pump on for five minutes” means actual duration.
 <a id="q30"></a>
 ## 30. Can I control operations based on high and low tide? [Partially unsupported]
 
-> **Current dev status:** High/low tide and offsets are supported. The run(10min, on_time) notation below is design notation; the compiler supports run(_, within(_)). [Current contract](reference/03-time-and-schedules.md#pulse-window-run-range).
+> **Current dev status:** High/low tide events and offsets are supported. The `run(10min, on_time)` notation below is design notation; the compiler supports `run(_, within(_))`. [Current contract](reference/03-time-and-schedules.md#pulse-window-run-range).
 
-Yes. Use predicted high/low tide times as the basis for schedule occurrences,
-and specify offsets before or after them separately from operating length.
-These two requirements have different reference times and operating lengths.
+Yes. Use the predicted high- or low-tide time as the reference point for schedule occurrences,
+and specify the offset before or after it separately from the operating length.
+The two requirements below have different reference points and different operating lengths.
 
 ```text
 30 minutes before high tide → start operation → run for ten minutes
 20 minutes after low tide → start operation → run for five minutes
 ```
 
-Write the first example in a `Tide` schedule as follows. This fragment omits the declared prediction provider and common policies.
+In a `Tide` schedule, the first requirement looks like this. The fragment omits the declared prediction provider and the common policies.
 
 ```ghost
 at = tide`high - 30min`;
 basis = run(10min, on_time);
 ```
 
-The schedule evaluates starting against predicted times. Once started, measure operating length with monotonic time.
-Specify the station or prediction model for the tide location, prediction revision, applicable period, and expiry time.
-Do not infer site high/low tide times from moon phase alone or assume a fixed number of daily occurrences.
+The schedule decides *when to start* from predicted times. Once a run has started, its length is measured with monotonic time.
+Specify the tide station or prediction model for the location, the prediction revision, its validity period, and its expiry time.
+Do not derive site high/low tide times from the moon phase alone, and do not assume a fixed number of tides per day.
 
-- **High/low tide:** A specific predicted time. It can provide a reference point such as “30 minutes before” or “20 minutes after.”
-- **Spring/neap tide:** A classification state or period of tidal range. Use it as a schedule permission condition, rather than treating it as “30 minutes before spring tide.”
-- **Actual water level:** A sensor condition separate from predicted time. Connect it separately when control requires actual water-level confirmation.
+- **High/low tide:** A specific predicted time. It can serve as a reference point, such as “30 minutes before” or “20 minutes after.”
+- **Spring/neap tide:** A classification (state or period) of the tidal range. Use it as a condition that permits a schedule, not as a point such as “30 minutes before spring tide.”
+- **Actual water level:** A sensor condition, separate from predicted times. Connect it separately if control must confirm the real water level.
 
-If predictions are missing or stale, follow the explicit fallback. The minimum policy, `skip`, skips new runs.
-Do not execute the same tide event twice when predictions are revised.
-Prediction revision or withdrawal alone does not automatically cancel an already-started run,
-and restored data does not cause past schedules to execute late.
-These rules depend on validity of the prediction data and times used, rather than internet connectivity itself.
+If predictions are missing or stale, follow the explicit fallback. The minimal policy, `skip`, skips new runs.
+Do not run the same tide event twice when predictions are revised.
+A revised or withdrawn prediction does not, by itself, cancel a run that has already started,
+and data that comes back later does not make past occurrences run late.
+These rules depend on whether the prediction data and times are valid, not on internet connectivity as such.
 
-**Why separate predicted times and operating length?** So prediction updates do not arbitrarily change an already-started task's duration,
-and the tide event that caused its start remains distinguishable.
+**Why keep predicted times and operating length separate?** So that a prediction update cannot change the length of a run that has already started,
+and the tide event that caused the start stays identifiable.
 
 **Syntax basis**
 
@@ -1626,17 +1694,17 @@ and the tide event that caused its start remains distinguishable.
 <a id="q31"></a>
 ## 31. Can I control operations based on spring/neap tides or the moon phase? [Changed]
 
-> **Current dev status:** tide_is and moon_is return `Result<Bool, TemporalContextFault>`. Handle ok/fault with case for when = tide_is(...) below. The separate Bool-input fragment remains valid. [Current contract](reference/03-time-and-schedules.md#달과-조석).
+> **Current dev status:** `tide_is` and `moon_is` return `Result<Bool, TemporalContextFault>`. For `when = tide_is(...)` below, handle `ok`/`fault` with `case`. The separate Bool-input fragment is still valid. [Current contract](reference/03-time-and-schedules.md#달과-조석).
 
-Yes. Treat spring/neap tides as **a tidal-range classification state or period**,
-and moon phase as a separate condition. When a condition is met, permit a schedule or select
+Yes. Treat spring/neap tide as **a classification (state or period) of the tidal range**,
+and the moon phase as a separate condition. When a condition holds, it can permit a schedule or select
 different control rules. Use `tide_is` or `moon_is` in schedule conditions.
 
 | Example desired behavior | Role of the condition |
 |---|---|
-| Run at 6:00 AM only during neap tides | Neap-tide status permits the timed schedule to start |
-| Select a shorter operating duration during spring tides | Spring-tide status selects the setting value |
-| Permit schedules only when a specified moon-phase condition is met | Moon-phase determination permits starting |
+| Run at 6:00 AM, but only during neap tides | Neap-tide status permits the timed schedule to start |
+| Use a shorter run time during spring tides | Spring-tide status selects the setting value |
+| Allow schedules only when a given moon-phase condition holds | The moon-phase decision permits starting |
 
 This Reference fragment connects a declared `TidePredictions` provider to the schedule's permission condition.
 
@@ -1644,10 +1712,10 @@ This Reference fragment connects a declared `TidePredictions` provider to the sc
 when = tide_is(harbor_tides, tide`neap`);
 ```
 
-A **fragment** receiving conditions as inputs and connecting them to control expressions can be written as follows.
-`is_neap` is a neap-tide determination from site tide data, `tide_valid` is its validity,
-and `schedule_due` means this start event from a separate schedule. These are not built-in variables,
-nor declarations calculating tides or querying data.
+You can also receive the conditions as inputs and connect them to control expressions, as in this **fragment**.
+`is_neap` is a neap-tide decision from site tide data, `tide_valid` is its validity,
+and `schedule_due` is this start event from a separate schedule. None of these are built-in variables,
+and the fragment neither calculates tides nor queries data.
 
 ```ghost
 input is_neap, tide_valid, schedule_due: Bool;
@@ -1662,20 +1730,20 @@ let start_allowed = case tide_valid {
 };
 ```
 
-Use `start_allowed` as the start condition when the operating state is waiting.
-Connecting this single schedule event directly to an operating output does not produce sustained operation.
-Maintain operating time after starting with state and a timer as in [question 7](#q07).
-If used only for start permission, the end of the neap-tide period does not automatically cancel an ongoing task.
+Use `start_allowed` as the start condition while the operating state is waiting.
+Connecting this one-shot schedule event directly to an output would not give sustained operation.
+Keep the run going after the start with state and a timer, as in [question 7](#q07).
+If the condition is used only to permit starting, the end of the neap-tide period does not cancel a task in progress.
 
-Spring/neap tides are not specific times, so do not attach offsets such as “30 minutes before spring tide.”
-For an exact starting point such as “30 minutes before high tide,” use [the high/low tide events in question 30](#q30).
-Do not substitute moon phase alone for site spring/neap classification or high-tide times.
-The data contract must clearly define spring/neap classification criteria and the evaluation range of moon-phase conditions.
-If data is missing or expired, follow the explicit fallback rather than treating it as a normal condition.
-The fragment above disallows new runs when validity is false.
+Spring/neap tides are not points in time, so do not attach offsets such as “30 minutes before spring tide.”
+For an exact starting point such as “30 minutes before high tide,” use [the high/low tide events of question 30](#q30).
+Do not use the moon phase alone in place of a site spring/neap classification or high-tide times.
+The data contract must clearly define how spring/neap tides are classified and over what range moon-phase conditions are evaluated.
+If data is missing or expired, follow the explicit fallback; do not treat it as a normal condition.
+The fragment above forbids new runs when validity is false.
 
-**Why distinguish events from state conditions?** Separating “when to start” from “during which period starting is permitted”
-avoids the confusion of requesting a new run on every evaluation throughout the same period.
+**Why tell events apart from state conditions?** Separating “when to start” from “during which period starting is allowed”
+avoids requesting a new run on every evaluation throughout the same period.
 
 **Syntax basis**
 
@@ -1689,13 +1757,13 @@ avoids the confusion of requesting a new run on every evaluation throughout the 
 <a id="q32"></a>
 ## 32. Can I code the behavior after power returns following an outage?
 
-Yes. Specify initial state and subsequent transition conditions to write behavior after restart.
-For example, express waiting stopped, running after readiness confirmation, or first executing a home-return stage
-with state and input conditions. Do not assume built-in syntax such as `on_power_restore`.
+Yes. Write the behavior after a restart by choosing the initial state and the transition conditions that follow it.
+For example, you can wait in the stopped state, run only after readiness is confirmed, or run a home-return stage first—all
+with state and input conditions. Do not assume a built-in construct such as `on_power_restore`.
 
-This example chooses **starting from declared initial values without restoring the previous running state**.
-After power returns, readiness must be confirmed, and Start must be released and pressed again to run.
-`ready` confirms that sensors and devices are ready to start a new run.
+This example chooses to **start from the declared initial values, without restoring the previous running state**.
+After power returns, readiness must be confirmed, and Start must be released and pressed again before the pump runs.
+`ready` confirms that sensors and devices are ready for a new run.
 
 ```ghost
 control RestartAndWait {
@@ -1726,28 +1794,28 @@ control RestartAndWait {
 }
 ```
 
-- At startup, `running` and `armed` are false. Booting with Start held does not automatically run.
-- Receive a new start request only after an evaluation where `ready` is true and both Stop and Start are released.
-- If `ready` becomes false or `stop` becomes true while running, release operation. A new start request is required even after readiness returns.
+- At startup, `running` and `armed` are false. Booting with Start held down does not start the pump.
+- A new start request is accepted only after an evaluation in which `ready` is true and both Stop and Start are released.
+- If `ready` becomes false or `stop` becomes true while running, operation is released. Even after readiness returns, a new start request is required.
 
-If multiple stages such as return or inspection are needed, set the initial enum state to a preparation stage
-and transition on device feedback as in [question 19](#q19).
-This rule determines output intent after GhostFlow begins evaluation.
-Device and output-renderer boot policy determines actual pin/relay states from power-on until the first evaluation.
+If you need several stages, such as returning home or inspecting, make a preparation stage the initial enum state,
+and move on device feedback as in [question 19](#q19).
+This rule decides output intent from the moment GhostFlow starts evaluating.
+The real pin and relay states between power-on and the first evaluation are decided by the boot policy of the device and the output renderer.
 
-**Resuming the pre-outage task is a separate policy.** Ordinary operational settings survive restart,
-but that alone does not automatically restore operating stages or timers.
-To resume, specify which state and times to retain, whether outage time counts as operating time,
-and whether current device positions and sensors match the restored state.
-This example does not restore such checkpoints.
+**Resuming the task that was running before the outage is a separate policy.** Ordinary operational settings survive a restart,
+but that alone does not restore operating stages or timers.
+To resume, specify which state and times are kept, whether the outage time counts as operating time,
+and whether the current device positions and sensor readings match the restored state.
+This example does not restore any such checkpoint.
 
-By default, sensors prepare again from `NotReady` after reboot.
-Do not treat an old healthy value as readiness confirmation.
-Initial state alone also cannot distinguish power restoration from ordinary restart.
-To behave differently only after power restoration, a contract must supply the restart cause through a separate input.
+By default, sensors start again from `NotReady` after a reboot.
+Do not treat an old healthy value as confirmation of readiness.
+The initial state alone also cannot tell a power restoration from an ordinary restart.
+To behave differently only after a power restoration, a contract must supply the restart cause through a separate input.
 
-**Why specify a restart policy?** Retained settings, restored task state, and current physical device state
-are different facts. Resuming previous operation merely because power returned does not explain the intent.
+**Why specify a restart policy?** Retained settings, restored task state, and the current state of the physical devices
+are different facts. “Power came back” is not, by itself, a reason that explains resuming the previous operation.
 
 **Syntax basis**
 
@@ -1760,15 +1828,15 @@ are different facts. Resuming previous operation merely because power returned d
 <a id="q33"></a>
 ## 33. Can I replace a temperature sensor without changing the control code? [Changed]
 
-> **Current dev status:** The Number example below remains valid. The statement that dedicated quantity notation is only design scope is outdated. Temperature, TemperatureDelta, and unit literals are now supported. [Current contract](reference/02-types-expressions-state.md#29-물리량과-단위).
+> **Current dev status:** The `Number` example below is still valid. The statement that dedicated quantity notation is only design scope is outdated: `Temperature`, `TemperatureDelta`, and unit literals are now supported. [Current contract](reference/02-types-expressions-state.md#29-물리량과-단위).
 
-**If the same logical input contract is maintained, the control code can stay unchanged.**
-The program reads logical roles such as “greenhouse temperature” instead of sensor model names or pin numbers.
-Installation bindings connect the actual sensor supplying the value.
+**If the same logical input contract is kept, the control code can stay unchanged.**
+The program reads a logical role, such as “greenhouse temperature,” instead of a sensor model name or a pin number.
+Installation bindings connect the actual sensor that supplies the value.
 
-This example reads temperature normalized to Celsius.
-The input contract of this example specifies that `temperature`'s `Number` value is Celsius.
-`Number` itself does not validate temperature units; dedicated physical-quantity notation is within the design scope of Reference §2.9.
+This example reads a temperature normalized to Celsius.
+The input contract of this example states that the `Number` value of `temperature` is in Celsius.
+`Number` itself does not check temperature units. Dedicated physical-quantity notation is described in Reference §2.9 (see the status note above for what is now supported).
 
 ```ghost
 control TemperatureMonitor {
@@ -1786,26 +1854,26 @@ control TemperatureMonitor {
 }
 ```
 
-Replacing sensor A with B preserves this evaluation expression if temperature from the same location is supplied under the same contract.
-Sensor errors are distinguished with a separate error output rather than converted to a normal temperature of zero.
+If sensor B supplies the temperature of the same location under the same contract, replacing sensor A with B leaves this expression unchanged.
+A sensor error is reported through a separate fault output; it is never turned into a normal temperature of zero.
 
-| What changes with replacement | Where to handle it |
+| What changes with the replacement | Where it is handled |
 |---|---|
 | Connection address, pin, physical device | Installation binding |
-| Communication method, raw-value interpretation, unit conversion | Driver and input supply boundary |
-| Comparing logical temperature against 30 degrees | Retain the control expression if the input contract is unchanged |
-| Changed measurement target, units, range, sampling period, or quality guarantees | Check contract compatibility and change necessary declarations/rules |
+| Communication method, raw-value interpretation, unit conversion | Driver and the input supply boundary |
+| Comparing the logical temperature with 30 degrees | The control expression stays the same if the input contract is unchanged |
+| A different measurement target, units, range, sampling period, or quality guarantee | Check contract compatibility, and change the declarations and rules as needed |
 
 For example, a much slower replacement sensor may fail the existing `stale_after` condition.
-Do not call sensors compatible merely because both produce numbers.
-Check the replacement sensor's new samples and quality. Do not treat the previous sensor's last healthy value as a measurement from the new sensor.
+Two sensors are not compatible merely because both produce numbers.
+Check the new sensor's own samples and quality. Do not treat the old sensor's last healthy value as a measurement from the new sensor.
 
-Preserving control source does not guarantee automatic device discovery or an unchanged Driver.
-The new sensor's communication must be supported, and the actual connection and new binding must be verified.
-If input is interrupted during replacement, follow the sensor fault handling rules written in the existing program.
+Keeping the control source does not mean the device is discovered automatically, or that the Driver stays the same.
+The new sensor's communication must be supported, and the actual connection and the new binding must be verified.
+If the input is interrupted during the replacement, the sensor-fault rules already written in the program apply.
 
-**Why separate the logical role and actual sensor?** To reuse the control intent “notify when temperature is high”
-without tying it to a manufacturer, communication method, or wiring.
+**Why separate the logical role from the actual sensor?** So the control intent “notify when the temperature is high” can be reused
+without tying it to a manufacturer, a communication method, or the wiring.
 
 **Syntax basis**
 
@@ -1818,47 +1886,51 @@ without tying it to a manufacturer, communication method, or wiring.
 <a id="q34"></a>
 ## 34. Are sensor settings separate from GhostFlow source? Do they change at different intervals?
 
-**Physical sensor connection information is separate from control source and has its own change history.**
-However, not all “sensor settings” are external.
-Declarations and rules defining how control accepts sensor values belong to GhostFlow source.
-The canonical control source here is one `.ghost.md` document.
+**The physical sensor connection is kept apart from the control source, and it has its own change history.**
+However, not every “sensor setting” lives outside the source.
+The declarations and rules that define how control accepts sensor values belong to the GhostFlow source.
+Here, the canonical control source is one `.ghost.md` document.
 
-| Category | Contents | What changes when modified |
+| Category | Contents | What a change produces |
 |---|---|---|
-| GhostFlow source | Logical sensor declarations/types, `sample`, `valid`, `filter`, `stale_after`, `recover_after`, error handling, and control expressions | Source revision; a new Program candidate when execution rules change |
-| Installation profile/binding | Connections of logical sensors to actual devices, ports, and addresses; provided capabilities | Installation/profile/binding revision and compatibility validation |
-| Operational settings | Overrides of values exposed as `config` in source | Settings revision in the same Program/run |
+| GhostFlow source | Logical sensor declarations and types; `sample`, `valid`, `filter`, `stale_after`, `recover_after`; error handling; control expressions | A source revision; a new Program candidate when execution rules change |
+| Installation profile/binding | Which actual device, port, and address each logical sensor uses; the capabilities provided | An installation/profile/binding revision plus a compatibility check |
+| Operational settings | Overrides of values exposed as `config` in the source | A settings revision within the same Program and run |
 
-For example, the logical declaration in [question 33](#q33) remains in source.
+![Where each kind of change is handled](diagrams/language-faq/device-boundaries.svg)
+
+The diagram shows the layers used in questions 33–40: settings change values inside the same Program, the source names logical ports, and bindings, Drivers, and renderers connect those ports to physical devices.
+
+For example, the logical declaration from [question 33](#q33) stays in the source.
 
 ```ghost
 input temperature: Number;
 ```
 
-Replacing sensor A with B changes the following connection. This is an explanation, not a file format or executable syntax.
+Replacing sensor A with B changes the connection shown below. This is an explanation, not a file format or executable syntax.
 
 ```text
 Logical sensor temperature → installation binding → actual sensor A
 Logical sensor temperature → new binding → actual sensor B
 ```
 
-If B satisfies the same input contract, control source can remain unchanged.
-In contrast, changing the source's `stale_after` declaration from “error if no new measurement for three seconds” to “ten seconds”
+If B satisfies the same input contract, the control source can stay unchanged.
+By contrast, changing the source's `stale_after` declaration from “error if there is no new measurement for three seconds” to “ten seconds”
 changes the control contract itself, so it is a source change.
-A field does not automatically become a live operational setting merely because it concerns a sensor.
+A field does not become a live operational setting just because it concerns a sensor.
 
-An operator changing an exposed operating duration from five to ten minutes is another kind of change.
-Keep source and Program unchanged and apply only the setting value in the same execution.
-This operational setting change path does not change physical bindings or sensor dependencies.
+An operator changing an exposed run time from five to ten minutes is yet another kind of change.
+The source and the Program stay the same; only the setting value changes, within the same run.
+This operational-setting path does not change physical bindings or sensor dependencies.
 
-Thus, **change intervals and revisions are separate, but this does not prescribe a storage format of exactly two files**.
-Installation information storage, whether files or a database, is separate from the language's `.ghost.md` source contract.
-Even when source and bindings change independently, their input contracts must be checked for compatibility when used together.
-Do not interpret physical connection changes as immediately applicable during operation like ordinary setting changes.
+So **change intervals and revisions are separate, but this does not prescribe a storage format of exactly two files**.
+How installation information is stored (files or a database) is separate from the language's `.ghost.md` source contract.
+Even when the source and the bindings change independently, their input contracts must be checked for compatibility when they are used together.
+Do not treat a physical connection change as something that can be applied immediately during operation, like an ordinary setting change.
 The installation contract defines the application procedure and revision boundaries for structural changes.
 
-**Why separate lifecycles?** Replacing sensors, changing control rules,
-and adjusting operating durations require different validation and change histories.
+**Why separate the lifecycles?** Replacing a sensor, changing control rules,
+and adjusting a run time each need different validation and different change histories.
 
 **Syntax basis**
 
@@ -1873,9 +1945,9 @@ and adjusting operating durations require different validation and change histor
 <a id="q35"></a>
 ## 35. Can I replace a sensor without recompiling the control program, like changing only a printer Driver?
 
-Yes. **If the new sensor satisfies the existing logical input contract, do not recompile the GhostFlow control program.**
-This is the same separation as Word using a common printing interface rather than being recompiled for every printer.
-The Driver handles sensor-specific communication and data interpretation. Installation bindings connect the sensor to use.
+Yes. **If the new sensor satisfies the existing logical input contract, you do not recompile the GhostFlow control program.**
+It is the same separation that lets a word processor use a common printing interface instead of being recompiled for every printer.
+The Driver handles sensor-specific communication and data interpretation. The installation binding picks which sensor is used.
 
 | Analogy | Role in GhostFlow |
 |---|---|
@@ -1884,23 +1956,23 @@ The Driver handles sensor-specific communication and data interpretation. Instal
 | Printer selection | Actual device selection in installation bindings |
 | Printer Driver | Driver handling device-specific communication and raw-value interpretation |
 
-For example, this **fragment** does not specify the manufacturer or communication method supplying temperature.
+For example, this **fragment** says nothing about the manufacturer or the communication method that supplies the temperature.
 
 ```ghost
 input temperature: Number;
 ```
 
-If the installation contract defines this value as Celsius temperature, the new Driver supplies values with the same meaning and quality information.
-A shared `Number` type alone does not make units or sampling periods compatible.
-For a replacement meeting the same contract, retain existing source and the compiled Program, updating only the installation connection.
+If the installation contract defines this value as a Celsius temperature, the new Driver must supply values with the same meaning and the same quality information.
+Sharing the `Number` type does not, by itself, make units or sampling periods compatible.
+For a replacement that meets the same contract, keep the existing source and the compiled Program, and update only the installation connection.
 
-How Drivers are added or changed is the execution environment's responsibility.
-This separation does not imply that Drivers can be dynamically installed on an MCU.
-Whether device support requires firmware changes and whether the GhostFlow control program requires recompilation
-are separate decisions.
+How Drivers are added or changed is the responsibility of the execution environment.
+This separation does not mean Drivers can be installed dynamically on an MCU.
+Whether supporting a device needs a firmware change, and whether the GhostFlow control program needs recompilation,
+are two separate decisions.
 
-**Why separate them this way?** Handling device-specific differences in Drivers lets the same program run in different installations
-without tying control intent to particular hardware.
+**Why separate them this way?** When Drivers absorb device-specific differences, the same program can run in different installations,
+and the control intent is not tied to particular hardware.
 
 **Syntax basis**
 
@@ -1913,15 +1985,15 @@ without tying control intent to particular hardware.
 <a id="q36"></a>
 ## 36. Should the separation of device replacement and recompilation also be in the language spec?
 
-Yes. Specify it as a rule at the language/device boundary, as well as through usage examples.
-The rule is **“replacing a device or Driver that satisfies the same logical device contract does not require control source changes
-or Program recompilation.”**
+Yes. It should be stated as a rule at the language/device boundary, not only shown in usage examples.
+The rule is: **“Replacing a device or Driver that satisfies the same logical device contract requires neither a control source change
+nor Program recompilation.”**
 
 This principle belongs in [§12.1](LANGUAGE.md#121-호환-장치-교체는-제어-프로그램-교체가-아니다) of the language contract
-and Reference §6.3. The FAQ explains it through the analogy and example in [question 35](#q35).
-It defines logical port, Driver, and binding responsibilities and change boundaries, rather than adding syntax.
+and in Reference §6.3. The FAQ explains it with the analogy and the example in [question 35](#q35).
+The rule adds no syntax. It defines the responsibilities and change boundaries of logical ports, Drivers, and bindings.
 
-**Why:** If this principle appeared only in the FAQ, there would be no criterion for deciding whether program regeneration is appropriate for every device replacement.
+**Why:** If the principle appeared only in the FAQ, there would be no rule for deciding, at each device replacement, whether regenerating the program is appropriate.
 
 **Syntax basis**
 
@@ -1931,9 +2003,9 @@ It defines logical port, Driver, and binding responsibilities and change boundar
 <a id="q37"></a>
 ## 37. If I connect a button to another GPIO pin, can I just change the input mapping?
 
-Yes. **If the new pin provides the same button input contract, change only the installation binding
-and retain the control source and compiled Program.**
-The program reads the logical input `start` instead of a GPIO number.
+Yes. **If the new pin provides the same button input contract, change only the installation binding,
+and keep the control source and the compiled Program.**
+The program reads the logical input `start`, not a GPIO number.
 
 ```ghost
 control ButtonRequest {
@@ -1950,26 +2022,26 @@ control ButtonRequest {
 }
 ```
 
-In this example, `start` is contracted to be true when pressed and false when released.
-The following describes connections before and after the change; it is not binding-file syntax.
+In this example, the contract for `start` is: true when pressed, false when released.
+The following shows the connections before and after the change. It is not binding-file syntax.
 
 ```text
 Before: GPIO A → button input Driver → logical input start
 After: GPIO B → button input Driver → logical input start
 ```
 
-Move the button wiring to B and change the actual input connected to `start` to B.
-The new pin must be usable as a button input on that board.
-Handle physical settings such as LOW/HIGH when pressed and required pull-ups/pull-downs
-at the installation/Driver boundary, providing the same true/false meaning to the program.
-Do not change logical input names or control expressions to match GPIO numbers.
+Move the button wiring to pin B, and change the actual input connected to `start` to B.
 
-This differs from a live operational setting changing operating time.
-Manage it as a new installation/binding revision and follow the installation contract's application procedure.
-No program recompilation does not imply permission to replace wiring during uninterrupted operation.
+- The new pin must be usable as a button input on that board.
+- Handle physical details—whether a press reads LOW or HIGH, and any required pull-up or pull-down—at the installation/Driver boundary, so the program still receives the same true/false meaning.
+- Do not rename logical inputs or change control expressions to match GPIO numbers.
 
-**Why leave GPIO numbers out of source?** When the button's role remains the same and only the wiring location changes,
-there is no reason to change the control intent and program revision too.
+This is different from a live operational setting such as a run time.
+Manage it as a new installation/binding revision, and follow the installation contract's application procedure.
+“No recompilation needed” does not mean you may rewire during uninterrupted operation.
+
+**Why keep GPIO numbers out of the source?** When the button's role stays the same and only the wiring location changes,
+there is no reason to change the control intent or the program revision.
 
 **Syntax basis**
 
@@ -1981,9 +2053,9 @@ there is no reason to change the control intent and program revision too.
 <a id="q38"></a>
 ## 38. Can I connect a different relay by changing only the output GPIO mapping?
 
-Yes. **For a relay meeting the same logical output contract, change the output binding
-and retain the control source and compiled Program.**
-The program uses logical outputs such as `pump` instead of relay GPIO numbers.
+Yes. **For a relay that meets the same logical output contract, change the output binding,
+and keep the control source and the compiled Program.**
+The program uses logical outputs such as `pump`, not relay GPIO numbers.
 
 ```ghost
 control PumpRequest {
@@ -2005,29 +2077,29 @@ control PumpRequest {
 }
 ```
 
-`pump = true` is a pump run request. It does not directly mean GPIO HIGH.
-The following describes connections, rather than binding-file syntax.
+`pump = true` is a request to run the pump. It does not directly mean “GPIO HIGH.”
+The following shows the connections; it is not binding-file syntax.
 
 ```text
 Before: logical output pump → output renderer → GPIO A → relay A
 After: logical output pump → output renderer → GPIO B → relay B
 ```
 
-If the new relay turns on at LOW, adjust polarity in renderer/installation settings
-to carry out the same run request. Actual output values during boot and faults are also defined at that boundary.
-The logical output's `Bool` type alone does not guarantee that the pin supports output, electrical drive conditions,
-contact ratings, wiring, and connected loads are compatible.
+If the new relay switches on at LOW, adjust polarity in renderer/installation settings
+so it still carries out the same run request. The actual output values during boot and during faults are also defined at that boundary.
+The `Bool` type of the logical output does not guarantee that the pin supports output, or that the electrical drive conditions,
+contact ratings, wiring, and connected load are compatible.
 
-This example replaces a relay serving the same pump role.
-It does not imply that the existing control rules suit different loads or devices with different roles.
-Also, a true `pump` does not confirm actual relay-contact or pump operation.
-Rules requiring operation confirmation use separate feedback inputs.
+This example replaces a relay that serves the same pump role.
+It does not mean the existing control rules suit a different load or a device with a different role.
+Also, a true `pump` does not confirm that the relay contact closed or that the pump actually runs.
+Rules that need confirmation of operation use separate feedback inputs.
 
-Manage output binding changes through installation revisions and application procedures.
-The absence of a recompilation requirement does not permit wiring replacement during uninterrupted operation.
+Manage output binding changes through installation revisions and their application procedures.
+Not needing recompilation does not mean you may rewire during uninterrupted operation.
 
 **Why separate logical outputs from GPIO?** Control expresses the intent “run the pump,”
-and renderers and installation connections apply it through the electrical signals needed by that relay.
+and the renderer and installation connections turn it into the electrical signals that the relay needs.
 
 **Syntax basis**
 
@@ -2041,8 +2113,8 @@ and renderers and installation connections apply it through the electrical signa
 <a id="q39"></a>
 ## 39. Can I increase the output count with an expansion board such as Waveshare?
 
-Yes. **Logical outputs can connect to expansion-device channels as well as direct GPIO.**
-The output renderer handles expansion-device communication and channel control. Bindings connect each logical output to its channel.
+Yes. **A logical output can connect to a channel of an expansion device, not only to a direct GPIO pin.**
+The output renderer handles communication with the expansion device and controls its channels. The binding connects each logical output to its channel.
 
 ```ghost
 control TwoRelayRequests {
@@ -2067,7 +2139,7 @@ control TwoRelayRequests {
 }
 ```
 
-The following describes installation connections, rather than binding-file syntax.
+The following shows the installation connections; it is not binding-file syntax.
 
 ```text
 relay1 → expansion output renderer → expansion board channel 1
@@ -2075,22 +2147,22 @@ relay2 → expansion output renderer → expansion board channel 2
 ```
 
 For example, the [official Waveshare Modbus RTU Relay 16CH documentation](https://www.waveshare.com/wiki/Modbus_RTU_Relay_16CH)
-describes controlling relays through Modbus commands over RS485.
-In this case, GhostFlow output bindings connect to device addresses and relay channels instead of direct GPIO numbers.
-Do not assume all boards share a communication method merely because the manufacturer is Waveshare.
+describes controlling the relays with Modbus commands over RS485.
+In that case, GhostFlow output bindings point to a device address and a relay channel instead of a GPIO number.
+Do not assume that all boards use the same communication method just because they are from Waveshare.
 
-**Distinguish simple multiplexers from independent output expansion.**
-For example, [TI CD74HC4067](https://www.ti.com/product/CD74HC4067) selects a channel to connect to a common signal.
-By itself, it is not an output device retaining each of several relays' ON/OFF states.
-Independent sustained outputs require an expansion device/circuit that retains each channel's state and a corresponding renderer contract.
+**Do not confuse a simple multiplexer with independent output expansion.**
+For example, the [TI CD74HC4067](https://www.ti.com/product/CD74HC4067) selects one channel and connects it to a common signal.
+On its own, it is not an output device that holds the ON/OFF state of several relays.
+Independent, sustained outputs need an expansion device or circuit that holds each channel's state, and a matching renderer contract.
 
-Moving existing logical outputs to compatible expansion channels does not require control source changes or recompilation.
+Moving existing logical outputs to compatible expansion channels needs no control source change or recompilation.
 However, adding logical outputs and control behavior for new devices is a program change.
-The output renderer must meet the required channel count, update time, output retention, and communication-failure behavior.
-Calculating several outputs in one tick alone does not mean physical relays switch simultaneously.
+The output renderer must meet the required channel count, update time, output retention, and behavior on communication failure.
+Computing several outputs in one tick does not, by itself, mean the physical relays switch at the same instant.
 
-**Why put expansion methods in the renderer?** So connecting the same control intent to direct GPIO, an expansion chip, or communication-controlled relays
-does not require adding bus commands and channel addresses to control code each time.
+**Why put the expansion method in the renderer?** So that connecting the same control intent to direct GPIO, an expansion chip, or communication-controlled relays
+never requires adding bus commands and channel addresses to the control code.
 
 **Syntax basis**
 
@@ -2102,9 +2174,9 @@ does not require adding bus commands and channel addresses to control code each 
 <a id="q40"></a>
 ## 40. Can I also map the inputs and outputs of an RS485 I/O expansion board?
 
-Yes. **Connect each input/output channel of the board to a GhostFlow logical port.**
-The input driver reads inputs and the output renderer sends output commands according to that board's communication protocol.
-Do not place RS485 addresses or communication commands in control source.
+Yes. **Connect each input and output channel of the board to a GhostFlow logical port.**
+Following the board's communication protocol, the input Driver reads the inputs and the output renderer sends the output commands.
+Do not put RS485 addresses or communication commands in the control source.
 
 This is an explanatory example of installation mapping. It is neither executable syntax nor a communication frame format.
 
@@ -2114,7 +2186,7 @@ Board address 1, DI channel 2 → input Driver → logical input stop
 Logical output pump → output renderer → board address 1, DO channel 3
 ```
 
-The control program using these connections is the same as with direct GPIO.
+The control program that uses these connections is the same as with direct GPIO.
 
 ```ghost
 control RemoteIoRequest {
@@ -2136,21 +2208,19 @@ control RemoteIoRequest {
 }
 ```
 
-This rule outputs while the start input is true. Follow [question 3](#q03) for self-holding behavior.
-Manage addresses, channels, communication speed, and frame settings at the installation/Driver boundary.
-An RS485 connection alone does not imply identical communication commands.
-For example, a Modbus RTU board requires handling that protocol and the board's register/channel definitions.
+This rule turns the output on while the start input is true. For self-holding behavior, follow [question 3](#q03).
 
-Input update intervals, validity, and communication failure handling must satisfy the existing logical input contract.
-The two Bool inputs in the code do not automatically detect communication failures.
-If control must distinguish healthy and faulty measurement inputs, use the `input` contract in [question 33](#q33).
-Distinguish output command transmission or responses from confirmation of actual contact/equipment operation too.
+- Manage addresses, channels, communication speed, and frame settings at the installation/Driver boundary.
+- An RS485 connection does not imply that every board uses the same commands. For example, a Modbus RTU board needs that protocol plus the board's own register and channel definitions.
+- Input update intervals, validity, and handling of communication failures must satisfy the existing logical input contract.
+- The two Bool inputs in the code do not detect communication failures on their own. If control must tell healthy measurement inputs from faulty ones, use the `input` contract from [question 33](#q33).
+- Also distinguish sending an output command, or receiving its response, from confirming that a contact or device actually operated.
 
-When moving existing inputs/outputs to compatible RS485 channels, change bindings
-and retain control source and the compiled Program. Adding new logical ports or control behavior is a source change.
+When you move existing inputs and outputs to compatible RS485 channels, change the bindings
+and keep the control source and the compiled Program. Adding new logical ports or control behavior is a source change.
 
-**Why put communication addresses outside control code?** To use the same start/stop/pump rules
-unchanged for both local GPIO and communication-based I/O.
+**Why keep communication addresses out of control code?** So the same start/stop/pump rules
+work unchanged for both local GPIO and communication-based I/O.
 
 **Syntax basis**
 
@@ -2164,8 +2234,8 @@ unchanged for both local GPIO and communication-based I/O.
 <a id="q41"></a>
 ## 41. How do I check or compile a document with the compiler CLI?
 
-Use the Node.js-based `ghostc` CLI. Node.js 22 or later is required.
-Run these commands from the `ghostflow-language` repository root.
+Use the Node.js-based `ghostc` CLI. It requires Node.js 22 or later.
+Run these commands from the root of the `ghostflow-language` repository.
 
 ```sh
 # 산출물을 저장하지 않고 검사
@@ -2175,13 +2245,14 @@ npm run compile -- --check examples/scheduled-watering.ghost.md
 npm run compile -- examples/scheduled-watering.ghost.md build/scheduled-watering.gfb
 ```
 
-For direct execution, pass the same arguments after `node tools/ghostc.mjs`.
-Input is a complete `.ghost.md` document including explanations. Do not extract and pass code blocks separately.
-`--check` compiles and checks source but does not write artifacts.
-This check does not replace program execution or confirmation of actual sensor/relay behavior.
+To run the CLI directly, pass the same arguments after `node tools/ghostc.mjs`.
 
-LLM calls use a TOON request file in the following versioned format. Requests point to the document path
-and immutable document/revision IDs. Do not copy code bodies into requests.
+- The input is the complete `.ghost.md` document, explanations included. Do not extract the code blocks and pass them separately.
+- `--check` compiles and checks the source but writes no artifact.
+- A check does not replace running the program or confirming real sensor and relay behavior.
+
+For LLM calls, use a TOON request file in the versioned format below. A request points to the document path
+and to immutable document and revision IDs. Do not copy code into the request.
 
 ```toon
 format: GhostFlow/cli-request-v1
@@ -2192,18 +2263,20 @@ source:
   revisionId: rev-2
 ```
 
-The document above contains intent anchors connected to outputs and constraints. Save the TOON content in
-`build/request.toon` when running it. Compile requests add `operation: compile` and
-`artifactPath`. Results default to TOON;
-`--format json` emits the same result as JSON. Compilation errors return exit code 1
-and diagnostics with original source locations. Invalid requests return exit code 2 and a `GF_CLI` error.
+The document above contains intent anchors linked to outputs and constraints. To run the request, save the TOON content as
+`build/request.toon`.
+
+- A compile request adds `operation: compile` and `artifactPath`.
+- Results are TOON by default; `--format json` emits the same result as JSON.
+- A compilation error returns exit code 1, with diagnostics that point to the original source locations.
+- An invalid request returns exit code 2 and a `GF_CLI` error.
 
 ```sh
 node tools/ghostc.mjs --request build/request.toon
 node tools/ghostc.mjs --request build/request.toon --format json
 ```
 
-**Why pass the entire document?** To process execution rules, authoring intent, and source locations as the same canonical revision.
+**Why pass the whole document?** So that execution rules, authoring intent, and source locations are all processed as the same canonical revision.
 
 **Syntax basis**
 
@@ -2213,9 +2286,10 @@ node tools/ghostc.mjs --request build/request.toon --format json
 
 ## When adding a FAQ
 
-Phrase questions as “How do I write this behavior?” rather than “What is this construct?”
-Answers include input meanings, code, state/time boundary behavior, and reasons for the implementation.
-Always end each answer with **Syntax basis**. List the syntax used,
-and attach **Reference chapter/section numbers, section titles, and direct links to those sections** to each item.
-Link all syntax beyond common declarations too, and provide example-file links as additional reading.
-Distinguish fragments, independent programs, and design notation. Do not silently create new language rules in the FAQ.
+Phrase each question as “How do I write this behavior?”, not “What is this construct?”
+An answer covers the meaning of the inputs, the code, the behavior at state and time boundaries, and the reason for the implementation.
+
+- Always end an answer with **Syntax basis**. List the syntax used, and give each item the
+  **Reference chapter/section number, the section title, and a direct link to that section**.
+- Link every piece of syntax beyond the common declarations, and add links to example files as further reading.
+- Label fragments, independent programs, and design notation clearly. Never quietly introduce new language rules in the FAQ.

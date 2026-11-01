@@ -1,0 +1,32 @@
+@startuml
+skinparam defaultFontSize 12
+skinparam shadowing false
+start
+:Accepted tick
+(one immutable ClockSnapshot);
+if (Trusted wall time?
+(or bounded hold_trusted)) then (no)
+  :Unknown(ClockUnknown)
+fallback decides; no new admission;
+  stop
+else (yes)
+endif
+:Trigger plans occurrence
+(At, Daily, DailySlots, Periodic,
+Cron, Solar, Tide);
+:Day rule / calendar (on)
+Unknown stays Unknown;
+if (Occurrence already admitted
+or terminal in the ledger?) then (yes)
+  :No new admission
+(no catch-up, no replay);
+  stop
+else (no)
+endif
+:Basis decides admission
+(pulse, window, run, range)
+using when and gap;
+:Projections .due / .open / .active / .missed
++ schedule observation record;
+stop
+@enduml

@@ -1,0 +1,24 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName Helvetica
+skinparam defaultFontSize 13
+title Two packaging options (both proposals; neither approved)
+
+package "Option 1: extended source bundle (recommended for review)" {
+  rectangle "Locked source closure\n(root + all imports,\nrevisions, digests)" as C1
+  rectangle "One compiler replay" as R1
+  rectangle "One composed artifact\n(GFB, manifest, source map)" as A1
+  rectangle "Signed payload" as S1
+  C1 --> R1
+  R1 --> A1
+  A1 --> S1
+}
+
+package "Option 2: composition envelope" {
+  rectangle "Envelope\n(pinned references + edges;\nwhether signing is mandatory: unresolved)" as E2
+  rectangle "Existing package A\n(own source map, signature)" as PA
+  rectangle "Existing package B\n(own source map, signature)" as PB
+  E2 --> PA : pins digest
+  E2 --> PB : pins digest
+}
+@enduml

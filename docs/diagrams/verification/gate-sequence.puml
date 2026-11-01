@@ -1,0 +1,23 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontSize 13
+title npm test (tools/verify-language.mjs): stops at the first failure
+
+start
+:Preflight: Node 22+, POSIX host,
+source hashes, catalog, docs check;
+:1. Toolchain versions + cargo fmt --check;
+:2. Compile legacy fixture (include_bytes!);
+:3. cargo test --locked --offline --workspace;
+:4. Build native runner, release scan_tape
+runner and release WASM from one core;
+:5. Node language/integration suite
+(incl. native/WASM tape parity);
+:6. Tutorial with fresh runners
+(native/WASM trace compare);
+:7. Record resources, runner/WASM
+digests and source hashes;
+:Write build/verification.json
+(+ unique copy in build/verification-runs/);
+stop
+@enduml

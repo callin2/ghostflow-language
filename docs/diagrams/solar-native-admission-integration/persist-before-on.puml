@@ -1,0 +1,26 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName Helvetica
+skinparam defaultFontSize 13
+skinparam ArrowColor #526d76
+
+participant "Host" as H
+participant "Provider" as P
+participant "Native VM\n(Runtime)" as R
+database "Durable storage" as D
+participant "Outputs" as O
+
+H -> P : request facts for installed\nSolar descriptor
+P --> H : occurrence facts\n(no due bit)
+H -> R : tick_with_solar(clock, facts)
+R -> R : stage admission, evaluate when,\ncommit clock, ledger, state,\noutput and journal together
+R --> H : outcome + schedule_trace
+H -> R : solar_checkpoint()
+R --> H : GFSO v1 bytes
+H -> D : persist checkpoint
+alt save succeeds
+  H -> O : publish / apply ON
+else save fails
+  H -> O : halt and clear outputs
+end
+@enduml

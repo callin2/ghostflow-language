@@ -1,0 +1,21 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName Helvetica
+skinparam defaultFontSize 13
+skinparam ParticipantPadding 12
+
+participant "Producers" as P
+participant "Host ingress\n(serialization point)" as H
+participant "Core\n(evaluate)" as C
+participant "Renderer /\nDevice" as D
+
+P -> H : 1. receipts\n(receiptSequence assigned)
+H -> H : 2. latch + close\nimmutable batch
+H -> C : 3. validate and evaluate\none snapshot
+C --> H : 4. logical outcome\n(commit or failed attempt)
+H -> H : 5. capture committed\nevidence (before hooks)
+H -> D : 6. dispatch committed\nsafe intent
+D --> H : 7. effect result =\nnew correlated receipt
+H -> H : 8. later batch: explicit\ntyped binding only
+note over P, H : Steps 1 and 7 may happen\nasynchronously between boundaries
+@enduml

@@ -1,0 +1,11 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName Helvetica
+start
+:1. Establish the working context\n(start from dev, record base SHA,\nread AGENTS.md, docs:find);
+:2. Set one task contract\n(outcome, scope, acceptance criteria,\nprerequisites, focused check);
+:3. Assign a complete bounded handoff\n(one worker per unit);
+:4. Verify once, at the right depth\n(static -> focused -> full CI);
+:5. Close the task\n(report evidence, improve repeatability);
+stop
+@enduml

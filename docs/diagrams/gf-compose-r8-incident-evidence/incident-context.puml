@@ -1,0 +1,19 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName Helvetica
+skinparam defaultFontSize 13
+skinparam rectangleRoundCorner 8
+title One incident context, three views (proposal)
+
+rectangle "Incident context tuple\n\ndefinition / module\ninstance\nsettings revision + effective event position\ninstallation / binding\nrun / scan\nlogical time\n(+ source / constraint links)" as T
+
+rectangle "Farmer view\none blocker + next action" as F
+rectangle "Software view\nrequested / safe output,\nsource and constraint" as S
+rectangle "Hardware view\nbinding, driver event,\nboot / event history" as H
+rectangle "Rejected as stale or unavailable:\nold run, wrong schema / module /\nsource, wrong binding" as R
+
+T --> F
+T --> S
+T --> H
+T ..> R : identity mismatch
+@enduml

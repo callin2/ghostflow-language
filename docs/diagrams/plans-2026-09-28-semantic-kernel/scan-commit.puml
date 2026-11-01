@@ -1,0 +1,19 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontSize 13
+start
+:Take one immutable snapshot\n(inputs + old committed state);
+:Evaluate all transitions simultaneously\n→ candidate state;
+:Evaluate requested intents\n(unprimed x = old state, x' = candidate);
+:Apply Boolean constraints\n→ safe intents;
+note right
+  A constraint that forces an
+  output safe is NOT a failed scan.
+end note
+if (Evaluation and validation succeeded?) then (yes)
+  :Commit candidate state and\nrequested/safe scan record atomically;
+else (no)
+  :Roll back: keep prior committed state;\nexpose no partial candidate;
+endif
+stop
+@enduml

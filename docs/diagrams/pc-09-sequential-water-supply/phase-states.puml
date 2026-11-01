@@ -1,0 +1,33 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName Helvetica
+skinparam ArrowColor #555555
+hide empty description
+
+[*] --> Idle
+Idle --> Opening : fresh START,\nclosed confirmed
+Opening --> Settling : only open limit
+Settling --> Watering : open held 2 s
+Watering --> PumpStopping : 5 min elapsed
+PumpStopping --> Closing : next scan\n(limits available)
+Closing --> Idle : only close limit
+Settling --> FeedbackFault : open feedback lost
+Watering --> FeedbackFault : open feedback lost
+PumpStopping --> FeedbackFault : open feedback lost
+FeedbackFault --> Idle : START released,\nclosed confirmed
+Interrupted --> Idle : START released,\nclosed confirmed
+
+state Opening : valve_open_contactor ON
+state Watering : pump_contactor ON
+state Closing : valve_close_contactor ON
+state FeedbackFault : all outputs OFF
+state Interrupted : all outputs OFF
+
+note as N
+From Idle to Closing, checked first:
+1. both limits true -> FeedbackFault
+2. stop_ok or overload_ok lost -> Interrupted
+Both fault states also wait until
+permission returns and no conflict.
+end note
+@enduml

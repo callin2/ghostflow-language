@@ -1,0 +1,24 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName Helvetica
+skinparam defaultFontSize 13
+skinparam ArrowColor #526d76
+
+rectangle "Installed module\n+ strategy + journal capacity" as M
+rectangle "GFTA activation profile\n(budgets)" as P
+rectangle "One checked structural plan\n(geometry, no temporal arenas)" as SP
+rectangle "Report\n(fitsBudget, required capacities)" as R
+rectangle "Activation" as A
+rectangle "Replay" as RP
+
+M --> SP
+P --> SP
+SP --> R : plan_temporal /\nplan_current_temporal_replay
+SP --> A : same plan
+SP --> RP : same plan
+note right of A
+  Allocated capacity must stay
+  within the planned geometry;
+  a mismatch rejects
+end note
+@enduml

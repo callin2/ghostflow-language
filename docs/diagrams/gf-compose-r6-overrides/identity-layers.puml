@@ -1,0 +1,21 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName Helvetica
+skinparam defaultFontSize 13
+left to right direction
+title Separate identities joined for a run (proposed record)
+
+rectangle "Source / composition\nrevision" as S
+rectangle "Compiled program\nidentity (bytes/hash)" as P
+rectangle "Settings revision /\neffective position" as G
+rectangle "Installation /\nbinding revision" as I
+rectangle "Deployment package\nidentity" as K
+rectangle "Run identity\n(runId; scanId ordered\nonly within a run)" as R
+
+S --> P : compile
+P --> K
+I --> K : bindingRevision
+K --> R : deployment starts a run
+G --> R : live event on\nthe same run
+I --> R : joined
+@enduml

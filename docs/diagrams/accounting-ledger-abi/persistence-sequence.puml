@@ -1,0 +1,26 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName Helvetica
+skinparam defaultFontSize 13
+skinparam ArrowColor #526d76
+
+participant "Host" as H
+participant "Ledger primitive" as L
+database "Durable storage\n(host-owned)" as D
+
+H -> L : create
+note right of L : reads Unknown
+H -> L : initialize empty (first install only)
+H -> L : snapshot
+L --> H : bytes + revision N
+H -> D : write bytes exactly
+D --> H : ok
+H -> L : acknowledge revision N
+note right of L : reads Known
+H -> L : insert record
+note right of L : revision N+1, reads Unknown
+H -> L : acknowledge stale revision N
+L --> H : rejected
+H -> L : snapshot, write, acknowledge N+1
+note right of L : reads Known again
+@enduml

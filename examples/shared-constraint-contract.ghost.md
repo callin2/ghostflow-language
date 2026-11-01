@@ -1,14 +1,23 @@
 # A complete checked shared resource contract
 
-This one-control document is a checked **nonexecutable descriptor**. Its
-software-only logical mapping is fully shown below. It neither installs a
-control nor protects physical outputs: runtime enforcement is the separate
-contract tracked by #158. Input and output names are logical ports, and the
-resource IDs below name virtual resources rather than discovered hardware.
+This document holds one control, and it compiles to a checked
+**nonexecutable descriptor**: an artifact that the compiler has checked but
+that no runtime will run. Its software-only logical mapping is shown in full
+below.
 
-The explicit safe values select pump=false and valve=true for this virtual
-loop. They satisfy the authored pump-needs-valve requirement. This is not an
-all-OFF default or a physical sequencing instruction.
+What this document does **not** do:
+
+- It does not install a control.
+- It does not protect physical outputs. Runtime enforcement is a separate
+  contract, tracked by #158.
+
+Input and output names are logical ports. The resource IDs name virtual
+resources, not discovered hardware.
+
+The explicit safe values select `pump=false` and `valve=true` for this virtual
+loop. These values satisfy the authored requirement that the pump needs an open
+valve (pump-needs-valve). They are not an all-OFF default, and they are not a
+physical sequencing instruction.
 
 ```ghost
 // Source revision: issue531-quality-shared-contract-v1
@@ -28,11 +37,20 @@ control SharedPumpPolicy {
 }
 ```
 
-Run the following JavaScript from the repository root to validate only the
-logical mapping. The hashes come from this exact document and checked artifact;
-the installation mapping supplies identity and typed ports, not another program
-or a replacement policy. All resource aliases and modes have explicit mappings.
-Changing a policy, prose revision, artifact or binding requires revalidation.
+Run the following JavaScript from the repository root. It validates only the
+logical mapping:
+
+- The hashes come from this exact document and its checked artifact.
+- The installation mapping supplies identities and typed ports. It does not
+  supply another program or a replacement policy.
+- Every resource alias and every mode has an explicit mapping.
+- Changing the policy, the prose revision, the artifact, or the binding
+  requires validating again.
+
+The diagram shows the data flow of this check. Its only result is a validated
+mapping that still reports `executable: false`.
+
+![Validation flow for the shared resource contract](../docs/diagrams/shared-constraint-contract/validation-flow.svg)
 
 ```js
 import fs from 'node:fs';
@@ -60,10 +78,16 @@ const validated = validateResourceConstraintBinding(compilation, mapping);
 console.log(validated.executable); // false: validation grants no execution
 ```
 
-Missing/mismatched identities or ports, stale hashes, aliased resource IDs,
-duplicate exclusive inputs and policy fields in the mapping reject. Both native
-and WASM module loaders reject these descriptor bytes, even if a caller changes
-the JSON `executable` flag. Admission arbitration, ongoing safe transitions,
-recovery and a sole writer covering every use path must be implemented and
-verified before this shared contract can execute. No physical output ABI is
-defined by this logical mapping.
+The validator rejects a mapping that has any of the following:
+
+- missing or mismatched identities or ports;
+- stale hashes;
+- aliased resource IDs (two names for the same resource);
+- duplicate exclusive inputs;
+- policy fields inside the mapping.
+
+Both the native and the WASM module loaders reject these descriptor bytes, even
+if a caller changes the JSON `executable` flag. Before this shared contract can
+execute, the following must be implemented and verified: admission arbitration,
+ongoing safe transitions, recovery, and a sole writer that covers every use
+path. This logical mapping defines no physical output ABI.

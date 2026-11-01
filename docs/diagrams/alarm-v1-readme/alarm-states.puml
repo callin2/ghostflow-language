@@ -1,0 +1,20 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName Helvetica
+skinparam defaultFontSize 13
+skinparam ArrowColor #526d76
+skinparam state {
+  BackgroundColor #f1f6f5
+  BorderColor #6d858b
+  FontColor #102b35
+}
+
+[*] --> unobserved : observer activated
+unobserved : before the first\nsuccessful scan
+unobserved --> inactive : first committed false\n(no event)
+unobserved --> active : first committed true\n/ "raised" (new episode)
+inactive --> active : true\n/ "raised" (new episode)
+active --> inactive : false\n/ "cleared" (same episode)
+active --> active : repeated true\n(no event)
+inactive --> inactive : repeated false\n(no event)
+@enduml

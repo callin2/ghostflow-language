@@ -1,0 +1,21 @@
+@startuml
+hide empty description
+skinparam shadowing false
+skinparam defaultFontName Helvetica
+skinparam state {
+  BackgroundColor White
+  BorderColor #555555
+}
+title Shared Bool guard: admission, trip and recovery (one exclusive group)
+
+[*] --> Idle
+Idle : no admitted activity
+Idle --> Admitted : fresh true claim\n+ all admission conditions\n+ candidate satisfies safe_output
+Idle --> Idle : candidate violates a relation\n(denied: no admission,\nno new protected output)
+Admitted : outputs = requested candidate
+Admitted --> Admitted : conflicting newcomer claim\n(denied; incumbent and\nprevious safe outputs kept)
+Admitted --> Tripped : requested candidate\nviolates a mandatory relation
+Tripped : outputs = authored safe vector\n(e.g. pump=false, valve=true)
+Tripped --> Tripped : inputs return to normal\n(no automatic restart)
+Tripped --> Idle : observation with\nall claims false
+@enduml

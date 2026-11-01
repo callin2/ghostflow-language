@@ -1,0 +1,27 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName Helvetica
+skinparam defaultFontSize 13
+start
+:Validate and capture inputs,\nsamples and schedule flags;
+:Begin one Rust-owned transaction\non every conditioner;
+:Condition inputs and build\ncomplete generated input list;
+:runtime.scan(explicit logical time);
+if (Conditioning failure or\nknown native rejection?) then (yes)
+  :Roll back conditioners;\nkeep logical time and frame ID;
+  :Caller may retry same frame;
+  stop
+elseif (Commit status unknown (trap)?) then (yes)
+  :Terminate host\n(no fabricated rollback);
+  stop
+else (positive scan)
+  :Commit conditioners,\nlogical time and frame ID;
+  if (Failure after commit?) then (yes)
+    :Terminate host;\ncommitted outcome kept;
+    stop
+  else (no)
+    :Return {vm, sensors, signals, frame};
+    stop
+  endif
+endif
+@enduml

@@ -1,0 +1,22 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName Helvetica
+skinparam defaultFontSize 13
+
+start
+if (old program declares?) then (sensor)
+  :compiler rejects with\nmigration diagnostic;
+  :rename to `input`, keep the\nexisting explicit fault policy;
+else (plain scalar input)
+  if (only standalone required\nunconditioned Bool inputs?) then (yes, explicit request)
+    :previewLegacyScalarMigration();
+    :new document with legacy\nadmission directive;
+  else (no)
+    :review use sites;
+    :choose fault policy first;
+    :add case analysis or\nexplicit recovery;
+  endif
+endif
+:new reviewed revision\n(predecessor kept intact);
+stop
+@enduml

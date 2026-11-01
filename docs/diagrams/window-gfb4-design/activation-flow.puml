@@ -1,0 +1,24 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontSize 13
+participant "Host\n(ControlRuntime)" as Host
+participant "WASM adapter" as Adapter
+participant "Rust decoder" as Decoder
+participant "Runtime" as RT
+
+Host -> Host : capture options.temporal\nbefore async work
+Host -> Adapter : activateTemporal(profile)
+Adapter -> Decoder : GFTA packet (24+16N bytes)
+Decoder -> Decoder : check every field independently
+alt valid
+  Decoder -> RT : activate_with_temporal(&TemporalActivation)
+  RT -> RT : preallocate engines, buffers,\nJ+1 checkpoints
+  RT --> Host : active
+  loop every scan
+    Host -> RT : scan with the fixed timeEpoch
+  end
+else rejected
+  Decoder --> Host : error; configuring state preserved
+end
+note over Host, RT : A new time epoch requires a new session.
+@enduml

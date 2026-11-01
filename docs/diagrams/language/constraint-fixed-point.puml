@@ -1,0 +1,25 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName Helvetica
+skinparam ArrowColor #555555
+skinparam ActivityBorderColor #555555
+
+start
+:Candidate bool outputs
+(requested intent);
+repeat
+  :Check every requires / mutex
+  against the same snapshot;
+  :Set the union of outputs
+  to shut down to false at once;
+repeat while (any output changed?) is (yes)
+-> no;
+:Safe intent
+(satisfies every constraint);
+note right
+  Outputs only go true -> false,
+  so at most N changing rounds
+  for N bool outputs.
+end note
+stop
+@enduml

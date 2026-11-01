@@ -1,0 +1,26 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName Helvetica
+skinparam defaultFontSize 13
+skinparam rectangleRoundCorner 8
+title Identities kept distinct (current facts vs. proposals)
+
+rectangle "Canonical source\ndocumentId + revisionId + sha256" as SRC
+rectangle "Compiled module\nfingerprint + bytecode digest" as MOD
+rectangle "Behavior instance\nopaque instanceId (proposal)" as INST
+rectangle "Logical port\nauthored id (instance-qualified, proposal)" as PORT
+rectangle "Physical binding\nbindingRevision / digest" as BIND
+rectangle "Settings revision\n+ effective event position (proposal)" as SET
+rectangle "Run\nrunId" as RUN
+rectangle "Occurrence\nrun + instance + scanId (proposal)" as OCC
+rectangle "Display label / filename\n(presentation, trace only)" as LBL #EEEEEE
+
+SRC --> MOD : compiles to
+SRC --> INST : pinned definition revision
+INST --> PORT : qualifies
+PORT --> BIND : bound by installation
+INST --> SET : joined with
+RUN --> OCC : orders scanId within
+INST --> OCC : qualifies
+LBL ..> INST : never identity
+@enduml

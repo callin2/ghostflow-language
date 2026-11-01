@@ -1,0 +1,25 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontSize 12
+start
+:node tools/ghostsim-console.mjs program.gfb --bind ...;
+if (stdin is a terminal?) then (yes: live mode)
+  :Require stderr terminal too;
+  :Scan at 0 ms, draw panel;
+  repeat
+    :100 ms timer or key 1-8 / :toggle;
+    :Scan once at current elapsed time;
+  repeat while (:exit or Ctrl-C?) is (no)
+  :Restore screen; print short summary;
+  note right: --record and --format rejected
+else (no: piped replay)
+  repeat
+    :Read one command per line;
+    :Toggle / scan N at virtual time;
+    :Print panel to stderr;
+  repeat while (exit or end of input?) is (no)
+  :Write one scenario-result-v1 to stdout\n(TOON default, --format json);
+  note right: --record writes replayable TOON scenario
+endif
+stop
+@enduml

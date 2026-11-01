@@ -1,0 +1,12 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName Helvetica
+hide empty description
+state "wasTrue = false" as Off
+state "wasTrue = true" as On
+[*] --> Off : initial (since = 0)
+Off --> Off : false / value 0, since' = now
+Off --> On : true / value 0, since' = now
+On --> On : true / value now - since,\nsince' = since
+On --> Off : false / value 0, since' = now
+@enduml

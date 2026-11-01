@@ -1,0 +1,21 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontSize 12
+left to right direction
+
+card "C1 check\n(valid sample < 20%\n=> safe intent OFF)" as C1
+card "Safe OFF\n(logic result)" as SO
+card "OFF request\ntransmitted" as TX
+card "ACK /\nregister readback" as ACK
+card "Load feedback\n(contact, motion, flow)" as LF
+
+C1 --> SO
+SO --> TX
+TX --> ACK
+ACK --> LF
+note bottom of ACK
+  Claim only up to the last stage
+  with evidence, e.g. "OFF request ACK
+  received; actual stop unconfirmed".
+end note
+@enduml

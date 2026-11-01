@@ -1,0 +1,19 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontSize 12
+hide empty description
+[*] --> received
+received --> rejected : never started\n(reason required)
+received --> started : domain-start evidence
+started --> completed : completion evidence
+started --> cancelled : reason optional
+started --> failed : reason required
+rejected --> [*]
+completed --> [*]
+cancelled --> [*]
+failed --> [*]
+note right of rejected
+  Terminal states
+  have no successor
+end note
+@enduml

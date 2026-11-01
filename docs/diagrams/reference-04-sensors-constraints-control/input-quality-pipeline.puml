@@ -1,0 +1,42 @@
+@startuml
+skinparam defaultFontName Helvetica
+skinparam shadowing false
+skinparam ActivityBackgroundColor #F7F9FC
+skinparam ActivityBorderColor #4A6FA5
+title Input processing order (one input)
+start
+:Driver delivers sample\n(source ID, epoch, sample ID, timestamp, quality);
+if (Driver reports Disconnected?) then (yes)
+  #FFE5E5:Result = fault(Disconnected)\n(propagates immediately);
+  stop
+else (no)
+endif
+if (New physical sample?) then (no: duplicate / clock-only)
+  :No filter or recovery contribution;\nfreshness not refreshed;
+else (yes)
+  if (Payload, unit and `valid` range OK?) then (no)
+    #FFE5E5:Result = fault(Invalid);
+    stop
+  else (yes)
+    :Update filter state;
+  endif
+endif
+if (Filter ready and `recover_after` met?) then (no)
+  #FFF4D6:Result = fault(NotReady);
+  stop
+else (yes)
+endif
+note right: Any fault clears the filter window;\nrecovery needs fresh valid samples.
+if (Age of last valid sample < `stale_after`?) then (no)
+  #FFE5E5:Result = fault(Stale);
+  stop
+else (yes)
+  :Stateful predicate\n(hysteresis, debounce, ...);
+  :Result = ok(value)\nwith quality preserved;
+endif
+stop
+legend bottom
+Every Result, ok or fault, reaches the author,
+who chooses a control value with `case` or `recover`.
+end legend
+@enduml

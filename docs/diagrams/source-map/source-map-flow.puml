@@ -1,0 +1,23 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontSize 13
+skinparam rectangleRoundCorner 8
+rectangle "Literate source\n(.ghost.md)" as src
+rectangle "compileSource" as cs
+rectangle "writeArtifact\n(validate, then write)" as wa
+rectangle "GFB bytes\n(unchanged)" as gfb
+rectangle "Control manifest\n(unchanged)" as man
+rectangle ".gfb.map.json\nsource-map-v1:\nnodes, lines, bytecodeSha256,\nsourceDocument, traceMetadata" as map
+rectangle "verifyArtifactSourceMap\n-> sourceDocument" as ver
+rectangle "restoreArtifactSourceMap\n-> source + trace maps" as res
+src --> cs
+cs --> wa
+wa --> gfb
+wa --> man
+wa --> map
+map --> ver
+gfb --> ver
+map --> res
+gfb --> res
+note bottom of res : strict: also checks traceMetadata,\nmodule fingerprint, source bindings
+@enduml

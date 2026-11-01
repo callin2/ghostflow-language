@@ -1,0 +1,38 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName Helvetica
+title Maintained request and the 2 s command duration
+
+binary "run_request" as R
+binary "run (committed)" as S
+binary "drive" as D
+
+@0
+R is low
+S is low
+D is low
+
+@1
+R is high
+S is high
+D is high
+
+@3
+D is low
+note bottom of D : deadline reached;\nrequest is still true
+
+@5
+R is low
+S is low
+
+@6
+R is high
+S is high
+D is high
+
+@8
+D is low
+
+D@1 <-> @3 : 2 s
+D@6 <-> @8 : fresh 2 s
+@enduml

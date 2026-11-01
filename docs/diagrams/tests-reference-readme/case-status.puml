@@ -1,0 +1,27 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontSize 13
+skinparam activityBackgroundColor #F8F8F8
+skinparam activityBorderColor #555555
+
+start
+:Read case from cases/*.json;
+switch (status?)
+case (executable)
+  :Run tools/ghostc.mjs\n(--check and artifact generation);
+  if (Result matches accept/reject?) then (yes)
+    :Pass;
+  else (no)
+    :Fail (kept failing,\nnever skipped);
+  endif
+case (specified)
+  if (Active external oracle\nlinked in feature-status catalog?) then (yes)
+    :externally-covered;
+  else (no)
+    :TODO (pendingCatalog);
+  endif
+case (decision)
+  :TODO (pendingCatalog)\nrequired decision in reason;
+endswitch
+stop
+@enduml

@@ -1,0 +1,24 @@
+@startuml
+skinparam defaultFontName Helvetica
+skinparam shadowing false
+skinparam rectangleBorderColor #4A6FA5
+skinparam rectangleBackgroundColor #F7F9FC
+title Continuous control objective loop
+rectangle "target\n(setpoint)" as T
+rectangle "measure\n(process value)" as M
+rectangle "PID controller\nP + I + D + bias" as PID
+rectangle "requested\n(clamped to output range)" as R
+rectangle "arbitration +\nsafety constraints" as C
+rectangle "safe target" as S
+rectangle "output renderer\n(applied)" as A
+rectangle "process +\nfeedback" as P
+T --> PID
+M --> PID
+PID --> R
+R --> C
+C --> S
+S --> A
+A --> P
+P --> M : next sample
+S ..> PID : anti-windup and\nbumpless tracking\nuse the safe target
+@enduml

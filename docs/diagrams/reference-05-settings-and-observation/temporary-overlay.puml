@@ -1,0 +1,17 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontSize 13
+hide empty description
+title One setting with a temporary overlay (§5.2)
+
+[*] --> Ordinary
+Ordinary : effective = latest ordinary value
+Ordinary --> Overlaid : temporary event\n(lifetime Run or Until(DateTime))
+Overlaid : effective = temporary value
+Overlaid : return target = previous\nvalidated ordinary value
+Overlaid --> Ordinary : expiry, end of Run, or cancellation\n(restore return target)
+Overlaid --> Ordinary : new ordinary value\n(overlay removed in the same event)
+Overlaid --> Overlaid : second temporary request:\nrejected
+Overlaid --> Unavailable : return fails
+Unavailable : not recorded as a successful return;\nreported as unavailable
+@enduml

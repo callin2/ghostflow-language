@@ -2,8 +2,19 @@
 
 Issue [language #97](https://github.com/callin2/ghostflow-language/issues/97)
 defines the handoff that unblocks [frontend #210](https://github.com/callin2/farm_studio_frontend/issues/210)'s
-real WASM gate. This is a workflow and verification contract; no artifact is
-claimed to exist until a hosted run and an independent download pass.
+real WASM gate. A *handoff* here is a CI artifact: a WASM binary plus the
+evidence that it was built and verified from an exact source revision.
+
+This document is a workflow and verification contract. No artifact is claimed
+to exist until a hosted run produces it and an independent download
+verification passes.
+
+**In this document:** scope and dependencies; setup and the test gate; the
+package, report, and manifest; upload, naming, and download verification.
+
+The diagram shows the whole pipeline, from checkout to consumer verification.
+
+![Verified WASM handoff: CI checks out and verifies the source, runs npm test offline, packages three files, and uploads them; the consumer re-verifies everything against trusted expected values](diagrams/wasm-ci-artifacts/handoff-pipeline.svg)
 
 ## Scope and dependencies
 
@@ -11,10 +22,11 @@ claimed to exist until a hosted run and an independent download pass.
 - Build the frontend active language pin:
   b2f2874dd0238207558dfa4cc83077d322356a6c.
 - A manual run may optionally provide source_sha. If omitted, use the current
-  workflow commit; if provided, it must be a full 40-hex commit SHA. Short
+  workflow commit. If provided, it must be a full 40-hex (lowercase) commit SHA. Short
   SHAs, branches, tags, and mutable refs are invalid.
 - source.commit is the exact language source test pin. ci.commit records the
-  workflow's checked-out PR head, push head, or dispatch commit and may differ.
+  workflow's checked-out PR head, push head, or dispatch commit, and the two may
+  differ.
 - #97 remains open until an actual hosted run produces an artifact and its
   download verifies. A local Rust pass does not close it.
 - [API #30](https://github.com/callin2/farm_studio_api/issues/30) is
@@ -23,16 +35,20 @@ claimed to exist until a hosted run and an independent download pass.
   includes performance work; this artifact does not represent real Android
   delivery.
 
-The workflow must resolve and record the exact source commit, tree, and
-Cargo.lock hash before packaging. It must fail if the requested commit is
-unavailable, the tracked checkout is dirty, or a tracked-source hash differs.
-The verifier and handoff share the complete source hash inventory in
-`tools/verification-sources.mjs`, including every crate. Missing or extra
-report entries are rejected as well as changed contents.
+Before packaging, the workflow must resolve and record the exact source commit,
+tree, and Cargo.lock hash. It must fail if:
+
+- the requested commit is unavailable;
+- the tracked checkout is dirty; or
+- a tracked-source hash differs.
+
+The verifier and the handoff share one complete source hash inventory in
+`tools/verification-sources.mjs`, which includes every crate. A report entry
+with changed contents is rejected, and so is a missing or an extra entry.
 
 ## Setup and gate
 
-Network is allowed during setup:
+Network access is allowed during setup:
 
 1. Check out the PR head or requested full source_sha and verify its commit and
    tree.
@@ -42,20 +58,21 @@ Network is allowed during setup:
 4. Run cargo fetch --locked for current main's crates.io dependencies,
    including native package verifier dependencies.
 
-Cargo must be offline and locked during verification, but this does not claim
-that all network access is globally disabled. The current full npm test already
-invokes the WASM build. Run that existing gate with Cargo offline:
+During verification, Cargo must be offline and locked. This does not claim that
+all network access is globally disabled. The current full npm test already
+invokes the WASM build, so run that existing gate with Cargo offline:
 
 ```sh
 CARGO_NET_OFFLINE=true npm test
 ```
 
-Do not add a second manual WASM build after the full test/report step. The
-single existing build is the source for the packaged binary and its hashes.
+Do not add a second manual WASM build after the full test/report step. That
+single existing build is the source of the packaged binary and its hashes.
 
 ## Package, report, and manifest
 
-The main implementation is tools/package-verified-wasm.mjs. It hands off:
+The main implementation is tools/package-verified-wasm.mjs. It hands off three
+files:
 
 ```text
 ghostflow_wasm.wasm
@@ -63,7 +80,7 @@ verification.json
 manifest.json
 ```
 
-The report must require:
+The report (`verification.json`) must require:
 
 ```json
 {
@@ -81,33 +98,36 @@ The report must require:
 The script throws on invalid or mismatched source, report, binary, or manifest
 data. The report's wasm.sha256 and wasm.bytes must match the packaged binary.
 
-manifest.json must contain format "GhostFlow/verified-wasm-artifact-v1" and:
+manifest.json must contain format "GhostFlow/verified-wasm-artifact-v1" and
+these fields:
 
-- source.repository, source.commit, source.tree, source.cargoLockSha256;
-- binary.path, binary.bytes, binary.sha256;
-- verification.path, verification.sha256, verification.scope;
-- toolchain.node, toolchain.npm, toolchain.rustc, toolchain.cargo,
-  toolchain.rustcVerbose;
-- build.command ["npm", "test"], target wasm32-unknown-unknown, and profile
-  release;
-- ci.repository, ci.commit, ci.workflowRef, ci.workflowSha, ci.runId,
-  ci.runAttempt, ci.runUrl.
+| Group | Fields |
+|---|---|
+| source | source.repository, source.commit, source.tree, source.cargoLockSha256 |
+| binary | binary.path, binary.bytes, binary.sha256 |
+| verification | verification.path, verification.sha256, verification.scope |
+| toolchain | toolchain.node, toolchain.npm, toolchain.rustc, toolchain.cargo, toolchain.rustcVerbose |
+| build | build.command ["npm", "test"], target wasm32-unknown-unknown, and profile release |
+| ci | ci.repository, ci.commit, ci.workflowRef, ci.workflowSha, ci.runId, ci.runAttempt, ci.runUrl |
 
-ci.workflowSha is the commit containing the workflow, not the workflow file's
-blob SHA. Tool versions record what ran; they do not make the artifact
-reproducible. SHA-256 values provide integrity checks, not a signed attestation.
+Three clarifications:
+
+- ci.workflowSha is the commit that contains the workflow, not the workflow
+  file's blob SHA.
+- Tool versions record what ran; they do not make the artifact reproducible.
+- SHA-256 values provide integrity checks, not a signed attestation.
 
 ## Upload, naming, and download verification
 
-Upload only after the full existing npm test and packaging script succeed. Use
-14-day retention and this name:
+Upload only after the full existing npm test and the packaging script both
+succeed. Use 14-day retention and this name:
 
 ```text
 ghostflow-wasm-<current|frontend-pin>-<source_sha>-<runid>-<attempt>
 ```
 
 A failed run may upload a separate failure report, but never a failed WASM
-handoff. There is no fallback binary or fabricated build stamp.
+handoff. There is no fallback binary and no fabricated build stamp.
 
 The consumer must verify the downloaded files against trusted expected values:
 
@@ -120,5 +140,5 @@ The consumer must verify the downloaded files against trusted expected values:
    commit. The downloaded zip and its manifest cannot authorize themselves.
 
 Normal source builds remain supported. This artifact is a verified build
-handoff, not a full frontend guard stamp or an installed device mapping.
+handoff. It is not a full frontend guard stamp or an installed device mapping.
 No semantic engine or JavaScript substitute is introduced.

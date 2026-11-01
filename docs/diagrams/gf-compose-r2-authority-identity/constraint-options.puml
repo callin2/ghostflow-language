@@ -1,0 +1,29 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName Helvetica
+skinparam defaultFontSize 13
+skinparam rectangleRoundCorner 8
+title #62 installation constraints: two open options (none selected)
+
+package "Option 1: separate canonical constraint compilation" {
+  rectangle "Behavior package\n(canonical .ghost.md)" as B1
+  rectangle "Constraint artifact\n(named-constraint path)" as C1
+  rectangle "API join\npins both digests" as J1
+  rectangle "Installer enforces\nconstraint artifact" as E1
+  B1 --> J1
+  C1 --> J1
+  J1 --> E1
+}
+
+package "Option 2: explicit cross-project boundary revision" {
+  rectangle "Installation boundary revision\n(published by API/system owner)" as R2
+  rectangle "Behavior revision" as B2
+  rectangle "Constraint revision" as C2
+  rectangle "Bindings" as BD2
+  rectangle "Enforcement owner" as EO2
+  R2 --> B2 : references
+  R2 --> C2 : references
+  R2 --> BD2 : references
+  R2 --> EO2 : names
+}
+@enduml

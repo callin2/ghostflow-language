@@ -1,0 +1,19 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontSize 13
+skinparam rectangleBorderColor #4A6FA5
+skinparam rectangleBackgroundColor #F7F9FC
+left to right direction
+title Where each kind of change is handled (questions 33-40)
+
+rectangle "GhostFlow source (.ghost.md)\nlogical inputs/outputs,\ninput contracts, control rules" as SRC
+rectangle "Operational settings\n(config values)" as CFG
+rectangle "Installation binding\nlogical port -> pin / channel / address" as BIND
+rectangle "Input Driver /\noutput renderer\nprotocol, raw values, polarity" as DRV
+rectangle "Physical device\nsensor, button, relay,\nexpansion board" as DEV
+
+CFG --> SRC : live event,\nsame Program
+SRC --> BIND : logical ports
+BIND --> DRV
+DRV --> DEV
+@enduml

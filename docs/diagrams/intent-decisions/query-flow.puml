@@ -1,0 +1,29 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontSize 12
+skinparam componentStyle rectangle
+left to right direction
+
+rectangle "intent-decisions-request-v1" as req {
+  card "current\n(source + intentEvidence\n+ optional sourceClosure)" as cur
+  card "previous (optional)" as prev
+  card "transitions (optional,\nneeds previous)" as tr
+  card "requirementContract\n(optional, external)" as rc
+}
+rectangle "inspectIntentDecisions\n(pure query)" as q
+card "Existing compiler:\nrecompile + validate\nanchors and evidence" as comp
+card "intent-decisions-result-v1\ndecisions, judgments,\nrequirements, comparison, trust" as res
+
+cur --> q
+prev --> q
+tr --> q
+rc --> q
+q --> comp
+comp --> q
+q --> res
+note bottom of res
+  Reports only. No approval, no
+  authentication, no hold/block,
+  no runtime change.
+end note
+@enduml

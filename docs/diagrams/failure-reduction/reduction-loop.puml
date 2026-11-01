@@ -1,0 +1,23 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName Helvetica
+skinparam defaultFontSize 13
+start
+:Run original scenario;
+if (Guards hold and target\nviolates expected?) then (no)
+  :original-not-applicable,\noriginal-not-failing or incomplete;
+  stop
+else (yes)
+endif
+repeat
+  :Try deleting the next\nnon-target action (in order);
+  if (Valid, completes, guards hold,\nsame violation?) then (yes)
+    :Accept; restart from\nthe first action;
+  else (no)
+    :Record attempt;
+  endif
+repeat while (Untried deletions and\nmaxAttempts left?) is (yes)
+-> no;
+:Report reproduced result\n(single-deletion-minimal, budget-exhausted\nor unresolved-candidates);
+stop
+@enduml

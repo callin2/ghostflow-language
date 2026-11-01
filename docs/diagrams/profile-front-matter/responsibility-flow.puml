@@ -1,0 +1,27 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName Helvetica
+skinparam defaultFontSize 13
+skinparam ArrowColor #526d76
+
+rectangle "Customer / AI authoring tool\n(canonical .ghost.md:\nintent, body, front matter)" as C
+rectangle "Board / installation profile\n(Device)" as B
+rectangle "Driver package\n(Drivers)" as D
+rectangle "Compiler host / Worker\n(Language)\nno network, files or GPIO" as L
+rectangle "Packaging host\n(Device)" as K
+node "MCU" as M {
+  rectangle "Shared communication\nservice" as S
+  rectangle "Driver instances" as I
+  rectangle "GhostFlow runtime" as R
+}
+
+C --> L : source
+B --> L : pinned profiles\n(caller-supplied closure)
+D --> L : device profiles\n(channels, requirements)
+L --> K : binding plan\n(tied to source/profile hashes)
+D --> K : modules (ELF)
+K --> M : deployment bundle\n+ provenance
+I --> S : bus requests\n(serialized, time-limited)
+I --> R : values + quality/errors
+R --> I : output requests
+@enduml

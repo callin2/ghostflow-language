@@ -1,17 +1,17 @@
 # A complete local output envelope
 
-This software-only example has one control and no imports or hidden bindings.
-All four inputs are Bool observations supplied by the test host. All four
-outputs are virtual Bool intent endpoints. For these particular virtual
-endpoints, false is the explicitly selected inactive value. That choice is
-not a safe behavior for arbitrary physical resources.
+This software-only example contains exactly one control, with no imports and no
+hidden bindings. The test host supplies all four inputs as Bool observations.
+All four outputs are virtual Bool intent endpoints. For these particular virtual
+endpoints, `false` is the explicitly chosen inactive value. That choice does
+not make `false` a safe behavior for arbitrary physical resources.
 
-The request expresses a goal. The local mandatory rules restrict its permitted
-outputs: the pump needs a ready valve, and the two direction outputs cannot
-be active together. They do not select an automatic/manual arbitration policy
-or certify that any output was applied to hardware.
+The request states a goal. Local mandatory rules then limit which outputs are
+permitted: the pump needs a ready valve, and the two direction outputs must not
+be active at the same time. These rules do not choose an automatic/manual
+arbitration policy, and they do not certify that any output reached hardware.
 
-Explicit input-quality-v1 revision: unknown producer data retains this virtual example’s last observation. Initial false initializes source-local observation memory. The original document is preserved separately.
+This is the explicit input-quality-v1 revision. When producer data is unknown (a fault), the example keeps its last observation of that input. The initial `false` only initializes this source-local observation memory. The original document is preserved separately.
 
 ```ghost
 control OutputEnvelope {
@@ -41,9 +41,16 @@ control OutputEnvelope {
 }
 ```
 
-For start=true and valve_ready=false, requested pump=true becomes safe
-pump=false. When valve_ready becomes true, the same request is permitted.
-With both direction requests true, both direction outputs become false.
-This is local output projection, not admission or generic shared-resource
-enforcement. See the [constraint contract](../docs/CONSTRAINTS.md) for those
-separate stages and the explicit binding boundary.
+The `constraints LocalEnvelope` block holds two local rules. Each scan, the
+control first computes the *requested* outputs from the inputs. The rules then
+project them onto the *safe* outputs that the host actually receives:
+
+| Situation | Inputs | Requested outputs | Safe outputs | Rule that applies |
+| --- | --- | --- | --- | --- |
+| Valve not ready | `start=true`, `valve_ready=false` | `pump=true`, `valve=false` | `pump=false`, `valve=false` | `require at safe_output pump => valve` |
+| Valve ready | `start=true`, `valve_ready=true` | `pump=true`, `valve=true` | `pump=true`, `valve=true` | Rule satisfied; the same request is now permitted |
+| Both directions requested | `forward_request=true`, `reverse_request=true` | `forward=true`, `reverse=true` | `forward=false`, `reverse=false` | `mutex(forward, reverse)` |
+
+This is local output projection only. It is not admission control and not
+generic shared-resource enforcement. The [constraint contract](../docs/CONSTRAINTS.md)
+describes those separate stages and the explicit binding boundary.

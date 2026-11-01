@@ -199,6 +199,1150 @@ For first and last recorded Git commit dates, run `node <skill>/scripts/docs-ind
 | [docs/assets/readme-replay.svg](assets/readme-replay.svg) | readme-replay.svg | svg |
 | [docs/assets/readme-trace.svg](assets/readme-trace.svg) | readme-trace.svg | svg |
 
+## docs/diagrams/
+
+| Path | Title | Type |
+| --- | --- | --- |
+| [docs/diagrams/_style.puml](diagrams/_style.puml) | _style.puml | puml |
+
+## docs/diagrams/2026-09-24-fixed-planned-time-range-decision/
+
+| Path | Title | Type |
+| --- | --- | --- |
+| [docs/diagrams/2026-09-24-fixed-planned-time-range-decision/range-timeline.puml](diagrams/2026-09-24-fixed-planned-time-range-decision/range-timeline.puml) | range-timeline.puml | puml |
+| [docs/diagrams/2026-09-24-fixed-planned-time-range-decision/range-timeline.svg](diagrams/2026-09-24-fixed-planned-time-range-decision/range-timeline.svg) | range-timeline.svg | svg |
+
+## docs/diagrams/accounting-ledger-abi/
+
+| Path | Title | Type |
+| --- | --- | --- |
+| [docs/diagrams/accounting-ledger-abi/persistence-sequence.puml](diagrams/accounting-ledger-abi/persistence-sequence.puml) | persistence-sequence.puml | puml |
+| [docs/diagrams/accounting-ledger-abi/persistence-sequence.svg](diagrams/accounting-ledger-abi/persistence-sequence.svg) | persistence-sequence.svg | svg |
+
+## docs/diagrams/adaptation-settings-host/
+
+| Path | Title | Type |
+| --- | --- | --- |
+| [docs/diagrams/adaptation-settings-host/admission-flow.puml](diagrams/adaptation-settings-host/admission-flow.puml) | admission-flow.puml | puml |
+| [docs/diagrams/adaptation-settings-host/admission-flow.svg](diagrams/adaptation-settings-host/admission-flow.svg) | admission-flow.svg | svg |
+
+## docs/diagrams/after-event-design/
+
+| Path | Title | Type |
+| --- | --- | --- |
+| [docs/diagrams/after-event-design/after-event-window.puml](diagrams/after-event-design/after-event-window.puml) | after-event-window.puml | puml |
+| [docs/diagrams/after-event-design/after-event-window.svg](diagrams/after-event-design/after-event-window.svg) | after-event-window.svg | svg |
+| [docs/diagrams/after-event-design/stage-batch.puml](diagrams/after-event-design/stage-batch.puml) | stage-batch.puml | puml |
+| [docs/diagrams/after-event-design/stage-batch.svg](diagrams/after-event-design/stage-batch.svg) | stage-batch.svg | svg |
+
+## docs/diagrams/after-event-wasm-abi/
+
+| Path | Title | Type |
+| --- | --- | --- |
+| [docs/diagrams/after-event-wasm-abi/result-lifecycle.puml](diagrams/after-event-wasm-abi/result-lifecycle.puml) | result-lifecycle.puml | puml |
+| [docs/diagrams/after-event-wasm-abi/result-lifecycle.svg](diagrams/after-event-wasm-abi/result-lifecycle.svg) | result-lifecycle.svg | svg |
+| [docs/diagrams/after-event-wasm-abi/stage-commit-sequence.puml](diagrams/after-event-wasm-abi/stage-commit-sequence.puml) | stage-commit-sequence.puml | puml |
+| [docs/diagrams/after-event-wasm-abi/stage-commit-sequence.svg](diagrams/after-event-wasm-abi/stage-commit-sequence.svg) | stage-commit-sequence.svg | svg |
+
+## docs/diagrams/ai-contribution-package/
+
+| Path | Title | Type |
+| --- | --- | --- |
+| [docs/diagrams/ai-contribution-package/focused-test-flow.puml](diagrams/ai-contribution-package/focused-test-flow.puml) | focused-test-flow.puml | puml |
+| [docs/diagrams/ai-contribution-package/focused-test-flow.svg](diagrams/ai-contribution-package/focused-test-flow.svg) | focused-test-flow.svg | svg |
+
+## docs/diagrams/alarm-v1-readme/
+
+| Path | Title | Type |
+| --- | --- | --- |
+| [docs/diagrams/alarm-v1-readme/alarm-states.puml](diagrams/alarm-v1-readme/alarm-states.puml) | alarm-states.puml | puml |
+| [docs/diagrams/alarm-v1-readme/alarm-states.svg](diagrams/alarm-v1-readme/alarm-states.svg) | alarm-states.svg | svg |
+
+## docs/diagrams/behavior-comparison/
+
+| Path | Title | Type |
+| --- | --- | --- |
+| [docs/diagrams/behavior-comparison/comparison-flow.puml](diagrams/behavior-comparison/comparison-flow.puml) | comparison-flow.puml | puml |
+| [docs/diagrams/behavior-comparison/comparison-flow.svg](diagrams/behavior-comparison/comparison-flow.svg) | comparison-flow.svg | svg |
+| [docs/diagrams/behavior-comparison/example-timeline.puml](diagrams/behavior-comparison/example-timeline.puml) | example-timeline.puml | puml |
+| [docs/diagrams/behavior-comparison/example-timeline.svg](diagrams/behavior-comparison/example-timeline.svg) | example-timeline.svg | svg |
+
+## docs/diagrams/behavior-composition-research/
+
+| Path | Title | Type |
+| --- | --- | --- |
+| [docs/diagrams/behavior-composition-research/authority-boundaries.puml](diagrams/behavior-composition-research/authority-boundaries.puml) | authority-boundaries.puml | puml |
+| [docs/diagrams/behavior-composition-research/authority-boundaries.svg](diagrams/behavior-composition-research/authority-boundaries.svg) | authority-boundaries.svg | svg |
+| [docs/diagrams/behavior-composition-research/live-property-event.puml](diagrams/behavior-composition-research/live-property-event.puml) | live-property-event.puml | puml |
+| [docs/diagrams/behavior-composition-research/live-property-event.svg](diagrams/behavior-composition-research/live-property-event.svg) | live-property-event.svg | svg |
+| [docs/diagrams/behavior-composition-research/research-dependencies.puml](diagrams/behavior-composition-research/research-dependencies.puml) | research-dependencies.puml | puml |
+| [docs/diagrams/behavior-composition-research/research-dependencies.svg](diagrams/behavior-composition-research/research-dependencies.svg) | research-dependencies.svg | svg |
+
+## docs/diagrams/boolean-output-explanation/
+
+| Path | Title | Type |
+| --- | --- | --- |
+| [docs/diagrams/boolean-output-explanation/explanation-flow.puml](diagrams/boolean-output-explanation/explanation-flow.puml) | explanation-flow.puml | puml |
+| [docs/diagrams/boolean-output-explanation/explanation-flow.svg](diagrams/boolean-output-explanation/explanation-flow.svg) | explanation-flow.svg | svg |
+| [docs/diagrams/boolean-output-explanation/short-circuit-and.puml](diagrams/boolean-output-explanation/short-circuit-and.puml) | short-circuit-and.puml | puml |
+| [docs/diagrams/boolean-output-explanation/short-circuit-and.svg](diagrams/boolean-output-explanation/short-circuit-and.svg) | short-circuit-and.svg | svg |
+
+## docs/diagrams/bound-resource-execution/
+
+| Path | Title | Type |
+| --- | --- | --- |
+| [docs/diagrams/bound-resource-execution/admission-trip.puml](diagrams/bound-resource-execution/admission-trip.puml) | admission-trip.puml | puml |
+| [docs/diagrams/bound-resource-execution/admission-trip.svg](diagrams/bound-resource-execution/admission-trip.svg) | admission-trip.svg | svg |
+
+## docs/diagrams/bytecode/
+
+| Path | Title | Type |
+| --- | --- | --- |
+| [docs/diagrams/bytecode/if-lowering.puml](diagrams/bytecode/if-lowering.puml) | if-lowering.puml | puml |
+| [docs/diagrams/bytecode/if-lowering.svg](diagrams/bytecode/if-lowering.svg) | if-lowering.svg | svg |
+| [docs/diagrams/bytecode/module-envelope.puml](diagrams/bytecode/module-envelope.puml) | module-envelope.puml | puml |
+| [docs/diagrams/bytecode/module-envelope.svg](diagrams/bytecode/module-envelope.svg) | module-envelope.svg | svg |
+
+## docs/diagrams/calendar-providers/
+
+| Path | Title | Type |
+| --- | --- | --- |
+| [docs/diagrams/calendar-providers/calendar-layers.puml](diagrams/calendar-providers/calendar-layers.puml) | calendar-layers.puml | puml |
+| [docs/diagrams/calendar-providers/calendar-layers.svg](diagrams/calendar-providers/calendar-layers.svg) | calendar-layers.svg | svg |
+| [docs/diagrams/calendar-providers/workday-decision.puml](diagrams/calendar-providers/workday-decision.puml) | workday-decision.puml | puml |
+| [docs/diagrams/calendar-providers/workday-decision.svg](diagrams/calendar-providers/workday-decision.svg) | workday-decision.svg | svg |
+
+## docs/diagrams/checked-constraint-replacements/
+
+| Path | Title | Type |
+| --- | --- | --- |
+| [docs/diagrams/checked-constraint-replacements/proof-pipeline.puml](diagrams/checked-constraint-replacements/proof-pipeline.puml) | proof-pipeline.puml | puml |
+| [docs/diagrams/checked-constraint-replacements/proof-pipeline.svg](diagrams/checked-constraint-replacements/proof-pipeline.svg) | proof-pipeline.svg | svg |
+
+## docs/diagrams/civil-schedule-reference-integration/
+
+| Path | Title | Type |
+| --- | --- | --- |
+| [docs/diagrams/civil-schedule-reference-integration/integration-steps.puml](diagrams/civil-schedule-reference-integration/integration-steps.puml) | integration-steps.puml | puml |
+| [docs/diagrams/civil-schedule-reference-integration/integration-steps.svg](diagrams/civil-schedule-reference-integration/integration-steps.svg) | integration-steps.svg | svg |
+
+## docs/diagrams/compiler-diagnostics/
+
+| Path | Title | Type |
+| --- | --- | --- |
+| [docs/diagrams/compiler-diagnostics/error-collection.puml](diagrams/compiler-diagnostics/error-collection.puml) | error-collection.puml | puml |
+| [docs/diagrams/compiler-diagnostics/error-collection.svg](diagrams/compiler-diagnostics/error-collection.svg) | error-collection.svg | svg |
+| [docs/diagrams/compiler-diagnostics/warning-vs-error-source.puml](diagrams/compiler-diagnostics/warning-vs-error-source.puml) | warning-vs-error-source.puml | puml |
+| [docs/diagrams/compiler-diagnostics/warning-vs-error-source.svg](diagrams/compiler-diagnostics/warning-vs-error-source.svg) | warning-vs-error-source.svg | svg |
+
+## docs/diagrams/compiler-diagnostics-plan/
+
+| Path | Title | Type |
+| --- | --- | --- |
+| [docs/diagrams/compiler-diagnostics-plan/catalog-growth.puml](diagrams/compiler-diagnostics-plan/catalog-growth.puml) | catalog-growth.puml | puml |
+| [docs/diagrams/compiler-diagnostics-plan/catalog-growth.svg](diagrams/compiler-diagnostics-plan/catalog-growth.svg) | catalog-growth.svg | svg |
+
+## docs/diagrams/composed-config-timer/
+
+| Path | Title | Type |
+| --- | --- | --- |
+| [docs/diagrams/composed-config-timer/instance-isolation.puml](diagrams/composed-config-timer/instance-isolation.puml) | instance-isolation.puml | puml |
+| [docs/diagrams/composed-config-timer/instance-isolation.svg](diagrams/composed-config-timer/instance-isolation.svg) | instance-isolation.svg | svg |
+
+## docs/diagrams/constraints/
+
+| Path | Title | Type |
+| --- | --- | --- |
+| [docs/diagrams/constraints/mode-interlock.puml](diagrams/constraints/mode-interlock.puml) | mode-interlock.puml | puml |
+| [docs/diagrams/constraints/mode-interlock.svg](diagrams/constraints/mode-interlock.svg) | mode-interlock.svg | svg |
+| [docs/diagrams/constraints/sensor-pipeline.puml](diagrams/constraints/sensor-pipeline.puml) | sensor-pipeline.puml | puml |
+| [docs/diagrams/constraints/sensor-pipeline.svg](diagrams/constraints/sensor-pipeline.svg) | sensor-pipeline.svg | svg |
+| [docs/diagrams/constraints/shared-guard-states.puml](diagrams/constraints/shared-guard-states.puml) | shared-guard-states.puml | puml |
+| [docs/diagrams/constraints/shared-guard-states.svg](diagrams/constraints/shared-guard-states.svg) | shared-guard-states.svg | svg |
+
+## docs/diagrams/context-execution-abi/
+
+| Path | Title | Type |
+| --- | --- | --- |
+| [docs/diagrams/context-execution-abi/call-order.puml](diagrams/context-execution-abi/call-order.puml) | call-order.puml | puml |
+| [docs/diagrams/context-execution-abi/call-order.svg](diagrams/context-execution-abi/call-order.svg) | call-order.svg | svg |
+| [docs/diagrams/context-execution-abi/tick-commit.puml](diagrams/context-execution-abi/tick-commit.puml) | tick-commit.puml | puml |
+| [docs/diagrams/context-execution-abi/tick-commit.svg](diagrams/context-execution-abi/tick-commit.svg) | tick-commit.svg | svg |
+
+## docs/diagrams/continuous-bool-timer-contract/
+
+| Path | Title | Type |
+| --- | --- | --- |
+| [docs/diagrams/continuous-bool-timer-contract/reset-timeline.puml](diagrams/continuous-bool-timer-contract/reset-timeline.puml) | reset-timeline.puml | puml |
+| [docs/diagrams/continuous-bool-timer-contract/reset-timeline.svg](diagrams/continuous-bool-timer-contract/reset-timeline.svg) | reset-timeline.svg | svg |
+| [docs/diagrams/continuous-bool-timer-contract/timer-states.puml](diagrams/continuous-bool-timer-contract/timer-states.puml) | timer-states.puml | puml |
+| [docs/diagrams/continuous-bool-timer-contract/timer-states.svg](diagrams/continuous-bool-timer-contract/timer-states.svg) | timer-states.svg | svg |
+
+## docs/diagrams/debounce-design/
+
+| Path | Title | Type |
+| --- | --- | --- |
+| [docs/diagrams/debounce-design/observation-decision.puml](diagrams/debounce-design/observation-decision.puml) | observation-decision.puml | puml |
+| [docs/diagrams/debounce-design/observation-decision.svg](diagrams/debounce-design/observation-decision.svg) | observation-decision.svg | svg |
+
+## docs/diagrams/development-workflow/
+
+| Path | Title | Type |
+| --- | --- | --- |
+| [docs/diagrams/development-workflow/ci-lane-routing.puml](diagrams/development-workflow/ci-lane-routing.puml) | ci-lane-routing.puml | puml |
+| [docs/diagrams/development-workflow/ci-lane-routing.svg](diagrams/development-workflow/ci-lane-routing.svg) | ci-lane-routing.svg | svg |
+| [docs/diagrams/development-workflow/workflow-steps.puml](diagrams/development-workflow/workflow-steps.puml) | workflow-steps.puml | puml |
+| [docs/diagrams/development-workflow/workflow-steps.svg](diagrams/development-workflow/workflow-steps.svg) | workflow-steps.svg | svg |
+
+## docs/diagrams/documentation-languages/
+
+| Path | Title | Type |
+| --- | --- | --- |
+| [docs/diagrams/documentation-languages/translation-flow.puml](diagrams/documentation-languages/translation-flow.puml) | translation-flow.puml | puml |
+| [docs/diagrams/documentation-languages/translation-flow.svg](diagrams/documentation-languages/translation-flow.svg) | translation-flow.svg | svg |
+
+## docs/diagrams/driver-abi-v1-draft/
+
+| Path | Title | Type |
+| --- | --- | --- |
+| [docs/diagrams/driver-abi-v1-draft/boundary.puml](diagrams/driver-abi-v1-draft/boundary.puml) | boundary.puml | puml |
+| [docs/diagrams/driver-abi-v1-draft/boundary.svg](diagrams/driver-abi-v1-draft/boundary.svg) | boundary.svg | svg |
+| [docs/diagrams/driver-abi-v1-draft/session-lifecycle.puml](diagrams/driver-abi-v1-draft/session-lifecycle.puml) | session-lifecycle.puml | puml |
+| [docs/diagrams/driver-abi-v1-draft/session-lifecycle.svg](diagrams/driver-abi-v1-draft/session-lifecycle.svg) | session-lifecycle.svg | svg |
+
+## docs/diagrams/effect-process-contract/
+
+| Path | Title | Type |
+| --- | --- | --- |
+| [docs/diagrams/effect-process-contract/process-lifecycle.puml](diagrams/effect-process-contract/process-lifecycle.puml) | process-lifecycle.puml | puml |
+| [docs/diagrams/effect-process-contract/process-lifecycle.svg](diagrams/effect-process-contract/process-lifecycle.svg) | process-lifecycle.svg | svg |
+
+## docs/diagrams/estimate-evidence/
+
+| Path | Title | Type |
+| --- | --- | --- |
+| [docs/diagrams/estimate-evidence/transport.puml](diagrams/estimate-evidence/transport.puml) | transport.puml | puml |
+| [docs/diagrams/estimate-evidence/transport.svg](diagrams/estimate-evidence/transport.svg) | transport.svg | svg |
+
+## docs/diagrams/exact-integer-contract/
+
+| Path | Title | Type |
+| --- | --- | --- |
+| [docs/diagrams/exact-integer-contract/int-error-boundary.puml](diagrams/exact-integer-contract/int-error-boundary.puml) | int-error-boundary.puml | puml |
+| [docs/diagrams/exact-integer-contract/int-error-boundary.svg](diagrams/exact-integer-contract/int-error-boundary.svg) | int-error-boundary.svg | svg |
+
+## docs/diagrams/execution-evidence/
+
+| Path | Title | Type |
+| --- | --- | --- |
+| [docs/diagrams/execution-evidence/explain-flow.puml](diagrams/execution-evidence/explain-flow.puml) | explain-flow.puml | puml |
+| [docs/diagrams/execution-evidence/explain-flow.svg](diagrams/execution-evidence/explain-flow.svg) | explain-flow.svg | svg |
+
+## docs/diagrams/explicit-feedback-adoption/
+
+| Path | Title | Type |
+| --- | --- | --- |
+| [docs/diagrams/explicit-feedback-adoption/inhibition-timeline.puml](diagrams/explicit-feedback-adoption/inhibition-timeline.puml) | inhibition-timeline.puml | puml |
+| [docs/diagrams/explicit-feedback-adoption/inhibition-timeline.svg](diagrams/explicit-feedback-adoption/inhibition-timeline.svg) | inhibition-timeline.svg | svg |
+
+## docs/diagrams/failure-reduction/
+
+| Path | Title | Type |
+| --- | --- | --- |
+| [docs/diagrams/failure-reduction/reduction-loop.puml](diagrams/failure-reduction/reduction-loop.puml) | reduction-loop.puml | puml |
+| [docs/diagrams/failure-reduction/reduction-loop.svg](diagrams/failure-reduction/reduction-loop.svg) | reduction-loop.svg | svg |
+
+## docs/diagrams/five-minute-watering/
+
+| Path | Title | Type |
+| --- | --- | --- |
+| [docs/diagrams/five-minute-watering/watering-states.puml](diagrams/five-minute-watering/watering-states.puml) | watering-states.puml | puml |
+| [docs/diagrams/five-minute-watering/watering-states.svg](diagrams/five-minute-watering/watering-states.svg) | watering-states.svg | svg |
+
+## docs/diagrams/framed-control-host/
+
+| Path | Title | Type |
+| --- | --- | --- |
+| [docs/diagrams/framed-control-host/framed-step-transaction.puml](diagrams/framed-control-host/framed-step-transaction.puml) | framed-step-transaction.puml | puml |
+| [docs/diagrams/framed-control-host/framed-step-transaction.svg](diagrams/framed-control-host/framed-step-transaction.svg) | framed-step-transaction.svg | svg |
+
+## docs/diagrams/gf-compose-r1-user-outcomes/
+
+| Path | Title | Type |
+| --- | --- | --- |
+| [docs/diagrams/gf-compose-r1-user-outcomes/first-journey.puml](diagrams/gf-compose-r1-user-outcomes/first-journey.puml) | first-journey.puml | puml |
+| [docs/diagrams/gf-compose-r1-user-outcomes/first-journey.svg](diagrams/gf-compose-r1-user-outcomes/first-journey.svg) | first-journey.svg | svg |
+
+## docs/diagrams/gf-compose-r2-authority-identity/
+
+| Path | Title | Type |
+| --- | --- | --- |
+| [docs/diagrams/gf-compose-r2-authority-identity/constraint-options.puml](diagrams/gf-compose-r2-authority-identity/constraint-options.puml) | constraint-options.puml | puml |
+| [docs/diagrams/gf-compose-r2-authority-identity/constraint-options.svg](diagrams/gf-compose-r2-authority-identity/constraint-options.svg) | constraint-options.svg | svg |
+| [docs/diagrams/gf-compose-r2-authority-identity/identity-joins.puml](diagrams/gf-compose-r2-authority-identity/identity-joins.puml) | identity-joins.puml | puml |
+| [docs/diagrams/gf-compose-r2-authority-identity/identity-joins.svg](diagrams/gf-compose-r2-authority-identity/identity-joins.svg) | identity-joins.svg | svg |
+
+## docs/diagrams/gf-compose-r3-execution/
+
+| Path | Title | Type |
+| --- | --- | --- |
+| [docs/diagrams/gf-compose-r3-execution/composition-options.puml](diagrams/gf-compose-r3-execution/composition-options.puml) | composition-options.puml | puml |
+| [docs/diagrams/gf-compose-r3-execution/composition-options.svg](diagrams/gf-compose-r3-execution/composition-options.svg) | composition-options.svg | svg |
+| [docs/diagrams/gf-compose-r3-execution/framed-host-failure.puml](diagrams/gf-compose-r3-execution/framed-host-failure.puml) | framed-host-failure.puml | puml |
+| [docs/diagrams/gf-compose-r3-execution/framed-host-failure.svg](diagrams/gf-compose-r3-execution/framed-host-failure.svg) | framed-host-failure.svg | svg |
+
+## docs/diagrams/gf-compose-r4-ports-bindings/
+
+| Path | Title | Type |
+| --- | --- | --- |
+| [docs/diagrams/gf-compose-r4-ports-bindings/allocation-flow.puml](diagrams/gf-compose-r4-ports-bindings/allocation-flow.puml) | allocation-flow.puml | puml |
+| [docs/diagrams/gf-compose-r4-ports-bindings/allocation-flow.svg](diagrams/gf-compose-r4-ports-bindings/allocation-flow.svg) | allocation-flow.svg | svg |
+
+## docs/diagrams/gf-compose-r5-contracts/
+
+| Path | Title | Type |
+| --- | --- | --- |
+| [docs/diagrams/gf-compose-r5-contracts/check-phases.puml](diagrams/gf-compose-r5-contracts/check-phases.puml) | check-phases.puml | puml |
+| [docs/diagrams/gf-compose-r5-contracts/check-phases.svg](diagrams/gf-compose-r5-contracts/check-phases.svg) | check-phases.svg | svg |
+| [docs/diagrams/gf-compose-r5-contracts/valve-switch.puml](diagrams/gf-compose-r5-contracts/valve-switch.puml) | valve-switch.puml | puml |
+| [docs/diagrams/gf-compose-r5-contracts/valve-switch.svg](diagrams/gf-compose-r5-contracts/valve-switch.svg) | valve-switch.svg | svg |
+
+## docs/diagrams/gf-compose-r6-overrides/
+
+| Path | Title | Type |
+| --- | --- | --- |
+| [docs/diagrams/gf-compose-r6-overrides/identity-layers.puml](diagrams/gf-compose-r6-overrides/identity-layers.puml) | identity-layers.puml | puml |
+| [docs/diagrams/gf-compose-r6-overrides/identity-layers.svg](diagrams/gf-compose-r6-overrides/identity-layers.svg) | identity-layers.svg | svg |
+| [docs/diagrams/gf-compose-r6-overrides/settings-event.puml](diagrams/gf-compose-r6-overrides/settings-event.puml) | settings-event.puml | puml |
+| [docs/diagrams/gf-compose-r6-overrides/settings-event.svg](diagrams/gf-compose-r6-overrides/settings-event.svg) | settings-event.svg | svg |
+
+## docs/diagrams/gf-compose-r7-packages/
+
+| Path | Title | Type |
+| --- | --- | --- |
+| [docs/diagrams/gf-compose-r7-packages/import-lock.puml](diagrams/gf-compose-r7-packages/import-lock.puml) | import-lock.puml | puml |
+| [docs/diagrams/gf-compose-r7-packages/import-lock.svg](diagrams/gf-compose-r7-packages/import-lock.svg) | import-lock.svg | svg |
+| [docs/diagrams/gf-compose-r7-packages/packaging-options.puml](diagrams/gf-compose-r7-packages/packaging-options.puml) | packaging-options.puml | puml |
+| [docs/diagrams/gf-compose-r7-packages/packaging-options.svg](diagrams/gf-compose-r7-packages/packaging-options.svg) | packaging-options.svg | svg |
+
+## docs/diagrams/gf-compose-r8-incident-evidence/
+
+| Path | Title | Type |
+| --- | --- | --- |
+| [docs/diagrams/gf-compose-r8-incident-evidence/evidence-stages.puml](diagrams/gf-compose-r8-incident-evidence/evidence-stages.puml) | evidence-stages.puml | puml |
+| [docs/diagrams/gf-compose-r8-incident-evidence/evidence-stages.svg](diagrams/gf-compose-r8-incident-evidence/evidence-stages.svg) | evidence-stages.svg | svg |
+| [docs/diagrams/gf-compose-r8-incident-evidence/incident-context.puml](diagrams/gf-compose-r8-incident-evidence/incident-context.puml) | incident-context.puml | puml |
+| [docs/diagrams/gf-compose-r8-incident-evidence/incident-context.svg](diagrams/gf-compose-r8-incident-evidence/incident-context.svg) | incident-context.svg | svg |
+
+## docs/diagrams/gf-compose-r9-acceptance/
+
+| Path | Title | Type |
+| --- | --- | --- |
+| [docs/diagrams/gf-compose-r9-acceptance/live-property-identity.puml](diagrams/gf-compose-r9-acceptance/live-property-identity.puml) | live-property-identity.puml | puml |
+| [docs/diagrams/gf-compose-r9-acceptance/live-property-identity.svg](diagrams/gf-compose-r9-acceptance/live-property-identity.svg) | live-property-identity.svg | svg |
+| [docs/diagrams/gf-compose-r9-acceptance/milestone-handoffs.puml](diagrams/gf-compose-r9-acceptance/milestone-handoffs.puml) | milestone-handoffs.puml | puml |
+| [docs/diagrams/gf-compose-r9-acceptance/milestone-handoffs.svg](diagrams/gf-compose-r9-acceptance/milestone-handoffs.svg) | milestone-handoffs.svg | svg |
+
+## docs/diagrams/ghost-timeline/
+
+| Path | Title | Type |
+| --- | --- | --- |
+| [docs/diagrams/ghost-timeline/live-and-branch.puml](diagrams/ghost-timeline/live-and-branch.puml) | live-and-branch.puml | puml |
+| [docs/diagrams/ghost-timeline/live-and-branch.svg](diagrams/ghost-timeline/live-and-branch.svg) | live-and-branch.svg | svg |
+
+## docs/diagrams/hardware-front-matter/
+
+| Path | Title | Type |
+| --- | --- | --- |
+| [docs/diagrams/hardware-front-matter/hardware-plan-flow.puml](diagrams/hardware-front-matter/hardware-plan-flow.puml) | hardware-plan-flow.puml | puml |
+| [docs/diagrams/hardware-front-matter/hardware-plan-flow.svg](diagrams/hardware-front-matter/hardware-plan-flow.svg) | hardware-plan-flow.svg | svg |
+
+## docs/diagrams/hold-last-design/
+
+| Path | Title | Type |
+| --- | --- | --- |
+| [docs/diagrams/hold-last-design/cache-lifecycle.puml](diagrams/hold-last-design/cache-lifecycle.puml) | cache-lifecycle.puml | puml |
+| [docs/diagrams/hold-last-design/cache-lifecycle.svg](diagrams/hold-last-design/cache-lifecycle.svg) | cache-lifecycle.svg | svg |
+
+## docs/diagrams/host-event-ordering-contract/
+
+| Path | Title | Type |
+| --- | --- | --- |
+| [docs/diagrams/host-event-ordering-contract/batch-boundary.puml](diagrams/host-event-ordering-contract/batch-boundary.puml) | batch-boundary.puml | puml |
+| [docs/diagrams/host-event-ordering-contract/batch-boundary.svg](diagrams/host-event-ordering-contract/batch-boundary.svg) | batch-boundary.svg | svg |
+| [docs/diagrams/host-event-ordering-contract/required-order.puml](diagrams/host-event-ordering-contract/required-order.puml) | required-order.puml | puml |
+| [docs/diagrams/host-event-ordering-contract/required-order.svg](diagrams/host-event-ordering-contract/required-order.svg) | required-order.svg | svg |
+
+## docs/diagrams/implementation/
+
+| Path | Title | Type |
+| --- | --- | --- |
+| [docs/diagrams/implementation/toolchain-path.puml](diagrams/implementation/toolchain-path.puml) | toolchain-path.puml | puml |
+| [docs/diagrams/implementation/toolchain-path.svg](diagrams/implementation/toolchain-path.svg) | toolchain-path.svg | svg |
+
+## docs/diagrams/incident-replay/
+
+| Path | Title | Type |
+| --- | --- | --- |
+| [docs/diagrams/incident-replay/capture-replay.puml](diagrams/incident-replay/capture-replay.puml) | capture-replay.puml | puml |
+| [docs/diagrams/incident-replay/capture-replay.svg](diagrams/incident-replay/capture-replay.svg) | capture-replay.svg | svg |
+
+## docs/diagrams/input-migration/
+
+| Path | Title | Type |
+| --- | --- | --- |
+| [docs/diagrams/input-migration/migration-paths.puml](diagrams/input-migration/migration-paths.puml) | migration-paths.puml | puml |
+| [docs/diagrams/input-migration/migration-paths.svg](diagrams/input-migration/migration-paths.svg) | migration-paths.svg | svg |
+| [docs/diagrams/input-migration/sample-to-result.puml](diagrams/input-migration/sample-to-result.puml) | sample-to-result.puml | puml |
+| [docs/diagrams/input-migration/sample-to-result.svg](diagrams/input-migration/sample-to-result.svg) | sample-to-result.svg | svg |
+
+## docs/diagrams/installed-sensor-binding/
+
+| Path | Title | Type |
+| --- | --- | --- |
+| [docs/diagrams/installed-sensor-binding/replace-binding.puml](diagrams/installed-sensor-binding/replace-binding.puml) | replace-binding.puml | puml |
+| [docs/diagrams/installed-sensor-binding/replace-binding.svg](diagrams/installed-sensor-binding/replace-binding.svg) | replace-binding.svg | svg |
+
+## docs/diagrams/instance-trace-projection/
+
+| Path | Title | Type |
+| --- | --- | --- |
+| [docs/diagrams/instance-trace-projection/projection-flow.puml](diagrams/instance-trace-projection/projection-flow.puml) | projection-flow.puml | puml |
+| [docs/diagrams/instance-trace-projection/projection-flow.svg](diagrams/instance-trace-projection/projection-flow.svg) | projection-flow.svg | svg |
+
+## docs/diagrams/integration-v1-readme/
+
+| Path | Title | Type |
+| --- | --- | --- |
+| [docs/diagrams/integration-v1-readme/evidence-gates.puml](diagrams/integration-v1-readme/evidence-gates.puml) | evidence-gates.puml | puml |
+| [docs/diagrams/integration-v1-readme/evidence-gates.svg](diagrams/integration-v1-readme/evidence-gates.svg) | evidence-gates.svg | svg |
+| [docs/diagrams/integration-v1-readme/record-linkage.puml](diagrams/integration-v1-readme/record-linkage.puml) | record-linkage.puml | puml |
+| [docs/diagrams/integration-v1-readme/record-linkage.svg](diagrams/integration-v1-readme/record-linkage.svg) | record-linkage.svg | svg |
+
+## docs/diagrams/intent-anchor-map/
+
+| Path | Title | Type |
+| --- | --- | --- |
+| [docs/diagrams/intent-anchor-map/anchor-classification.puml](diagrams/intent-anchor-map/anchor-classification.puml) | anchor-classification.puml | puml |
+| [docs/diagrams/intent-anchor-map/anchor-classification.svg](diagrams/intent-anchor-map/anchor-classification.svg) | anchor-classification.svg | svg |
+| [docs/diagrams/intent-anchor-map/anchor-link-flow.puml](diagrams/intent-anchor-map/anchor-link-flow.puml) | anchor-link-flow.puml | puml |
+| [docs/diagrams/intent-anchor-map/anchor-link-flow.svg](diagrams/intent-anchor-map/anchor-link-flow.svg) | anchor-link-flow.svg | svg |
+
+## docs/diagrams/intent-consistency-contract/
+
+| Path | Title | Type |
+| --- | --- | --- |
+| [docs/diagrams/intent-consistency-contract/evidence-chain.puml](diagrams/intent-consistency-contract/evidence-chain.puml) | evidence-chain.puml | puml |
+| [docs/diagrams/intent-consistency-contract/evidence-chain.svg](diagrams/intent-consistency-contract/evidence-chain.svg) | evidence-chain.svg | svg |
+| [docs/diagrams/intent-consistency-contract/pump-evidence-stages.puml](diagrams/intent-consistency-contract/pump-evidence-stages.puml) | pump-evidence-stages.puml | puml |
+| [docs/diagrams/intent-consistency-contract/pump-evidence-stages.svg](diagrams/intent-consistency-contract/pump-evidence-stages.svg) | pump-evidence-stages.svg | svg |
+
+## docs/diagrams/intent-decisions/
+
+| Path | Title | Type |
+| --- | --- | --- |
+| [docs/diagrams/intent-decisions/query-flow.puml](diagrams/intent-decisions/query-flow.puml) | query-flow.puml | puml |
+| [docs/diagrams/intent-decisions/query-flow.svg](diagrams/intent-decisions/query-flow.svg) | query-flow.svg | svg |
+
+## docs/diagrams/intent-evidence/
+
+| Path | Title | Type |
+| --- | --- | --- |
+| [docs/diagrams/intent-evidence/record-flow.puml](diagrams/intent-evidence/record-flow.puml) | record-flow.puml | puml |
+| [docs/diagrams/intent-evidence/record-flow.svg](diagrams/intent-evidence/record-flow.svg) | record-flow.svg | svg |
+
+## docs/diagrams/interaction-stream-contract/
+
+| Path | Title | Type |
+| --- | --- | --- |
+| [docs/diagrams/interaction-stream-contract/alarm-episode.puml](diagrams/interaction-stream-contract/alarm-episode.puml) | alarm-episode.puml | puml |
+| [docs/diagrams/interaction-stream-contract/alarm-episode.svg](diagrams/interaction-stream-contract/alarm-episode.svg) | alarm-episode.svg | svg |
+| [docs/diagrams/interaction-stream-contract/command-lifecycle.puml](diagrams/interaction-stream-contract/command-lifecycle.puml) | command-lifecycle.puml | puml |
+| [docs/diagrams/interaction-stream-contract/command-lifecycle.svg](diagrams/interaction-stream-contract/command-lifecycle.svg) | command-lifecycle.svg | svg |
+
+## docs/diagrams/interaction-v0-readme/
+
+| Path | Title | Type |
+| --- | --- | --- |
+| [docs/diagrams/interaction-v0-readme/schema-snapshot-join.puml](diagrams/interaction-v0-readme/schema-snapshot-join.puml) | schema-snapshot-join.puml | puml |
+| [docs/diagrams/interaction-v0-readme/schema-snapshot-join.svg](diagrams/interaction-v0-readme/schema-snapshot-join.svg) | schema-snapshot-join.svg | svg |
+
+## docs/diagrams/irrigation/
+
+| Path | Title | Type |
+| --- | --- | --- |
+| [docs/diagrams/irrigation/decision.puml](diagrams/irrigation/decision.puml) | decision.puml | puml |
+| [docs/diagrams/irrigation/decision.svg](diagrams/irrigation/decision.svg) | decision.svg | svg |
+
+## docs/diagrams/issue-137-plan/
+
+| Path | Title | Type |
+| --- | --- | --- |
+| [docs/diagrams/issue-137-plan/scan-transaction.puml](diagrams/issue-137-plan/scan-transaction.puml) | scan-transaction.puml | puml |
+| [docs/diagrams/issue-137-plan/scan-transaction.svg](diagrams/issue-137-plan/scan-transaction.svg) | scan-transaction.svg | svg |
+
+## docs/diagrams/keyboard-host/
+
+| Path | Title | Type |
+| --- | --- | --- |
+| [docs/diagrams/keyboard-host/console-modes.puml](diagrams/keyboard-host/console-modes.puml) | console-modes.puml | puml |
+| [docs/diagrams/keyboard-host/console-modes.svg](diagrams/keyboard-host/console-modes.svg) | console-modes.svg | svg |
+
+## docs/diagrams/language/
+
+| Path | Title | Type |
+| --- | --- | --- |
+| [docs/diagrams/language/constraint-fixed-point.puml](diagrams/language/constraint-fixed-point.puml) | constraint-fixed-point.puml | puml |
+| [docs/diagrams/language/constraint-fixed-point.svg](diagrams/language/constraint-fixed-point.svg) | constraint-fixed-point.svg | svg |
+| [docs/diagrams/language/tick-steps.puml](diagrams/language/tick-steps.puml) | tick-steps.puml | puml |
+| [docs/diagrams/language/tick-steps.svg](diagrams/language/tick-steps.svg) | tick-steps.svg | svg |
+
+## docs/diagrams/language-examples/
+
+| Path | Title | Type |
+| --- | --- | --- |
+| [docs/diagrams/language-examples/watering-behavior.puml](diagrams/language-examples/watering-behavior.puml) | watering-behavior.puml | puml |
+| [docs/diagrams/language-examples/watering-behavior.svg](diagrams/language-examples/watering-behavior.svg) | watering-behavior.svg | svg |
+
+## docs/diagrams/language-faq/
+
+| Path | Title | Type |
+| --- | --- | --- |
+| [docs/diagrams/language-faq/cancel-and-return.puml](diagrams/language-faq/cancel-and-return.puml) | cancel-and-return.puml | puml |
+| [docs/diagrams/language-faq/cancel-and-return.svg](diagrams/language-faq/cancel-and-return.svg) | cancel-and-return.svg | svg |
+| [docs/diagrams/language-faq/device-boundaries.puml](diagrams/language-faq/device-boundaries.puml) | device-boundaries.puml | puml |
+| [docs/diagrams/language-faq/device-boundaries.svg](diagrams/language-faq/device-boundaries.svg) | device-boundaries.svg | svg |
+| [docs/diagrams/language-faq/input-quality-pattern.puml](diagrams/language-faq/input-quality-pattern.puml) | input-quality-pattern.puml | puml |
+| [docs/diagrams/language-faq/input-quality-pattern.svg](diagrams/language-faq/input-quality-pattern.svg) | input-quality-pattern.svg | svg |
+| [docs/diagrams/language-faq/off-delay-states.puml](diagrams/language-faq/off-delay-states.puml) | off-delay-states.puml | puml |
+| [docs/diagrams/language-faq/off-delay-states.svg](diagrams/language-faq/off-delay-states.svg) | off-delay-states.svg | svg |
+| [docs/diagrams/language-faq/on-delay-states.puml](diagrams/language-faq/on-delay-states.puml) | on-delay-states.puml | puml |
+| [docs/diagrams/language-faq/on-delay-states.svg](diagrams/language-faq/on-delay-states.svg) | on-delay-states.svg | svg |
+| [docs/diagrams/language-faq/two-zone-sequence.puml](diagrams/language-faq/two-zone-sequence.puml) | two-zone-sequence.puml | puml |
+| [docs/diagrams/language-faq/two-zone-sequence.svg](diagrams/language-faq/two-zone-sequence.svg) | two-zone-sequence.svg | svg |
+
+## docs/diagrams/language-mvp-0-1/
+
+| Path | Title | Type |
+| --- | --- | --- |
+| [docs/diagrams/language-mvp-0-1/tick-steps.puml](diagrams/language-mvp-0-1/tick-steps.puml) | tick-steps.puml | puml |
+| [docs/diagrams/language-mvp-0-1/tick-steps.svg](diagrams/language-mvp-0-1/tick-steps.svg) | tick-steps.svg | svg |
+
+## docs/diagrams/language-reference/
+
+| Path | Title | Type |
+| --- | --- | --- |
+| [docs/diagrams/language-reference/reference-map.puml](diagrams/language-reference/reference-map.puml) | reference-map.puml | puml |
+| [docs/diagrams/language-reference/reference-map.svg](diagrams/language-reference/reference-map.svg) | reference-map.svg | svg |
+
+## docs/diagrams/language-surface/
+
+| Path | Title | Type |
+| --- | --- | --- |
+| [docs/diagrams/language-surface/tick-anatomy.puml](diagrams/language-surface/tick-anatomy.puml) | tick-anatomy.puml | puml |
+| [docs/diagrams/language-surface/tick-anatomy.svg](diagrams/language-surface/tick-anatomy.svg) | tick-anatomy.svg | svg |
+| [docs/diagrams/language-surface/timed-watering-phases.puml](diagrams/language-surface/timed-watering-phases.puml) | timed-watering-phases.puml | puml |
+| [docs/diagrams/language-surface/timed-watering-phases.svg](diagrams/language-surface/timed-watering-phases.svg) | timed-watering-phases.svg | svg |
+
+## docs/diagrams/lesson-bundle/
+
+| Path | Title | Type |
+| --- | --- | --- |
+| [docs/diagrams/lesson-bundle/bundle-structure.puml](diagrams/lesson-bundle/bundle-structure.puml) | bundle-structure.puml | puml |
+| [docs/diagrams/lesson-bundle/bundle-structure.svg](diagrams/lesson-bundle/bundle-structure.svg) | bundle-structure.svg | svg |
+
+## docs/diagrams/literate/
+
+| Path | Title | Type |
+| --- | --- | --- |
+| [docs/diagrams/literate/literate-pipeline.puml](diagrams/literate/literate-pipeline.puml) | literate-pipeline.puml | puml |
+| [docs/diagrams/literate/literate-pipeline.svg](diagrams/literate/literate-pipeline.svg) | literate-pipeline.svg | svg |
+
+## docs/diagrams/llm-authoring-workflow/
+
+| Path | Title | Type |
+| --- | --- | --- |
+| [docs/diagrams/llm-authoring-workflow/authoring-loop.puml](diagrams/llm-authoring-workflow/authoring-loop.puml) | authoring-loop.puml | puml |
+| [docs/diagrams/llm-authoring-workflow/authoring-loop.svg](diagrams/llm-authoring-workflow/authoring-loop.svg) | authoring-loop.svg | svg |
+
+## docs/diagrams/llm-toolchain-architecture/
+
+| Path | Title | Type |
+| --- | --- | --- |
+| [docs/diagrams/llm-toolchain-architecture/evidence-stages.puml](diagrams/llm-toolchain-architecture/evidence-stages.puml) | evidence-stages.puml | puml |
+| [docs/diagrams/llm-toolchain-architecture/evidence-stages.svg](diagrams/llm-toolchain-architecture/evidence-stages.svg) | evidence-stages.svg | svg |
+
+## docs/diagrams/observation-event-history/
+
+| Path | Title | Type |
+| --- | --- | --- |
+| [docs/diagrams/observation-event-history/publish-and-read.puml](diagrams/observation-event-history/publish-and-read.puml) | publish-and-read.puml | puml |
+| [docs/diagrams/observation-event-history/publish-and-read.svg](diagrams/observation-event-history/publish-and-read.svg) | publish-and-read.svg | svg |
+
+## docs/diagrams/operator-settings-stream/
+
+| Path | Title | Type |
+| --- | --- | --- |
+| [docs/diagrams/operator-settings-stream/emission-admission.puml](diagrams/operator-settings-stream/emission-admission.puml) | emission-admission.puml | puml |
+| [docs/diagrams/operator-settings-stream/emission-admission.svg](diagrams/operator-settings-stream/emission-admission.svg) | emission-admission.svg | svg |
+
+## docs/diagrams/optimizer-pass-contract/
+
+| Path | Title | Type |
+| --- | --- | --- |
+| [docs/diagrams/optimizer-pass-contract/pass-pipeline.puml](diagrams/optimizer-pass-contract/pass-pipeline.puml) | pass-pipeline.puml | puml |
+| [docs/diagrams/optimizer-pass-contract/pass-pipeline.svg](diagrams/optimizer-pass-contract/pass-pipeline.svg) | pass-pipeline.svg | svg |
+
+## docs/diagrams/optional-feedback-timer/
+
+| Path | Title | Type |
+| --- | --- | --- |
+| [docs/diagrams/optional-feedback-timer/timer-timeline.puml](diagrams/optional-feedback-timer/timer-timeline.puml) | timer-timeline.puml | puml |
+| [docs/diagrams/optional-feedback-timer/timer-timeline.svg](diagrams/optional-feedback-timer/timer-timeline.svg) | timer-timeline.svg | svg |
+
+## docs/diagrams/pc-02-start-stop/
+
+| Path | Title | Type |
+| --- | --- | --- |
+| [docs/diagrams/pc-02-start-stop/start-stop-states.puml](diagrams/pc-02-start-stop/start-stop-states.puml) | start-stop-states.puml | puml |
+| [docs/diagrams/pc-02-start-stop/start-stop-states.svg](diagrams/pc-02-start-stop/start-stop-states.svg) | start-stop-states.svg | svg |
+
+## docs/diagrams/pc-04-direction-interlock/
+
+| Path | Title | Type |
+| --- | --- | --- |
+| [docs/diagrams/pc-04-direction-interlock/phase-states.puml](diagrams/pc-04-direction-interlock/phase-states.puml) | phase-states.puml | puml |
+| [docs/diagrams/pc-04-direction-interlock/phase-states.svg](diagrams/pc-04-direction-interlock/phase-states.svg) | phase-states.svg | svg |
+
+## docs/diagrams/pc-05-limit-feedback/
+
+| Path | Title | Type |
+| --- | --- | --- |
+| [docs/diagrams/pc-05-limit-feedback/phase-states.puml](diagrams/pc-05-limit-feedback/phase-states.puml) | phase-states.puml | puml |
+| [docs/diagrams/pc-05-limit-feedback/phase-states.svg](diagrams/pc-05-limit-feedback/phase-states.svg) | phase-states.svg | svg |
+
+## docs/diagrams/pc-06-timer-patterns/
+
+| Path | Title | Type |
+| --- | --- | --- |
+| [docs/diagrams/pc-06-timer-patterns/channel-timeline.puml](diagrams/pc-06-timer-patterns/channel-timeline.puml) | channel-timeline.puml | puml |
+| [docs/diagrams/pc-06-timer-patterns/channel-timeline.svg](diagrams/pc-06-timer-patterns/channel-timeline.svg) | channel-timeline.svg | svg |
+
+## docs/diagrams/pc-07-tank-hysteresis/
+
+| Path | Title | Type |
+| --- | --- | --- |
+| [docs/diagrams/pc-07-tank-hysteresis/phase-states.puml](diagrams/pc-07-tank-hysteresis/phase-states.puml) | phase-states.puml | puml |
+| [docs/diagrams/pc-07-tank-hysteresis/phase-states.svg](diagrams/pc-07-tank-hysteresis/phase-states.svg) | phase-states.svg | svg |
+
+## docs/diagrams/pc-08-manual-auto/
+
+| Path | Title | Type |
+| --- | --- | --- |
+| [docs/diagrams/pc-08-manual-auto/auto-rearm-timeline.puml](diagrams/pc-08-manual-auto/auto-rearm-timeline.puml) | auto-rearm-timeline.puml | puml |
+| [docs/diagrams/pc-08-manual-auto/auto-rearm-timeline.svg](diagrams/pc-08-manual-auto/auto-rearm-timeline.svg) | auto-rearm-timeline.svg | svg |
+
+## docs/diagrams/pc-09-sequential-water-supply/
+
+| Path | Title | Type |
+| --- | --- | --- |
+| [docs/diagrams/pc-09-sequential-water-supply/phase-states.puml](diagrams/pc-09-sequential-water-supply/phase-states.puml) | phase-states.puml | puml |
+| [docs/diagrams/pc-09-sequential-water-supply/phase-states.svg](diagrams/pc-09-sequential-water-supply/phase-states.svg) | phase-states.svg | svg |
+
+## docs/diagrams/pc-10-fault-alarm-reset/
+
+| Path | Title | Type |
+| --- | --- | --- |
+| [docs/diagrams/pc-10-fault-alarm-reset/phase-states.puml](diagrams/pc-10-fault-alarm-reset/phase-states.puml) | phase-states.puml | puml |
+| [docs/diagrams/pc-10-fault-alarm-reset/phase-states.svg](diagrams/pc-10-fault-alarm-reset/phase-states.svg) | phase-states.svg | svg |
+
+## docs/diagrams/plans-2026-09-28-semantic-kernel/
+
+| Path | Title | Type |
+| --- | --- | --- |
+| [docs/diagrams/plans-2026-09-28-semantic-kernel/dependency-order.puml](diagrams/plans-2026-09-28-semantic-kernel/dependency-order.puml) | dependency-order.puml | puml |
+| [docs/diagrams/plans-2026-09-28-semantic-kernel/dependency-order.svg](diagrams/plans-2026-09-28-semantic-kernel/dependency-order.svg) | dependency-order.svg | svg |
+| [docs/diagrams/plans-2026-09-28-semantic-kernel/ir-boundary.puml](diagrams/plans-2026-09-28-semantic-kernel/ir-boundary.puml) | ir-boundary.puml | puml |
+| [docs/diagrams/plans-2026-09-28-semantic-kernel/ir-boundary.svg](diagrams/plans-2026-09-28-semantic-kernel/ir-boundary.svg) | ir-boundary.svg | svg |
+| [docs/diagrams/plans-2026-09-28-semantic-kernel/scan-commit.puml](diagrams/plans-2026-09-28-semantic-kernel/scan-commit.puml) | scan-commit.puml | puml |
+| [docs/diagrams/plans-2026-09-28-semantic-kernel/scan-commit.svg](diagrams/plans-2026-09-28-semantic-kernel/scan-commit.svg) | scan-commit.svg | svg |
+
+## docs/diagrams/plans-2026-10-14-lifecycle-range-integration/
+
+| Path | Title | Type |
+| --- | --- | --- |
+| [docs/diagrams/plans-2026-10-14-lifecycle-range-integration/boot-event.puml](diagrams/plans-2026-10-14-lifecycle-range-integration/boot-event.puml) | boot-event.puml | puml |
+| [docs/diagrams/plans-2026-10-14-lifecycle-range-integration/boot-event.svg](diagrams/plans-2026-10-14-lifecycle-range-integration/boot-event.svg) | boot-event.svg | svg |
+| [docs/diagrams/plans-2026-10-14-lifecycle-range-integration/envelope-allocation.puml](diagrams/plans-2026-10-14-lifecycle-range-integration/envelope-allocation.puml) | envelope-allocation.puml | puml |
+| [docs/diagrams/plans-2026-10-14-lifecycle-range-integration/envelope-allocation.svg](diagrams/plans-2026-10-14-lifecycle-range-integration/envelope-allocation.svg) | envelope-allocation.svg | svg |
+
+## docs/diagrams/portable-package/
+
+| Path | Title | Type |
+| --- | --- | --- |
+| [docs/diagrams/portable-package/key-rotation.puml](diagrams/portable-package/key-rotation.puml) | key-rotation.puml | puml |
+| [docs/diagrams/portable-package/key-rotation.svg](diagrams/portable-package/key-rotation.svg) | key-rotation.svg | svg |
+| [docs/diagrams/portable-package/verification-order.puml](diagrams/portable-package/verification-order.puml) | verification-order.puml | puml |
+| [docs/diagrams/portable-package/verification-order.svg](diagrams/portable-package/verification-order.svg) | verification-order.svg | svg |
+
+## docs/diagrams/profile-front-matter/
+
+| Path | Title | Type |
+| --- | --- | --- |
+| [docs/diagrams/profile-front-matter/responsibility-flow.puml](diagrams/profile-front-matter/responsibility-flow.puml) | responsibility-flow.puml | puml |
+| [docs/diagrams/profile-front-matter/responsibility-flow.svg](diagrams/profile-front-matter/responsibility-flow.svg) | responsibility-flow.svg | svg |
+
+## docs/diagrams/program-replacement-host/
+
+| Path | Title | Type |
+| --- | --- | --- |
+| [docs/diagrams/program-replacement-host/replace-transaction.puml](diagrams/program-replacement-host/replace-transaction.puml) | replace-transaction.puml | puml |
+| [docs/diagrams/program-replacement-host/replace-transaction.svg](diagrams/program-replacement-host/replace-transaction.svg) | replace-transaction.svg | svg |
+
+## docs/diagrams/programming-in-ghostflow/
+
+| Path | Title | Type |
+| --- | --- | --- |
+| [docs/diagrams/programming-in-ghostflow/p1-signal-boundaries.puml](diagrams/programming-in-ghostflow/p1-signal-boundaries.puml) | p1-signal-boundaries.puml | puml |
+| [docs/diagrams/programming-in-ghostflow/p1-signal-boundaries.svg](diagrams/programming-in-ghostflow/p1-signal-boundaries.svg) | p1-signal-boundaries.svg | svg |
+| [docs/diagrams/programming-in-ghostflow/p1-switch-lamp-timeline.puml](diagrams/programming-in-ghostflow/p1-switch-lamp-timeline.puml) | p1-switch-lamp-timeline.puml | puml |
+| [docs/diagrams/programming-in-ghostflow/p1-switch-lamp-timeline.svg](diagrams/programming-in-ghostflow/p1-switch-lamp-timeline.svg) | p1-switch-lamp-timeline.svg | svg |
+| [docs/diagrams/programming-in-ghostflow/p1-tick-cycle.puml](diagrams/programming-in-ghostflow/p1-tick-cycle.puml) | p1-tick-cycle.puml | puml |
+| [docs/diagrams/programming-in-ghostflow/p1-tick-cycle.svg](diagrams/programming-in-ghostflow/p1-tick-cycle.svg) | p1-tick-cycle.svg | svg |
+| [docs/diagrams/programming-in-ghostflow/p2-e03-latch-states.puml](diagrams/programming-in-ghostflow/p2-e03-latch-states.puml) | p2-e03-latch-states.puml | puml |
+| [docs/diagrams/programming-in-ghostflow/p2-e03-latch-states.svg](diagrams/programming-in-ghostflow/p2-e03-latch-states.svg) | p2-e03-latch-states.svg | svg |
+| [docs/diagrams/programming-in-ghostflow/p2-e03-latch-timeline.puml](diagrams/programming-in-ghostflow/p2-e03-latch-timeline.puml) | p2-e03-latch-timeline.puml | puml |
+| [docs/diagrams/programming-in-ghostflow/p2-e03-latch-timeline.svg](diagrams/programming-in-ghostflow/p2-e03-latch-timeline.svg) | p2-e03-latch-timeline.svg | svg |
+| [docs/diagrams/programming-in-ghostflow/p2-e04-swap.puml](diagrams/programming-in-ghostflow/p2-e04-swap.puml) | p2-e04-swap.puml | puml |
+| [docs/diagrams/programming-in-ghostflow/p2-e04-swap.svg](diagrams/programming-in-ghostflow/p2-e04-swap.svg) | p2-e04-swap.svg | svg |
+| [docs/diagrams/programming-in-ghostflow/p2-output-evidence.puml](diagrams/programming-in-ghostflow/p2-output-evidence.puml) | p2-output-evidence.puml | puml |
+| [docs/diagrams/programming-in-ghostflow/p2-output-evidence.svg](diagrams/programming-in-ghostflow/p2-output-evidence.svg) | p2-output-evidence.svg | svg |
+| [docs/diagrams/programming-in-ghostflow/p3-e08-phase-states.puml](diagrams/programming-in-ghostflow/p3-e08-phase-states.puml) | p3-e08-phase-states.puml | puml |
+| [docs/diagrams/programming-in-ghostflow/p3-e08-phase-states.svg](diagrams/programming-in-ghostflow/p3-e08-phase-states.svg) | p3-e08-phase-states.svg | svg |
+| [docs/diagrams/programming-in-ghostflow/p3-e09-two-clocks.puml](diagrams/programming-in-ghostflow/p3-e09-two-clocks.puml) | p3-e09-two-clocks.puml | puml |
+| [docs/diagrams/programming-in-ghostflow/p3-e09-two-clocks.svg](diagrams/programming-in-ghostflow/p3-e09-two-clocks.svg) | p3-e09-two-clocks.svg | svg |
+| [docs/diagrams/programming-in-ghostflow/p3-e10-sensor-pipeline.puml](diagrams/programming-in-ghostflow/p3-e10-sensor-pipeline.puml) | p3-e10-sensor-pipeline.puml | puml |
+| [docs/diagrams/programming-in-ghostflow/p3-e10-sensor-pipeline.svg](diagrams/programming-in-ghostflow/p3-e10-sensor-pipeline.svg) | p3-e10-sensor-pipeline.svg | svg |
+| [docs/diagrams/programming-in-ghostflow/p4-e22-fanout.puml](diagrams/programming-in-ghostflow/p4-e22-fanout.puml) | p4-e22-fanout.puml | puml |
+| [docs/diagrams/programming-in-ghostflow/p4-e22-fanout.svg](diagrams/programming-in-ghostflow/p4-e22-fanout.svg) | p4-e22-fanout.svg | svg |
+| [docs/diagrams/programming-in-ghostflow/p4-hysteresis-band.puml](diagrams/programming-in-ghostflow/p4-hysteresis-band.puml) | p4-hysteresis-band.puml | puml |
+| [docs/diagrams/programming-in-ghostflow/p4-hysteresis-band.svg](diagrams/programming-in-ghostflow/p4-hysteresis-band.svg) | p4-hysteresis-band.svg | svg |
+| [docs/diagrams/programming-in-ghostflow/p4-literate-extraction.puml](diagrams/programming-in-ghostflow/p4-literate-extraction.puml) | p4-literate-extraction.puml | puml |
+| [docs/diagrams/programming-in-ghostflow/p4-literate-extraction.svg](diagrams/programming-in-ghostflow/p4-literate-extraction.svg) | p4-literate-extraction.svg | svg |
+| [docs/diagrams/programming-in-ghostflow/p4-temperature-units.puml](diagrams/programming-in-ghostflow/p4-temperature-units.puml) | p4-temperature-units.puml | puml |
+| [docs/diagrams/programming-in-ghostflow/p4-temperature-units.svg](diagrams/programming-in-ghostflow/p4-temperature-units.svg) | p4-temperature-units.svg | svg |
+| [docs/diagrams/programming-in-ghostflow/p4-vpd-control-flow.puml](diagrams/programming-in-ghostflow/p4-vpd-control-flow.puml) | p4-vpd-control-flow.puml | puml |
+| [docs/diagrams/programming-in-ghostflow/p4-vpd-control-flow.svg](diagrams/programming-in-ghostflow/p4-vpd-control-flow.svg) | p4-vpd-control-flow.svg | svg |
+| [docs/diagrams/programming-in-ghostflow/p5-error-learning.puml](diagrams/programming-in-ghostflow/p5-error-learning.puml) | p5-error-learning.puml | puml |
+| [docs/diagrams/programming-in-ghostflow/p5-error-learning.svg](diagrams/programming-in-ghostflow/p5-error-learning.svg) | p5-error-learning.svg | svg |
+| [docs/diagrams/programming-in-ghostflow/p5-quantity-types.puml](diagrams/programming-in-ghostflow/p5-quantity-types.puml) | p5-quantity-types.puml | puml |
+| [docs/diagrams/programming-in-ghostflow/p5-quantity-types.svg](diagrams/programming-in-ghostflow/p5-quantity-types.svg) | p5-quantity-types.svg | svg |
+| [docs/diagrams/programming-in-ghostflow/p5-tide-admission.puml](diagrams/programming-in-ghostflow/p5-tide-admission.puml) | p5-tide-admission.puml | puml |
+| [docs/diagrams/programming-in-ghostflow/p5-tide-admission.svg](diagrams/programming-in-ghostflow/p5-tide-admission.svg) | p5-tide-admission.svg | svg |
+
+## docs/diagrams/readme/
+
+| Path | Title | Type |
+| --- | --- | --- |
+| [docs/diagrams/readme/how-it-works.puml](diagrams/readme/how-it-works.puml) | how-it-works.puml | puml |
+| [docs/diagrams/readme/how-it-works.svg](diagrams/readme/how-it-works.svg) | how-it-works.svg | svg |
+
+## docs/diagrams/reference-01-source-and-syntax/
+
+| Path | Title | Type |
+| --- | --- | --- |
+| [docs/diagrams/reference-01-source-and-syntax/anchor-link.puml](diagrams/reference-01-source-and-syntax/anchor-link.puml) | anchor-link.puml | puml |
+| [docs/diagrams/reference-01-source-and-syntax/anchor-link.svg](diagrams/reference-01-source-and-syntax/anchor-link.svg) | anchor-link.svg | svg |
+| [docs/diagrams/reference-01-source-and-syntax/extraction.puml](diagrams/reference-01-source-and-syntax/extraction.puml) | extraction.puml | puml |
+| [docs/diagrams/reference-01-source-and-syntax/extraction.svg](diagrams/reference-01-source-and-syntax/extraction.svg) | extraction.svg | svg |
+
+## docs/diagrams/reference-02-types-expressions-state/
+
+| Path | Title | Type |
+| --- | --- | --- |
+| [docs/diagrams/reference-02-types-expressions-state/quantity-operations.puml](diagrams/reference-02-types-expressions-state/quantity-operations.puml) | quantity-operations.puml | puml |
+| [docs/diagrams/reference-02-types-expressions-state/quantity-operations.svg](diagrams/reference-02-types-expressions-state/quantity-operations.svg) | quantity-operations.svg | svg |
+| [docs/diagrams/reference-02-types-expressions-state/result-flow.puml](diagrams/reference-02-types-expressions-state/result-flow.puml) | result-flow.puml | puml |
+| [docs/diagrams/reference-02-types-expressions-state/result-flow.svg](diagrams/reference-02-types-expressions-state/result-flow.svg) | result-flow.svg | svg |
+| [docs/diagrams/reference-02-types-expressions-state/tick-cycle.puml](diagrams/reference-02-types-expressions-state/tick-cycle.puml) | tick-cycle.puml | puml |
+| [docs/diagrams/reference-02-types-expressions-state/tick-cycle.svg](diagrams/reference-02-types-expressions-state/tick-cycle.svg) | tick-cycle.svg | svg |
+
+## docs/diagrams/reference-03-time-and-schedules/
+
+| Path | Title | Type |
+| --- | --- | --- |
+| [docs/diagrams/reference-03-time-and-schedules/continuous-true-timeline.puml](diagrams/reference-03-time-and-schedules/continuous-true-timeline.puml) | continuous-true-timeline.puml | puml |
+| [docs/diagrams/reference-03-time-and-schedules/continuous-true-timeline.svg](diagrams/reference-03-time-and-schedules/continuous-true-timeline.svg) | continuous-true-timeline.svg | svg |
+| [docs/diagrams/reference-03-time-and-schedules/range-late-admission.puml](diagrams/reference-03-time-and-schedules/range-late-admission.puml) | range-late-admission.puml | puml |
+| [docs/diagrams/reference-03-time-and-schedules/range-late-admission.svg](diagrams/reference-03-time-and-schedules/range-late-admission.svg) | range-late-admission.svg | svg |
+| [docs/diagrams/reference-03-time-and-schedules/schedule-evaluation.puml](diagrams/reference-03-time-and-schedules/schedule-evaluation.puml) | schedule-evaluation.puml | puml |
+| [docs/diagrams/reference-03-time-and-schedules/schedule-evaluation.svg](diagrams/reference-03-time-and-schedules/schedule-evaluation.svg) | schedule-evaluation.svg | svg |
+
+## docs/diagrams/reference-04-sensors-constraints-control/
+
+| Path | Title | Type |
+| --- | --- | --- |
+| [docs/diagrams/reference-04-sensors-constraints-control/bool-constraint-fixpoint.puml](diagrams/reference-04-sensors-constraints-control/bool-constraint-fixpoint.puml) | bool-constraint-fixpoint.puml | puml |
+| [docs/diagrams/reference-04-sensors-constraints-control/bool-constraint-fixpoint.svg](diagrams/reference-04-sensors-constraints-control/bool-constraint-fixpoint.svg) | bool-constraint-fixpoint.svg | svg |
+| [docs/diagrams/reference-04-sensors-constraints-control/input-quality-pipeline.puml](diagrams/reference-04-sensors-constraints-control/input-quality-pipeline.puml) | input-quality-pipeline.puml | puml |
+| [docs/diagrams/reference-04-sensors-constraints-control/input-quality-pipeline.svg](diagrams/reference-04-sensors-constraints-control/input-quality-pipeline.svg) | input-quality-pipeline.svg | svg |
+| [docs/diagrams/reference-04-sensors-constraints-control/output-stages.puml](diagrams/reference-04-sensors-constraints-control/output-stages.puml) | output-stages.puml | puml |
+| [docs/diagrams/reference-04-sensors-constraints-control/output-stages.svg](diagrams/reference-04-sensors-constraints-control/output-stages.svg) | output-stages.svg | svg |
+| [docs/diagrams/reference-04-sensors-constraints-control/percent-arbitration.puml](diagrams/reference-04-sensors-constraints-control/percent-arbitration.puml) | percent-arbitration.puml | puml |
+| [docs/diagrams/reference-04-sensors-constraints-control/percent-arbitration.svg](diagrams/reference-04-sensors-constraints-control/percent-arbitration.svg) | percent-arbitration.svg | svg |
+| [docs/diagrams/reference-04-sensors-constraints-control/pid-objective-loop.puml](diagrams/reference-04-sensors-constraints-control/pid-objective-loop.puml) | pid-objective-loop.puml | puml |
+| [docs/diagrams/reference-04-sensors-constraints-control/pid-objective-loop.svg](diagrams/reference-04-sensors-constraints-control/pid-objective-loop.svg) | pid-objective-loop.svg | svg |
+
+## docs/diagrams/reference-05-settings-and-observation/
+
+| Path | Title | Type |
+| --- | --- | --- |
+| [docs/diagrams/reference-05-settings-and-observation/atomic-live-event.puml](diagrams/reference-05-settings-and-observation/atomic-live-event.puml) | atomic-live-event.puml | puml |
+| [docs/diagrams/reference-05-settings-and-observation/atomic-live-event.svg](diagrams/reference-05-settings-and-observation/atomic-live-event.svg) | atomic-live-event.svg | svg |
+| [docs/diagrams/reference-05-settings-and-observation/temporary-overlay.puml](diagrams/reference-05-settings-and-observation/temporary-overlay.puml) | temporary-overlay.puml | puml |
+| [docs/diagrams/reference-05-settings-and-observation/temporary-overlay.svg](diagrams/reference-05-settings-and-observation/temporary-overlay.svg) | temporary-overlay.svg | svg |
+
+## docs/diagrams/reference-06-composition-and-replay/
+
+| Path | Title | Type |
+| --- | --- | --- |
+| [docs/diagrams/reference-06-composition-and-replay/farm-composition.puml](diagrams/reference-06-composition-and-replay/farm-composition.puml) | farm-composition.puml | puml |
+| [docs/diagrams/reference-06-composition-and-replay/farm-composition.svg](diagrams/reference-06-composition-and-replay/farm-composition.svg) | farm-composition.svg | svg |
+| [docs/diagrams/reference-06-composition-and-replay/hot-replacement.puml](diagrams/reference-06-composition-and-replay/hot-replacement.puml) | hot-replacement.puml | puml |
+| [docs/diagrams/reference-06-composition-and-replay/hot-replacement.svg](diagrams/reference-06-composition-and-replay/hot-replacement.svg) | hot-replacement.svg | svg |
+| [docs/diagrams/reference-06-composition-and-replay/replay-branch.puml](diagrams/reference-06-composition-and-replay/replay-branch.puml) | replay-branch.puml | puml |
+| [docs/diagrams/reference-06-composition-and-replay/replay-branch.svg](diagrams/reference-06-composition-and-replay/replay-branch.svg) | replay-branch.svg | svg |
+
+## docs/diagrams/reference-07-semantic-rules-and-index/
+
+| Path | Title | Type |
+| --- | --- | --- |
+| [docs/diagrams/reference-07-semantic-rules-and-index/failure-classes.puml](diagrams/reference-07-semantic-rules-and-index/failure-classes.puml) | failure-classes.puml | puml |
+| [docs/diagrams/reference-07-semantic-rules-and-index/failure-classes.svg](diagrams/reference-07-semantic-rules-and-index/failure-classes.svg) | failure-classes.svg | svg |
+
+## docs/diagrams/reference-08-language-runtime-and-device-boundaries/
+
+| Path | Title | Type |
+| --- | --- | --- |
+| [docs/diagrams/reference-08-language-runtime-and-device-boundaries/layer-boundaries.puml](diagrams/reference-08-language-runtime-and-device-boundaries/layer-boundaries.puml) | layer-boundaries.puml | puml |
+| [docs/diagrams/reference-08-language-runtime-and-device-boundaries/layer-boundaries.svg](diagrams/reference-08-language-runtime-and-device-boundaries/layer-boundaries.svg) | layer-boundaries.svg | svg |
+| [docs/diagrams/reference-08-language-runtime-and-device-boundaries/output-facts.puml](diagrams/reference-08-language-runtime-and-device-boundaries/output-facts.puml) | output-facts.puml | puml |
+| [docs/diagrams/reference-08-language-runtime-and-device-boundaries/output-facts.svg](diagrams/reference-08-language-runtime-and-device-boundaries/output-facts.svg) | output-facts.svg | svg |
+
+## docs/diagrams/reference-compliance-plan/
+
+| Path | Title | Type |
+| --- | --- | --- |
+| [docs/diagrams/reference-compliance-plan/phase-roadmap.puml](diagrams/reference-compliance-plan/phase-roadmap.puml) | phase-roadmap.puml | puml |
+| [docs/diagrams/reference-compliance-plan/phase-roadmap.svg](diagrams/reference-compliance-plan/phase-roadmap.svg) | phase-roadmap.svg | svg |
+
+## docs/diagrams/reference-query/
+
+| Path | Title | Type |
+| --- | --- | --- |
+| [docs/diagrams/reference-query/lookup-flow.puml](diagrams/reference-query/lookup-flow.puml) | lookup-flow.puml | puml |
+| [docs/diagrams/reference-query/lookup-flow.svg](diagrams/reference-query/lookup-flow.svg) | lookup-flow.svg | svg |
+
+## docs/diagrams/requirements-readme/
+
+| Path | Title | Type |
+| --- | --- | --- |
+| [docs/diagrams/requirements-readme/catalog-relation.puml](diagrams/requirements-readme/catalog-relation.puml) | catalog-relation.puml | puml |
+| [docs/diagrams/requirements-readme/catalog-relation.svg](diagrams/requirements-readme/catalog-relation.svg) | catalog-relation.svg | svg |
+
+## docs/diagrams/result-provenance-design/
+
+| Path | Title | Type |
+| --- | --- | --- |
+| [docs/diagrams/result-provenance-design/result-trace-flow.puml](diagrams/result-provenance-design/result-trace-flow.puml) | result-trace-flow.puml | puml |
+| [docs/diagrams/result-provenance-design/result-trace-flow.svg](diagrams/result-provenance-design/result-trace-flow.svg) | result-trace-flow.svg | svg |
+
+## docs/diagrams/rolling-budget-explanation/
+
+| Path | Title | Type |
+| --- | --- | --- |
+| [docs/diagrams/rolling-budget-explanation/release-example.puml](diagrams/rolling-budget-explanation/release-example.puml) | release-example.puml | puml |
+| [docs/diagrams/rolling-budget-explanation/release-example.svg](diagrams/rolling-budget-explanation/release-example.svg) | release-example.svg | svg |
+
+## docs/diagrams/rs485-current-relay/
+
+| Path | Title | Type |
+| --- | --- | --- |
+| [docs/diagrams/rs485-current-relay/bus.puml](diagrams/rs485-current-relay/bus.puml) | bus.puml | puml |
+| [docs/diagrams/rs485-current-relay/bus.svg](diagrams/rs485-current-relay/bus.svg) | bus.svg | svg |
+
+## docs/diagrams/scan-frame-wasm/
+
+| Path | Title | Type |
+| --- | --- | --- |
+| [docs/diagrams/scan-frame-wasm/framed-handle-lifecycle.puml](diagrams/scan-frame-wasm/framed-handle-lifecycle.puml) | framed-handle-lifecycle.puml | puml |
+| [docs/diagrams/scan-frame-wasm/framed-handle-lifecycle.svg](diagrams/scan-frame-wasm/framed-handle-lifecycle.svg) | framed-handle-lifecycle.svg | svg |
+
+## docs/diagrams/scan-tape-parity/
+
+| Path | Title | Type |
+| --- | --- | --- |
+| [docs/diagrams/scan-tape-parity/parity-flow.puml](diagrams/scan-tape-parity/parity-flow.puml) | parity-flow.puml | puml |
+| [docs/diagrams/scan-tape-parity/parity-flow.svg](diagrams/scan-tape-parity/parity-flow.svg) | parity-flow.svg | svg |
+
+## docs/diagrams/scenario-runner/
+
+| Path | Title | Type |
+| --- | --- | --- |
+| [docs/diagrams/scenario-runner/closed-loop-boundary.puml](diagrams/scenario-runner/closed-loop-boundary.puml) | closed-loop-boundary.puml | puml |
+| [docs/diagrams/scenario-runner/closed-loop-boundary.svg](diagrams/scenario-runner/closed-loop-boundary.svg) | closed-loop-boundary.svg | svg |
+| [docs/diagrams/scenario-runner/runner-paths.puml](diagrams/scenario-runner/runner-paths.puml) | runner-paths.puml | puml |
+| [docs/diagrams/scenario-runner/runner-paths.svg](diagrams/scenario-runner/runner-paths.svg) | runner-paths.svg | svg |
+
+## docs/diagrams/schedule-clock-design/
+
+| Path | Title | Type |
+| --- | --- | --- |
+| [docs/diagrams/schedule-clock-design/clock-gate-states.puml](diagrams/schedule-clock-design/clock-gate-states.puml) | clock-gate-states.puml | puml |
+| [docs/diagrams/schedule-clock-design/clock-gate-states.svg](diagrams/schedule-clock-design/clock-gate-states.svg) | clock-gate-states.svg | svg |
+
+## docs/diagrams/schedule-pulse-design/
+
+| Path | Title | Type |
+| --- | --- | --- |
+| [docs/diagrams/schedule-pulse-design/admission-boundary.puml](diagrams/schedule-pulse-design/admission-boundary.puml) | admission-boundary.puml | puml |
+| [docs/diagrams/schedule-pulse-design/admission-boundary.svg](diagrams/schedule-pulse-design/admission-boundary.svg) | admission-boundary.svg | svg |
+| [docs/diagrams/schedule-pulse-design/admission-flow.puml](diagrams/schedule-pulse-design/admission-flow.puml) | admission-flow.puml | puml |
+| [docs/diagrams/schedule-pulse-design/admission-flow.svg](diagrams/schedule-pulse-design/admission-flow.svg) | admission-flow.svg | svg |
+
+## docs/diagrams/schedule-wire-design/
+
+| Path | Title | Type |
+| --- | --- | --- |
+| [docs/diagrams/schedule-wire-design/tick-transaction.puml](diagrams/schedule-wire-design/tick-transaction.puml) | tick-transaction.puml | puml |
+| [docs/diagrams/schedule-wire-design/tick-transaction.svg](diagrams/schedule-wire-design/tick-transaction.svg) | tick-transaction.svg | svg |
+
+## docs/diagrams/scheduled-watering/
+
+| Path | Title | Type |
+| --- | --- | --- |
+| [docs/diagrams/scheduled-watering/phases.puml](diagrams/scheduled-watering/phases.puml) | phases.puml | puml |
+| [docs/diagrams/scheduled-watering/phases.svg](diagrams/scheduled-watering/phases.svg) | phases.svg | svg |
+
+## docs/diagrams/sensor-atomicity-design/
+
+| Path | Title | Type |
+| --- | --- | --- |
+| [docs/diagrams/sensor-atomicity-design/scan-transaction.puml](diagrams/sensor-atomicity-design/scan-transaction.puml) | scan-transaction.puml | puml |
+| [docs/diagrams/sensor-atomicity-design/scan-transaction.svg](diagrams/sensor-atomicity-design/scan-transaction.svg) | scan-transaction.svg | svg |
+
+## docs/diagrams/shared-constraint-contract/
+
+| Path | Title | Type |
+| --- | --- | --- |
+| [docs/diagrams/shared-constraint-contract/validation-flow.puml](diagrams/shared-constraint-contract/validation-flow.puml) | validation-flow.puml | puml |
+| [docs/diagrams/shared-constraint-contract/validation-flow.svg](diagrams/shared-constraint-contract/validation-flow.svg) | validation-flow.svg | svg |
+
+## docs/diagrams/solar-config-execution/
+
+| Path | Title | Type |
+| --- | --- | --- |
+| [docs/diagrams/solar-config-execution/config-fault-recovery.puml](diagrams/solar-config-execution/config-fault-recovery.puml) | config-fault-recovery.puml | puml |
+| [docs/diagrams/solar-config-execution/config-fault-recovery.svg](diagrams/solar-config-execution/config-fault-recovery.svg) | config-fault-recovery.svg | svg |
+
+## docs/diagrams/solar-native-admission-integration/
+
+| Path | Title | Type |
+| --- | --- | --- |
+| [docs/diagrams/solar-native-admission-integration/persist-before-on.puml](diagrams/solar-native-admission-integration/persist-before-on.puml) | persist-before-on.puml | puml |
+| [docs/diagrams/solar-native-admission-integration/persist-before-on.svg](diagrams/solar-native-admission-integration/persist-before-on.svg) | persist-before-on.svg | svg |
+
+## docs/diagrams/solar-schedule/
+
+| Path | Title | Type |
+| --- | --- | --- |
+| [docs/diagrams/solar-schedule/poll-decision.puml](diagrams/solar-schedule/poll-decision.puml) | poll-decision.puml | puml |
+| [docs/diagrams/solar-schedule/poll-decision.svg](diagrams/solar-schedule/poll-decision.svg) | poll-decision.svg | svg |
+
+## docs/diagrams/source-map/
+
+| Path | Title | Type |
+| --- | --- | --- |
+| [docs/diagrams/source-map/source-map-flow.puml](diagrams/source-map/source-map-flow.puml) | source-map-flow.puml | puml |
+| [docs/diagrams/source-map/source-map-flow.svg](diagrams/source-map/source-map-flow.svg) | source-map-flow.svg | svg |
+
+## docs/diagrams/source-safety-trace/
+
+| Path | Title | Type |
+| --- | --- | --- |
+| [docs/diagrams/source-safety-trace/observation-joins.puml](diagrams/source-safety-trace/observation-joins.puml) | observation-joins.puml | puml |
+| [docs/diagrams/source-safety-trace/observation-joins.svg](diagrams/source-safety-trace/observation-joins.svg) | observation-joins.svg | svg |
+| [docs/diagrams/source-safety-trace/safety-snapshots.puml](diagrams/source-safety-trace/safety-snapshots.puml) | safety-snapshots.puml | puml |
+| [docs/diagrams/source-safety-trace/safety-snapshots.svg](diagrams/source-safety-trace/safety-snapshots.svg) | safety-snapshots.svg | svg |
+
+## docs/diagrams/target-query/
+
+| Path | Title | Type |
+| --- | --- | --- |
+| [docs/diagrams/target-query/channel-availability.puml](diagrams/target-query/channel-availability.puml) | channel-availability.puml | puml |
+| [docs/diagrams/target-query/channel-availability.svg](diagrams/target-query/channel-availability.svg) | channel-availability.svg | svg |
+
+## docs/diagrams/tasks-plan/
+
+| Path | Title | Type |
+| --- | --- | --- |
+| [docs/diagrams/tasks-plan/research-waves.puml](diagrams/tasks-plan/research-waves.puml) | research-waves.puml | puml |
+| [docs/diagrams/tasks-plan/research-waves.svg](diagrams/tasks-plan/research-waves.svg) | research-waves.svg | svg |
+
+## docs/diagrams/temporal-adapter-replay-design/
+
+| Path | Title | Type |
+| --- | --- | --- |
+| [docs/diagrams/temporal-adapter-replay-design/ghost-replay.puml](diagrams/temporal-adapter-replay-design/ghost-replay.puml) | ghost-replay.puml | puml |
+| [docs/diagrams/temporal-adapter-replay-design/ghost-replay.svg](diagrams/temporal-adapter-replay-design/ghost-replay.svg) | ghost-replay.svg | svg |
+
+## docs/diagrams/temporal-layout-evidence/
+
+| Path | Title | Type |
+| --- | --- | --- |
+| [docs/diagrams/temporal-layout-evidence/probe-pipeline.puml](diagrams/temporal-layout-evidence/probe-pipeline.puml) | probe-pipeline.puml | puml |
+| [docs/diagrams/temporal-layout-evidence/probe-pipeline.svg](diagrams/temporal-layout-evidence/probe-pipeline.svg) | probe-pipeline.svg | svg |
+
+## docs/diagrams/temporal-replay/
+
+| Path | Title | Type |
+| --- | --- | --- |
+| [docs/diagrams/temporal-replay/live-and-ghost.puml](diagrams/temporal-replay/live-and-ghost.puml) | live-and-ghost.puml | puml |
+| [docs/diagrams/temporal-replay/live-and-ghost.svg](diagrams/temporal-replay/live-and-ghost.svg) | live-and-ghost.svg | svg |
+
+## docs/diagrams/temporal-resource-plan-design/
+
+| Path | Title | Type |
+| --- | --- | --- |
+| [docs/diagrams/temporal-resource-plan-design/shared-plan.puml](diagrams/temporal-resource-plan-design/shared-plan.puml) | shared-plan.puml | puml |
+| [docs/diagrams/temporal-resource-plan-design/shared-plan.svg](diagrams/temporal-resource-plan-design/shared-plan.svg) | shared-plan.svg | svg |
+
+## docs/diagrams/temporary-settings-host/
+
+| Path | Title | Type |
+| --- | --- | --- |
+| [docs/diagrams/temporary-settings-host/overlay-lifecycle.puml](diagrams/temporary-settings-host/overlay-lifecycle.puml) | overlay-lifecycle.puml | puml |
+| [docs/diagrams/temporary-settings-host/overlay-lifecycle.svg](diagrams/temporary-settings-host/overlay-lifecycle.svg) | overlay-lifecycle.svg | svg |
+
+## docs/diagrams/tests-reference-readme/
+
+| Path | Title | Type |
+| --- | --- | --- |
+| [docs/diagrams/tests-reference-readme/case-status.puml](diagrams/tests-reference-readme/case-status.puml) | case-status.puml | puml |
+| [docs/diagrams/tests-reference-readme/case-status.svg](diagrams/tests-reference-readme/case-status.svg) | case-status.svg | svg |
+
+## docs/diagrams/time-and-schedule-contract/
+
+| Path | Title | Type |
+| --- | --- | --- |
+| [docs/diagrams/time-and-schedule-contract/daily-responsibility.puml](diagrams/time-and-schedule-contract/daily-responsibility.puml) | daily-responsibility.puml | puml |
+| [docs/diagrams/time-and-schedule-contract/daily-responsibility.svg](diagrams/time-and-schedule-contract/daily-responsibility.svg) | daily-responsibility.svg | svg |
+| [docs/diagrams/time-and-schedule-contract/late-start-intervals.puml](diagrams/time-and-schedule-contract/late-start-intervals.puml) | late-start-intervals.puml | puml |
+| [docs/diagrams/time-and-schedule-contract/late-start-intervals.svg](diagrams/time-and-schedule-contract/late-start-intervals.svg) | late-start-intervals.svg | svg |
+| [docs/diagrams/time-and-schedule-contract/occurrence-lifecycle.puml](diagrams/time-and-schedule-contract/occurrence-lifecycle.puml) | occurrence-lifecycle.puml | puml |
+| [docs/diagrams/time-and-schedule-contract/occurrence-lifecycle.svg](diagrams/time-and-schedule-contract/occurrence-lifecycle.svg) | occurrence-lifecycle.svg | svg |
+
+## docs/diagrams/true-for-driver-contract/
+
+| Path | Title | Type |
+| --- | --- | --- |
+| [docs/diagrams/true-for-driver-contract/coverage-states.puml](diagrams/true-for-driver-contract/coverage-states.puml) | coverage-states.puml | puml |
+| [docs/diagrams/true-for-driver-contract/coverage-states.svg](diagrams/true-for-driver-contract/coverage-states.svg) | coverage-states.svg | svg |
+| [docs/diagrams/true-for-driver-contract/vertical-status.puml](diagrams/true-for-driver-contract/vertical-status.puml) | vertical-status.puml | puml |
+| [docs/diagrams/true-for-driver-contract/vertical-status.svg](diagrams/true-for-driver-contract/vertical-status.svg) | vertical-status.svg | svg |
+
+## docs/diagrams/tutorial/
+
+| Path | Title | Type |
+| --- | --- | --- |
+| [docs/diagrams/tutorial/parity-flow.puml](diagrams/tutorial/parity-flow.puml) | parity-flow.puml | puml |
+| [docs/diagrams/tutorial/parity-flow.svg](diagrams/tutorial/parity-flow.svg) | parity-flow.svg | svg |
+
+## docs/diagrams/tutorial-01-latch/
+
+| Path | Title | Type |
+| --- | --- | --- |
+| [docs/diagrams/tutorial-01-latch/latch-fault-states.puml](diagrams/tutorial-01-latch/latch-fault-states.puml) | latch-fault-states.puml | puml |
+| [docs/diagrams/tutorial-01-latch/latch-fault-states.svg](diagrams/tutorial-01-latch/latch-fault-states.svg) | latch-fault-states.svg | svg |
+
+## docs/diagrams/tutorial-02-watering/
+
+| Path | Title | Type |
+| --- | --- | --- |
+| [docs/diagrams/tutorial-02-watering/watering-phases.puml](diagrams/tutorial-02-watering/watering-phases.puml) | watering-phases.puml | puml |
+| [docs/diagrams/tutorial-02-watering/watering-phases.svg](diagrams/tutorial-02-watering/watering-phases.svg) | watering-phases.svg | svg |
+
+## docs/diagrams/tutorial-03-moisture/
+
+| Path | Title | Type |
+| --- | --- | --- |
+| [docs/diagrams/tutorial-03-moisture/moisture-flow.puml](diagrams/tutorial-03-moisture/moisture-flow.puml) | moisture-flow.puml | puml |
+| [docs/diagrams/tutorial-03-moisture/moisture-flow.svg](diagrams/tutorial-03-moisture/moisture-flow.svg) | moisture-flow.svg | svg |
+
+## docs/diagrams/tutorial-04-extra-valves/
+
+| Path | Title | Type |
+| --- | --- | --- |
+| [docs/diagrams/tutorial-04-extra-valves/extra-valve-phases.puml](diagrams/tutorial-04-extra-valves/extra-valve-phases.puml) | extra-valve-phases.puml | puml |
+| [docs/diagrams/tutorial-04-extra-valves/extra-valve-phases.svg](diagrams/tutorial-04-extra-valves/extra-valve-phases.svg) | extra-valve-phases.svg | svg |
+
+## docs/diagrams/verification/
+
+| Path | Title | Type |
+| --- | --- | --- |
+| [docs/diagrams/verification/ci-routing.puml](diagrams/verification/ci-routing.puml) | ci-routing.puml | puml |
+| [docs/diagrams/verification/ci-routing.svg](diagrams/verification/ci-routing.svg) | ci-routing.svg | svg |
+| [docs/diagrams/verification/gate-sequence.puml](diagrams/verification/gate-sequence.puml) | gate-sequence.puml | puml |
+| [docs/diagrams/verification/gate-sequence.svg](diagrams/verification/gate-sequence.svg) | gate-sequence.svg | svg |
+
+## docs/diagrams/wasm-ci-artifacts/
+
+| Path | Title | Type |
+| --- | --- | --- |
+| [docs/diagrams/wasm-ci-artifacts/handoff-pipeline.puml](diagrams/wasm-ci-artifacts/handoff-pipeline.puml) | handoff-pipeline.puml | puml |
+| [docs/diagrams/wasm-ci-artifacts/handoff-pipeline.svg](diagrams/wasm-ci-artifacts/handoff-pipeline.svg) | handoff-pipeline.svg | svg |
+
+## docs/diagrams/wasm-readme/
+
+| Path | Title | Type |
+| --- | --- | --- |
+| [docs/diagrams/wasm-readme/runtime-layers.puml](diagrams/wasm-readme/runtime-layers.puml) | runtime-layers.puml | puml |
+| [docs/diagrams/wasm-readme/runtime-layers.svg](diagrams/wasm-readme/runtime-layers.svg) | runtime-layers.svg | svg |
+
+## docs/diagrams/what-if-replay/
+
+| Path | Title | Type |
+| --- | --- | --- |
+| [docs/diagrams/what-if-replay/branch-flow.puml](diagrams/what-if-replay/branch-flow.puml) | branch-flow.puml | puml |
+| [docs/diagrams/what-if-replay/branch-flow.svg](diagrams/what-if-replay/branch-flow.svg) | branch-flow.svg | svg |
+
+## docs/diagrams/window-derived-design/
+
+| Path | Title | Type |
+| --- | --- | --- |
+| [docs/diagrams/window-derived-design/nested-composition.puml](diagrams/window-derived-design/nested-composition.puml) | nested-composition.puml | puml |
+| [docs/diagrams/window-derived-design/nested-composition.svg](diagrams/window-derived-design/nested-composition.svg) | nested-composition.svg | svg |
+| [docs/diagrams/window-derived-design/scan-admission.puml](diagrams/window-derived-design/scan-admission.puml) | scan-admission.puml | puml |
+| [docs/diagrams/window-derived-design/scan-admission.svg](diagrams/window-derived-design/scan-admission.svg) | scan-admission.svg | svg |
+
+## docs/diagrams/window-evidence-design/
+
+| Path | Title | Type |
+| --- | --- | --- |
+| [docs/diagrams/window-evidence-design/milestones.puml](diagrams/window-evidence-design/milestones.puml) | milestones.puml | puml |
+| [docs/diagrams/window-evidence-design/milestones.svg](diagrams/window-evidence-design/milestones.svg) | milestones.svg | svg |
+
+## docs/diagrams/window-gfb4-design/
+
+| Path | Title | Type |
+| --- | --- | --- |
+| [docs/diagrams/window-gfb4-design/activation-flow.puml](diagrams/window-gfb4-design/activation-flow.puml) | activation-flow.puml | puml |
+| [docs/diagrams/window-gfb4-design/activation-flow.svg](diagrams/window-gfb4-design/activation-flow.svg) | activation-flow.svg | svg |
+| [docs/diagrams/window-gfb4-design/module-layout.puml](diagrams/window-gfb4-design/module-layout.puml) | module-layout.puml | puml |
+| [docs/diagrams/window-gfb4-design/module-layout.svg](diagrams/window-gfb4-design/module-layout.svg) | module-layout.svg | svg |
+| [docs/diagrams/window-gfb4-design/prelude-evaluation.puml](diagrams/window-gfb4-design/prelude-evaluation.puml) | prelude-evaluation.puml | puml |
+| [docs/diagrams/window-gfb4-design/prelude-evaluation.svg](diagrams/window-gfb4-design/prelude-evaluation.svg) | prelude-evaluation.svg | svg |
+
 ## docs/historical/
 
 | Path | Title | Type |
@@ -279,4 +1423,4 @@ For first and last recorded Git commit dates, run `node <skill>/scripts/docs-ind
 | [docs/research/GF-COMPOSE-R9-ACCEPTANCE.ko.md](research/GF-COMPOSE-R9-ACCEPTANCE.ko.md) | GF-COMPOSE R9: acceptance와 구현 인계 | md |
 | [docs/research/GF-COMPOSE-R9-ACCEPTANCE.md](research/GF-COMPOSE-R9-ACCEPTANCE.md) | GF-COMPOSE R9: acceptance and implementation handoff | md |
 
-240 documents.
+679 documents.

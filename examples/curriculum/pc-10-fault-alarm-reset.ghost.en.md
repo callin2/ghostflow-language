@@ -5,23 +5,36 @@
 # PC-10 — Sequential water supply with fault, alarm, and reset
 
 <!-- ghostflow:anchor id=GF-INT-PC10-FAULT-ALARM-RESET-V1 kind=intent status=confirmed origin=imported -->
-> Learning scenario: Open and confirm the valve before running the pump. A
-> normal STOP halts without fault. An emergency-stop observation, overload,
-> sensor conflict, lost feedback, unavailable drive, or movement timeout latches
-> its cause and stops safely. Low source water is a special case: only with the
-> valve confirmed open may the pump stop first and the valve then close.
+> Learning scenario: open the valve and confirm it before running the pump. A
+> normal STOP halts without a fault. An emergency-stop observation, overload,
+> sensor conflict, lost feedback, unavailable valve drive, or movement timeout
+> latches its cause and stops safely. Low source water is a special case: only
+> when the valve is confirmed open may the pump stop first and the valve then
+> close.
 
-The linked original is the sole canonical literate executable source for PC-10. PC-09
-[sequential valve/pump water supply](pc-09-sequential-water-supply.ghost.md)
-preserves the normal sequence and feedback; [PC-05 limit feedback](pc-05-limit-feedback.ghost.md)
-preserves valve-position observations. This lesson replaces neither. It adds
-timeout, fault-cause latching, alarm, and reset semantics.
+The linked Korean `.ghost.md` file is the only canonical, executable literate
+source for PC-10. Two earlier lessons stay as they are:
+[PC-09 sequential valve/pump water supply](pc-09-sequential-water-supply.ghost.en.md)
+keeps the normal sequence and feedback, and
+[PC-05 limit feedback](pc-05-limit-feedback.ghost.en.md) keeps the valve-position
+observations. This lesson replaces neither. It adds a timeout, latching of the
+fault cause, an alarm, and reset rules.
+
+Key terms used below:
+
+- **Latch** — remember a value (here, the first fault cause) until an explicit
+  reset clears it, even if the live input changes back.
+- **Motion outputs** — the three outputs that move equipment:
+  `valve_open_contactor`, `valve_close_contactor`, and `pump_contactor`.
+- **Fresh press** — a button that has been seen released and is then pressed
+  again. Holding a button down never counts twice.
 
 ## Learning I/O and the first control-cabinet budget
 
 This example is **not a wiring diagram or firmware contract that can be mapped
-one-to-one onto an initial 8DI device.** It is a standalone learning interface
-that separates semantic inputs so the reader can follow the control intent.
+one-to-one onto a first 8-DI (digital input) device.** It is a standalone
+learning interface. Its inputs are split by meaning so that you can follow the
+control intent.
 
 ```text
 Inputs (9 Bool)
@@ -32,36 +45,76 @@ Outputs (4 Bool)
   valve_open_contactor, valve_close_contactor, pump_contactor, alarm
 ```
 
-The common semantic budget for a complete watering control cabinet has **eight**
-existing signals: `START`, `STOP`, `MODE`, tank low, tank high, open limit,
-close limit, and overload. It needs **three** more for `RESET`, an E-stop status
-observation, and source-water-low. Separating `valve_drive_ok` makes **12
-meanings** total. This example's nine inputs represent the meanings PC-10 needs
-for its safety behavior. `MODE` and tank upper/lower limits are separate PC-08/
-PC-07 concerns and are not falsely combined here.
+**Signal budget for a complete cabinet.** A typical complete watering control
+cabinet already has **eight** signals: `START`, `STOP`, `MODE`, tank low, tank
+high, open limit, close limit, and overload. It needs **three** more: `RESET`,
+an E-stop status observation, and source-water-low. Splitting out
+`valve_drive_ok` makes **12 meanings** in total. This example's nine inputs are
+the meanings PC-10 needs for its safety behavior. `MODE` and the tank upper/lower
+limits belong to PC-08 and PC-07; they are not falsely merged in here.
 
-The actual installation must choose one of the following; the choice has not
-yet been decided for any particular installation.
+Each real installation must choose one of the following options. That choice
+has not yet been made for any particular installation.
 
-- Aggregate several causes through an external safety chain. Without separate observations, GhostFlow cannot explain each cause individually.
-- Represent START/MODE/RESET as authenticated host commands while retaining STOP and the physical safety circuit as wired signals.
-- Expand the DI set to observe each cause directly.
+- Combine several causes in an external safety chain. Without separate
+  observations, however, GhostFlow cannot report each cause individually.
+- Send START/MODE/RESET as authenticated host commands, and keep STOP and the
+  physical safety circuit as wired signals.
+- Add more DIs so that each cause is observed directly.
 
 The E-stop is an **external hardwired safety chain** that removes energy.
-`emergency_stop_ok` is an observation input describing its state. GhostFlow
-outputs or the alarm do not guarantee that contactor energy is removed.
+`emergency_stop_ok` only observes its state. Neither GhostFlow's outputs nor the
+alarm guarantee that contactor energy is removed.
 
 ## Intent and settled safety rules
 
-- Normal `stop_ok == false` is not a fault. Return to `Idle` immediately with every MCU motion output off and alarm off. Require the closed position to be externally confirmed, then require START to be released and pressed again. Never restart automatically.
-- `FaultCause` latches the first cause. If several causes occur in one scan, choose in this order: `EmergencyStop > Overload > ValveDriveUnavailable > SensorConflict > FeedbackLost > OpenTimeout/CloseTimeout > LowSourceWater`. Later changes to live inputs do not change the latched cause, but the current condition preventing closure can be observed separately in the trace.
-- The `Opening` and `Closing` timeouts are 10 seconds. If the target limit is observed on the scan at exactly 10 seconds, the limit takes precedence over timeout. Do not skip multiple states in one scan.
-- Only `LowSourceWater` permits a conditional orderly close. If the open position is already confirmed and STOP/E-stop/overload/valve-drive/sensor conditions permit closure, first turn off all motion outputs for one logical scan in `FaultPumpStopping`, then command closure only in `FaultClosing`. Otherwise enter all-off `Faulted` immediately. `FaultClosing` ends on close-limit feedback, timeout, or motion inhibition while retaining the original fault cause.
-- Reset is allowed only when the latched cause and all current fault conditions are clear and `known_closed` is true. Once those conditions hold, RESET must be released and pressed again. Holding RESET while conditions clear does not reset. Reset returns only to `Idle`/OFF; it does not replace START.
+- **Normal STOP is not a fault.** When `stop_ok == false`, the control returns to
+  `Idle` at once, with every MCU motion output off and the alarm off. To run
+  again, the closed position must be confirmed externally, and START must be
+  released and pressed again. It never restarts automatically.
+- **The first cause is latched.** `FaultCause` latches the first cause. If
+  several causes occur on the same scan, the cause is chosen in this order:
+  `EmergencyStop > Overload > ValveDriveUnavailable > SensorConflict > FeedbackLost > OpenTimeout/CloseTimeout > LowSourceWater`.
+  Later changes to live inputs do not change the latched cause. The current
+  condition that is blocking closure can still be seen separately in the trace.
+- **Movement timeout.** `Opening` and `Closing` each time out after 10 seconds.
+  If the target limit is observed on the scan at exactly 10 seconds, the limit
+  wins over the timeout. The control never skips several states in one scan.
+- **Orderly close only for low source water.** Only `LowSourceWater` allows a
+  conditional, orderly close. It applies when the open position is already
+  confirmed and the STOP, E-stop, overload, valve-drive, and sensor conditions
+  all allow closing. Then the control:
+  1. turns off every motion output for one logical scan in `FaultPumpStopping`;
+  2. commands closing only in `FaultClosing`.
+
+  Otherwise it goes straight to `Faulted` with everything off. `FaultClosing`
+  ends when the close limit is seen, the closing timeout expires, or motion is
+  inhibited. The original fault cause is kept in every case.
+- **Reset needs a clear plant and a fresh press.** Reset is allowed only when
+  the latched cause **and** every current fault condition are clear, and
+  `known_closed` is true. Once those conditions hold, RESET must be released and
+  pressed again. Holding RESET while the conditions clear does not reset. Reset
+  only returns to `Idle`/OFF; it does not replace START.
+
+The state diagram below shows the normal sequence, the orderly low-water close,
+and the reset path. The note lists the checks that run first on every scan.
+
+![PC-10 phase transitions with fault, alarm, and reset](../../docs/diagrams/pc-10-fault-alarm-reset/phase-states.svg)
 
 ## GhostFlow source
 
-This explicit input revision consumes producer quality, not physical button diagnostics. Good(false) remains a normal observation. Unknown motion permission or position observations authorize no motion, conditional fault closure, reset, or request rearming. An existing fault cause remains latched; without one, the existing Idle/OFF path is used. Only known observations establish the physical-condition cause labels, while an unconfirmed target at the existing hard deadline can still establish OpenTimeout or CloseTimeout. No new START input or global restart policy is added.
+**Input quality.** This revision reads the quality that each input's producer
+reports. It does not diagnose physical button faults.
+
+- A healthy `false` (Good(false)) is a normal observation.
+- Unknown motion-permission or position observations allow no motion, no
+  conditional fault closing, no reset, and no request re-arming.
+- An existing fault cause stays latched. If there is no fault cause, the
+  existing `Idle`/OFF path is used.
+- Only known observations can set the cause labels for physical conditions.
+  However, if the target position is still not confirmed at the existing hard
+  deadline, `OpenTimeout` or `CloseTimeout` can still be set.
+- No new START input or global restart policy is added.
 
 ```ghost
 // Source revision: issue531-producer-quality-pc10-v1
@@ -234,16 +287,17 @@ control FaultAlarmResetWaterSupply {
 }
 ```
 
-The alarm in `FaultPumpStopping` indicates the cause has already been reported;
-its three motion outputs are off for one logical scan so the pump stops before
-the valve closes. The `FaultClosing` command requests closure in software only.
-It does not claim that the E-stop hardwired chain removed energy or that the
-valve physically moved.
+**Reading the fault outputs.** In `FaultPumpStopping`, the alarm is already on,
+which shows the cause has been reported. The three motion outputs are off for
+one logical scan, so the pump stops before the valve closes. The close command
+in `FaultClosing` is only a software request. It does not claim that the E-stop
+hardwired chain removed energy, or that the valve physically moved.
 
 ## Verification boundary
 
 `tools/check-pc-10.mjs` creates a fresh `ControlRuntime` for each scenario and
 does not rebuild the existing WASM artifact. A compiler/WASM trace PASS proves
-that GhostFlow's virtual state/output calculation matches expectations. Web UX,
-MCU upload, contactor closure, valve movement, pump rotation, flow, and physical
-acceptance of the external safety chain are outside this example and checker.
+that GhostFlow's virtual state and output calculation matches expectations. Web
+UX, MCU upload, contactor closure, valve movement, pump rotation, flow, and
+physical acceptance of the external safety chain are outside this example and
+its checker.

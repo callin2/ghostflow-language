@@ -1,0 +1,18 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontSize 12
+hide empty description
+
+state "assumption\nstatus=unconfirmed\n(e.g. origin=ai)" as AU
+state "intent / premise\nstatus=confirmed" as C
+state "superseded anchor\n(any kind)" as S
+
+[*] --> AU : AI or author guess
+AU --> C : a person confirms;\nsource is reclassified
+AU --> S : old assumption kept\nas prose
+C --> S : replaced by a\nnewer statement
+
+AU : may link only with\nrelation=assumes
+C : may link with implements,\nconstrains, or fallback
+S : cannot link to\na current node
+@enduml

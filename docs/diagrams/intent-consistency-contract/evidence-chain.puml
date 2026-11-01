@@ -1,0 +1,25 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontSize 12
+left to right direction
+
+card "Original\nrequest" as O
+card "Interpretation" as I
+card "Decision\n(§3 category)" as D
+card "Verification\ncondition" as C
+card "Code\n(.ghost.md, GFB)" as P
+card "Execution\n(run / scan)" as E
+card "Real device\n(observation)" as R
+
+O --> I : external authoring system
+I --> D : confirmation flow /\npolicy applier
+D --> C : author /\nverification designer
+C --> P : authoring tool\n+ compiler
+P --> E : execution /\nverification tool
+E --> R : device / host /\nobserver
+note bottom of D
+  Each link carries its own revisions.
+  A missing link leaves only the claims
+  that depend on it unknown.
+end note
+@enduml

@@ -1,0 +1,30 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName Helvetica
+skinparam ArrowColor #555555
+skinparam ActivityBorderColor #555555
+
+start
+:1. Freeze strategy, profile revision,
+inputs, and old state;
+:2. Compute let/with and every next
+(reads old state + same inputs);
+:3. Build complete candidate state
+(no transition = keep old value);
+:4. Compute intent/emit
+(state = old, next = candidate);
+:5. Apply safety constraints
+(requested -> safe intent);
+if (tick failed?) then (yes)
+  :Commit nothing;
+  :Host applies its
+  safe-output policy;
+  stop
+else (no)
+  :6. Commit state, outputs,
+  and records together;
+  :7. Real host only: apply
+  safe intent to renderer;
+  stop
+endif
+@enduml

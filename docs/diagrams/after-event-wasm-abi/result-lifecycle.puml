@@ -1,0 +1,15 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontSize 13
+hide empty description
+[*] --> pending : start at event.atMs\nidentity (sourceTag, sourceEpoch, id)
+pending --> satisfied : measured true observation\nbefore event.atMs + windowMs\n(sets satisfiedAtMs)
+pending --> expired : window end reached\n(end is excluded)
+satisfied --> [*] : explicit acknowledgement
+expired --> [*] : explicit acknowledgement
+note right of pending
+  Cannot be acknowledged
+  before its terminal boundary.
+  Retained (max 32) until acknowledged.
+end note
+@enduml

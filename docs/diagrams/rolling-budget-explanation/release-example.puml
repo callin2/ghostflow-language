@@ -1,0 +1,28 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName Helvetica
+skinparam defaultFontSize 13
+
+concise "Applied A" as A
+concise "Applied B" as B
+concise "60s window\nat 40s (from -20s)" as W1
+concise "60s window\nat 65s (from 5s)" as W2
+
+@0
+A is "ON [0,20s]"
+B is {-}
+W1 is "used 30s, +5s blocked"
+W2 is {-}
+@5
+W2 is "used 25s, +5s admissible"
+@10
+B is "ON [10,30s]"
+@20
+A is {-}
+@30
+B is {-}
+@40
+W1 is {-}
+@65
+W2 is {-}
+@enduml

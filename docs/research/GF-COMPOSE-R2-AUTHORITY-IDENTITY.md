@@ -1,38 +1,60 @@
 # GF-COMPOSE R2: authority and identity
 
+This note decides who is authoritative for each composition concept and which
+identities must stay separate. It covers the current evidence, an authority
+matrix, identity-change rules, per-projection graph and cycle policy, the open
+installation-constraint conflict (#62) with operational-memory context (#68),
+and the resulting recommendation and owners.
+
 ## User problem
 
 A displayed pump, an engineer's trace, and a physical installation must not be
-silently treated as the same thing. Composition needs linked identities without
-turning a graph view into a second executable source. The recommendation below
-keeps canonical `.ghost.md` rules authoritative, keeps execution in the Rust
-core, and makes API, Device, and frontend responsibilities explicit.
+silently treated as the same thing. Composition needs **linked** identities
+without turning a graph view into a second executable source.
+
+The recommendation below:
+
+- keeps canonical `.ghost.md` rules authoritative;
+- keeps execution in the Rust core;
+- makes API, Device, and frontend responsibilities explicit.
 
 ## Evidence at examined revision
 
 Evidence was examined at `ffdbc96461eca67908252507fb851fa4dabd9a2c` (the
-working-tree `HEAD`). `compileSource` accepts one canonical literate source,
-stores `sourceDocument` (`format`, `kind`, `filename`, `text`, `sha256`), and
-can emit an interaction identity containing `documentId` and `revisionId`.
-The compiler also emits module fingerprint/bytecode provenance and source maps.
-Filename and source locations are trace coordinates, not public identity.
+working-tree `HEAD`). Everything in this section is an implemented code or
+contract fact, not a composition proposal.
 
-The interaction contract currently joins static descriptors and completed
-snapshots by source document/revision, module ID/fingerprint/bytecode digest,
-schema digest, and `runId`. `scanId` is only ordered within a run. A reset or
-new run must change `runId`; therefore `scanId=0` in two runs is not one
-occurrence. These are implemented contract facts, not composition proposals.
+**Compiler.** `compileSource` accepts one canonical literate source and stores
+`sourceDocument` (`format`, `kind`, `filename`, `text`, `sha256`). It can emit
+an interaction identity containing `documentId` and `revisionId`. The compiler
+also emits module fingerprint/bytecode provenance and source maps. Filename and
+source locations are trace coordinates, not public identity.
 
-The intent-anchor map says generated provenance is not editable source and
-does not infer or approve intent. `docs/CONSTRAINTS.md` describes a bounded,
-host-owned named-constraint path and states that installation bindings are
-external to the control source. The current control parser rejects the
-`constraints` construct and the standalone constraints parser is deliberately
-limited. This document does not claim a unified constraint runtime.
+**Interaction contract.** It currently joins static descriptors and completed
+snapshots by:
+
+- source document/revision;
+- module ID/fingerprint/bytecode digest;
+- schema digest;
+- `runId`.
+
+`scanId` is only ordered within a run. A reset or new run must change `runId`;
+therefore `scanId=0` in two runs is not one occurrence.
+
+**Intent anchors and constraints.** The intent-anchor map says generated
+provenance is not editable source and does not infer or approve intent.
+`docs/CONSTRAINTS.md` describes a bounded, host-owned named-constraint path and
+states that installation bindings are external to the control source. The
+current control parser rejects the `constraints` construct, and the standalone
+constraints parser is deliberately limited. This document does not claim a
+unified constraint runtime.
 
 ## Tables and examples
 
 ### Authority matrix
+
+Each row names one concept, who owns it today, which identity fields already
+exist, and what composition would add (proposal only).
 
 | Concept | Current authoritative owner | Existing identity fields | Proposed composition addition | Evidence reference |
 |---|---|---|---|---|
@@ -47,21 +69,31 @@ limited. This document does not claim a unified constraint runtime.
 The proposed fields are design recommendations only. No new identifier
 generator, wire schema, or ABI is authorized by this research.
 
-Correction note (2026-09-20): identity joins must distinguish program/run
-identity from a live settings revision and effective event position.
-Runtime-adjustable properties are approved live events: one multi-property
-action validates atomically and changes all properties or none. Accepted
-changes apply when processed, including during active logic; they require no
-recompile, new program/run, or controller-wide stop. Properties persist across
-real ESP restarts, while a physical restart creates a new run identity. This
-is an agreed design amendment, not implemented behavior. The older stopped
-Configure requirement in [`CONSTRAINTS.md`](../CONSTRAINTS.md) and
-[`LANGUAGE.md`](../LANGUAGE.md) must be reconciled under #89/#90. The current
-source-rewrite/recompile helper is not this live path. No implicit reset or
-stale-program join reinterpretation is implied. Durability, ordering, ABI, and
-verification remain design gaps.
+The diagram summarizes how these identities relate. Boxes marked “proposal”
+do not exist in any current contract.
+
+![Distinct identities and their joins; labels and filenames are never identity](../diagrams/gf-compose-r2-authority-identity/identity-joins.svg)
+
+**Correction note (2026-09-20).** Identity joins must distinguish
+program/run identity from a live settings revision and effective event
+position. This is an agreed design amendment, **not** implemented behavior:
+
+- Runtime-adjustable properties are approved live events. One multi-property
+  action validates atomically and changes all properties or none.
+- Accepted changes apply when processed, including during active logic. They
+  require no recompile, new program/run, or controller-wide stop.
+- Properties persist across real ESP restarts, while a physical restart creates
+  a new run identity.
+- The older stopped Configure requirement in [`CONSTRAINTS.md`](../CONSTRAINTS.md)
+  and [`LANGUAGE.md`](../LANGUAGE.md) must be reconciled under #89/#90.
+- The current source-rewrite/recompile helper is not this live path.
+- No implicit reset or stale-program join reinterpretation is implied.
+- Durability, ordering, ABI, and verification remain design gaps.
 
 ### Identity-change matrix
+
+For each event, the middle column says what stays the same and the right
+column says what changes.
 
 | Event | Stable logical identity | Exact revision / occurrence effect |
 |---|---|---|
@@ -72,16 +104,21 @@ verification remain design gaps.
 | Binding change | Logical port and behavior instance stay stable | New binding revision/digest and a new installation/deployment decision; physical endpoint identity changes |
 | Restart | Definition, instance, and binding can remain stable | New `runId`; `scanId` may return to zero. A runtime occurrence is never identified by `scanId` alone |
 
-Worked example (hand-worked, not execution evidence):
-`east-irrigation` and `west-irrigation` reference one immutable definition
-revision. They have distinct instance IDs, state/timer stores, settings joins,
-and provenance. Renaming the displayed east pump changes neither its binding
-nor its logical port. After restart, `run-A/scanId=0` and `run-B/scanId=0` are
-different occurrences.
+**Worked example** (hand-worked, not execution evidence):
+
+- `east-irrigation` and `west-irrigation` reference one immutable definition
+  revision.
+- They have distinct instance IDs, state/timer stores, settings joins, and
+  provenance.
+- Renaming the displayed east pump changes neither its binding nor its logical
+  port.
+- After restart, `run-A/scanId=0` and `run-B/scanId=0` are different
+  occurrences.
 
 ### Graph projections and cycle policy
 
-There should be several typed projections, not a universal ontology:
+There should be several typed projections, not a universal ontology. Each
+projection has its own edge meaning and its own cycle rule:
 
 | Projection | Allowed edge meaning | Cycle policy |
 |---|---|---|
@@ -94,37 +131,47 @@ There should be several typed projections, not a universal ontology:
 These edge meanings are scoped recommendations. They do not define a universal
 graph database, serialization, or cross-project ontology.
 
-Approved live property events change data values only. They leave the validated
-executable graph unchanged and preserve every existing cycle and phase
-restriction. They cannot create a bypass for dependency validation or alter
-which expressions may read next-state values; stale-program joins are not
-silently reinterpreted.
+Approved live property events change data values only. They:
+
+- leave the validated executable graph unchanged and preserve every existing
+  cycle and phase restriction;
+- cannot create a bypass for dependency validation or alter which expressions
+  may read next-state values;
+- do not silently reinterpret stale-program joins.
 
 ### Installation-constraint conflict
 
-System installation issue #62 proposes independently enforced,
-non-weakenable installation constraints. Operational-memory issue #68 now
-provides supported architecture context: raw conversation and structured
-memory claims are separate, linked by exact source spans and provenance;
-confirmation state distinguishes observed, inferred, farmer-confirmed,
-rejected, and superseded information; and memory does not automatically become
-current truth. Memory can explain why a decision exists, but conversation is
-not executable source and a confirmed decision is required before changing a
-GhostFlow revision. This is system/API proposal evidence, not an implemented
-language contract in this repository.
+**Background: #62.** System installation issue #62 proposes independently
+enforced, non-weakenable installation constraints.
 
-Issue #68 also requires traceability across memory → decision → source →
-program/settings/installation contract → execution/outcome, bounded
-provenance-aware retrieval instead of sending the whole conversation, and
-failure isolation so retrieval or LLM failure cannot damage a valid program or
-local control. Raw and structured memory must support export/delete/local
-archive and separate AI-training consent. These requirements add provenance
-links and privacy/retention boundaries; they do not add authority to memory,
-labels, or a frontend graph.
+**Background: #68.** Operational-memory issue #68 now provides supported
+architecture context. This is system/API proposal evidence, not an implemented
+language contract in this repository:
 
-The conflict is concrete: this repository says canonical `.ghost.md` owns
-executable rules, while installation constraints must be enforceable at the
-installation boundary. Two options remain:
+- Raw conversation and structured memory claims are separate, linked by exact
+  source spans and provenance.
+- Confirmation state distinguishes observed, inferred, farmer-confirmed,
+  rejected, and superseded information.
+- Memory does not automatically become current truth. Memory can explain why a
+  decision exists, but conversation is not executable source, and a confirmed
+  decision is required before changing a GhostFlow revision.
+
+Issue #68 also requires:
+
+- traceability across memory → decision → source →
+  program/settings/installation contract → execution/outcome;
+- bounded, provenance-aware retrieval instead of sending the whole conversation;
+- failure isolation, so retrieval or LLM failure cannot damage a valid program
+  or local control;
+- export/delete/local archive for raw and structured memory, and separate
+  AI-training consent.
+
+These requirements add provenance links and privacy/retention boundaries; they
+do not add authority to memory, labels, or a frontend graph.
+
+**The conflict.** This repository says canonical `.ghost.md` owns executable
+rules, while installation constraints must be enforceable at the installation
+boundary. Two options remain:
 
 1. **Separate canonical constraint compilation.** Keep installation
    constraints in their existing named-constraint source path. The API joins a
@@ -138,28 +185,41 @@ installation boundary. Two options remain:
    Consequence: this repository still owns behavior semantics, but acceptance
    depends on a cross-project contract and revisioned boundary artifact.
 
+The diagram contrasts the two shapes. Neither is selected.
+
+![Two open options for #62 installation constraints](../diagrams/gf-compose-r2-authority-identity/constraint-options.svg)
+
 Neither option is selected here. The system architecture owner for #62, with
 the language owner and API/deployment owner, must decide whether constraints
 are separately compiled artifacts or references under an explicit boundary
 revision. A JSON overlay must not be adopted as an unapproved second source.
 
-The #68 memory chain does not resolve that choice. It requires the selected
-constraint artifact or boundary revision to be referenced by a confirmed
-decision and to retain the originating memory provenance, while preserving the
-canonical `.ghost.md` rule. The API/system owners must also define whether a
-memory reference is retained, redacted, or deleted when a user exercises
-privacy or retention controls; source and runtime identities must remain
-valid without silently treating deleted memory as current evidence.
+The #68 memory chain does not resolve that choice. Whatever is chosen:
+
+- The selected constraint artifact or boundary revision must be referenced by a
+  confirmed decision and retain the originating memory provenance, while
+  preserving the canonical `.ghost.md` rule.
+- The API/system owners must also define whether a memory reference is
+  retained, redacted, or deleted when a user exercises privacy or retention
+  controls.
+- Source and runtime identities must remain valid without silently treating
+  deleted memory as current evidence.
 
 ## Recommendation
 
 Adopt the authority matrix and identity-change rules as the composition review
-baseline. Composition should pin immutable definition revisions, add an opaque
-instance identity, preserve authored logical port IDs, and join installation,
-settings, module, schema, source, and run identities without conflating them.
-Use projection-specific edges and cycle rules. Start implementation only after
-the #62 boundary decision and an explicit contract extension for instance
-identity. Keep labels and filenames presentation/trace data.
+baseline. Composition should:
+
+- pin immutable definition revisions;
+- add an opaque instance identity;
+- preserve authored logical port IDs;
+- join installation, settings, module, schema, source, and run identities
+  without conflating them;
+- use projection-specific edges and cycle rules;
+- keep labels and filenames as presentation/trace data.
+
+Start implementation only after the #62 boundary decision and an explicit
+contract extension for instance identity.
 
 ## Unresolved questions and owners
 

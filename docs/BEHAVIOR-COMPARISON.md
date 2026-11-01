@@ -2,7 +2,21 @@
 
 [한국어](BEHAVIOR-COMPARISON.ko.md) · [Intent responsibility contract](INTENT-CONSISTENCY-CONTRACT.en.md) · [#560](https://github.com/callin2/ghostflow-language/issues/560)
 
-`compareBehavior(request)` in `tools/behavior-comparison.mjs` compiles two canonical `.ghost.md` sources and runs the same frozen `GhostFlow/scenario-v1` once from each source's canonical initial state. It uses the existing `ghostsim` Rust native or WASM runner. The caller chooses the observations, exact scan/time scope, and optional expected changes. The result reports actual virtual requested/safe intents, state and faults for that scope. It does not infer farmer intent, operate a live device, or establish physical effects.
+`compareBehavior(request)` in `tools/behavior-comparison.mjs` answers one question: *given the same inputs, how does a candidate program behave differently from a baseline program?*
+
+It works like this:
+
+1. It compiles two canonical `.ghost.md` sources: the **baseline** and the **candidate**.
+2. It runs the same frozen `GhostFlow/scenario-v1` once from each source's canonical initial state, using the existing `ghostsim` Rust native or WASM runner.
+3. It reports the actual virtual requested/safe intents, state and faults inside a scope that you choose.
+
+You, the caller, choose the observations, the exact scan/time scope and, optionally, the changes you expect.
+
+What it does **not** do: it does not infer farmer intent, operate a live device, or establish physical effects.
+
+The diagram below shows the pipeline: both programs run the identical captured scenario independently, and an incomplete run turns every assertion into `unknown`.
+
+![Behavior comparison pipeline](diagrams/behavior-comparison/comparison-flow.svg)
 
 ## Request and API
 
@@ -17,13 +31,23 @@ The public request is a JSON-compatible object:
 | `scope` | `{ from: { scanId, logicalTimeMs }, to: { scanId, logicalTimeMs } }`. Both endpoints must match executed scans exactly. Observations include both endpoints. |
 | `assertions` | Optional list (at most 64) of caller-supplied predicates below. Omitting it returns an observed comparison without an expected-change judgment. |
 
-Use `const report = await compareBehavior(request)`. The API throws on invalid source, metadata, scenario, observation or request shape. A run that starts but cannot complete returns `outcome: 'incomplete'`, side-specific errors and available partial observations; **every assertion is `unknown`**. A completed comparison reports per-scan values and `equal`, plus changed/unchanged counts only inside the selected scope. No output is treated as an installation command. The result's `physicalEffects` is always `false`.
+Call it as `const report = await compareBehavior(request)`. There are three kinds of result:
 
-The result binds the full request, scenario, canonical source documents, GFB bytes, manifests, optional source closures and optional intent evidence by SHA-256. It also records the selected runtime/host paths and hashes, and the Node version when using the WASM host. These are execution identities, not signatures. The initial state is the state declared in each canonical source; a change to initial state is part of the program difference.
+| Situation | Result |
+|---|---|
+| Invalid source, metadata, scenario, observation or request shape | The API **throws**. |
+| A run starts but cannot complete | `outcome: 'incomplete'`, side-specific errors and any available partial observations. **Every assertion is `unknown`.** |
+| The comparison completes | Per-scan values and `equal`, plus changed/unchanged counts computed only inside the selected scope. |
+
+No output is treated as an installation command. The result's `physicalEffects` is always `false`.
+
+**Identities.** The result binds, by SHA-256, the full request, the scenario, the canonical source documents, the GFB bytes, the manifests, and the optional source closures and intent evidence. It also records the selected runtime/host paths and hashes, and the Node version when the WASM host is used. These are execution identities, not signatures.
+
+**Initial state.** Each run starts from the state declared in its own canonical source. A change to the initial state is therefore part of the program difference.
 
 ### Optional predicates
 
-Every assertion has a unique `id`, `kind` and an `observation` already listed in `observations`:
+Every assertion has a unique `id`, a `kind`, and an `observation` that is already listed in `observations`:
 
 | Kind | Additional fields | Evaluation |
 |---|---|---|
@@ -31,11 +55,17 @@ Every assertion has a unique `id`, `kind` and an `observation` already listed in
 | `equals` | `side: 'baseline'\|'candidate'`, exact `at: { scanId, logicalTimeMs }`, `expected` JSON value | The named side's actual value at that scan equals the supplied value. |
 | `bool-on-duration-delta` | `expectedDeltaMs` safe integer | `candidateMs - baselineMs` equals the supplied delta. Counts only true Bool segments `[scan_i, scan_(i+1))` between the exact scope endpoints. The final scan is an endpoint, never extrapolated. |
 
-An assertion may add `evidence: { side, condition: { id, revision, sha256 } }`. The reference must match that side's supplied `intentEvidence` condition, including `intentConditionDigest(condition)`. The report retains the condition's confirmation scope and `authority: 'not-authenticated'`. Without this link it says `evidenceBinding: 'unlinked'`. `satisfied` means only that the supplied predicate held for the observed scan scope; it does not mean the interpretation was confirmed, the condition was an independent oracle, or the change fits the user's intent. The complete assertion specification and its digest remain in the report so the expected value cannot disappear from a success claim.
+**Linking an assertion to intent evidence.** An assertion may add `evidence: { side, condition: { id, revision, sha256 } }`.
+
+- The reference must match that side's supplied `intentEvidence` condition, including `intentConditionDigest(condition)`.
+- The report keeps the condition's confirmation scope and `authority: 'not-authenticated'`.
+- Without this link, the report says `evidenceBinding: 'unlinked'`.
+
+**What `satisfied` means.** It means only that the supplied predicate held over the observed scan scope. It does **not** mean that the interpretation was confirmed, that the condition was an independent oracle, or that the change fits the user's intent. The complete assertion specification and its digest stay in the report, so the expected value cannot disappear from a success claim.
 
 ## Runnable example
 
-Run this from the repository root after the existing scenario runner artifacts are available:
+Run this from the repository root once the existing scenario runner artifacts are available:
 
 ```js
 import { compareBehavior } from './tools/behavior-comparison.mjs';
@@ -71,6 +101,15 @@ const report = await compareBehavior(request);
 console.log(report.outcome, report.assertions);
 ```
 
-The example's `drive` binding selects the existing WASM scenario host. Its values are virtual and carry no physical actuator claim. The expected delta is supplied independently by this example, not generated from either program.
+The example compares a 10-second timer (baseline) with a 15-second timer (candidate) over four scans at 0, 10000, 15000 and 20000 ms. The timeline below shows when `expired` is true in each program; counting stops at the scope endpoint (scan 3, 20000 ms), so the baseline is true for 10000 ms, the candidate for 5000 ms, and the delta is 5000 − 10000 = −5000 ms.
 
-For a structured CLI call, serialize the same request as JSON or TOON, then run `node tools/ghostcompare.mjs --request comparison.json --format json`. Default output is TOON; `--format toon` is also accepted. A completed comparison exits 0, while rejected or incomplete results exit 1. The CLI reads at most 3 MiB of request bytes, and the captured scenario is limited to 256 KiB. The result is capped at 1 MiB; exceeding it yields an incomplete result with unknown assertions. The API and CLI do not accept JavaScript callbacks in the request.
+![Timeline of the safe expired output in the example](diagrams/behavior-comparison/example-timeline.svg)
+
+The example's `drive` binding selects the existing WASM scenario host. Its values are virtual and carry no physical actuator claim. The expected delta is supplied independently by this example; it is not generated from either program.
+
+**Command line.** Serialize the same request as JSON or TOON, then run `node tools/ghostcompare.mjs --request comparison.json --format json`.
+
+- Default output is TOON; `--format toon` is also accepted.
+- Exit code: 0 for a completed comparison, 1 for rejected or incomplete results.
+- Limits: the CLI reads at most 3 MiB of request bytes, and the captured scenario is limited to 256 KiB. The result is capped at 1 MiB; exceeding the cap yields an incomplete result with unknown assertions.
+- The API and the CLI do not accept JavaScript callbacks in the request.

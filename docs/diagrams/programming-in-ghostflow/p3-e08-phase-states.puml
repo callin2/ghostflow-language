@@ -1,0 +1,15 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName Helvetica
+hide empty description
+
+[*] --> Idle
+Idle --> Waiting : start\n(age restarts at 0)
+Waiting --> Idle : !start
+Waiting --> Running : start && age >= value\n(delay is ok(value))
+Running --> Idle : !start
+Waiting --> Idle : delay is fault(_)
+Running --> Idle : delay is fault(_)
+
+note "Each tick takes at most one transition.\nIf observed_start is a fault, phase keeps its value.\nmotor <- phase' == Running" as N
+@enduml

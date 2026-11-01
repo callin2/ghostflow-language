@@ -1,0 +1,22 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName Helvetica
+skinparam ArrowColor #555555
+title Checked adjacent-duplicate replacement
+
+start
+:Lowered Bool output constraints;
+if (List has at most 128 entries?) then (no)
+  :Keep original\n(v1 companions);
+  stop
+else (yes)
+endif
+:Candidate generation:\nmerge adjacent exact duplicates\n(groups within 8 unique names / 32 occurrences);
+:Independent finite checker:\nall Bool snapshots, blocked sets,\nfault strings, idempotence;
+if (Transformed and checked?) then (yes)
+  :Emit optimized artifact\nwith constraintProof\n(source-trace-v2 / source-observation-v2);
+else (no change, unsupported\nor checker failure)
+  :Keep original\n(v1 companions);
+endif
+stop
+@enduml

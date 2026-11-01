@@ -1,0 +1,19 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontSize 13
+skinparam stateBorderColor #4A6FA5
+skinparam stateBackgroundColor #F7F9FC
+title CancelAndReturn (question 19)
+
+[*] --> Idle
+Idle --> Working : start_event && !cancel
+Working --> Stopping : cancel
+Stopping --> Idle : stopped && home
+Stopping --> Returning : stopped && !home
+Returning --> Idle : home
+
+Working : work = true
+Stopping : no command\n(wait for stop feedback)
+Returning : return_device = true
+note "If any input is unknown, the phase is kept.\nNo timeout: missing feedback keeps the phase." as N
+@enduml

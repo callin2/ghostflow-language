@@ -1,0 +1,18 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontSize 13
+skinparam componentStyle rectangle
+component "Pinned definition\n(configs + timers)" as D
+package "Combined Program (shared Rust core)" {
+  component "east instance\nown config Result,\nemissionRevision, timer state" as East
+  component "west instance\nown config Result,\nemissionRevision, timer state" as West
+}
+component "Settings transaction\n(one global settingsRevision)" as S
+component "Logical clock\n(same supplied time)" as C
+D --> East : instantiate
+D --> West : instantiate
+S --> East : event for east config ID
+S ..> West : unchanged
+C --> East
+C --> West
+@enduml

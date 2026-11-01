@@ -2,24 +2,35 @@
 
 [한국어](HARDWARE-FRONT-MATTER.ko.md) · [Reference 1.1](reference/01-source-and-syntax.en.md)
 
-For compact authoring with reusable board/driver defaults, read the
-[profile design and purpose](PROFILE-FRONT-MATTER.en.md). The explicit `hardware`
-form below remains for the current deployed Device packaging path while actual
-profiles and the compact packaging adapter are implemented. Retire this authored
-form after verified installation migration; the derived deployment contract may
-still contain expanded hardware facts.
+> **Status.** For compact authoring with reusable board/driver defaults, read
+> the [profile design and purpose](PROFILE-FRONT-MATTER.en.md). The explicit
+> `hardware` form below is kept for the current deployed Device packaging path
+> while actual profiles and the compact packaging adapter are being
+> implemented. This authored form will be retired after a verified installation
+> migration; the derived deployment contract may still contain expanded
+> hardware facts.
 
-The reserved top-level YAML `hardware` field in a `.ghost.md` document declares
-installation dependencies and logical bindings for input drivers and output
-renderers. The source document remains authoritative. The compiler returns a
-derived `hardwarePlan`; the declaration does not execute code or change GFB bytes,
-the runtime ABI, or the portable package format. Work: [#555](https://github.com/callin2/ghostflow-language/issues/555).
+The reserved top-level YAML field `hardware` in a `.ghost.md` document declares:
+
+- the installation dependencies (board profile and driver modules); and
+- the logical bindings from the program's inputs and outputs to input drivers
+  and output renderers.
+
+The source document remains authoritative. The compiler returns a derived
+`hardwarePlan`. The declaration does not execute code, and it does not change
+GFB bytes, the runtime ABI, or the portable package format. Work:
+[#555](https://github.com/callin2/ghostflow-language/issues/555).
+
+![The compiler produces unchanged GFB/manifest plus a derived hardwarePlan, which the deployment owner validates before activation](diagrams/hardware-front-matter/hardware-plan-flow.svg)
+
+As the diagram shows, the plan is a side output for the deployment owner; the
+control bytecode is the same with or without it.
 
 ## Declaration
 
-This example shows JSY as one input module and a relay as an output module.
-The example digests are placeholders: deployment requires the actual exact-byte
-profile/module digests and reviewed immutable revisions.
+This example shows a JSY meter as one input module and a relay bank as an
+output module. The example digests are placeholders: deployment requires the
+actual exact-byte profile/module digests and reviewed immutable revisions.
 
 ```yaml
 hardware:
@@ -57,9 +68,9 @@ hardware:
       pump: { instance: panel, channel: relay1 }
 ```
 
-Place the YAML between opening and closing `---` lines at the document start,
-followed by Markdown and normal `ghost` fences. Closing `...` is also accepted.
-The corresponding logical declarations can be:
+Place the YAML between an opening and a closing `---` line at the start of the
+document, followed by Markdown and normal `ghost` fences. A closing `...` line
+is also accepted. The matching logical declarations can be:
 
 ```ghost
 control MeterRequest {
@@ -69,52 +80,84 @@ control MeterRequest {
 }
 ```
 
-All six hardware fields are required. `profile` and each `modules` value contain
-exactly `id`, `revision`, and lowercase 64-hex `sha256`; `latest` is rejected.
-Module aliases, bus/instance names and logical binding names are bounded to
-`[A-Za-z_][A-Za-z0-9_.:-]{0,127}`. Pin IDs, revisions, service and channel strings
-use `[A-Za-z0-9][A-Za-z0-9._:/@+-]{0,255}`. Empty named maps are allowed.
-Every bus has `service` and `config`. Every instance has `module`, `role`
-(`input` or `output`) and `config`. Every binding has `instance` and `channel`.
-Structural fields are closed; misspelled or missing fields fail compilation.
+Here the binding `inputs.current` connects the logical input `current` to the
+`current` channel of instance `power`, and `outputs.pump` connects the logical
+output `pump` to `relay1` of instance `panel`.
 
-`config` is an object containing arbitrary nested JSON-compatible data. The
-language does not special-case JSY, baud rates, addresses, GPIO or channel types.
-The deployment owner must resolve the pinned profile and modules, validate each
-configuration using its provider-supplied schema, validate service availability,
-bus references, channel identity and types, then check admission before activation.
-Parsing is not provider validation, module installation or physical verification.
+**Field rules.**
 
-Bindings refer to declared logical inputs and outputs in the compiler manifest.
-Missing modules/instances, wrong instance roles, undeclared logical ports, and
-duplicate instance/channel bindings within either role fail. Unbound logical
-ports may use separately declared host context; the language does not synthesize
-bindings. Two logical Number inputs can independently select different drivers.
-Input acquisition quality and output requested/applied/confirmed evidence retain
-their existing contracts. Executable import composition containing hardware in
-the root or an imported document is rejected until composition semantics exist.
+- All six hardware fields are required.
+- `profile` and each `modules` value contain exactly `id`, `revision`, and a
+  lowercase 64-hex `sha256`. `latest` is rejected.
+- Name patterns:
+
+| Names | Pattern |
+| --- | --- |
+| Module aliases, bus/instance names, logical binding names | `[A-Za-z_][A-Za-z0-9_.:-]{0,127}` |
+| Pin IDs, revisions, service and channel strings | `[A-Za-z0-9][A-Za-z0-9._:/@+-]{0,255}` |
+
+- Empty named maps are allowed.
+- Every bus has `service` and `config`. Every instance has `module`, `role`
+  (`input` or `output`) and `config`. Every binding has `instance` and
+  `channel`.
+- Structural fields are closed: a misspelled or missing field fails compilation.
+
+**`config` is opaque to the language.** It is an object containing arbitrary
+nested JSON-compatible data. The language does not special-case JSY, baud rates,
+addresses, GPIO or channel types. Before activation, the deployment owner must:
+
+1. resolve the pinned profile and modules;
+2. validate each configuration using its provider-supplied schema;
+3. validate service availability, bus references, channel identity and types;
+4. check admission.
+
+Parsing is not provider validation, module installation or physical
+verification.
+
+**Bindings.** Bindings refer to the declared logical inputs and outputs in the
+compiler manifest.
+
+- These fail: missing modules/instances, wrong instance roles, undeclared
+  logical ports, and duplicate instance/channel bindings within either role.
+- Unbound logical ports may use separately declared host context; the language
+  does not synthesize bindings.
+- Two logical Number inputs can independently select different drivers.
+- Input acquisition quality and output requested/applied/confirmed evidence keep
+  their existing contracts.
+- Executable import composition that has `hardware` in the root or in an
+  imported document is rejected until composition semantics exist.
 
 ## Public helper and diagnostics
 
 `parseHardwareFrontMatter(source, { filename })` from
-`tools/hardware-frontmatter.mjs` returns `null` without the reserved field,
-otherwise `{ format: 'GhostFlow/hardware-plan-v1', source: { filename, sha256 },
-hardware, locations }`. `hardware` is the validated declaration; `locations`
-maps JSON pointers such as `/hardware/instances/power/config/address` to
-`{ filename, line, column, endLine, endColumn }` in the canonical document.
-Locations are one-based; ends are exclusive. The digest covers the exact source
-bytes, including prose and line endings. `validateHardwareBindings(plan, manifest)`
-checks logical port membership separately. `compileSource` and `compileSourceSync`
-return `hardwarePlan` only when the declaration exists.
+`tools/hardware-frontmatter.mjs` returns:
 
-The pinned YAML parser enforces unique keys. Hardware-bearing front matter rejects
-aliases, anchors, explicit tags, merge keys, non-string keys, non-finite values and
-prototype-sensitive object keys, with bounded nesting and node counts. Errors
-carry canonical line/column and a `GhostFlow/diagnostics-v1` envelope with
-`GF_HARDWARE` and source digest. Front matter without `hardware` retains its
-existing non-executable behavior.
+- `null` when the reserved field is absent;
+- otherwise `{ format: 'GhostFlow/hardware-plan-v1', source: { filename, sha256 },
+  hardware, locations }`.
 
-Why: colocating installation intent with control source keeps driver selection
-reviewable and revision-bound without creating another editable control program.
-The generic provider boundary accommodates measurement drivers, switches,
-relays, motors and screens without embedding board behavior in the language.
+In that result:
+
+- `hardware` is the validated declaration.
+- `locations` maps JSON pointers such as
+  `/hardware/instances/power/config/address` to
+  `{ filename, line, column, endLine, endColumn }` in the canonical document.
+  Locations are one-based; ends are exclusive.
+- The digest covers the exact source bytes, including prose and line endings.
+
+`validateHardwareBindings(plan, manifest)` checks logical port membership
+separately. `compileSource` and `compileSourceSync` return `hardwarePlan` only
+when the declaration exists.
+
+**YAML safety.** The pinned YAML parser enforces unique keys. Front matter that
+contains `hardware` rejects aliases, anchors, explicit tags, merge keys,
+non-string keys, non-finite values and prototype-sensitive object keys, and it
+bounds nesting depth and node counts. Errors carry the canonical line/column and
+a `GhostFlow/diagnostics-v1` envelope with `GF_HARDWARE` and the source digest.
+Front matter without `hardware` keeps its existing non-executable behavior.
+
+Why: keeping installation intent next to the control source makes driver
+selection reviewable and revision-bound, without creating another editable
+control program. The generic provider boundary accommodates measurement drivers,
+switches, relays, motors and screens without embedding board behavior in the
+language.

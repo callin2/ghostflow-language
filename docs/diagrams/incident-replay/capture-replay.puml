@@ -1,0 +1,25 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName Helvetica
+skinparam defaultFontSize 13
+
+start
+if (command?) then (capture)
+  :run scenario from program initializers\n(ghostsim.runScenario);
+  :seal GFB, manifest, source map,\nscenario and completed result\ninto a new directory;
+  :captured (exit 0);
+  stop
+else (replay)
+  :verify manifest seal and every\ninventory hash and size;
+  :stage verified bytes in a\nprivate temporary directory;
+  :re-execute; compare with the record\n(and with --candidate, if given);
+  if (classify outcome) then (all checks pass)
+    :completed / compared (exit 0);
+  elseif () then (initial state or\nartifacts missing)
+    :partial (exit 2);
+  else (corruption, revision mismatch,\nscan gap, time or boot error,\nchanged decision, candidate failure)
+    :rejected (exit 1);
+  endif
+  stop
+endif
+@enduml

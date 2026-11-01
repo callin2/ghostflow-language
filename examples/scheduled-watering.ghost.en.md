@@ -4,12 +4,14 @@
 
 # Sequential watering by daily schedule
 
-This document contains both explanation and GhostFlow code. It runs through the
-control/literate compiler and manifest-aware host. It is a virtual tutorial,
-not physical output. The linked original is the canonical executable program;
-`scheduled-watering.ghost` is non-executable historical evidence.
+This document mixes explanation with GhostFlow code. The control/literate
+compiler builds it, and the manifest-aware host runs it. It is a virtual
+tutorial: it drives no physical outputs. The linked Korean original is the
+canonical executable program; `scheduled-watering.ghost` is non-executable
+historical evidence.
 
-At each selected time, water zone 1 and then zone 2. Both zones share one pump.
+The task: at each selected time, water zone 1 and then zone 2. Both zones share
+one pump.
 
 ```ghost
 // Executable with ghostc and the manifest-aware virtual host; no GPIO driver.
@@ -18,8 +20,9 @@ control ScheduledWatering {
 
 ## When does watering start?
 
-The day is divided into 96 slots of 15 minutes each. Select the desired times.
-This example starts at 06:00, 06:15, 12:30, and 18:45 Korea time.
+The schedule divides the day into 96 slots of 15 minutes each. You select the
+slots you want. This example starts at 06:00, 06:15, 12:30, and 18:45 Korea
+time.
 
 ```ghost
   schedule starts: DailySlots<15min> {
@@ -30,10 +33,15 @@ This example starts at 06:00, 06:15, 12:30, and 18:45 Korea time.
 
 ## How long does watering run?
 
-Water each zone for five minutes. Wait two seconds after opening a valve before
-turning on the pump. After stopping the pump, keep that valve open for two more
-seconds. Wait two seconds with both valves closed between zones. These timings
-are not sensor values confirming actual device behavior.
+The timing rules:
+
+- Water each zone for five minutes.
+- After opening a valve, wait two seconds before turning on the pump.
+- After stopping the pump, keep that valve open for two more seconds.
+- Between zones, wait two seconds with both valves closed.
+
+These are configured durations. They are not sensor values that confirm what
+the devices actually did.
 
 ```ghost
   let water1_time = 5min;
@@ -47,9 +55,9 @@ are not sensor values confirming actual device behavior.
 
 ## How far has the sequence progressed?
 
-`phase` is the current step and `age` is the time spent in that step.
-When a phase transition commits, `age` resets to zero. Ghost execution restores
-the phase and timer state together.
+`phase` is the current step, and `age` is the time spent in that step. When a
+phase transition commits, `age` resets to zero. Ghost execution restores the
+phase and the timer state together.
 
 ```ghost
   type Phase =
@@ -68,9 +76,15 @@ the phase and timer state together.
 
 ## What is the next step?
 
-Accept schedule-start signals only in Idle. Skip a scheduled occurrence that
-arrives during operation; do not queue it. Each phase checks elapsed time, so
-the control loop is not blocked.
+Schedule start signals are accepted only in `Idle`. A scheduled occurrence that
+arrives while a cycle is running is skipped, not queued. Each phase only checks
+its elapsed time, so the control loop is never blocked.
+
+The state diagram shows the full cycle. Each arrow is labeled with its
+condition, using the configured values (`valve_delay`, `pump_stop_delay` and
+`switch_delay` are 2 s; `water1_time` and `water2_time` are 5 min).
+
+![Phase state machine for ScheduledWatering](../docs/diagrams/scheduled-watering/phases.svg)
 
 ```ghost
   phase' = case phase {
@@ -102,9 +116,10 @@ the control loop is not blocked.
 
 ## What outputs are requested?
 
-Compute the intended valves and pump for the next phase. Output definitions are
-not executed block by block. Candidate outputs for a tick are calculated
-together, then constraints are applied.
+This step computes the intended valves and pump for the next phase (`phase'`).
+Output definitions do not run block by block. All candidate outputs for a tick
+are calculated together, and then the constraints are applied: the pump needs
+an open valve, and the two valves are never requested open at the same time.
 
 ```ghost
   valve1 <- phase' in {Open1, Water1, Stop1};
@@ -118,9 +133,9 @@ together, then constraints are applied.
 
 ## Expected sequence
 
-The table below is explanatory material; it is not executable code or program
-input. One cycle is about 10 minutes 10 seconds by configuration. Actual phase
-transitions also include tick-resolution error.
+The table below is explanatory material. It is not executable code or program
+input. By configuration, one cycle takes about 10 minutes 10 seconds. Actual
+phase transitions also include tick-resolution error.
 
 | Phase | Duration | Pump | Valve 1 | Valve 2 |
 |---|---|---|---|---|

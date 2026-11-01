@@ -1,0 +1,24 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName Helvetica
+skinparam rectangleRoundCorner 8
+skinparam ArrowColor #555555
+left to right direction
+
+rectangle "Host supplies\ninput, sensor reads\n(value or fault)" as IN
+rectangle "Previous state\nwatering" as PREV
+rectangle "Pure computation\nlet, fn, if, case" as CALC
+rectangle "Next state\nwatering'" as NEXT
+rectangle "Output connections\npump <- ...;" as OUT
+rectangle "require constraints\nblock bool outputs" as REQ
+rectangle "Host / renderer\napplies outputs,\nowns fail-safe" as HOST
+
+IN --> CALC
+PREV --> CALC
+CALC --> NEXT
+CALC --> OUT
+NEXT --> OUT : output expressions\nmay read next state
+OUT --> REQ : candidate intents
+REQ --> HOST : requested / safe intent
+NEXT ..> PREV : committed together\nat end of tick
+@enduml

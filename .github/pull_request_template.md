@@ -7,18 +7,18 @@ Allowed scope and prerequisites:
 
 ## Independent oracle and verification
 
-Expected outcomes and authoritative source (not generated from this implementation):
-Before / after commands, exit codes, results and exact artifact/report identities:
-Boundary / failure cases and deliberate protection-weakening result:
+Expected outcomes and their authoritative source (not generated from this implementation):
+Before / after commands, exit codes, results, and exact artifact/report identities:
+Boundary / failure cases, and the result of deliberately weakening the protection:
 Regression checks and remaining limitations (host / Device / physical):
 
 ## Review changed evidence separately
 
-- [ ] Inspect protection rule removal/weakening independently of expected-value edits.
-- [ ] Inspect oracle changes, assertion loss, test deletion/skip/todo and runner-list changes.
-- [ ] Inspect requirement status/testIds/locator digest/pendingReason changes.
-- [ ] Explain shared implementation/test misunderstanding risk; native/WASM agreement is portability evidence.
-- [ ] Any legitimate specification change cites authoritative evidence and separate meaning review.
-- [ ] Relevant bilingual docs/changelog and required repository gates remain intact.
+- [ ] I reviewed any removal or weakening of a protection rule separately from expected-value edits.
+- [ ] I reviewed oracle changes, lost assertions, deleted/skipped/todo tests, and runner-list changes.
+- [ ] I reviewed changes to requirement status, testIds, locator digest, and pendingReason.
+- [ ] I explained the risk that the implementation and its tests share the same misunderstanding; native/WASM agreement is only portability evidence.
+- [ ] Any legitimate specification change cites authoritative evidence and a separate meaning review.
+- [ ] Relevant bilingual docs/changelog and the required repository gates remain intact.
 
 Reference: [bounded contribution package](../docs/AI-CONTRIBUTION-PACKAGE.md).

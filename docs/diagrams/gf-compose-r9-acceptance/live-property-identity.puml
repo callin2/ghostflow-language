@@ -1,0 +1,14 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName Helvetica
+skinparam defaultFontSize 13
+title Identity across live property events and restart (proposed acceptance)
+
+[*] --> RunA : run starts\n(runId A, settings rev N)
+RunA --> RunA : valid live property event\nall values applied as one event;\nsettings rev N -> N+1;\nsource/program hashes and runId unchanged
+RunA --> RunA : invalid multi-property event\nwhole event rejected;\nno property mutates
+RunA --> RunB : real restart\n(GhostFlow restart event)
+RunB : new runId B
+RunB : accepted settings persist
+RunB : response = authored GhostFlow logic\n(no global resume/manual policy)
+@enduml

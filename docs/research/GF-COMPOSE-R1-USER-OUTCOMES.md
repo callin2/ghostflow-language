@@ -5,44 +5,71 @@ Issue: [#100](https://github.com/callin2/ghostflow-language/issues/100)
 Evidence revision examined: `ffdbc96461eca67908252507fb851fa4dabd9a2c`
 Status: research/design. No participant sessions or numeric baseline have been completed.
 
+This note defines what behavior composition must achieve for its users and how
+to measure it. It covers:
+
+- the user problem and the first end-to-end journey;
+- what the examined revision already provides (and what is only proposed);
+- five scenarios, a measurement sheet, and a paper walkthrough that separates
+  automation from human knowledge;
+- the recommendation, open questions with owners, and how this note was checked.
+
 ## User problem
 
-Farmers need to apply a prepared behavior with few technical decisions. They
-need to know what is required at their farm and what to do when an action is
-blocked. Software engineers and behavior authors need the exact definition,
-revision, instance, inputs, state, and constraint decision behind a result.
-Hardware engineers and installers need the installation binding, application
-result, and available physical feedback. The product outcomes are reduced
-effort, increased explainability, and increased traceability.
+Three groups of people need different answers from the same system:
 
-The first journey is: select a prepared behavior; review plain-language
-requirements; confirm farm/installation facts; apply; receive either a
-specific accepted result or a specific blocker; open the same incident to see
-technical evidence. No farmer step requires imports or a graph.
+| Who | What they need |
+|---|---|
+| Farmers | Apply a prepared behavior with few technical decisions. Know what is required at their farm, and what to do when an action is blocked. |
+| Software engineers and behavior authors | The exact definition, revision, instance, inputs, state, and constraint decision behind a result. |
+| Hardware engineers and installers | The installation binding, the application result, and the available physical feedback. |
+
+The product outcomes are **reduced effort**, **increased explainability**, and
+**increased traceability**.
+
+The first journey is:
+
+1. Select a prepared behavior.
+2. Review plain-language requirements.
+3. Confirm farm/installation facts.
+4. Apply.
+5. Receive either a specific accepted result or a specific blocker.
+6. Open the same incident to see technical evidence.
+
+No farmer step requires imports or a graph. The diagram below shows the same
+journey, with the farmer's steps and the shared incident view separated.
+
+![First journey: the farmer applies a behavior; engineers open the same incident](../diagrams/gf-compose-r1-user-outcomes/first-journey.svg)
 
 ## Evidence at examined revision
 
-- `compileSource` accepts one canonical `.ghost.md` literate document and
-  preserves source identity. Product composition and imported-source
-  provenance are therefore proposals, not current compiler behavior. See
-  [`tools/compile-source.mjs`](../../tools/compile-source.mjs).
-- The interaction contract defines static descriptors and completed runtime
+The following facts come from the examined revision. Anything about composition
+itself is still a proposal.
+
+- **Compiler input.** `compileSource` accepts one canonical `.ghost.md` literate
+  document and preserves source identity. Product composition and
+  imported-source provenance are therefore proposals, not current compiler
+  behavior. See [`tools/compile-source.mjs`](../../tools/compile-source.mjs).
+- **Interaction contract.** It defines static descriptors and completed runtime
   observations. It requires exact schema, module, source, and run joins;
   `stale` is derived by the validating consumer. It currently permits only
   read-only `state` and `timer` descriptors. See
   [`contracts/interaction-v0/README.md`](../../contracts/interaction-v0/README.md).
-- The integration contract keeps source/module/device/profile/installation
+- **Integration contract.** It keeps source/module/device/profile/installation
   identities distinct. A host pass does not establish hardware or physical
   success, and missing evidence remains unknown. See
   [`contracts/integration-v1/README.md`](../../contracts/integration-v1/README.md).
-- The local composition summary proposes one event with participant-specific
-  views. That is a design recommendation, not implemented behavior. The
-  frontend, API, and Device remain the owners stated in [`AGENTS.md`](../../AGENTS.md).
+- **Local composition summary.** It proposes one event with
+  participant-specific views. That is a design recommendation, not implemented
+  behavior. The frontend, API, and Device remain the owners stated in
+  [`AGENTS.md`](../../AGENTS.md).
 
 ## Tables and examples
 
-The “current effort” cells are explicitly hypothetical workflows. The
-walkthrough is hand-worked; it is not execution or participant evidence.
+Read the tables with two caveats:
+
+- The “current effort” cells are explicitly **hypothetical** workflows.
+- The walkthrough is **hand-worked**; it is not execution or participant evidence.
 
 | Scenario | Participant | Trigger | Current effort / hypothesis | Necessary user decisions | Proposed visible answer | Supporting evidence | Success measure |
 |---|---|---|---|---|---|---|---|
@@ -54,11 +81,14 @@ walkthrough is hand-worked; it is not execution or participant evidence.
 
 ### Measurement sheet
 
-Collection uses a scripted walkthrough of the five scenarios with the same
-fixture, then later moderated sessions with farmers, behavior authors, and
-installers. Record timestamps, actor, scenario, source revision, installation
-revision, and whether each answer came from a heuristic walkthrough or a real
-participant. Do not pool those evidence classes.
+Collect data in two stages:
+
+1. A scripted walkthrough of the five scenarios, all using the same fixture.
+2. Later, moderated sessions with farmers, behavior authors, and installers.
+
+For every answer, record the timestamp, actor, scenario, source revision,
+installation revision, and whether the answer came from a heuristic
+walkthrough or a real participant. Do not pool those two evidence classes.
 
 | Measure | Collection method | Baseline status | Desired interpretation |
 |---|---|---|---|
@@ -71,6 +101,9 @@ participant. Do not pool those evidence classes.
 | Unresolved cases | Count unknown/missing/stale evidence cases and whether owner is named | Unmeasured | Unknown stays visible rather than becoming pass or success |
 
 ### Paper walkthrough and automation boundary
+
+For each scenario, the first sentence says what software can check; the rest
+says what still needs a person with farm or installation knowledge.
 
 1. **Apply irrigation:** automate descriptor and binding checks. Farm/site
    suitability and water-source confirmation require farm knowledge.
@@ -90,7 +123,8 @@ participant. Do not pool those evidence classes.
    exists. Deciding whether to inspect wiring, retry, or call an installer is
    human/installation knowledge. Missing feedback remains unknown.
 
-Unanswered questions for later participant validation (not interviews):
+Three questions remain for later participant validation. They are open
+questions, not interview results:
 
 1. Which minimum requirement wording lets farmers decide suitability without
    understanding compiler terms? Owner: frontend/product, with farmer sessions.
@@ -103,27 +137,33 @@ Unanswered questions for later participant validation (not interviews):
 
 ## Recommendation
 
-Adopt the five-scenario journey and measurement sheet as the acceptance
-protocol for composition research. Prioritize a small result record that joins
-participant wording to the exact source/module/instance/run and installation
-identities already represented by the contracts. Reuse the interaction and
-integration identity rules. Add no graph editor, telemetry pipeline, or new
-storage system in this issue.
+- **Adopt** the five-scenario journey and the measurement sheet as the
+  acceptance protocol for composition research.
+- **Prioritize** a small result record that joins participant wording to the
+  exact source/module/instance/run and installation identities already
+  represented by the contracts.
+- **Reuse** the interaction and integration identity rules.
+- **Do not add** a graph editor, telemetry pipeline, or new storage system in
+  this issue.
 
-The first implementation-facing requirement should be a farmer-readable
-result with a specific blocker or accepted result, plus an engineer view of
-the same event. Explanation and event semantics remain with #88/#74; physical
-observation remains Device-owned. The missing command/explanation descriptors
-are unresolved contract work, not evidence that they exist today.
+The first implementation-facing requirement should be a farmer-readable result
+with a specific blocker or accepted result, plus an engineer view of the same
+event.
+
+Ownership stays where it is:
+
+- Explanation and event semantics remain with #88/#74.
+- Physical observation remains Device-owned.
+- The missing command/explanation descriptors are unresolved contract work,
+  not evidence that they exist today.
 
 ## Unresolved questions and owners
 
-- #70 / interaction owner: whether and how command, input, event, and
-  explanation descriptors extend interaction-v0 while retaining exact joins.
-- #88 / explanation owner and #74 / event owner: canonical incident fields for
-  requested output, safe output, application result, and missing feedback.
-- API/Device owners: retention and transport of installation/application/
-  physical evidence. The language repository must not silently choose them.
+| Owner | Open question |
+|---|---|
+| #70 / interaction owner | Whether and how command, input, event, and explanation descriptors extend interaction-v0 while retaining exact joins. |
+| #88 / explanation owner and #74 / event owner | Canonical incident fields for requested output, safe output, application result, and missing feedback. |
+| API/Device owners | Retention and transport of installation/application/physical evidence. The language repository must not silently choose them. |
 
 ## Verification
 

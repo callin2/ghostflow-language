@@ -1,10 +1,27 @@
 # Authoring and virtual simulation architecture
 
-This map describes the offline toolchain at this checkout. The canonical program is
-one complete `.ghost.md` document. Its prose, intent anchors, document ID, and
-revision ID travel with the compiled artifact; no second editable control string
-is created. The [Language Reference](LANGUAGE-REFERENCE.md) defines program
-semantics. This document describes the current tools and their boundaries.
+This document maps the **offline toolchain** in this checkout: how a program is
+authored, compiled and simulated without a real device. The
+[Language Reference](LANGUAGE-REFERENCE.md) defines program semantics; this
+document describes the current tools and where their responsibilities end.
+
+**In this document**
+
+- The overall toolchain and its two audiences (an LLM client and a human
+  terminal).
+- Which component plays which "driver" or "runtime" role.
+- Three representative execution sequences: a virtual timer, a piped console
+  session, and a physical scan on a Device.
+- What the simulations prove, what they leave open, and current limits.
+- Commands to reproduce the public path.
+
+**One canonical program.** The canonical program is one complete `.ghost.md`
+document. Its prose, intent anchors, document ID and revision ID travel with the
+compiled artifact. The toolchain never creates a second, separately editable
+control string.
+
+The flowchart below shows every tool on the offline path and what flows between
+them. Dotted lines mark separate paths that this CLI does not drive.
 
 ```mermaid
 flowchart LR
@@ -33,86 +50,122 @@ flowchart LR
   Device[Device ownership: firmware and physical I/O] -. profile metadata only .-> Profile
 ```
 
-The model path uses strict TOON for [Reference queries](../tools/reference-query.mjs),
-[`GhostFlow/cli-request-v1` and `cli-result-v1`](../tools/ghostc.mjs), and
-[`GhostFlow/scenario-v1` and `scenario-result-v1`](../tools/ghostsim.mjs).
+**Model-facing formats.** The LLM path uses strict TOON (a compact text
+encoding for structured requests and results) for:
+
+- [Reference queries](../tools/reference-query.mjs),
+- [`GhostFlow/cli-request-v1` and `cli-result-v1`](../tools/ghostc.mjs), and
+- [`GhostFlow/scenario-v1` and `scenario-result-v1`](../tools/ghostsim.mjs).
+
 `ghostc --request` returns typed diagnostics with source spans. The human
-`ghostc` command accepts the document path directly and prints short text
-diagnostics. The [ASCII console](KEYBOARD-HOST.md) has two modes. Interactive
-TTY mode starts with an immediate scan, then uses one persistent Rust WASM
-runtime and ScanDriver at a 100 ms wall-clock cadence. Number keys 1–8 toggle
-Bool inputs and scan immediately; `:toggle CHANNEL` is also available. Piped
-mode consumes deterministic line commands, runs the existing scenario runner,
-and can record a replayable TOON scenario.
+`ghostc` command takes the document path directly and prints short text
+diagnostics.
 
-The source map holds the complete document and immutable document/revision
-identity. `ghostsim` checks the map against the exact GFB bytes and manifest
-before execution. The result names the scenario SHA-256,
-bytecode SHA-256, source document SHA-256 and filename, plus document/revision
-IDs when supplied. A malformed request or failed activation returns a rejected
-result with no scan rows. A runtime error returns only earlier committed scans
-and its action index. A host failure after runner invocation reports
-`host-error` with `traceComplete: false`; an empty scan list then means child
-observations are unavailable, not that the runtime performed no scan. All
-failures exit nonzero.
+**Two console modes.** The [ASCII console](KEYBOARD-HOST.md) has two modes:
 
-The scenario result is a deterministic replay artifact, not a live observation
-record. Its `scanId` is scoped to that replay and it has no `runId`. A host that
-publishes scans as observations must assign its own run identity and preserve
-the artifact, source, scenario, and scan identities together, as required by
+- **Interactive TTY mode** scans immediately at startup. It then uses one
+  persistent Rust WASM runtime and ScanDriver at a 100 ms wall-clock cadence.
+  Number keys 1–8 toggle Bool inputs and scan immediately; `:toggle CHANNEL`
+  does the same.
+- **Piped mode** reads deterministic line commands, runs the existing scenario
+  runner, and can record a replayable TOON scenario.
+
+**Identity checks.** The source map holds the complete document and its
+immutable document/revision identity. Before execution, `ghostsim` checks the
+map against the exact GFB bytes and the manifest. The result names:
+
+- the scenario SHA-256,
+- the bytecode SHA-256,
+- the source document SHA-256 and filename, and
+- the document/revision IDs, when supplied.
+
+**Failure results.** All failures exit nonzero.
+
+| Failure | What the result contains |
+| --- | --- |
+| Malformed request or failed activation | A rejected result with no scan rows. |
+| Runtime error | Only the scans committed before it, plus the failing action index. |
+| Host failure after the runner was invoked | `host-error` with `traceComplete: false`. An empty scan list here means the child's observations are unavailable — not that the runtime performed no scan. |
+
+**A replay, not a live record.** The scenario result is a deterministic replay
+artifact, not a live observation record. Its `scanId` is scoped to that replay,
+and it has no `runId`. A host that publishes scans as observations must assign
+its own run identity. It must also keep the artifact, source, scenario and scan
+identities together, as required by
 [Reference §5.4](reference/05-settings-and-observation.md#54-정체성과-물리적-사실의-경계).
 
-Only a `scan` action evaluates the program. Its nonnegative `atMs` is a virtual
-clock value that cannot move backward. Input and key actions update held values;
-a later clock-only scan evaluates them again. The Rust core produces requested
-and safe **virtual intent** separately. Neither field says a relay moved.
-Plain input scenarios use a private JSON transport to the native Rust process.
-Sensor, certified interval, and Solar scenarios use the existing Rust/WASM
-`ControlRuntime` child with explicit observations and activation profiles.
-Both paths execute the portable Rust core; the transport is not another source
-language. Its window, sensor, and adaptation cases use framed scans; certified
-interval and Solar cases use the existing legacy WASM entry points with
-replay-local scan IDs assigned by the host. Timer time is supplied as monotonic
-`atMs`. Wall-clock, calendar,
-and Solar provider facts belong to the host binding, whether its source is an
-offline RTC or an optional NTP correction. The language's time semantics stay
-the same across those sources.
-Piped console mode accumulates one TOON scenario and replays it through the
-same `runScenario` path for each command redraw. It has explicit virtual time
-and no background clock. If a piped command or scan time fails after completed
-scans, `command-error` retains those rows and `--record` saves only the
-accepted, replayable prefix. Interactive TTY mode is separate: it owns one
-persistent activated Rust WASM `FramedGhostFlowRuntime`/`ScanDriver`, scans at
-startup and every 100 ms, and supplies elapsed wall time as nondecreasing
-virtual logical time. A key toggle also causes an immediate scan. Its display
-history is capped at 120 scans and redraws do not replay old actions. Both
-modes display only virtual inputs and requested/safe intent; neither applies
+**Scans and virtual time.**
+
+- Only a `scan` action evaluates the program.
+- Its nonnegative `atMs` is a virtual clock value. It cannot move backward.
+- Input and key actions only update held values. A later scan — even one that
+  only advances the clock — evaluates them again.
+- The Rust core produces requested and safe **virtual intent** separately.
+  Neither field says a relay moved.
+
+**Two transports, one core.** Both paths execute the same portable Rust core.
+The transport is not another source language.
+
+| Scenario kind | Transport | Scan entry point |
+| --- | --- | --- |
+| Plain inputs | Private JSON to the native `scenario_scan` Rust process | Rust `ScanDriver` in that process |
+| Window, sensor and adaptation cases | Existing Rust/WASM `ControlRuntime` child, with explicit observations and activation profiles | Framed scans |
+| Certified interval and Solar cases | Same `ControlRuntime` child | Existing legacy WASM entry points; the host assigns replay-local scan IDs |
+
+**Where time comes from.** Timer time is supplied as monotonic `atMs`.
+Wall-clock, calendar and Solar provider facts belong to the host binding, whether
+they come from an offline RTC or an optional NTP correction. The language's time
+semantics are the same for every source.
+
+**Piped mode in detail.** Piped console mode accumulates one TOON scenario. For
+each command redraw, it replays that scenario through the same `runScenario`
+path. It has explicit virtual time and no background clock. If a piped command
+or scan time fails after completed scans, `command-error` keeps those rows, and
+`--record` saves only the accepted, replayable prefix.
+
+**Interactive mode in detail.** Interactive TTY mode is separate. It owns one
+persistent, activated Rust WASM `FramedGhostFlowRuntime`/`ScanDriver`.
+
+- It scans at startup and every 100 ms.
+- It supplies elapsed wall time as nondecreasing virtual logical time.
+- A key toggle also causes an immediate scan.
+- Display history is capped at 120 scans. Redraws do not replay old actions.
+
+Both modes display only virtual inputs and requested/safe intent. Neither applies
 physical output or confirms hardware state.
 
-The selected [`GhostFlow/board-profile-v1`](KEYBOARD-HOST.md) or presentation-only
-Channel descriptor supplies the console's ordered input and output channel
-roster. `--bind CHANNEL=port` connects each channel to a matching manifest
-logical port; board profiles never infer a logical binding from an endpoint
-name. With no descriptor, the console uses a **virtual Waveshare 8DI/8RO**
-layout. Only exact matching default `DI`/`RO` logical names bind automatically.
-The layout does not verify pins, an installed board, an installation mapping,
-or an applied output. Other channel counts come from the chosen descriptor.
-The result records its profile ID, revision when present, digest, bindings, and
-`physical: unconfirmed`.
+**Channel roster and bindings.** The selected
+[`GhostFlow/board-profile-v1`](KEYBOARD-HOST.md) or presentation-only Channel
+descriptor supplies the console's ordered input and output channels.
 
-The [browser-safe public toolchain](../tools/browser-toolchain.mjs) and
-[WASM adapter](../runtimes/wasm/README.md) form a separate host path to the
-same portable language/runtime semantics. The
-API host owns model requests, conversation, document storage and deployment
-orchestration. The Device repository owns board profiles, firmware, actual
-drivers, pins, clocks and physical verification. This CLI makes no model calls
-and no device calls.
+- `--bind CHANNEL=port` connects each channel to a matching logical port in the
+  manifest.
+- Board profiles never infer a logical binding from an endpoint name.
+- With no descriptor, the console uses a **virtual Waveshare 8DI/8RO** layout.
+  Only exact matching default `DI`/`RO` logical names bind automatically.
+- That layout does not verify pins, an installed board, an installation mapping
+  or an applied output.
+- Other channel counts come from the chosen descriptor.
+
+The result records the profile ID, the revision when present, the digest, the
+bindings, and `physical: unconfirmed`.
+
+**Other hosts and owners.**
+
+- The [browser-safe public toolchain](../tools/browser-toolchain.mjs) and the
+  [WASM adapter](../runtimes/wasm/README.md) form a separate host path to the
+  same portable language/runtime semantics.
+- The API host owns model requests, conversation, document storage and
+  deployment orchestration.
+- The Device repository owns board profiles, firmware, actual drivers, pins,
+  clocks and physical verification.
+- This CLI makes no model calls and no device calls.
 
 ## Driver, runtime and virtual device responsibilities
 
-The following components are implemented in the offline path. The word
-**Driver** needs a qualifier: an input adapter, the core `ScanDriver`, a console
-descriptor and a physical I/O driver have different responsibilities.
+The components below are implemented on the offline path. The word **Driver**
+always needs a qualifier: an input adapter, the core `ScanDriver`, a console
+descriptor and a physical I/O driver each have different responsibilities.
 
 | Component | Responsibility and state | Implementation |
 | --- | --- | --- |
@@ -125,25 +178,36 @@ descriptor and a physical I/O driver have different responsibilities.
 | Virtual device view | Displays held inputs, requested/safe output banks and scan identity using the selected channel roster. The state consists of simulated input values, core program state and recorded observations; it has no separate actuator or plant model. | [ASCII panel and profile rules](KEYBOARD-HOST.md) |
 | Profile / channel descriptor | Describes ordered channels and types; explicit bindings connect them to manifest ports. Board-profile driver/address/polarity metadata is not executed by the console. | [`board-profile-v1` contract](../contracts/integration-v1/README.md), [`console-profile-v1`](KEYBOARD-HOST.md) |
 
-“Virtual device” here means an I/O view around a real GhostFlow runtime. The
-native runner registers virtual actuator capabilities from the module's output
-types so the runtime can activate. It does not emulate a Waveshare controller,
-relay register, contact, pump, tank level or sensor response. In particular,
-`safe.pump = true` does not automatically change a water-level input. A scenario
-must supply that input explicitly. A closed-loop plant model or simulated
-applied/confirmed output would require a separate, explicit model and evidence
-contract; neither is implemented by this CLI.
+**What "virtual device" means.** Here, a "virtual device" is an I/O view around a
+real GhostFlow runtime — not an emulated machine.
 
-The browser has its own input and pacing host. Farm Studio's
-`app/src/features/playground/playgroundRuntime.ts` instantiates
-`ControlRuntime.instantiateFramed`; `playgroundScan.ts` supplies manifest-shaped
-Boolean snapshots and explicit logical time, then reads displayed outputs from
-the returned safe bank. `simulationPacer.ts` determines scan opportunities for
-interactive playback. These frontend components do not evaluate GhostFlow
-rules. Browser runtime state persists between scans. Interactive TTY mode also
-preserves runtime state in one live WASM session. Piped console mode reconstructs
-state by replaying its accumulated scenario in a fresh native process. The older
-real-time Rust keyboard example remains a separate host.
+- The native runner registers virtual actuator capabilities from the module's
+  output types, so the runtime can activate.
+- It does not emulate a Waveshare controller, relay register, contact, pump,
+  tank level or sensor response.
+- In particular, `safe.pump = true` does not change a water-level input. The
+  scenario must supply that input explicitly.
+- A closed-loop plant model, or a simulated applied/confirmed output, would need
+  a separate, explicit model and evidence contract. This CLI implements neither.
+
+**Runtime state across scans, per host.**
+
+| Host | How runtime state carries across scans |
+| --- | --- |
+| Browser (Farm Studio) | Persists between scans in the browser runtime. |
+| Interactive TTY mode | Persists in one live WASM session. |
+| Piped console mode | Reconstructed by replaying the accumulated scenario in a fresh native process. |
+
+The browser has its own input and pacing host. In Farm Studio:
+
+- `app/src/features/playground/playgroundRuntime.ts` instantiates
+  `ControlRuntime.instantiateFramed`.
+- `playgroundScan.ts` supplies manifest-shaped Boolean snapshots and explicit
+  logical time, then reads the displayed outputs from the returned safe bank.
+- `simulationPacer.ts` decides scan opportunities for interactive playback.
+
+These frontend components do not evaluate GhostFlow rules. The older real-time
+Rust keyboard example remains a separate host.
 
 ## Representative execution sequences
 
@@ -152,9 +216,11 @@ real-time Rust keyboard example remains a separate host.
 This implemented path uses the complete
 [`virtual-timer.ghost.md`](../examples/authoring/corpus/virtual-timer.ghost.md)
 and its [scenario](../examples/authoring/corpus/virtual-timer-scenario.toon).
-`phase` starts at `Idle`; `pump` follows the computed next phase. No wall-clock
-waiting occurs between the three scans. The phase names below describe the
-source semantics; the trace also contains compiler-generated timer state.
+
+- `phase` starts at `Idle`; `pump` follows the computed next phase.
+- There is no wall-clock waiting between the three scans.
+- The phase names in the diagram describe source semantics. The actual trace
+  also contains compiler-generated timer state.
 
 ```plantuml
 @startuml
@@ -202,20 +268,27 @@ Host --> Author: one TOON/JSON result + hashes + all scan rows
 
 ![Offline timer sequence](assets/llm-toolchain-timer.svg)
 
-Validation or activation failure yields no scan rows. An action-level runtime
-error stops execution and returns earlier committed rows with its action index.
-A constraint fault can instead be a successful scan with a blocked safe intent;
-it is not automatically a runner failure. These paths are implemented in
-[`ghostsim.mjs`](../tools/ghostsim.mjs),
-[`scenario_scan.rs`](../crates/ghostflow-core/examples/scenario_scan.rs), and
+**How this sequence can fail.**
+
+- Validation or activation failure yields no scan rows.
+- An action-level runtime error stops execution. The result returns the rows
+  committed earlier, plus the failing action index.
+- A constraint fault is different: it can be a *successful* scan whose safe
+  intent is blocked. It is not automatically a runner failure.
+
+These paths are implemented in [`ghostsim.mjs`](../tools/ghostsim.mjs),
+[`scenario_scan.rs`](../crates/ghostflow-core/examples/scenario_scan.rs) and
 [`ScanDriver`](../crates/ghostflow-core/src/scan.rs).
 
 ### Piped mode: toggle an input, inspect permission blocking, then replay
 
-This is the piped console command sequence in the reproduction section below, using
-`pump-rev-2.ghost.md` and explicit DI/RO bindings. This pump has no program state
-or timer. The console owns the accumulated scenario; each `runScenario` call
-creates a fresh Rust process that reconstructs runtime state from the beginning.
+This sequence is the piped console command sequence from the reproduction
+section below. It uses `pump-rev-2.ghost.md` with explicit DI/RO bindings.
+
+- This pump program has no program state and no timer.
+- The console owns the accumulated scenario.
+- Each `runScenario` call creates a fresh Rust process, which rebuilds runtime
+  state from the beginning.
 
 ```plantuml
 @startuml
@@ -264,18 +337,37 @@ Host --> Human: TOON result (no console presentation envelope)
 
 ![Piped console pump sequence](assets/llm-toolchain-console.svg)
 
-Recording retains logical input/key actions and virtual scan times. The
-profile digest and DI/RO binding roster are added to the final console result,
-not to the scenario file. Replaying the recording reproduces logical scans;
-reproducing the panel also requires retaining its profile and binding arguments.
+**What a recording keeps.** A recording keeps logical input/key actions and
+virtual scan times. The profile digest and DI/RO binding roster are added to the
+final console result, not to the scenario file. So:
+
+- replaying the recording reproduces the logical scans, but
+- reproducing the panel also requires keeping its profile and binding arguments.
 
 ## Physical Driver and Device boundary
 
-Input **drivers** produce logical inputs; output **renderers** apply logical output intent to relays, motors, lamps or screens. These are roles, not mutually exclusive device classes. A USB force-feedback joystick has an input driver and an output renderer; an EC11 encoder with TFT similarly combines input and output roles. These examples define boundaries, not implementations. Driver and renderer source belongs in `farm-device-drivers`; Device owns host/board integration, bindings, clocks, watchdogs and boot/failure policy. The cabinet operator UI is `@ghostflow/cabinet-view` and is distinct from an output renderer. Existing `ScanDriver`, host ABI identifiers and profile `driver` fields retain their names and contracts.
+**Drivers and renderers are roles.** Input **drivers** produce logical inputs.
+Output **renderers** apply logical output intent to relays, motors, lamps or
+screens. These are roles, not mutually exclusive device classes:
 
-The physical path has additional responsibilities defined by
+- A USB force-feedback joystick has both an input driver and an output renderer.
+- An EC11 encoder with a TFT screen likewise combines input and output roles.
+
+These examples define boundaries, not implementations.
+
+| Item | Owner or name |
+| --- | --- |
+| Driver and renderer source | `farm-device-drivers` |
+| Host/board integration, bindings, clocks, watchdogs, boot/failure policy | Device |
+| Cabinet operator UI (distinct from an output renderer) | `@ghostflow/cabinet-view` |
+
+Existing `ScanDriver`, host ABI identifiers and profile `driver` fields keep
+their names and contracts.
+
+The physical path has additional responsibilities, defined by
 [Reference §8](reference/08-language-runtime-and-device-boundaries.md) and the
-[integration contract](../contracts/integration-v1/README.md):
+[integration contract](../contracts/integration-v1/README.md). The sequence
+below shows them for one physical scan:
 
 ```plantuml
 @startuml
@@ -341,62 +433,88 @@ end
 
 ![Physical scan boundary sequence](assets/llm-toolchain-device.svg)
 
-This diagram combines the ownership contract with the current `farm-device`
-firmware failure path. It is not a connection made by `ghostsim` or hardware
-verification. Independent physical confirmation is a contract boundary;
-the current firmware observation reports intent, applied write and register
-latch only, with no relay-contact or load feedback.
-Device owns firmware, driver/renderer host and board integration, approved board profiles, clocks,
-watchdogs and output handling at boot or failure. Installation bindings select
-the actual endpoint for each logical port. Logical safe intent, renderer-applied
-output, register readback and physical confirmation remain distinct evidence.
-The integration validator checks supplied identities and mappings; it neither
-installs them nor performs I/O.
+**How to read this diagram.** It combines the ownership contract with the
+current `farm-device` firmware failure path. It is not a connection that
+`ghostsim` makes, and it is not hardware verification.
 
-Device adapter code exists separately in `farm-device`:
+- Independent physical confirmation is a contract boundary. The current firmware
+  observation reports only intent, applied write and register latch. It has no
+  relay-contact or load feedback.
+- Device owns firmware, the driver/renderer host and board integration, approved
+  board profiles, clocks, watchdogs, and output handling at boot or failure.
+- Installation bindings select the actual endpoint for each logical port.
+- The integration validator checks supplied identities and mappings. It neither
+  installs them nor performs I/O.
+
+**Four kinds of evidence.** Logical safe intent, renderer-applied output,
+register readback and physical confirmation stay distinct. The diagram below
+shows who can produce each fact; this CLI stops at safe intent.
+
+![Output evidence stages and their owners](diagrams/llm-toolchain-architecture/evidence-stages.svg)
+
+**Device adapter code.** Device adapter code lives separately in `farm-device`.
 `rust/ghostflow-adapter/src/lib.rs` uses the shared `ScanDriver` and records
-applied masks and relay latch observations through `record_relay`; the firmware
-owns the actual output operation. That separate implementation is not invoked
-or certified by this authoring path. Its firmware/core revision, installation
-mapping and physical evidence must be checked for the intended deployment.
-There is no end-to-end device deployment, hardware emulation or physical
-confirmation step in the commands below.
+applied masks and relay latch observations through `record_relay`. The firmware
+owns the actual output operation.
 
-The output evidence chain is already defined by
-[Reference §4.7](reference/04-sensors-constraints-control.md#47-requested-safe-applied-confirmed):
-requested intent, safe intent, applied command and confirmed feedback are
-different facts. The [command-result lifecycle](reference/05-settings-and-observation.md#event-command-result와-alarm)
-describes request receipt, rejection, start, completion, cancellation and failure;
-it does not make a completed core scan proof of a completed physical action.
-The [Interaction v0 contract](../contracts/interaction-v0/README.md) projects
-completed runtime observations and performs no I/O. Reference
-[§8.5](reference/08-language-runtime-and-device-boundaries.md#85-변경과-재시작의-생명주기)
-separately assigns restart/state restoration to an explicit policy and checkpoint
-contract; it does not require rolling back a successful core scan after an I/O
-failure.
+- This authoring path neither invokes nor certifies that separate
+  implementation.
+- For the intended deployment, its firmware/core revision, installation mapping
+  and physical evidence must be checked.
+- The commands below contain no end-to-end device deployment, hardware emulation
+  or physical confirmation step.
 
-The current Device policy is visible in `farm-device/rust/firmware/src/ghostflow.rs`
+**Where the evidence chain is defined.**
+
+- [Reference §4.7](reference/04-sensors-constraints-control.md#47-requested-safe-applied-confirmed)
+  already defines the output evidence chain: requested intent, safe intent,
+  applied command and confirmed feedback are different facts.
+- The [command-result lifecycle](reference/05-settings-and-observation.md#event-command-result와-alarm)
+  describes request receipt, rejection, start, completion, cancellation and
+  failure. A completed core scan is not proof that a physical action completed.
+- The [Interaction v0 contract](../contracts/interaction-v0/README.md) projects
+  completed runtime observations and performs no I/O.
+- Reference
+  [§8.5](reference/08-language-runtime-and-device-boundaries.md#85-변경과-재시작의-생명주기)
+  assigns restart and state restoration to an explicit policy and checkpoint
+  contract. It does not require rolling back a successful core scan after an I/O
+  failure.
+
+**Current Device failure policy.** The policy is visible in
+`farm-device/rust/firmware/src/ghostflow.rs`
 (`scan_with_clock`, `set_mask`, `record_relay`, then `halt`) and
 `farm-device/rust/ghostflow-adapter/src/lib.rs` (`halt`, `scan_inner`, `resume`).
-It preserves the attempted safe mask as an observation, stops further core
-evaluation, clears adapter live output intents and requests OFF on the next
-firmware loop. It retains the committed core state and rejects resume while
-faulted. This is an implemented Device policy, not a missing language transaction.
+On an output failure it:
 
-This assessment was checked against clean `farm-device` revision
+1. keeps the attempted safe mask as an observation,
+2. stops further core evaluation,
+3. clears the adapter's live output intents,
+4. requests OFF on the next firmware loop,
+5. keeps the committed core state, and
+6. rejects resume while faulted.
+
+This is an implemented Device policy, not a missing language transaction.
+
+**Revision checked.** This assessment was checked against clean `farm-device`
+revision
 [`6d2e97b`](https://github.com/callin2/farm-device/commit/6d2e97b243045e3b2dfbbb9bf205614e26eceba4),
-including `rust/ghostflow-adapter/tests/adapter.rs`'s
-`relay_fault_halts_clears_intent_and_trace_is_bounded` case. The test was read,
-not rerun for this documentation review. A later Device revision must be
-inspected before repeating the implementation claim. Neither that host test
-nor this diagram proves an actual relay contact reached OFF.
+including the `relay_fault_halts_clears_intent_and_trace_is_bounded` case in
+`rust/ghostflow-adapter/tests/adapter.rs`. The test was read, not rerun, for this
+documentation review. Inspect any later Device revision before repeating the
+implementation claim. Neither that host test nor this diagram proves that an
+actual relay contact reached OFF.
 
 ## What the sequences establish and leave open
 
-The offline ownership chain is coherent: hosts supply inputs and time, the Rust
-core owns evaluation and state, and views consume traces. The sequences do not
-establish that a deployment is complete. The following are review findings,
-with severity relative to the scenario that needs the missing behavior.
+**What is established.** The offline ownership chain is coherent:
+
+- hosts supply inputs and time,
+- the Rust core owns evaluation and state, and
+- views consume traces.
+
+**What is not.** The sequences do not show that a deployment is complete. The
+review findings below rate severity relative to the scenario that needs the
+missing behavior.
 
 | Finding | Consequence and severity | Required evidence or decision |
 | --- | --- | --- |
@@ -406,21 +524,28 @@ with severity relative to the scenario that needs the missing behavior.
 | Interactive TTY scans at 100 ms wall-clock cadence with 120 display samples retained. | **Host timing limit:** scheduler delays can affect actual scan intervals; runtime logical time uses elapsed wall time. | This is a virtual review view, not a deadline guarantee or device host. |
 | A console recording omits its presentation profile/bindings; those exist in the final result. | **Low for logical replay; medium for panel reproduction:** the recorded logical scans are reproducible, but the original channel labels/layout cannot be recovered from TOON alone. | Retain the final console result and profile/binding arguments alongside the recording when panel identity matters. |
 
-The pump permission sequence checks requested versus safe intent. The timer
-sequence checks previous/next program state and the 1999/2000 ms boundary.
-Neither proves a physical deadline: if a host supplies no scan at 2000 ms,
-the runtime performs no autonomous transition then. Actual scan cadence,
+**What each sequence checks.**
+
+- The pump permission sequence checks requested versus safe intent.
+- The timer sequence checks previous/next program state and the 1999/2000 ms
+  boundary.
+
+Neither proves a physical deadline. If a host supplies no scan at 2000 ms, the
+runtime makes no autonomous transition at that moment. Actual scan cadence,
 input freshness and output latency remain host/Device acceptance criteria.
-The Device-side debug/output policy is tracked in
-[farm-device #25](https://github.com/callin2/farm-device/issues/25); physical
-relay contact evidence is tracked in
-[farm-device #26](https://github.com/callin2/farm-device/issues/26).
+
+Open Device work is tracked here:
+
+- Device-side debug/output policy:
+  [farm-device #25](https://github.com/callin2/farm-device/issues/25).
+- Physical relay contact evidence:
+  [farm-device #26](https://github.com/callin2/farm-device/issues/26).
 
 ## Reproduce the public path
 
-From the language repository root, with dependencies installed and the native
-`scenario_scan` example built, run these commands. They use the reviewed sample
-document and its TOON requests; no raw control copy is generated.
+Run these commands from the language repository root, with dependencies
+installed and the native `scenario_scan` example built. They use the reviewed
+sample document and its TOON requests; no raw control copy is generated.
 
 ```sh
 mkdir -p build/authoring
@@ -434,28 +559,48 @@ printf '1\n3\nscan 5\nexit\n' | node tools/ghostsim-console.mjs build/authoring/
 node tools/ghostsim.mjs build/authoring/pump.gfb build/authoring/console.toon --format toon
 ```
 
-This reproduction exercises **piped deterministic mode**. The check and compile results identify document `GF-EXAMPLE-PUMP`, revision
-`rev-2`, and the same full-document SHA-256. The scripted scenario scans at
-0, 1 and 2 ms; `pump` requested/safe values are `ON/OFF`, `ON/ON`, then
-`OFF/OFF`. The console example scans at 0, 0 and 5 ms. Its panel has eight
-input/output rows, including unbound DI8/RO8, and reports physical status as
-unconfirmed. Its recorded scenario replays with the same scans and artifact
-identity. A selected 2DI/4RO board-profile fixture exercises unequal rows in
-[`ghostsim-console.test.mjs`](../tests/ghostsim-console.test.mjs). The
-[`authoring-workflow.test.mjs`](../tests/authoring-workflow.test.mjs) already
-checks the TOON check/compile/simulate path; no separate compiler or runner is
-needed for this view.
+This reproduction exercises **piped deterministic mode**. Expected results:
+
+- **Check and compile** identify document `GF-EXAMPLE-PUMP`, revision `rev-2`,
+  and the same full-document SHA-256.
+- **Scripted scenario** scans at 0, 1 and 2 ms. The `pump` requested/safe values
+  are `ON/OFF`, then `ON/ON`, then `OFF/OFF`.
+- **Console example** scans at 0, 0 and 5 ms. Its panel has eight input/output
+  rows, including unbound DI8/RO8, and reports physical status as unconfirmed.
+- **Recorded scenario** replays with the same scans and artifact identity.
+
+Related tests:
+
+- A selected 2DI/4RO board-profile fixture exercises unequal row counts in
+  [`ghostsim-console.test.mjs`](../tests/ghostsim-console.test.mjs).
+- [`authoring-workflow.test.mjs`](../tests/authoring-workflow.test.mjs) already
+  checks the TOON check/compile/simulate path. No separate compiler or runner is
+  needed for this view.
 
 ## Current limits
 
-The runner permits at most 256 KiB of scenario text, 1,024 actions, 256 scans,
-and 1 MiB of encoded result. It uses plain runtime activation. Controls that
-need external certified intervals, schedule bindings, or another host resource
-are rejected at activation. Host event ordering is tracked in
-[#115](https://github.com/callin2/ghostflow-language/issues/115), while
-temporal resources are described in [TEMPORAL-RESOURCES.md](TEMPORAL-RESOURCES.md);
-basic virtual-time simulation does not supply a hidden default policy. Piped
-console mode has no automatic scan cadence. Interactive TTY mode scans at
-100 ms wall-clock cadence and immediately after toggles. Neither mode proves
-physical behavior: displayed outputs are requested and safe virtual intent,
-with no physical application or confirmation.
+**Runner limits.**
+
+| Limit | Value |
+| --- | --- |
+| Scenario text | 256 KiB |
+| Actions | 1,024 |
+| Scans | 256 |
+| Encoded result | 1 MiB |
+
+**Activation.** The runner uses plain runtime activation. Controls that need
+external certified intervals, schedule bindings or another host resource are
+rejected at activation.
+
+- Host event ordering is tracked in
+  [#115](https://github.com/callin2/ghostflow-language/issues/115).
+- Temporal resources are described in
+  [TEMPORAL-RESOURCES.md](TEMPORAL-RESOURCES.md).
+- Basic virtual-time simulation supplies no hidden default policy.
+
+**Scan cadence.** Piped console mode has no automatic scan cadence. Interactive
+TTY mode scans at a 100 ms wall-clock cadence and immediately after toggles.
+
+**No physical proof.** Neither mode proves physical behavior. Displayed outputs
+are requested and safe virtual intent, with no physical application or
+confirmation.

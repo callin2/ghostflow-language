@@ -1,0 +1,21 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontSize 13
+start
+:Read the old authored state;
+:Evaluate source **ok**;
+if (ok succeeded?) then (yes)
+  :Eagerly evaluate **payload**,
+  even for a duplicate observation
+  (selected-expression faults are kept);
+else (no)
+  :Evaluate the **fault** / **origin** branch
+  (payload is not evaluated);
+  note right
+    Physical-root density and
+    continuity observations
+    are still processed.
+  end note
+endif
+stop
+@enduml

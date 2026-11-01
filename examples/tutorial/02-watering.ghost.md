@@ -1,7 +1,7 @@
 # Scheduled watering
 
-This canonical tutorial control opens each valve in turn on its selected daily
-slots and holds the pump only during each watering phase.
+This canonical tutorial control waters two zones in turn at selected daily slots.
+It opens each valve in sequence and runs the pump only during a watering phase.
 
 ```ghost
 control ScheduledWatering {
@@ -50,3 +50,24 @@ control ScheduledWatering {
   require !(valve1 && valve2);
 }
 ```
+
+How it works:
+
+- **Schedule.** `starts` is a `DailySlots<15min>` schedule in the `Asia/Seoul`
+  time zone. It becomes due at 06:00, 06:15, 12:30 and 18:45.
+- **Phases.** `phase` walks through eight states. Only `Idle` looks at
+  `starts.due`, so a slot that becomes due while a cycle is still running does not
+  start a second cycle.
+- **Timer.** `age = elapsed(phase)` is the time since `phase` last committed a
+  change, so each phase measures its own duration.
+- **Valve and pump timing.** Each valve opens 2 s (`valve_delay`) before the
+  pump starts, waters for 5 min, and stays open 2 s (`pump_stop_delay`) after the
+  pump stops. Between the two zones, everything is off for 2 s (`switch_delay`).
+- **Outputs.** Outputs are computed from the next phase `phase'`, so they match
+  the phase chosen in the same tick.
+- **Requirements.** `require` states two safety rules: the pump may run only
+  when a valve is open, and the two valves are never open together.
+
+The phase cycle and the outputs that are on in each phase:
+
+![Watering phases: Idle, Open1, Water1, Stop1, Switch, Open2, Water2, Stop2, with the timer condition for each transition](../../docs/diagrams/tutorial-02-watering/watering-phases.svg)

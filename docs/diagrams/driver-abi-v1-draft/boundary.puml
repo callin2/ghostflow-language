@@ -1,0 +1,25 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName Helvetica
+skinparam componentStyle rectangle
+title Proposed native boundary (draft, not implemented)
+
+package "Execution host" {
+  [Rust core\n(evaluation, commit)] as Core
+  [Host\n(bindings, scheduling, policy)] as Host
+}
+package "Driver (device-specific)" {
+  [Endpoint I/O and\ninterpretation] as Drv
+}
+node "Device / board\n(physical I/O, failure policy)" as Dev
+
+Host --> Core : ordered input records
+Core --> Host : safe/effective intent
+Host --> Drv : gfdrv_api_v1\n(describe, open, poll,\napply, cancel, close)
+Drv ..> Host : gfdrv_host_v1\n(clock, report)
+Drv --> Dev : endpoint communication
+note bottom of Core
+  Not this ABI: Rust ScanDriver (core scan adapter)
+  and the gf_* / gf_frame_* WASM host-core ABI
+end note
+@enduml

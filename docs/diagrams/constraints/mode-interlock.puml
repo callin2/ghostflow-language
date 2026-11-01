@@ -1,0 +1,26 @@
+@startuml
+hide empty description
+skinparam shadowing false
+skinparam defaultFontName Helvetica
+skinparam state {
+  BackgroundColor White
+  BorderColor #555555
+}
+title Station mode interlock (Station adapter facility contract)
+
+state Stopped
+state Auto
+state Manual
+state Configure : structural configuration session\n(restart prohibited)
+state Stopping : stop ongoing work\ninhibit new starts\ncleanup, return ownership
+
+[*] --> Stopped
+Stopped --> Auto : enter(Auto)\nonly when stopped(station)
+Stopped --> Manual : enter(Manual)\nonly when stopped(station)
+Stopped --> Configure : enter(Configure)\nonly when stopped(station)
+Auto --> Stopping : explicit stop request
+Manual --> Stopping : explicit stop request
+Stopping --> Stopped : stopping complete\n(CommandedStop or VerifiedStop)
+Configure --> Stopped : validate + atomic apply,\nclose session
+note "No direct Auto <-> Manual\nor operation -> Configure transition" as N1
+@enduml

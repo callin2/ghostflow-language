@@ -1,25 +1,155 @@
 # Temporary settings reference host
 
-`TemporarySettingsHost` implements the adopted overlay lifecycle in Reference §5.2. It adds no GhostFlow keyword. The host owns actor grants, Program/run identity, one overlay layer, lifetime, return provenance and admission. Expressions, control state, timers, typed Result emissions and scan transactions execute in the shared Rust core through `ControlRuntime`.
+`TemporarySettingsHost` implements the adopted overlay lifecycle from
+Reference §5.2. A **temporary setting** (an *overlay*) changes a setting for a
+limited lifetime and then returns to the ordinary value that was in effect
+before it. The host adds no GhostFlow keyword.
 
-Activation receives an exact compiled literate artifact, `runId`, actor-to-config-ID `grants`, bounded history capacity, and the existing context profile. Source bytes, bytecode and manifest are recompiled and compared before activation; import closures must be supplied with composed artifacts. Actor grants, run identity, trusted clock observations and approved checkpoint storage are supplied by the embedding host. An actor/origin label is not authentication. This adapter does not issue Device runs, acquire a clock, persist storage or touch physical outputs.
+**Division of work.**
+
+| Owned by the host | Executed in the shared Rust core (through `ControlRuntime`) |
+| --- | --- |
+| actor grants, Program/run identity, one overlay layer, lifetime, return provenance, admission | expressions, control state, timers, typed Result emissions, scan transactions |
+
+**Activation.** Activation receives:
+
+- an exact compiled literate artifact;
+- a `runId`;
+- `grants`, mapping each actor to the config IDs it may change;
+- a bounded history capacity;
+- the existing context profile.
+
+Before activation, the host recompiles the source bytes and compares the
+bytecode and manifest. Composed artifacts must be supplied together with their
+import closures.
+
+**What the embedding host must supply.** Actor grants, run identity, trusted
+clock observations, and approved checkpoint storage all come from the
+embedding host. An actor/origin label is not authentication. This adapter does
+not issue Device runs, acquire a clock, persist storage, or touch physical
+outputs.
 
 ## Requests and observations
 
-`step(packet, event)` accepts the existing control packet plus an optional identified host event. Every event names `kind`, exact `programFingerprint`, `sourceSha256`, `runId`, `eventId`, `baseRevision`, `actor` and `reason`. `temporary` and `ordinary` events have nonempty unique `changes` containing `configId` and typed `result`. `cancel` names the original IDs in `cancelOverlayIds`. The host allocates the effective application position; raw settings facts cannot bypass it.
+`step(packet, event)` accepts the existing control packet plus an optional
+identified host event.
 
-A temporary event requires one explicit group lifetime: `{ kind: 'Run' }` or `{ kind: 'Until', dateTimeMs }`, where the latter is an absolute DateTime in milliseconds. All targets must be operator-editable and granted to the actor. Every value and the recorded ordinary return value must satisfy the current Program's type, bounds, grid and list capacity. Omitted lifetime, nesting, foreign Program/source/run, stale revision, duplicate event, unknown target and unauthorized requests reject before a core step. Cancellation must be committed before a new temporary request. A partial ordinary replacement of a temporary group requires cancellation of the whole group and the new ordinary changes in one event.
+Every event names:
 
-The ordinary value immediately preceding the temporary event remains in the underlying layer. A new ordinary event removes affected overlays and applies the new ordinary Result atomically; an old expiry cannot overwrite it. Ordinary invalid payloads preserve the core's aggregate `fault(SettingsInvalid)` behavior and settings revision. Cancellation/expiry records effective Results and whether the return was applied, superseded by an ordinary event, or completed as a fault emission; a fault is never labeled a successful return.
+- `kind`;
+- the exact `programFingerprint`, `sourceSha256`, and `runId`;
+- `eventId` and `baseRevision`;
+- `actor` and `reason`.
+
+Event kinds:
+
+- `temporary` and `ordinary` events carry `changes`: a nonempty list with no
+  duplicates, where each entry has a `configId` and a typed `result`.
+- `cancel` events name the original overlay IDs in `cancelOverlayIds`.
+
+The host allocates the effective application position. Raw settings facts
+cannot bypass it.
+
+**Rules for a temporary event.**
+
+- It requires exactly one explicit lifetime for the whole group:
+  `{ kind: 'Run' }` or `{ kind: 'Until', dateTimeMs }`. `dateTimeMs` is an
+  absolute DateTime in milliseconds.
+- Every target must be operator-editable and granted to the actor.
+- Every value, and the recorded ordinary return value, must satisfy the current
+  Program's type, bounds, grid, and list capacity.
+
+The host rejects these requests before any core step: omitted lifetime,
+nesting, a foreign Program/source/run, a stale revision, a duplicate event, an
+unknown target, and an unauthorized request.
+
+A cancellation must be committed before a new temporary request. To replace
+only part of a temporary group with ordinary values, submit one event that both
+cancels the whole group and makes the new ordinary changes.
+
+**How the ordinary value is kept and restored.** The ordinary value in effect
+just before the temporary event stays in the underlying layer. A new ordinary
+event removes the affected overlays and applies the new ordinary Result
+atomically. An old expiry can never overwrite it afterwards.
+
+An invalid ordinary payload keeps the core's existing behavior: an aggregate
+`fault(SettingsInvalid)`, with the settings revision preserved.
+
+A cancellation or expiry records the effective Results and how the return
+ended:
+
+- the return was applied;
+- the return was superseded by an ordinary event; or
+- the return completed as a fault emission.
+
+A fault is never labeled as a successful return. The diagram summarizes these
+outcomes.
+
+![Lifecycle of a temporary overlay and its three recorded return outcomes](diagrams/temporary-settings-host/overlay-lifecycle.svg)
 
 ## Lifetime, return and restart
 
-`Run` returns on `endRun(packet)` or before the first decision of a restored different run. `endRun` evaluates the final settings-return transaction and closes that host run; later steps reject. `Until` remains active before expiry across approved restarts of the exact same Program. Its trusted wall-time uncertainty interval must establish which side of expiry applies. Unknown time or an interval crossing expiry marks lifetime validity unavailable and blocks control evaluation. Explicit cancellation can recover without guessing time validity. Return/control transaction failure preserves settings, overlays, committed outcome and checkpoint; valid retry uses the unaccepted identity.
+**`Run` lifetime.** The overlay returns on `endRun(packet)`, or before the
+first decision of a restored *different* run. `endRun` evaluates the final
+settings-return transaction and closes that host run; later steps are
+rejected.
 
-`checkpoint()` binds the exact Program/source, ordinary Results, overlays, core checkpoint, completed revision/positions and bounded history with a digest. `instantiate` restoration requires `restoreApproved: true` and a new supplied `runId`. The digest detects corruption; it is not storage authentication. The restore path validates the entire overlay provenance, permission snapshot, creation event, expiry, rollback targets/values and core effective state. It restores settings and context terminal identities into a fresh core, not VM control state or timer memory. Settings revisions persist; application positions belong to the new run. Restoration and lifetime decisions finish before the first control decision. Program Q never receives P's overlay automatically; Q requires a fresh identified, authorized and validated request.
+**`Until` lifetime.** The overlay stays active until expiry, including across
+approved restarts of the exact same Program. The trusted wall-time uncertainty
+interval must show which side of the expiry the current time is on. If the time
+is unknown, or the interval straddles the expiry, lifetime validity is marked
+unavailable and control evaluation is blocked. An explicit cancellation can
+recover from this without guessing whether the time is valid.
+
+**Failure and retry.** If a return or control transaction fails, the host
+keeps the settings, overlays, committed outcome, and checkpoint. A valid retry
+reuses the identity that was not accepted.
+
+**Checkpoint and restore.** `checkpoint()` binds the following together with a
+digest: the exact Program/source, ordinary Results, overlays, core checkpoint,
+completed revision/positions, and bounded history.
+
+- Restoring through `instantiate` requires `restoreApproved: true` and a newly
+  supplied `runId`.
+- The digest detects corruption. It does not authenticate storage.
+- The restore path validates the entire overlay provenance, the permission
+  snapshot, the creation event, the expiry, the rollback targets/values, and
+  the core effective state.
+- It restores settings and context terminal identities into a fresh core. It
+  does not restore VM control state or timer memory.
+- Settings revisions persist; application positions belong to the new run.
+- Restore and lifetime decisions finish before the first control decision.
+
+**Changing Program.** Program Q never receives Program P's overlay
+automatically. Q requires a fresh request that is identified, authorized, and
+validated.
 
 ## TimeSlots return boundary
 
-Context settings origin tag `2`, `temporaryReturn`, is reserved for host-validated lifecycle returns. Like other origin labels it is not authorization. It requires operator-editable targets and retains all type, range, grid, capacity and duplicate checks. A return may reuse a row key already allocated in that stream, preserving the ordinary identity hidden by an overlay. It cannot use an unallocated key. Ordinary `operatorEdit` and `producerObservation` continue rejecting retired keys. The reference host admits only recorded return keys; compound ordinary changes reject keys outside the current or underlying ordinary rows. The new origin is an additive extension of GFSF5/6; older runtimes reject the new tag and must not consume these requests.
+Context settings origin tag `2`, `temporaryReturn`, is reserved for lifecycle
+returns that the host has validated. Like other origin labels, it is not
+authorization.
 
-REF-05-018 tests execute actual Run/Until ownership, P-to-Q revalidation, group cancellation, conservative unavailable handling, ordinary faults and digest-correct forged provenance rejection. Native Rust and framed WASM compare complete core outcomes, settings and checkpoint bytes, including failed return/retry. These are reference-host semantics with supplied evidence, not production API orchestration, Device deployment, physical cutoff or general closure of #89.
+A `temporaryReturn` change:
+
+- requires operator-editable targets;
+- keeps all type, range, grid, capacity, and duplicate checks;
+- may reuse a row key already allocated in that stream, which preserves the
+  ordinary identity hidden by an overlay;
+- cannot use an unallocated key.
+
+Ordinary `operatorEdit` and `producerObservation` changes still reject retired
+keys. The reference host admits only recorded return keys. Compound ordinary
+changes reject keys outside the current or underlying ordinary rows.
+
+The new origin is an additive extension of GFSF5/6. Older runtimes reject the
+new tag and must not consume these requests.
+
+**Evidence.** The REF-05-018 tests execute real Run/Until ownership, P-to-Q
+revalidation, group cancellation, conservative unavailable handling, ordinary
+faults, and rejection of forged provenance even when its digest is correct.
+Native Rust and framed WASM compare complete core outcomes, settings, and
+checkpoint bytes, including a failed return and its retry. These are
+reference-host semantics with supplied evidence. They are not production API
+orchestration, Device deployment, a physical cutoff, or general closure of
+#89.

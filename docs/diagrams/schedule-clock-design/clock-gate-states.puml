@@ -1,0 +1,22 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName Helvetica
+skinparam defaultFontSize 13
+hide empty description
+state "No baseline" as None
+state "BootBaseline" as Boot
+state "ClockUnknown" as Unknown
+state "RecoveryBaseline" as Recovery
+state "Trusted tracking\n(compare deltas with gap)" as Tracking
+[*] --> None : construct(gap, run epoch)
+None --> Boot : first trusted wall time
+None --> Unknown : missing or untrusted\nwall time
+Boot --> Tracking
+Recovery --> Tracking
+Tracking --> Tracking : delta <= gap
+Tracking --> Tracking : delta > gap\n/ ObservationGap
+Tracking --> Unknown : missing or untrusted\nwall time
+Unknown --> Recovery : trusted wall time again
+note right of Boot : Baselines are never\nadmission pulses
+note bottom of Tracking : Validation failure (range, epoch,\nmonotonic regression) leaves\nstate unchanged
+@enduml

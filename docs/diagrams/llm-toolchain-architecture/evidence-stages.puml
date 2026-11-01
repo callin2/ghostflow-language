@@ -1,0 +1,19 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontSize 12
+left to right direction
+title Output evidence: separate facts, separate owners
+rectangle "Rust core\n(ghostsim / CLI reaches here)" as CoreBox {
+  card "Requested intent" as Req
+  card "Safe intent" as Safe
+}
+rectangle "Device (farm-device firmware)" as DeviceBox {
+  card "Applied write\n(renderer acknowledged)" as Applied
+  card "Register latch\n(readback)" as Latch
+}
+card "Confirmed effect\n(independent observation;\nnot reported by current firmware)" as Confirmed
+Req --> Safe : constraints
+Safe --> Applied : map + write
+Applied --> Latch : read register
+Latch --> Confirmed : observe contact/load
+@enduml

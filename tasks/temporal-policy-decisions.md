@@ -1,18 +1,34 @@
 # Temporal policy decisions
 
-Status: **approved product decisions recorded in Reference §§3.5 and 4.4**. This
-file remains a test and technical-contract planning record. It does not claim
-compiler or runtime support.
+**Status: approved product decisions, recorded in Reference §§3.5 and 4.4.**
+
+This file remains a planning record for tests and technical contracts. It does
+not claim compiler or runtime support.
+
+**In this document:**
+
+| Topic | Decision in one line | Reference |
+| --- | --- | --- |
+| `true_for` | Only Driver-certified continuous intervals count; no interpolation. | §4.4 |
+| `after_event` | Each start event keeps its own independent result. | §4.4 |
+| Multiple schedule crossings | All crossed occurrences are missed; none executes. | §3.5 |
+
+Each decision below quotes the Korean sentence that was applied to the
+Reference.
 
 ## Settled decisions
 
 ### `true_for`
 
-`true_for(..., quality: measured)` may accumulate only continuous intervals
-that the installed Driver certifies were actually observed. Separate point
-samples do not certify the interval between them. The compiler/runtime must not
-interpolate between samples or treat expected cadence, scan cadence, duplicate
-samples, or clock-only ticks as observed continuity.
+`true_for(..., quality: measured)` may accumulate only continuous intervals that
+the installed Driver certifies were actually observed. Separate point samples do
+not certify the interval between them.
+
+The compiler/runtime must not:
+
+- interpolate between samples; or
+- treat expected cadence, scan cadence, duplicate samples, or clock-only ticks
+  as observed continuity.
 
 Applied to Reference §4.4 after the existing `true_for` sentence:
 
@@ -22,10 +38,12 @@ Applied to Reference §4.4 after the existing `true_for` sentence:
 
 ### `after_event`
 
-Every distinct start event has an independently tracked result. Overlapping
-events remain distinguishable. A later start event does not overwrite an older
-pending or completed result. The existing half-open interval `[e,e+window)`
-continues to apply to each event identity.
+Every distinct start event has an independently tracked result.
+
+- Overlapping events remain distinguishable.
+- A later start event does not overwrite an older pending or completed result.
+- The existing half-open interval `[e,e+window)` continues to apply to each
+  event identity.
 
 Applied to Reference §4.4 after the existing `after_event` sentence:
 
@@ -39,8 +57,10 @@ This resolves the product choice previously marked pending in
 
 When one accepted observation interval crosses two or more occurrences of the
 same schedule, record every crossed occurrence as missed and execute none of
-them. This rule is limited to the multiple-crossing case. A scan that crosses
-exactly one occurrence continues to use the ordinary pulse admission rules.
+them.
+
+This rule applies only to the multiple-crossing case. A scan that crosses
+exactly one occurrence still uses the ordinary pulse admission rules.
 
 Applied to Reference §3.5 under observation gaps and recovery:
 
@@ -50,12 +70,14 @@ Applied to Reference §3.5 under observation gaps and recovery:
 
 ## Decisive specification scenarios
 
+Each scenario separates the approved behavior from a plausible wrong one.
+
 1. **Certified continuity:** two touching Driver-certified true intervals whose
    union reaches the positive duration make `true_for` true at the boundary.
 2. **No interpolation:** true point samples at `t=0` and `t=d` with no certified
    interval between them do not satisfy `true_for`, regardless of expected or
    actual scan cadence.
-3. **Continuity break:** a gap in certified coverage, false interval, or
+3. **Continuity break:** a gap in certified coverage, a false interval, or
    inadmissible quality resets the accumulated true interval.
 4. **Overlapping events:** event `A` starts, then event `B` starts before `A`'s
    window ends. Predicate observations update separately addressable `A` and
@@ -67,12 +89,12 @@ Applied to Reference §3.5 under observation gaps and recovery:
    no execution for either, and an identical retry cannot duplicate the two
    records after commit.
 7. **Single-crossing control:** the same schedule with one crossed occurrence
-   follows ordinary predicate/admission behavior, proving the new missed policy
-   was not applied broadly.
+   follows ordinary predicate/admission behavior. This proves the new missed
+   policy was not applied broadly.
 
 ## Technical contracts still required
 
-These decisions do not choose the following implementation contracts:
+These decisions do **not** choose the following implementation contracts:
 
 - Driver interval-certificate wire shape, trust binding, coverage validation,
   clock/epoch identity, and proof propagation through transformed signals.

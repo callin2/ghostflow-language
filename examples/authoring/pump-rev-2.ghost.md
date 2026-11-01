@@ -1,8 +1,8 @@
 # Pump request with permission
 
-This is revision rev-2-input-v1 of document `GF-EXAMPLE-PUMP`. It corrects the incomplete
-expression at the diagnostic's original document span. The user confirmed that
-stop takes priority and that an absent permission blocks the pump's safe intent.
+This file is revision `rev-2-input-v1` of document `GF-EXAMPLE-PUMP`. It fixes the
+incomplete expression from [revision 1](pump-rev-1.ghost.md) at the exact document span
+that the diagnostic reported. The user confirmed two rules: STOP takes priority, and missing permission blocks the pump's safe intent.
 
 <!-- ghostflow:anchor id=GF-INT-PUMP-REQUEST kind=intent status=confirmed origin=user -->
 > Start requests the pump. Stop cancels the request.
@@ -13,7 +13,7 @@ stop takes priority and that an absent permission blocks the pump's safe intent.
 <!-- ghostflow:anchor id=GF-ASM-PUMP-MAX-RUN kind=assumption status=unconfirmed origin=ai -->
 > A maximum run duration may be wanted. Its value and restart rule were not supplied. Ask the user before adding a timer.
 
-Explicit input-quality-v1 source revision. Unknown requests retain authored state and cannot create a new request; known STOP or a known released START cancels it. Original source bytes and dated benchmark evidence remain separately preserved.
+This is an explicit input-quality-v1 source revision: each input carries producer quality (`ok` or `fault`). An unknown (faulted) request keeps the stored request state and can never create a new request. A known STOP, or a known released START, cancels the request. The original source bytes and dated benchmark evidence are preserved separately. The corrected assignment is `pump <- requested';`, so the pump request follows the next request state, and `require pump => permit` blocks it while permission is absent.
 
 ```ghost
 control PumpRequest {

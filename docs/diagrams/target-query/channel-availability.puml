@@ -1,0 +1,35 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName Helvetica
+skinparam defaultFontSize 13
+title Availability of one selected channel
+
+start
+:Keep only fresh, linked observations
+(invalid reports are excluded and
+recorded in diagnostics);
+:Collect states for the channel
+and for each declared resource;
+if (Do reports disagree about the
+channel or about any one resource?) then (yes)
+  :conflict;
+  stop
+endif
+if (Is `resources` declared on the channel?) then (no)
+  :unknown;
+  stop
+endif
+if (Does the channel and every declared
+resource have at least one state?) then (no)
+  :unknown;
+  stop
+endif
+if (Any state is reserved?) then (yes)
+  :reserved;
+elseif (Any state is busy?) then (yes)
+  :busy;
+else (all available)
+  :available;
+endif
+stop
+@enduml

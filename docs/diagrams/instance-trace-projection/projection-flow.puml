@@ -1,0 +1,19 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName Helvetica
+skinparam defaultFontSize 13
+left to right direction
+
+artifact "Compiled artifact\n(source, closure, bytecode,\nmanifest, source map)" as A
+artifact "Presentation\n(labels,\npresentationRevision)" as L
+rectangle "Activation\n(verify identity,\nrecompile, check labels)" as ACT
+artifact "Runtime trace\n(observeSourceTrace)" as T
+rectangle "projectTrace(trace)\n(check module fingerprint)" as PT
+artifact "Frozen entries\n(instance ID, label, node,\nsymbol, trace fields)" as OUT
+
+A --> ACT
+L --> ACT
+ACT --> PT
+T --> PT
+PT --> OUT
+@enduml

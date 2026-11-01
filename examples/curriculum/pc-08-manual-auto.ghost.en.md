@@ -5,39 +5,64 @@
 # PC-08 — Manual/automatic modes and common permission
 
 <!-- ghostflow:anchor id=GF-INT-PC08-MANUAL-AUTO-REARM-V1 kind=intent status=confirmed origin=imported -->
-> Learning scenario: Select manual or automatic operation for one pump and
-> handle stop/overload permissions common to both modes. Require a fresh run
-> request so a mode change or permission recovery cannot silently restart equipment.
+> Learning scenario: run one pump in either manual or automatic mode, and handle
+> the stop/overload permissions that apply to both modes. A fresh run request is
+> required, so a mode change or a permission recovery can never quietly restart
+> the equipment.
 
-The linked original is the sole canonical literate executable source for PC-08. It combines
-the [PC-03 manual start/latching](./pc-03-motor-contactor.ghost.md) and
-[PC-07 automatic demand](./pc-07-tank-hysteresis.ghost.md) examples without
-replacing them. The existing [station mode rules](../station-rules.ghost.md)
-and [shared pump example](../tutorial/04-extra-valves.ghost.md) are preserved
-for their distinct advanced topic of multi-control arbitration.
+The linked Korean `.ghost.md` file is the only canonical, executable literate
+source for PC-08. It combines two earlier lessons without replacing them:
+[PC-03 manual start and latching](./pc-03-motor-contactor.ghost.en.md) and
+[PC-07 automatic demand](./pc-07-tank-hysteresis.ghost.en.md). Two other
+examples, the [station mode rules](../station-rules.ghost.md) and the
+[shared pump example](../tutorial/04-extra-valves.ghost.md), are kept as they
+are: they cover a separate, more advanced topic, arbitration between several
+controls.
 
 ## Intent and normalization
 
-An operator might say, “Run the pump when I turn it on manually or when there is
+An operator might say: "Run the pump when I start it manually or when there is
 automatic demand. Stop immediately if stop or overload permission is lost, and
-do not restart automatically when permission returns.” This document normalizes
-that intent as follows.
+don't restart by itself when permission comes back." This document turns that
+request into precise rules (*normalizes* it):
 
-- `manual_mode_request` and `auto_mode_request` are maintained mode-selection inputs.
-- If both are false, mode is `Off`; if one is true, that mode is selected; if both are true, mode is `ModeConflict`. Outputs are always off during a conflict.
-- `manual_start` is a momentary manual-start event. Once accepted, it keeps `Running` in Manual mode. Holding the input does not reuse it as a restart event after permission recovers.
-- `auto_demand` is maintained automatic demand, but it can start only after stable Auto mode first observes it false to rearm, then observes it newly true.
-- `stop_ok` and `overload_ok` are common permissions for both modes. If either is false, stop immediately; restoring permission alone does not restart.
+- **Mode selection.** `manual_mode_request` and `auto_mode_request` are
+  maintained mode-selection inputs.
+
+  | `manual_mode_request` | `auto_mode_request` | Mode |
+  | --- | --- | --- |
+  | false | false | `Off` |
+  | true | false | `Manual` |
+  | false | true | `Auto` |
+  | true | true | `ModeConflict` (outputs always off) |
+
+- **Manual start.** `manual_start` is a momentary manual-start event. Once it is
+  accepted, the pump stays `Running` in Manual mode. Holding the button down is
+  not reused as a restart event after permission comes back.
+- **Automatic demand.** `auto_demand` is a maintained automatic demand. It can
+  start the pump only after Auto mode is stable, has seen the demand false once
+  (this *re-arms* the request), and then sees it become true again.
+- **Common permission.** `stop_ok` and `overload_ok` apply to both modes. If
+  either is not true, the pump stops at once. Restoring permission alone never
+  restarts it.
 
 `Mode` and `RunPhase` are logical states. `pump_contactor` is a logical coil
-command reflecting the next scan's state. Actual contactor closure, main-circuit
-voltage, and pump rotation are outside this example's evidence. The installation
-requires independent hardware protection such as emergency stop, thermal
-overload relay, and electrical interlocks.
+command that reflects the next scan's state. Real contactor closure,
+main-circuit voltage, and pump rotation are outside this example's evidence. A
+real installation needs independent hardware protection, such as an emergency
+stop, a thermal overload relay, and electrical interlocks.
 
 ## GhostFlow source
 
-This explicit input revision consumes producer quality, not physical button diagnostics. Good(false) remains a normal observation. Unknown request/position/mode observations do not establish a new request, released request, position, or mode; existing state is retained where no observation justifies a transition. Existing protection permission requires a confirmed Good(true), and existing hard time limits remain effective. No new START input or global restart policy is added.
+**Input quality.** This revision reads the quality that each input's producer
+reports. It does not diagnose physical button faults.
+
+- A healthy `false` (Good(false)) is a normal observation.
+- An unknown request or mode observation does not establish a new request, a
+  released request, or a mode. Where no observation justifies a transition, the
+  current state is kept.
+- Protection permission requires a confirmed Good(true).
+- No new START input or global restart policy is added.
 
 ```ghost
 // Source revision: issue531-producer-quality-pc08-v1
@@ -105,34 +130,44 @@ control ManualAutoPump {
 }
 ```
 
-On a scan where mode selection changes, `run_phase'` must become `Stopped`
-even though `mode'` records the new mode. An `auto_demand` already held when
-entering Auto does not start on that scan. It starts only after Auto observes it
-false once, sets `request_armed`, and then sees it true again. The same
-`request_armed` logic detects a fresh Manual START event, so a START held through
-loss and restoration of permission is not treated as a restart. If demand
-disappears during Auto operation, stop on that scan and prepare for the next
-fresh demand.
+**Mode changes always stop first.** On a scan where the mode selection changes,
+`mode'` records the new mode, but `run_phase'` must become `Stopped`.
+
+**Fresh demand is required.** An `auto_demand` that is already true when Auto is
+entered does not start the pump. Auto must first see the demand false once, which
+sets `request_armed`; only then does a new true value start the pump. The same
+`request_armed` logic detects a fresh Manual START. So a START button held down
+while permission is lost and restored is not treated as a restart. If the
+demand disappears during Auto operation, the pump stops on that scan, and the
+control waits for the next fresh demand.
+
+The timeline below follows these rules scan by scan. The demand is already true
+when Auto is selected at scan 1, so the pump stays stopped. The demand drops at
+scan 3, which arms the request, and the new demand at scan 4 starts the pump.
+When the demand drops again at scan 6, the pump stops.
+
+![PC-08 scan timeline: Auto mode re-arms before starting](../../docs/diagrams/pc-08-manual-auto/auto-rearm-timeline.svg)
 
 ## Comparison with relays and PLCs
 
-Relay/PLC logic may repeat mode-selection contacts, START latching contacts, and
-the common stop/overload NC path across several rungs. GhostFlow represents
-`mode` and `run_phase` as separate states and shares the common `permit` before
-every operating path. This makes it possible to trace “why did the pump turn on
-in this mode?” through mode selection → fresh-start event/rearming → common
-permission → next state → coil connection.
+In relay or PLC logic, mode-selection contacts, START latching contacts, and the
+common stop/overload NC (normally closed) path are often repeated across several
+rungs. GhostFlow keeps `mode` and `run_phase` as separate states and puts one
+shared `permit` in front of every operating path. This lets you answer "why did
+the pump turn on in this mode?" by following one chain: mode selection → fresh
+start event / re-arming → common permission → next state → coil output.
 
 This lesson covers only modes and common permission. Timers, sequential valves,
-resource conflicts between equipment, timeout/fault latching, UI, firmware
-export, and physical-output guarantees belong to later tasks and are not added
-implicitly to this source.
+resource conflicts between machines, timeout/fault latching, UI, firmware
+export, and physical-output guarantees belong to later lessons. They are not
+quietly added to this source.
 
 ## Verification boundary
 
-`tools/check-pc-08.mjs` creates a fresh WASM `ControlRuntime` for each scenario
-and uses the same existing compiler, literate extractor, adapter, and WASM
-artifact. It checks `stateBefore`, `stateAfter`, `requested`, `safe`, and
-nondecreasing `nowMs`, then prints hashes for the expected records and relevant
-executables. A checker PASS means the virtual/compiler/WASM logical trace
-matches; it does not mean an actual relay or pump operated.
+`tools/check-pc-08.mjs` creates a fresh WASM `ControlRuntime` for each scenario.
+Every scenario uses the same existing compiler, literate extractor, adapter, and
+WASM artifact. The checker verifies `stateBefore`, `stateAfter`, `requested`,
+`safe`, and that `nowMs` never decreases. It then prints SHA-256 hashes of the
+expected records and the relevant executables. A checker PASS means the
+virtual/compiler/WASM logical trace matches. It does not mean that a real relay
+or pump operated.

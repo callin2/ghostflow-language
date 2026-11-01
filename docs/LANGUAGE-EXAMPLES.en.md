@@ -3,33 +3,42 @@
 
 # GhostFlow syntax alternatives: three versions of the same watering program
 
-2026-09-05 · For design comparison. The code below proposes new syntax and cannot run with the current `ghostc`.
-This document records the initial A/B/C comparison.
-The syntax and literate format selected in subsequent discussion are in [control syntax](LANGUAGE-SURFACE.md) and [LITERATE.md](LITERATE.md).
-The running MVP example is [irrigation.ghost.md](../examples/irrigation.ghost.md).
-Common semantics follow the [language specification](LANGUAGE.md); the reasoning behind stylistic preferences is in the [design notes](DESIGN-NOTES.md).
+2026-09-05 · For design comparison only. The code below proposes **new** syntax and cannot run with the current `ghostc`.
+
+This document records the initial comparison of three syntax alternatives, A, B and C. It is kept as design history.
+
+- The syntax and literate format chosen in later discussion are described in [control syntax](LANGUAGE-SURFACE.en.md) and [LITERATE.en.md](LITERATE.en.md).
+- The runnable MVP example is [irrigation.ghost.md](../examples/irrigation.ghost.md).
+- Shared semantics follow the [language specification](LANGUAGE.en.md). The reasoning behind style preferences is in the [design notes](DESIGN-NOTES.md).
 
 ## Behavior being compared
 
-The three programs express the following behavior with the same inputs, state, strategies, and outputs.
+All three programs express the same behavior, with the same inputs, state, strategies and outputs:
 
-1. A start input begins watering. Previous state latches it even when the start input goes low.
-2. Stop takes priority if stop or low-water is true. A low-water sensor error also blocks watering.
-3. A configuration without a moisture sensor selects `basic`.
-4. A configuration with a moisture sensor selects `moisture_aware`. It starts and continues only below 35. It stops at 35 or above, or on a sensor error.
-5. The same watering intent is emitted to the valve and pump, with `pump requires valve` applied.
+1. A start input begins watering. The program *latches* (holds itself on) using its previous state, so watering continues after the start input goes low.
+2. Stop has priority: if stop or low-water is true, watering stops. A low-water sensor error also blocks watering.
+3. A configuration without a moisture sensor selects the `basic` strategy.
+4. A configuration with a moisture sensor selects `moisture_aware`. Watering starts and continues only while moisture is below 35. It stops at 35 or above, or on a sensor error.
+5. The same watering intent goes to both the valve and the pump, and `pump requires valve` is applied.
 
-`start` and `stop` are bool samples each tick, not edge events.
-`low_water` is a common mandatory sensor. The `moisture` input is declared only within the enhanced strategy.
-A configuration without a moisture sensor does not need a fabricated moisture value.
+Input details:
 
-The 35 in this example is a threshold for a driver-normalized moisture index.
-Physical-unit types are a separate extension.
-The existing MVP example allows the start signal to bypass the moisture threshold. The new comparison examples deliberately apply the threshold even when starting.
+- `start` and `stop` are bool samples taken every tick. They are not edge events.
+- `low_water` is a mandatory sensor shared by both strategies.
+- The `moisture` input is declared only inside the enhanced strategy. A configuration without a moisture sensor therefore never needs a made-up moisture value.
+
+About the threshold:
+
+- 35 is a threshold on a moisture index that the driver has already normalized. Physical-unit types are a separate extension.
+- In the existing MVP example, the start signal bypasses the moisture threshold. These comparison examples deliberately apply the threshold at start too.
+
+The diagram below shows the shared behavior: the device profile selects a strategy, and both strategies feed the same latch, intent and safety rule.
+
+![Strategy selection and data flow of the watering program](diagrams/language-examples/watering-behavior.svg)
 
 ## Alternative A — YAML-centered declarative syntax
 
-Declarations are laid out with a short expression in each field. Device queries are block strings.
+Declarations are laid out as YAML, with a short expression in each field. Device queries are block strings.
 
 ```yaml
 module: irrigation
@@ -82,17 +91,22 @@ safety:
     - [pump, valve]
 ```
 
-After YAML is read, the values of `functions`, `let`, `next`, and `intent` are parsed as GhostFlow expressions.
-There is no arbitrary code execution. `state.initial` is a literal matching its type.
+How it is processed:
 
-This is convenient for editing device lists and settings, or round-tripping with a form UI.
-Longer logic, however, looks like a nested configuration document, and error locations from both YAML parsing and expression parsing must be displayed together.
-Matching data shapes alone do not make code and data semantically equivalent; the common type graph connects them.
+- After the YAML is read, the values of `functions`, `let`, `next` and `intent` are parsed as GhostFlow expressions.
+- No arbitrary code is executed.
+- `state.initial` is a literal that matches its type.
+
+Strengths and weaknesses:
+
+- **Good for:** editing device lists and settings, and round-tripping with a form UI.
+- **Weak for:** longer logic, which starts to look like a nested configuration document. Errors can come from two stages — YAML parsing and expression parsing — and both locations must be shown together.
+
+Having the same data shape does not by itself make code and data mean the same thing. The shared type graph is what connects them.
 
 ## Alternative B — Literate CoffeeScript-centered flow syntax
 
-Code follows explanation. An editor can attach current values and timelines below that code.
-The proposal treats the entire outer Markdown below as one document-form source.
+Explanation comes first, then code. An editor can attach current values and timelines below each code block. In this proposal, the whole outer Markdown below is a single document-form source. (The prose inside the example is in Korean, as in the original proposal.)
 
 ````markdown
 # 관수
@@ -165,18 +179,23 @@ safety
 ```
 ````
 
-Ordinary source uses the same code without explanations and fences.
-Function composition and intermediate signals are directly visible, making it convenient to connect code, explanation, and execution results.
-YAML-style `name: type` declarations and Cypher-style `match` are included in this syntax.
+Ordinary (non-literate) source uses the same code without the explanations and fences.
 
-The syntax takes inspiration from CoffeeScript but follows GhostFlow's type and tick rules.
-Call parentheses are retained and indentation rules are fixed, so expression boundaries are clear.
-Document-form source requires a source map linking back to the original Markdown.
+Strengths:
+
+- Function composition and intermediate signals are directly visible.
+- It is easy to connect code, explanation and execution results.
+- It absorbs YAML-style `name: type` declarations and Cypher-style `match`.
+
+Design notes:
+
+- The syntax borrows the feel of CoffeeScript but follows GhostFlow's type and tick rules.
+- Call parentheses are kept and indentation rules are fixed, so expression boundaries are clear.
+- Document-form source needs a source map that links back to the original Markdown.
 
 ## Alternative C — Cypher-centered query syntax
 
-Each strategy reads as clauses: `match → where → with → next → emit`.
-Device conditions, intermediate computations, state transitions, and outputs appear in sequence.
+Each strategy reads as a sequence of clauses: `match → where → with → next → emit`. Device conditions, intermediate computations, state transitions and outputs appear in that order.
 
 ```ghost
 module irrigation version 1
@@ -211,22 +230,28 @@ safety
 end
 ```
 
-`where moisture.type is number` spells out the type condition of `(moisture:sensor<number>)`.
-Here `where` checks a device profile, not the sensor's current value.
-`with` is a pure computation for one tick; `next` defines next state; `emit` corresponds to `intent` in the other alternatives.
-`end` closes strategy and safety blocks.
+What the clauses mean:
 
-This code does not execute directly in Cypher or Lua, and is not a database query updating multiple rows.
-This draft's `match` checks the presence of named capabilities.
+| Clause | Meaning |
+|---|---|
+| `where moisture.type is number` | Spells out the type condition of `(moisture:sensor<number>)`. It checks the device profile, **not** the sensor's current value. |
+| `with` | A pure computation for one tick. |
+| `next` | Defines the next state. |
+| `emit` | Same as `intent` in the other alternatives. |
+| `end` | Closes strategy and safety blocks. |
 
-This is easy to read around device queries and graphs.
-When composing long transition expressions, however, more clauses are needed, and readers must understand that device selection and per-tick computation run at different times.
+This code does not run as Cypher or Lua. It is also not a database query that updates multiple rows. In this draft, `match` only checks that the named capabilities are present.
+
+Strengths and weaknesses:
+
+- **Good for:** reading around device queries and graphs.
+- **Weak for:** long transition expressions, which need more clauses. Readers must also understand that device selection and per-tick computation run at different times.
 
 ## Where does Meta Lua syntax extension fit?
 
-All three alternatives lower an AST into a common type graph, so syntax extension need not belong exclusively to one alternative.
-The following is a separate extension sketch using alternative B notation.
-The complete examples above use the ordinary `latch` function and do not require this extension.
+All three alternatives lower their AST into a shared type graph. So syntax extension does not have to belong to any single alternative.
+
+Below is a separate extension sketch, written in alternative B notation. The complete examples above use the ordinary `latch` function and do not need this extension.
 
 ```ghost
 syntax hold(start: Expr<bool>, stop: Expr<bool>, held: Expr<bool>)
@@ -238,21 +263,29 @@ next
   watering = @hold(input.start, blocked, state.watering)
 ```
 
-`quote` constructs syntax and `$(...)` inserts supplied syntax. `@hold(...)` expands at compile time.
-This notation is a GhostFlow proposal; it does not replicate Metalua's original syntax.
-The preceding function suffices for simple reuse. Macros are used when generating new domain notation or structure.
+How it works:
 
-Expansion finishes in the host compiler and must pass type, cycle, and resource validation again.
-Generated names do not capture caller names. The compiler displays original and expanded code together.
-No parser is loaded onto the runtime and no dynamic `eval` is executed.
+- `quote` builds syntax. `$(...)` inserts syntax passed in as an argument.
+- `@hold(...)` expands at compile time.
+- This notation is a GhostFlow proposal. It does not copy Metalua's original syntax.
+- For simple reuse, the plain function shown earlier is enough. Macros are for generating new domain notation or structure.
+
+Safety rules for expansion:
+
+- Expansion finishes inside the host compiler. The expanded code must pass type, cycle and resource validation again.
+- Generated names do not capture the caller's names (the expansion is hygienic).
+- The compiler shows the original and the expanded code together.
+- No parser is loaded into the runtime, and no dynamic `eval` is executed.
 
 ## Behavior comparison criteria
 
-The following expectations are specification scenarios for all of A/B/C.
-They are not yet results verified by executing each syntax parser.
-Below, `L` is the low-water input and `M` is the moisture input.
-Each row is independent and explicitly injects `previous state`.
-`—` means that field is absent from the basic strategy's input schema.
+The expected values below are specification scenarios that apply to all of A, B and C. They have **not** yet been verified by running a parser for each syntax.
+
+How to read the table:
+
+- `L` is the low-water input and `M` is the moisture input.
+- Each row is independent and explicitly injects the previous state.
+- `—` means the field is not in the basic strategy's input schema.
 
 | Strategy | Previous state | start | stop | L | M | next.watering | valve / pump intent |
 |---|---|---|---|---|---|---|---|
@@ -267,21 +300,26 @@ Each row is independent and explicitly injects `previous state`.
 | moisture_aware | true | false | false | Ok(false) | Err(Stale) | false | false / false |
 | moisture_aware | false | false | false | Ok(false) | Ok(20) | false | false / false |
 
-An `Err` input remains recorded as a fault in the journal even after a recovery value is used.
-If start is false after a sensor error releases watering, sensor recovery does not automatically restore the latched state.
-If start stays true, watering can restart when conditions recover.
-Requiring a fresh button press to restart needs a separate edge/rearming policy.
+**Errors and restart.**
 
-The basic device profile provides pump, valve, and low_water.
-Adding moisture makes both strategies match, but selects the strategy with priority 10.
-Missing mandatory low_water is an activation error.
-If moisture fails while the enhanced strategy runs, its Err input stops operation. Replacement by the basic strategy follows a separate profile-change procedure.
+- An `Err` input stays recorded as a fault in the journal, even after a recovery value is used.
+- Suppose a sensor error released watering. If start is false, the latched state does **not** come back automatically when the sensor recovers.
+- If start stays true, watering can restart once conditions recover.
+- To require a fresh button press before restarting, you need a separate edge/rearming policy.
 
-The watering example always has equal outputs, so `requires` does not intervene.
-An independent verification condition for the constraint itself is that a `pump=true, valve=false` request makes pump false.
-Interlock comparison uses a separate `mutex forward, reverse` constraint; when both requests are true, both final outputs must be false.
-A valve-open command does not prove actual opening.
-Devices requiring actual feedback need separate inputs and constraints.
+**Strategy selection.**
+
+- The basic device profile provides pump, valve and low_water.
+- When moisture is added, both strategies match, and the strategy with priority 10 is selected.
+- A missing mandatory low_water is an activation error.
+- If moisture fails while the enhanced strategy runs, its `Err` input stops watering. Switching to the basic strategy follows a separate profile-change procedure.
+
+**Constraints.**
+
+- In the watering example the two outputs are always equal, so `requires` never intervenes.
+- To verify the constraint independently: a request of `pump=true, valve=false` must make pump false.
+- Interlocks are compared with a separate `mutex forward, reverse` constraint. When both requests are true, both final outputs must be false.
+- A valve-open command does not prove the valve actually opened. Devices that need real feedback require separate inputs and constraints.
 
 ## Selection proposal
 
@@ -293,7 +331,9 @@ Devices requiring actual feedback need separate inputs and constraints.
 | Reading burden | Deep nesting | Indentation and document boundaries | Clause roles and execution timing |
 | Recommended use | Declarations and interchange format | Default authoring syntax | Device-selection expressions |
 
-The initial recommendation was to use B as the default, incorporating A's declaration style and C's device queries.
-Meta Lua code extension belongs in the common compilation layer.
-There was no decision to implement all three parsers as products.
-Subsequently, control syntax centered on expressions and output connections was selected as the basic direction. This comparison is retained as design history.
+Outcome:
+
+- The initial recommendation was to make B the default, adopting A's declaration style and C's device queries.
+- Meta Lua-style code extension belongs in the shared compilation layer.
+- There was no decision to build all three parsers as products.
+- Later, a control syntax centered on expressions and output connections was chosen as the basic direction. This comparison is kept as design history.

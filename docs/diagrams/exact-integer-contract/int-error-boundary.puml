@@ -1,0 +1,22 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName Helvetica
+skinparam defaultFontSize 13
+skinparam activityBackgroundColor #F7F9FC
+start
+:Source with Int values;
+if (Constant overflow, bad literal,\nmixed Int/Number, or\nstatically invalid conversion?) then (yes)
+  :Compile diagnostic;
+  stop
+else (no)
+endif
+:Encode GFB and run a scan;
+if (Input-dependent overflow,\nzero divisor, or invalid conversion?) then (yes)
+  :Reject the scan\n(stable reason, e.g. integer-overflow);
+  :No new state or intents commit;\nlast accepted outcome stays as evidence;
+  stop
+else (no)
+  :Commit exact Int results;
+  stop
+endif
+@enduml

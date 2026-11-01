@@ -1,0 +1,17 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName Helvetica
+start
+:Compute exact diff\n(PR: merge-base..head;\npush: previous..current commit);
+if (manual dispatch?) then (yes)
+  :Full verification;
+elseif (diff empty or unresolved?) then (yes)
+  :Full verification;
+elseif (every path on the\ndocumentation allowlist?) then (yes)
+  :Documentation lane\n(docs:check, doc-index and\nrouting tests; no WASM artifact);
+else (no: unknown, mixed, .ghost.md,\nspec, contract, policy, unsafe mode)
+  :Full verification;
+endif
+:Verification result check\n(classification + selected lane);
+stop
+@enduml

@@ -1,0 +1,23 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName Helvetica
+skinparam defaultFontSize 13
+title Valve-switch counterexample (hand-worked, not execution evidence)
+
+participant "Behavior A\n(pump session owner)" as A
+participant "Station policy\n(prepare_start_batch,\nauthorize_output)" as S
+participant "Behavior B" as B
+
+A -> S : pump session active (ValveA)
+A -> S : pump OFF briefly,\nchange ValveA -> ValveB
+note over S : Session is retained\nacross valve cleanup
+B -> B : sees pump=false
+B -> S : request the same physical pump
+S --> B : rejected (AlreadyOwned):\nA still owns the session;\nan inactive control cannot stop the owner
+note over A, B
+A local rule "pump is off, therefore B may start"
+would break the session ownership invariant.
+This is a bounded station claim only, not proof
+that arbitrary composed behaviors share resources correctly.
+end note
+@enduml

@@ -1,0 +1,16 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontSize 13
+skinparam rectangleRoundCorner 8
+rectangle "Compiler companion\ntraceMetadata (source-trace-v1):\nfingerprint, bindings, constraints,\ndependencies, windowSites" as meta
+rectangle "Runtime trace\nTickRecord.to_json():\nsafetyTrace, windowTrace" as trace
+rectangle "observeSourceTrace\n(source + safety + window evidence)" as ost
+rectangle "observeRuntimeValues\n(runtime-values-v1)" as orv
+rectangle "interaction-runtime-snapshot\n(runtime-snapshot-v0)" as snap
+meta --> ost
+trace --> ost
+meta --> orv
+trace --> orv
+orv --> snap : generated timer storage\nresolved internally
+note bottom of ost : joins actual fields only;\nnever re-evaluates expressions
+@enduml

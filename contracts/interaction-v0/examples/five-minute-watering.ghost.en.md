@@ -4,16 +4,41 @@
 
 [Korean canonical source](./five-minute-watering.ghost.md)
 
+This literate GhostFlow program waters for exactly five minutes after a button press. A stop button or a low-water sensor ends watering at once. It is the canonical parser corpus input for the interaction contract.
+
 ## Execution contract
 
-- At logical time 0, `watering` and all outputs are off and `age` is 0.
-- DI1 is a momentary watering request. A false-to-true edge starts a new watering cycle; holding it does not restart the cycle. A healthy released sample arms the next press.
-- DI2 stop or DI3 low-water immediately clears watering and both outputs. They have priority over a new DI1 request.
-- Clearing DI2/DI3 or holding DI1 does not restart watering. Release DI1 and press again to start a new full five-minute cycle.
-- RO1 pump and RO2 watering valve follow the accepted watering state together. DI4–DI8 are spare inputs and RO3–RO8 remain off.
-- `age = elapsed(watering)` measures time since the Boolean state last changed. The cycle ends at exactly five minutes; a later new DI1 edge restarts the interval.
+**Start state**
+
+- At logical time 0, `watering` is false, every output is off, and `age` is 0.
+
+**Starting a cycle**
+
+- DI1 is a momentary watering request. Only a false-to-true edge (a new press) starts a new watering cycle.
+- Holding DI1 does not restart the cycle. Releasing DI1 (a healthy false sample) arms the next press.
+
+**Stopping**
+
+- DI2 (stop) or DI3 (low water) immediately turns off watering and both outputs. Both stop inputs have priority over a new DI1 request.
+- A cycle ended by DI2 or DI3 does not resume. Clearing DI2/DI3, or continuing to hold DI1, does not restart watering. To start a new full five-minute cycle, release DI1 and press it again.
+
+**Outputs**
+
+- RO1 (pump) and RO2 (watering valve) follow the accepted `watering` state together: both on when it is true, both off when it is false.
+- DI4–DI8 are spare inputs. RO3–RO8 always stay off.
+
+**Timing**
+
+- `age = elapsed(watering)` is the time since the Boolean `watering` state last changed. It limits the cycle only while `watering` is true.
+- The cycle ends at exactly five minutes. A later new DI1 edge starts a new interval.
+
+The state diagram below summarizes these rules.
+
+![Watering state machine: Off and On states with start and stop transitions](../../../docs/diagrams/five-minute-watering/watering-states.svg)
 
 ## Required capability bindings
+
+These are logical channels the program needs from the host.
 
 | Channel | Name | Role |
 | --- | --- | --- |
@@ -33,15 +58,20 @@ either condition or holding DI1 must not restart; RO1 pump and RO2 watering
 valve operate in lockstep from the accepted watering state; timer age =
 elapsed(watering), exact 5min cutoff.”
 
-- DI1 true denotes the asserted button; DI2/DI3 true denotes the corresponding stop condition. The original request does not specify electrical polarity.
-- The capability mapping identifies logical channels and makes no assertion about Waveshare polarity or physical wiring.
+- In control terms, DI1 true means the button is pressed, and DI2/DI3 true means the matching stop condition is present. The original request does not specify electrical polarity, and this document does not define it.
+- The table above maps software (virtual) channels only. It says nothing about Waveshare terminal numbers, polarity, or physical wiring.
 
 ## New revision with explicit input quality
 
-This revision uses the #531 quality input contract. Healthy false/0 is not a fault.
-A DI1 fault prevents new starts and retains existing operation only when DI2/DI3 are healthy and released.
-A DI2 or DI3 fault clears operation. Once any input fault has been observed, a healthy DI1 false sample followed by true is required to restart. Recovery alone does not start operation.
-The predecessor is preserved in `tests/fixtures/history/issue531/consumer-fixtures.pre-input.json`.
+This revision uses the input quality contract from #531. Each input is either `ok(value)` or `fault(...)`. A healthy false/0 reading is not a fault.
+
+| Situation | Effect |
+| --- | --- |
+| DI1 fault | Blocks new starts. An existing cycle continues only while DI2 and DI3 are healthy and released. |
+| DI2 or DI3 fault | Treated as an active stop: watering turns off. |
+| Any input fault was observed | After recovery, DI1 must be seen as a healthy false and then as true before watering can start again. Recovery alone never starts watering. |
+
+The previous source (before this revision) is preserved in `tests/fixtures/history/issue531/consumer-fixtures.pre-input.json`.
 
 ```ghost
 control FiveMinuteWatering {
@@ -79,6 +109,14 @@ control FiveMinuteWatering {
 }
 ```
 
+How the code maps to the rules:
+
+- `recover(false)` treats a faulted DI1 as "not pressed"; `recover(true)` treats a faulted DI2/DI3 as "stop".
+- `request_was_high` remembers the previous request. It is forced to true whenever any of DI1–DI3 is faulted, so only a healthy false followed by true counts as a new edge.
+- `watering'` is true only when no stop is active and either a new edge arrived or the current cycle is still under `watering_limit`.
+
 ## Corpus role
 
 This literate document is the canonical parser corpus input. It does not replace imported intent or earlier history, benchmark, replay, or projection evidence.
+
+This document and the corpus files derived from it are for software verification only. They do not test or prove firmware integration, or the behavior of a real pump, valve, relay, or contact.

@@ -1,16 +1,29 @@
 # Timer control with optional observation
 
-2026-10-05 explicit input-quality revision: unknown request retains established run state; the two-second deadline still applies. Quality does not assert a physical failure.
+2026-10-05 explicit input-quality revision: if the request is unknown, the established run state is kept, and the two-second deadline still applies. Input quality does not assert a physical failure.
 
-The operator establishes a command duration for this example: two seconds. This illustrative value is not a measured travel time or an approved setting for a particular installation. Replace it only with an explicitly established installation value. No physical feedback is required to calculate output intent.
+The operator establishes a command duration for this example: two seconds. This is an illustrative value. It is not a measured travel time, and it is not an approved setting for any particular installation. Replace it only with an explicitly established installation value. Calculating the output intent requires no physical feedback.
 
-`run_request` is a maintained Bool request. The first accepted true scan starts a new interval. Repeated true scans do not reset the timer. At two seconds, requested and safe `drive` become false. Keeping the request true does not restart it. A false scan stops immediately and commits `run = false`; a later true scan starts a fresh interval. A false/true pulse between accepted scans cannot reset the timer. On a new runtime, state and timer initialize again; a first true request starts a new interval.
+`run_request` is a maintained Bool request. The timer behaves as follows:
 
-`age` times the committed Bool state `run`. `run_age` is zero on a requested state transition, so start and stop take effect in the current decision. The timer uses supplied monotonic scan time. If there is no scan exactly at the limit, the next accepted scan applies the limit.
+- The first accepted `true` scan starts a new interval.
+- Repeated `true` scans do not reset the timer.
+- At two seconds, requested and safe `drive` become `false`. Keeping the request `true` does not restart it.
+- A `false` scan stops immediately and commits `run = false`. A later `true` scan starts a fresh interval.
+- A `false`/`true` pulse that falls between accepted scans cannot reset the timer, because the timer only sees accepted scans.
+- A new runtime initializes state and timer again, so its first `true` request starts a new interval.
 
-The optional `observation` capability selects `Observed` when installed and `Baseline` when absent. Both strategies issue exactly the same actuator intent. Healthy true, healthy false, missing samples and installed faults remain separate sensor observations returned by the production host. The host returns a `NotReady` reading placeholder for an absent optional sensor; capability metadata and the selected strategy establish absence. Supplying a sample cannot invent the absent capability. A fault does not select the absence strategy. This example grants observation no control authority.
+The timeline below shows these rules for one request, a stop, and a new request.
 
-Timer completion is the end of authored command duration. It does not prove renderer application, relay contact operation, load movement or position. Requested intent, safe intent, applied command and independent physical evidence remain separate.
+![Timeline: maintained request, two-second deadline and restart](../docs/diagrams/optional-feedback-timer/timer-timeline.svg)
+
+`age` times the committed Bool state `run`. On a decision where the requested state differs from `run`, `run_age` is zero, so a start or stop takes effect in that same decision. The timer uses the supplied monotonic scan time. If no scan falls exactly at the limit, the next accepted scan applies it.
+
+The optional `observation` capability selects a strategy: `Observed` when the capability is installed, `Baseline` when it is absent. Both strategies issue exactly the same actuator intent. This example grants observation no control authority.
+
+The production host still returns each sensor observation separately: healthy `true`, healthy `false`, missing sample, or installed fault. For an absent optional sensor, the host returns a `NotReady` reading placeholder; the capability metadata and the selected strategy establish that it is absent. Supplying a sample cannot invent an absent capability, and a fault does not select the absence strategy.
+
+Timer completion marks the end of the authored command duration. It does not prove renderer application, relay contact operation, load movement, or position. Requested intent, safe intent, the applied command, and independent physical evidence remain separate.
 
 ```ghost
 control OptionalFeedbackTimer {

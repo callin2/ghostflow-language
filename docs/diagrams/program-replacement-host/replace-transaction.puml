@@ -1,0 +1,25 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName Helvetica
+skinparam defaultFontSize 13
+
+start
+:host.replace({ artifact, runId });
+:Check run ID is new and history capacity remains;
+:Copy candidate, recompile canonical source + closure,\ncheck source/manifest/bytecode identity\nand supported profile;
+if (All checks pass?) then (no)
+  :Reject;
+  :Keep previous Program, state,\nrun, assessment and last trace;
+  stop
+endif
+:Rust core hotSwap\n(core transfers same-name, same-type state);
+if (Core compatibility check passes?) then (no)
+  :Reject;
+  :Keep previous Program, state,\nrun, assessment and last trace;
+  stop
+endif
+:Publish new source / artifact / run identity\nwith recomputed assessment;
+:Clear last trace; core has dropped its input cache;
+:Next step() needs a complete\nnew observation map;
+stop
+@enduml

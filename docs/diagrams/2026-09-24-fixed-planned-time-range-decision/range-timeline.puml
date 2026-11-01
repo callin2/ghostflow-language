@@ -1,0 +1,48 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName Helvetica
+skinparam defaultFontSize 13
+scale 1 as 60 pixels
+hide time-axis
+
+concise "Wall time" as T
+concise "Planned interval" as P
+concise "Range .active" as A
+concise "Safe output" as S
+
+@0
+T is "07:58"
+P is "before"
+A is "inactive"
+S is "OFF"
+
+@2
+T is "08:00"
+P is "range(10min)"
+
+@6
+T is "08:04"
+A is "active"
+S is "ON"
+
+@8
+T is "08:06"
+S is "blocked"
+
+@10
+T is "08:08"
+S is "ON"
+
+@12
+T is "08:10"
+P is "ended"
+A is "inactive"
+S is "OFF"
+
+@14
+T is "08:12"
+
+P@2 <-> @12 : planned [08:00, 08:10)
+A@6 <-> @12 : late admission 08:04: 6 min left
+S@8 <-> @10 : safety block, not added at end
+@enduml

@@ -1,0 +1,29 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontSize 12
+title Settings emission: admission and resulting Result
+start
+:Settings packet arrives
+(operator edit or producer observation);
+if (Malformed, unrecognized target,\nstale Program/base revision\nor denied authority?) then (yes)
+  :Reject before admission;
+  note right: No observation created
+  stop
+else (no)
+endif
+if (Conflicting explicit fault codes\nin one aggregate?) then (yes)
+  :Reject packet;
+  stop
+else (no)
+endif
+if (Uniform explicit fault?) then (yes)
+  :That fault (e.g. SettingsUnavailable)\nfor the addressed group;
+elseif (All payloads validate together?) then (yes)
+  :ok(value) for every addressed config;
+else (no)
+  :fault(SettingsInvalid)\nfor the addressed group;
+endif
+:Accepted emission advances\nsettings observation revision;
+:All consumers at this evaluation\nposition read the same current Result;
+stop
+@enduml

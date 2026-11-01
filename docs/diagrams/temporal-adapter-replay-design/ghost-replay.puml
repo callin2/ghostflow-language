@@ -1,0 +1,27 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName Helvetica
+skinparam defaultFontSize 13
+skinparam ArrowColor #526d76
+
+rectangle "Live runtime" as L {
+  rectangle "Journal\n(retained records)" as J
+  rectangle "State, pending inputs,\nintents, clock, frame IDs" as S
+  rectangle "Live trace /\nframed outcome" as T
+}
+rectangle "Ghost instance" as G {
+  rectangle "Fork of installed\nmodule + capabilities" as F
+}
+rectangle "Replay result buffer\n(gf_replay_ptr/len,\ngf_frame_replay_ptr/len)" as B
+actor "Effect sinks /\nactuators" as A
+
+J --> F : checkpoint before prefix\n+ oldest `count` records
+F --> B : replace only on success
+F ..> A : no effect dispatch
+F ..> S : no live changes
+F ..> T : never overwritten
+note bottom of G
+  Never dispatches effects and never
+  changes live state, journal or outputs
+end note
+@enduml

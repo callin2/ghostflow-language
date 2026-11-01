@@ -1,0 +1,30 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontSize 13
+skinparam ActivityBackgroundColor #F8F8F8
+start
+:Parse source;
+note right: stops at first error
+:Set up declarations;
+note right: stops at first error
+partition "Collected phases (up to 20 distinct errors)" {
+  :Validate let bindings;
+  if (errors?) then (yes)
+    :Report collected errors;
+    stop
+  endif
+  :Validate next-state assignments;
+  if (errors?) then (yes)
+    :Report collected errors;
+    stop
+  endif
+  :Validate ordinary output connections;
+  if (errors?) then (yes)
+    :Report collected errors;
+    stop
+  endif
+}
+:Functions, adaptive strategies,\nconstraints, lowering;
+note right: stop at first error
+stop
+@enduml

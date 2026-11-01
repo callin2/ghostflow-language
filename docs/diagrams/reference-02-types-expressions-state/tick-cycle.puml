@@ -1,0 +1,28 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontSize 13
+skinparam ActivityBackgroundColor #F7F9FC
+skinparam ActivityBorderColor #4A6FA5
+title One tick: read a snapshot, compute candidates, commit together
+
+start
+:Read input snapshot\n+ previous state;
+:Compute every next state\n(all read previous values);
+:Build complete candidate state;
+:Compute requested output intent\n(<- expressions may read state');
+:Apply output constraints\n-> safe intent;
+if (Any runtime fault?\n(overflow, percent-out-of-range, ...)) then (yes)
+  :Reject the tick;
+  note right
+    Nothing commits:
+    no candidate state,
+    no intent,
+    no successful journal entry
+  end note
+  stop
+else (no)
+  :Commit state and logical\nresults together;
+  :Committed state becomes\n"previous state" of next tick;
+  stop
+endif
+@enduml

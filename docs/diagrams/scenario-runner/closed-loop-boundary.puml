@@ -1,0 +1,19 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontSize 13
+participant "Plant model\n(greenhouse-temperature-v1)" as P
+participant "Scenario host" as H
+participant "Rust control" as C
+participant "Virtual actuator\n(roof-vent)" as A
+H -> P : integrate to atMs\n(prior applied position held constant)
+P --> H : temperature in canonical K
+H -> C : generated Good Temperature sample
+C --> H : safe vent target
+H -> A : range check (min..max)
+alt evaluation and range check succeed
+  H -> H : commit scan row
+  A --> H : safe target becomes applied position\nfor the next interval
+else evaluation or renderer acceptance fails
+  H -> H : terminate run, no row for this boundary\n(plant calculation discarded)
+end
+@enduml

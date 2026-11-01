@@ -1,0 +1,29 @@
+@startuml
+hide empty description
+skinparam shadowing false
+skinparam defaultFontName Helvetica
+skinparam state {
+  BackgroundColor White
+  BorderColor #555555
+}
+title Process lifecycle observations when mapped to #74
+
+state received
+state rejected : reason code + detail\n(incl. cancel honored before start)
+state started
+state completed
+state cancelled : reason optional\nneeds domain cancellation evidence
+state failed : reason code + detail
+
+[*] --> received
+received --> rejected
+received --> started : declared start evidence
+started --> completed : declared completion evidence
+started --> cancelled
+started --> failed
+rejected --> [*]
+completed --> [*]
+cancelled --> [*]
+failed --> [*]
+note "Terminal states have no successor.\nFirst valid terminal in #115 order wins." as N1
+@enduml

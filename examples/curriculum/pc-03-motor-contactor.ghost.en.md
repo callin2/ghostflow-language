@@ -9,16 +9,28 @@
 > latching behavior. This document defines a curriculum learning scenario; it
 > does not quote a direct user statement.
 
-The linked original is the sole canonical literate executable source for PC-03. It reuses
-PC-02's fresh-start event and restart inhibition, and preserves the existing
-basic latching example in lesson [E03](../../docs/ProgrammingInGhostflow.md#ch03).
+The linked Korean original is the only canonical, literate, executable source
+for PC-03. It reuses PC-02's fresh-start event and restart inhibition, and it
+keeps the basic latching example of lesson
+[E03](../../docs/ProgrammingInGhostflow.en.md#ch03) intact.
 
-`stop_ok` and `overload_ok` are permission inputs with normalized meanings.
-The NC wiring and contact polarity of the actual stop button and overload relay
-belong to the electrical installation/device adapter; this learning example
-receives only Bool values.
+`stop_ok` and `overload_ok` are permission inputs whose meaning is already
+normalized: `true` means the stop path or the overload protection permits
+operation. The NC wiring and contact polarity of the real stop button and
+overload relay belong to the electrical installation and the device adapter.
+This learning example receives only Bool values.
 
-This explicit quality-input revision preserves the healthy replay. Unavailable START requests cannot start or rearm; an existing run may continue while STOP and protection remain healthy and permitted. Unavailable STOP or protection removes permission. Recovery requires healthy release and a new START request. The previous source is retained as non-executable history at `tests/fixtures/history/issue531/pc-03-motor-contactor.ghost.en.md.pre-input.txt`.
+This explicit quality-input revision keeps the healthy-input replay unchanged.
+For acquisition faults:
+
+- An unavailable START request cannot start or rearm the control. An existing
+  run may continue while STOP and protection stay healthy and permit operation.
+- An unavailable STOP or protection input removes permission.
+- After recovery, a healthy START release followed by a new START request is
+  required.
+
+The previous source is kept as non-executable history at
+`tests/fixtures/history/issue531/pc-03-motor-contactor.ghost.en.md.pre-input.txt`.
 
 ```ghost
 // Source revision: issue531-approved-fault-restart-v1
@@ -48,24 +60,31 @@ control MotorContactor {
 }
 ```
 
-`motor_contactor` is the logical command sent to the MC coil. It does not prove
-that the main contacts closed, that the motor is energized, or that it is
-rotating. If the overload relay trips and `overload_ok=false` during operation,
-the next state and command turn off immediately. When protection recovers,
-holding START does not arm the control, so it does not restart automatically.
-START must be released and pressed again to permit a fresh start.
+`motor_contactor` is the logical command sent to the MC (magnetic contactor)
+coil. It does not prove that the main contacts closed, that the motor is
+energized, or that it is rotating.
 
-In the installation, the main circuit is the power path through the breaker,
-MC main contacts, overload relay, and motor. The control circuit energizes the
-MC coil from the control supply through STOP/overload protection contacts and
-the START/MC auxiliary-contact latching branch. A software coil command does
-not replace independent electrical overcurrent, emergency-stop, or protection
-functions.
+If the overload relay trips during operation (`overload_ok=false`), the next
+state and the command turn off in the same tick. When protection recovers,
+holding START does not arm the control, so the motor does not restart by
+itself. START must be released and then pressed again to permit a fresh start.
+
+In the installation, the two circuits are:
+
+- **Main circuit:** the power path from the breaker through the MC main
+  contacts and the overload relay to the motor.
+- **Control circuit:** the path that energizes the MC coil from the control
+  supply, through the STOP and overload-protection contacts and the latching
+  branch formed by START and an MC auxiliary contact.
+
+A software coil command does not replace independent electrical overcurrent,
+emergency-stop, or protection functions.
 
 This example has no alarm output, fault latch/reset, timer, sensor feedback,
-hardware operation, or new GhostFlow syntax. Later curriculum stages address
+hardware operation, or new GhostFlow syntax. Later curriculum stages cover
 those topics separately.
 
-`tools/check-pc-03.mjs` provides virtual/compiler/WASM learning evidence using
-the current compiler and existing WASM runtime. Its result does not include
-physical evidence for the relay, MC main contacts, motor power, or motor rotation.
+`tools/check-pc-03.mjs` produces virtual/compiler/WASM learning evidence with
+the current compiler and the existing WASM runtime. Its result contains no
+physical evidence about the relay, the MC main contacts, motor power, or motor
+rotation.

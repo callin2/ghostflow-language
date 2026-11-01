@@ -1,0 +1,17 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName Helvetica
+skinparam defaultFontSize 13
+hide empty description
+
+state "Planned\n(stable occurrence ID)" as Planned
+state "Admitted\n(.due true for one scan)" as Admitted
+state "Missed\n(reason kept in trace)" as Missed
+
+[*] --> Planned
+Planned --> Planned : pre-admission provider\ncorrection moves planned time
+Planned --> Admitted : all conditions true inside\nPulse crossing / Window /\nRun late-start interval
+Planned --> Missed : ConditionsFalseAtPulse\nObservationGap\nLateStartExpired\nCorrectionPastHighWater\nEventWithdrawn
+Admitted --> [*] : at most once;\nno rearm, no duplicate
+Missed --> [*] : never queued\nor replayed
+@enduml

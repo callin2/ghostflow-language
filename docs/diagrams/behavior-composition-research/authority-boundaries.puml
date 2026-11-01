@@ -1,0 +1,15 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontSize 13
+skinparam componentStyle rectangle
+component "Canonical .ghost.md +\npinned imported sources" as SRC
+component "API-owned records\n(revisions, installation\ncontext, deployment)" as API
+component "Device-owned profiles,\ndrivers, observations" as DEV
+component "Portable Rust core" as CORE
+component "Frontends" as FE
+SRC --> CORE : executable behavior
+API ..> SRC : identifies revision
+DEV --> CORE : physical information
+CORE --> FE : semantic descriptors,\nrecorded results
+FE ..> SRC : edit that changes rules =\nsource-change candidate
+@enduml

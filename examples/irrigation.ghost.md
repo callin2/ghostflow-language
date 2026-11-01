@@ -1,15 +1,28 @@
 # Irrigation runtime fixture
 
-This canonical literate fixture supplies the portable-core host tests. It is a
-virtual control fixture, not hardware or deployment evidence.
+This canonical literate fixture feeds the portable-core host tests. It is a
+virtual control fixture. It is not evidence of hardware or of a deployment.
 
-This explicit revision, issue531-approved-fault-restart-v1, retains healthy STOP
-and low-water priority. START faults inhibit new starts; STOP/low-water faults
-release the run. Recovery requires a healthy START off-to-on request. Fault
-quality/reason remains in the acquisition and Result trace; low_fault records
-the asserted or unavailable protection condition. The exact predecessor is
-retained under tests/fixtures/history/issue531. No physical START button or
-hardware acceptance is implied.
+The control decides from three Bool inputs (`start`, `stop`, `low_water`) and
+drives `pump` and `valve` together. The `moisture` input is declared but not
+used by this decision. This explicit revision,
+issue531-approved-fault-restart-v1, defines how input faults affect a run:
+
+- A healthy STOP request and low-water detection still take priority and stop
+  watering.
+- A fault on START inhibits new starts. It does not stop a run in progress.
+- A fault on STOP or on low water releases (stops) the run.
+- After a fault, a restart requires a healthy START off-to-on request.
+
+The fault's quality and reason remain in the acquisition and `Result` trace.
+`low_fault` records that the protection condition was asserted or unavailable.
+The exact predecessor source is retained under tests/fixtures/history/issue531.
+No physical START button or hardware acceptance is implied.
+
+The diagram summarizes one decision. The checks run in priority order; the
+`restart_blocked` flag is updated alongside them.
+
+![Decision flow for one irrigation tick](../docs/diagrams/irrigation/decision.svg)
 
 ```ghost
 control irrigation {

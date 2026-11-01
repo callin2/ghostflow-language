@@ -1,0 +1,22 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName Helvetica
+skinparam defaultFontSize 13
+title First journey (proposed; no imports or graph for the farmer)
+
+|Farmer|
+start
+:Select a prepared behavior;
+:Review plain-language requirements;
+:Confirm farm / installation facts;
+:Apply;
+if (Result?) then (accepted)
+  :Specific accepted result;
+else (blocked)
+  :Specific blocker\n+ next action;
+endif
+|Engineer / installer|
+:Open the same incident;
+:See technical evidence\n(source, revision, instance,\ninputs, constraint, run, binding);
+stop
+@enduml

@@ -1,0 +1,17 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontSize 12
+skinparam StateBackgroundColor #F7F9FC
+skinparam StateBorderColor #4A6FA5
+title hold_last cache (measured slice)
+[*] --> Unavailable : cold restart
+state "Unavailable\navailable=false\nresult: NotReady" as Unavailable
+state "Held\navailable=true, held=true\nage < forAtMost\nresult quality: Held" as Held
+state "Expired\navailable=true, held=false\nresult: NotReady" as Expired
+Unavailable --> Held : fresh admissible sample\n(cached with its own timestamp)
+Held --> Held : fresh admissible sample replaces cache;\nduplicate does not refresh age;\nfault / selection change keeps cache
+Held --> Expired : age reaches forAtMost
+Expired --> Held : fresh admissible sample
+Held --> Unavailable : epoch replaced on the\ncached root (even if unselected)
+Expired --> Unavailable : epoch replaced on the\ncached root
+@enduml

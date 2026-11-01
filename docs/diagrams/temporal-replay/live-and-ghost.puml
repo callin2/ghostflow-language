@@ -1,0 +1,18 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName Helvetica
+skinparam defaultFontSize 13
+
+rectangle "Live runtime" as Live {
+  rectangle "Recorded ticks / scans" as Rec
+  rectangle "Live state, journal, intents,\ntrace/outcome, frame sequence,\nclock, last outcome" as State
+}
+rectangle "Separate ghost instance" as Ghost
+rectangle "replay result\n(runtime.replay)" as Result
+actor Caller
+
+Caller --> Ghost : replayTemporal({count, profile,\nmaxPeakTemporalBytes, maxJsonBytes})
+Rec --> Ghost : checkpoint before oldest\neligible prefix + records
+Ghost --> Result : success replaces only this
+Ghost ..> State : no effects,\nno changes
+@enduml

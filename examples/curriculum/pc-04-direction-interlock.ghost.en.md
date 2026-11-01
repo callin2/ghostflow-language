@@ -8,19 +8,34 @@
 > Learning scenario: A learning scenario based on the forward/reverse stage of
 > the user's PLC-replacement curriculum. This document is not a direct user quote.
 
-The linked original is the sole canonical literate executable source for PC-04. It preserves
-and references the existing lesson
-[E06 DirectionInterlock](../../docs/ProgrammingInGhostflow.md#e06--두-방향을-동시에-요청하면).
-E06 demonstrates a small safety constraint that blocks simultaneous output
-requests. This lesson adds a fresh-start event, stopped state, and direction-change wait.
+The linked Korean original is the only canonical, literate, executable source
+for PC-04. It keeps and references the existing lesson
+[E06 DirectionInterlock](../../docs/ProgrammingInGhostflow.md#e06--두-방향을-동시에-요청하면),
+which shows a small safety constraint that blocks simultaneous output requests.
+This lesson builds on E06 and makes three things explicit: a fresh-start event,
+a stopped state, and a wait before changing direction.
 
-`forward_start` and `reverse_start` are momentary inputs that remain true while
-pressed. `stop_ok` and `overload_ok` are normalized inputs that are true when
-the stop path and overload protection respectively permit operation. Outputs
-are logical commands to the forward/reverse contactor coils, not evidence of
-actual motor rotation.
+The inputs and outputs are:
 
-This explicit quality-input revision preserves the healthy replay. Unavailable START requests cannot start or rearm; an existing run may continue while STOP and protection remain healthy and permitted. Unavailable STOP or protection removes permission. Recovery requires healthy release and a new START request. The previous source is retained as non-executable history at `tests/fixtures/history/issue531/pc-04-direction-interlock.ghost.en.md.pre-input.txt`.
+- `forward_start` and `reverse_start` are momentary inputs: `true` while the
+  button is pressed.
+- `stop_ok` and `overload_ok` are normalized inputs: `true` when the stop path
+  and the overload protection, respectively, permit operation.
+- `forward_contactor` and `reverse_contactor` are logical commands to the
+  forward and reverse contactor coils, not evidence that the motor actually
+  rotates.
+
+This explicit quality-input revision keeps the healthy-input replay unchanged.
+For acquisition faults:
+
+- An unavailable START request cannot start or rearm the control. An existing
+  run may continue while STOP and protection stay healthy and permit operation.
+- An unavailable STOP or protection input removes permission.
+- After recovery, a healthy START release followed by a new START request is
+  required.
+
+The previous source is kept as non-executable history at
+`tests/fixtures/history/issue531/pc-04-direction-interlock.ghost.en.md.pre-input.txt`.
 
 ```ghost
 // Source revision: issue531-approved-fault-restart-v1
@@ -91,27 +106,42 @@ control DirectionChangeInterlock {
 }
 ```
 
-During normal operation, a new press in the opposite direction enters
-`WaitForward` or `WaitReverse`. Since `phase'` becomes a wait state in that
-transition, both contactor commands turn off immediately in that tick. The
-opposite direction is commanded only after two seconds of waiting. Continuing
-to hold the same direction button is not a new direction-change event. Pressing
-both buttons together or losing stop/overload permission cancels the wait into
-`Stopped`. If the operator presses the opposite button during the wait and
-changes the target direction again, the control enters the corresponding Wait
-state and restarts the full two-second delay. It cannot later start toward the
-old target.
+The state diagram below shows the five phases and the events that move between
+them. A contactor command is ON only in `Forward` or `Reverse`.
 
-`mutex` is a software safety backstop. The actual installation also needs
-electrical and mechanical interlocks between the forward/reverse contactors.
-The two-second wait does not prove that the motor has stopped, and this learning
-example has no zero-speed feedback input. A checker PASS therefore means only
-that the virtual/compiler/WASM trace for contactor coil commands matches; it is
-not physical acceptance of contact closure, power application, or motor rotation.
+![PC-04 phases: Stopped, Forward, Reverse and the two wait phases](../../docs/diagrams/pc-04-direction-interlock/phase-states.svg)
+
+During normal operation, a new press of the opposite button moves the control
+to `WaitForward` or `WaitReverse`. Because `phase'` is a wait phase in that
+transition, both contactor commands turn off immediately, in the same tick. The
+opposite direction is commanded only after two seconds of waiting. Rules during
+the wait:
+
+- Continuing to hold the same direction button is not a new direction-change
+  event.
+- Pressing both buttons together, or losing stop/overload permission, cancels
+  the wait and returns to `Stopped`.
+- If the operator presses the opposite button during the wait and changes the
+  target direction again, the control enters the matching Wait phase and
+  restarts the full two-second delay. It can never start late toward the old
+  target.
+
+`mutex` is a software safety backstop. A real installation also needs
+electrical and mechanical interlocks between the forward and reverse
+contactors. The two-second wait does not prove that the motor has stopped, and
+this learning example has no zero-speed feedback input. A checker PASS
+therefore means only that the virtual/compiler/WASM trace of the contactor coil
+commands matches. It is not physical acceptance of contact closure, power
+application, or motor rotation.
 
 `tools/check-pc-04.mjs` creates a fresh WASM runtime for each case and does not
-rebuild the existing WASM artifact. It uses actual compiler/WASM traces to check
-simultaneous-request blocking and rearming, normal latching, both outputs OFF
-immediately after a direction change, the 1999 ms wait, the opposite direction
-ON at exactly 2000 ms, stop/overload cancellation during the wait, and target
-changes during the wait with the delay restarted.
+rebuild the existing WASM artifact. Using actual compiler/WASM traces, it
+checks:
+
+- blocking and rearming for simultaneous requests;
+- normal latching;
+- both outputs OFF immediately after a direction change;
+- still waiting at 1999 ms;
+- the opposite direction ON at exactly 2000 ms;
+- stop/overload cancellation during the wait;
+- a target change during the wait, with the delay restarted.

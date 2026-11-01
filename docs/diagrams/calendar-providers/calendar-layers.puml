@@ -1,0 +1,25 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName Helvetica
+skinparam ArrowColor #555555
+skinparam rectangle {
+  BackgroundColor White
+  BorderColor #555555
+}
+title Calendar layers and execution path
+
+rectangle "Reviewed dataset\nkr-public-2026-2027.json" as D
+rectangle "HolidayCalendar\ncreateKoreanHolidayCalendar" as H
+rectangle "WorkCalendar\ncreateWorkCalendar\n(weekly mask, holiday policy)" as W
+rectangle "Composed calendar\ncomposeCalendar\n(new ID + revision)" as O
+rectangle "Installation binding\n(calendar ID, timezone)" as B
+rectangle "Context facts per tick\n(clock, coverage, rows,\nenvelope.snapshot)" as F
+rectangle "Shared Rust core\n(day filter, admission,\ngap/recovery, dedup)" as R
+
+D --> H
+H --> W : base
+W --> O : base + overrides
+O --> B
+B --> F
+F --> R
+@enduml

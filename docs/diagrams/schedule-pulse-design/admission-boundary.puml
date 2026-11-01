@@ -1,0 +1,21 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName Helvetica
+skinparam defaultFontSize 13
+skinparam componentStyle rectangle
+component "Verified provider\n(Solar occurrence facts,\nnever .due)" as P
+component "Native / WASM host\n(validates envelope\nand binding)" as H
+rectangle "Rust core (one portable engine)" {
+  component "Admission engine\n(clock, gap, dedup,\npulse result)" as E
+  component "Compiled prelude\n(when predicate,\ndependency order)" as W
+  component "VM transaction\n(stage, commit or roll back)" as T
+}
+card "Schedule observation\n+ Bool .due" as O
+component "Journal / replay\n(no live provider)" as J
+P --> H : coverage facts
+H --> E : clock snapshot +\nbounded coverage
+W --> E : predicate on\ncrossing tick
+E --> T : staged projections
+T --> O : on whole-tick success
+O --> J
+@enduml

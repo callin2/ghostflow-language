@@ -1,0 +1,29 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontSize 12
+skinparam rectangle {
+  RoundCorner 8
+}
+left to right direction
+legend top left
+  Green = implemented slice
+  Orange = still open (public path stays RED)
+endlegend
+
+rectangle "Public .ghost.md compiler\n(unsupported diagnostic active)" as PC #FFE0B2
+rectangle "Type checker + true-for\ndescriptor (direct Bool)" as TC #C8E6C9
+rectangle "GFB format 6\nprelude tag 2, opcode 59" as GFB #C8E6C9
+rectangle "ControlRuntime: manifest,\ninterval capture, frames" as CR #FFE0B2
+rectangle "WASM activateTemporal\n(GFTA v2)" as W #C8E6C9
+rectangle "Native TrueForActivation\n+ Rust tick" as N #C8E6C9
+rectangle "TrueFor engine\nstage / commit / rollback" as E #C8E6C9
+rectangle "Certified checkpoint,\nrewind, replay" as CK #FFE0B2
+
+PC --> TC
+TC --> GFB
+GFB --> N
+CR --> W
+W --> N
+N --> E
+E --> CK
+@enduml

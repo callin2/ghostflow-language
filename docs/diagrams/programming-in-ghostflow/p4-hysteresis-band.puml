@@ -1,0 +1,18 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontSize 13
+title hysteresis(moisture, on_below: 30%, off_above: 35%, initial: false)
+
+[*] --> NotReady
+state "Not ready / fault\n(public result is fault;\nprocessing reset to initial)" as NotReady
+state "dry = false" as F
+state "dry = true" as T
+
+NotReady --> F : good sample after\nrecovery/filter (initial false)
+F --> T : value < 30%
+T --> F : value > 35%
+F --> F : value in [30%,35%]
+T --> T : value in [30%,35%]
+F --> NotReady : Disconnected/Stale/Invalid
+T --> NotReady : Disconnected/Stale/Invalid
+@enduml

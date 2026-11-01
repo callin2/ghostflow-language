@@ -1,0 +1,23 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName Helvetica
+skinparam rectangle {
+  BackgroundColor White
+  BorderColor #555555
+}
+left to right direction
+title Sensor processing order for the moisture example
+
+rectangle "Driver\nnew sample ID + time" as drv
+rectangle "Input validation\nvalid = 0% .. 100%" as val
+rectangle "Filter\nmedian(5)" as flt
+rectangle "Freshness / recovery\nstale_after = 3s\nrecover_after = 3 samples" as fr
+rectangle "Hysteresis\non_below 30%\noff_above 35%" as hy
+rectangle "case dry { ok / fault }\nexplicit handling" as cs
+
+drv --> val
+val --> flt
+flt --> fr
+fr --> hy : Result<T, SensorFault>
+hy --> cs : quality preserved
+@enduml

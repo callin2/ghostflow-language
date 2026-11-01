@@ -1,0 +1,38 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName Helvetica
+skinparam ArrowColor #555555
+hide empty description
+
+[*] --> Idle
+Idle --> Opening : fresh START,\nclosed confirmed
+Opening --> Settling : open confirmed
+Settling --> Watering : 2 s
+Watering --> PumpStopping : 5 min
+PumpStopping --> Closing : next scan
+Closing --> Idle : closed confirmed
+
+Settling --> FaultPumpStopping : low source water,\nopen confirmed,\nmotion permitted
+Watering --> FaultPumpStopping
+PumpStopping --> FaultPumpStopping
+FaultPumpStopping --> FaultClosing : next scan
+FaultPumpStopping --> Faulted : motion inhibited
+FaultClosing --> Faulted : closed / 10 s /\nmotion inhibited
+Faulted --> Idle : fresh RESET,\nreset allowed
+
+state Opening : open ON (timeout 10 s)
+state Watering : pump ON
+state Closing : close ON (timeout 10 s)
+state FaultPumpStopping : all motion OFF, alarm ON
+state FaultClosing : close ON, alarm ON
+state Faulted : all motion OFF, alarm ON
+
+note as N
+Checked first, every scan:
+- any fault cause (except the orderly
+  low-water case) -> Faulted, cause latched
+- observation unavailable -> Faulted if a cause
+  is latched, otherwise Idle
+- normal STOP in Idle..Closing -> Idle (no alarm)
+end note
+@enduml

@@ -1,7 +1,7 @@
 # Extra station valves
 
-This independent canonical control shares the host-owned station pump while
-sequencing valves three and four at its own selected time.
+This independent canonical control shares the host-owned station pump. At its own
+selected time, it runs valves three and four one after the other.
 
 ```ghost
 control ExtraValves {
@@ -33,3 +33,16 @@ control ExtraValves {
   require !(valve3 && valve4);
 }
 ```
+
+The control follows the same pattern as [Scheduled watering](02-watering.ghost.md):
+
+- **Schedule.** `extra_starts` becomes due once a day at 19:15 (`Asia/Seoul`).
+- **Sequence.** Each valve opens 2 s before the pump starts, waters for 5 min,
+  and stays open 2 s after the pump stops. The `Switch` phase keeps everything
+  off for `valve_delay` (2 s) before valve four opens.
+- **Requirements.** The pump may run only when valve three or four is open, and
+  the two valves are never open together.
+- **Shared pump.** This control declares its own `pump` output. The host binds
+  it to the same station pump used by the scheduled-watering control.
+
+![Extra valve phases: Idle, Open3, Water3, Stop3, Switch, Open4, Water4, Stop4, with the timer condition for each transition](../../docs/diagrams/tutorial-04-extra-valves/extra-valve-phases.svg)

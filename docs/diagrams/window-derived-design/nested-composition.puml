@@ -1,0 +1,15 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontSize 12
+left to right direction
+rectangle "Physical root\n(sourceTag, sourceEpoch, sampleId)\n+ original timestamp" as P
+rectangle "Inner window U\nover 2 ms" as U
+rectangle "Outer window W\nover 10 ms" as W
+P --> U : samples (0,0) (1,10) (2,20)
+U --> W : derived events (site, revision)\nvalues 0, 5, 15\nquality 3 + U's site
+note bottom of W
+  Average of 3 derived events = 20/3
+  (NOT 10 from flattened physical leaves)
+  Result quality: Derived (3)
+end note
+@enduml

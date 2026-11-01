@@ -1,0 +1,21 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontSize 13
+skinparam rectangleBorderColor #555555
+skinparam rectangleBackgroundColor #F7F7F7
+
+rectangle "GFB21 = immutable civil IANA Range\n(kept)" as R21
+rectangle "GFB22 = lifecycle envelope\n(new, distinct)" as L22 {
+  rectangle "checked restart\ndescriptor" as DESC
+  rectangle "unchanged inner GFB bytes\nformats 1–4, 10, 11\nor Range 21" as INNER
+}
+rectangle "Rejected: lifecycle GFB19\n(historical prerelease 99ca1a3)" as L19 #FFEEEE
+rectangle "Rejected: lifecycle GFB21\n(provisional PR536)" as L21 #FFEEEE
+
+INNER ..> R21 : may wrap
+L19 -[hidden]- L21
+note bottom of L19
+  No translation or fallback.
+  Recompile reviewed source instead.
+end note
+@enduml

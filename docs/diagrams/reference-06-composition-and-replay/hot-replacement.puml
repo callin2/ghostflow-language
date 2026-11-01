@@ -1,0 +1,19 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontSize 13
+skinparam activityBorderColor #4A6FA5
+skinparam activityBackgroundColor #F7F9FC
+title Program hot replacement (§6.9)
+
+start
+:Candidate with new source revision\nor import closure;
+if (Port, ownership, profile, resource\nand state compatibility valid?) then (yes)
+  :Commit atomically at a tick boundary;
+  :Transfer only same-name, same-type state\nNew state = declared default\nRemoved state disappears;
+  :Discard old input cache;\nreceive complete input snapshot\nfor the new schema;
+  :New artifact/source identity\nand new run boundary;
+else (no)
+  :Keep the previous Program;
+endif
+stop
+@enduml

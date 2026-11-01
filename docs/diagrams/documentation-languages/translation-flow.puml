@@ -1,0 +1,18 @@
+@startuml
+!include ../_style.puml
+left to right direction
+rectangle "English\nNAME.md or NAME.en.md\n(canonical)" as en
+rectangle "Korean\nNAME.ko.md or NAME.md" as ko
+rectangle "Chinese\nNAME.zh.md" as zh
+rectangle "Spanish\nNAME.es.md" as es
+rectangle "Japanese\nNAME.ja.md" as ja
+rectangle "docs/translations.json\nsha256 per file" as manifest
+en --> ko : translate
+en --> zh : translate
+en --> es : translate
+en --> ja : translate
+ko ..> manifest : npm run docs:stamp
+zh ..> manifest
+es ..> manifest
+ja ..> manifest
+@enduml

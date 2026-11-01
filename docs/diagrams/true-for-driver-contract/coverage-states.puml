@@ -1,0 +1,23 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontSize 12
+hide empty description
+[*] --> NoRun
+NoRun : no certified coverage
+Accumulating : union of measured-true [start,end)
+Satisfied : covered duration >= duration
+
+NoRun --> Accumulating : Measured true certificate
+Accumulating --> Accumulating : touching / overlapping\nMeasured true certificate
+Accumulating --> Satisfied : coverage reaches duration
+Satisfied --> Satisfied : continuing Measured true
+Accumulating --> NoRun : false or non-Measured evidence,\nquality fault (reset floor)
+Satisfied --> NoRun : false or non-Measured evidence,\nquality fault (reset floor)
+Accumulating --> NoRun : source or clock epoch change\n(new chain)
+Satisfied --> NoRun : source or clock epoch change\n(new chain)
+note bottom of Accumulating
+  NoObservation: NotReady, no coverage added.
+  Duplicates never advance coverage.
+  Malformed input: rejected, committed state unchanged.
+end note
+@enduml

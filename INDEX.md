@@ -392,7 +392,7 @@ For first and last recorded Git commit dates, run `node <skill>/scripts/docs-ind
 
 | Path | Title | Type |
 | --- | --- | --- |
-| [examples/curriculum/pc-02-start-stop.ghost.en.md](examples/curriculum/pc-02-start-stop.ghost.en.md) | PC-02 — START / STOP latching and fresh-start permission | md |
+| [examples/curriculum/pc-02-start-stop.ghost.en.md](examples/curriculum/pc-02-start-stop.ghost.en.md) | PC-02 — START/STOP latching and fresh-start permission | md |
 | [examples/curriculum/pc-02-start-stop.ghost.md](examples/curriculum/pc-02-start-stop.ghost.md) | PC-02 — START / STOP 자기유지와 새 시작 허가 | md |
 | [examples/curriculum/pc-03-motor-contactor.ghost.en.md](examples/curriculum/pc-03-motor-contactor.ghost.en.md) | PC-03 — Motor contactor command and overload permission | md |
 | [examples/curriculum/pc-03-motor-contactor.ghost.md](examples/curriculum/pc-03-motor-contactor.ghost.md) | PC-03 — 모터 접촉기 명령과 과부하 허가 | md |
@@ -611,10 +611,10 @@ For first and last recorded Git commit dates, run `node <skill>/scripts/docs-ind
 | Path | Title | Type |
 | --- | --- | --- |
 | [tests/reference/BASELINE.md](tests/reference/BASELINE.md) | Reference 테스트 작성 후 기준 결과 | md |
-| [tests/reference/DECISIONS.en.md](tests/reference/DECISIONS.en.md) | Tracking settlement of the original 49 pending decisions | md |
+| [tests/reference/DECISIONS.en.md](tests/reference/DECISIONS.en.md) | Tracking how the original 49 pending decisions were settled | md |
 | [tests/reference/DECISIONS.md](tests/reference/DECISIONS.md) | 기존 결정 대기 49건의 확정 추적 | md |
 | [tests/reference/EDGE-CASES.md](tests/reference/EDGE-CASES.md) | 엣지 케이스·경계값 점검 | md |
-| [tests/reference/README.en.md](tests/reference/README.en.md) | Individual Language Reference acceptance tests | md |
+| [tests/reference/README.en.md](tests/reference/README.en.md) | Language Reference acceptance tests (per case) | md |
 | [tests/reference/README.md](tests/reference/README.md) | Language Reference 개별 수용 테스트 | md |
 
 442 documents.

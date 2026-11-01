@@ -2,85 +2,127 @@
 
 Date: 2026-09-20. Parent: [GF-COMPOSE #99](https://github.com/callin2/ghostflow-language/issues/99).
 Inspected language revision: `ffdbc96461eca67908252507fb851fa4dabd9a2c`.
-Status: research summary and proposed design direction. Composition is not implemented
-by this document. The child issues produce bounded design evidence before implementation.
+Status: research summary and proposed design direction. This document does not
+implement composition. The child issues produce bounded design evidence before any
+implementation starts.
+
+*Behavior composition* means combining several reusable behaviors (for example,
+irrigation and ventilation) into one installed controller. This document records
+what the research found, which rules are already fixed, and which design choices
+remain open.
+
+In this document:
+
+- **Correction record** — what is an established rule, what is an agreed
+  amendment, and what is still open.
+- **Product objective** and **completed delegated research** — why the work
+  exists and what the nine research outputs (R1–R9) cover.
+- **Research findings** and **architecture recommendations (A1–A8)** — evidence
+  and the proposed direction.
+- **Decomposition**, **research sequence**, **acceptance scenarios**, **handoff
+  rules** and **review checkpoints** — how the work is split and checked.
 
 ## Correction record (2026-09-20)
 
-This record separates established language rules, an agreed design amendment,
-and unresolved implementation choices. It is design evidence only. It does not
-change normative language documents or claim implementation or verification.
+This record separates three kinds of statement:
 
-- **Existing execution invariants:** `x` reads old state and `x'` defines a
-  candidate next value. Every transition uses the same input/old-state snapshot.
-  A next-state reference is allowed only in output expressions, not in another
-  transition or a `let`. State and logical output results commit together.
-  Combinational cycles and duplicate output definitions are invalid. Preserve
-  these rules in any composition. They are not open questions. Each output
-  channel has one authoritative direct definition; competing direct writers
-  must fail compilation and must never be deployed. This does not remove the
-  existing station single-writer resource manager: station requests are not
+| Kind | Meaning |
+| --- | --- |
+| Existing rule | Already part of the language or its boundaries. Not open for debate here. |
+| Agreed design amendment | Decided direction, but **not** yet normative or implemented. |
+| Open choice | Mechanism, ABI, verification or spec alignment still to be decided. |
+
+The record is design evidence only. It does not change normative language
+documents, and it does not claim implementation or verification.
+
+- **Existing execution invariants (fixed rules):**
+  - `x` reads old state; `x'` defines a candidate next value.
+  - Every transition uses the same input/old-state snapshot.
+  - A next-state reference is allowed only in output expressions, not in another
+    transition or a `let`.
+  - State and logical output results commit together.
+  - Combinational cycles and duplicate output definitions are invalid.
+
+  Preserve these rules in any composition; they are not open questions. Each
+  output channel has one authoritative direct definition. Competing direct
+  writers must fail compilation and must never be deployed. This does not remove
+  the existing station single-writer resource manager: station requests are not
   competing direct writes. Physical endpoint alias checks remain a separate
   binding validation.
-- **Existing input-driver/output-renderer boundary:** GhostFlow defines typed Sources and Intents.
-  Driver backing may be software, specialized hardware, or both. Precision
-  measurement/protocol/raw-ISR versus scan handling belongs at that boundary;
-  meaningful typed events or measurements enter core logic without farm policy
-  hidden in the Driver. Capture time, receipt/evaluation time, and quality are
-  distinct. A command acknowledgement is not proof of physical operation.
-- **Agreed design amendment, not current implementation:** runtime-adjustable
-  property changes are live events. One action changing several properties is
-  one atomic event. Validate the complete event; if any value is invalid, reject
-  all of it without mutation. On acceptance, active logic uses the new values
-  when the event is processed, including during active operation; application
-  is not deferred to another watering cycle, a new run, or stopped mode. Do not
-  rewrite source, recompile, update firmware/bytecode, or stop/restart the whole
-  controller for this event. Preserve program and run identity; advance settings
-  revision/effective event position. Existing rules may consequently change an
-  output. No implicit reset or automatic reinterpretation of stale program joins.
-  Settings persist across a real ESP restart; that physical restart still starts
-  a new run identity.
+- **Existing input-driver/output-renderer boundary:** GhostFlow defines typed
+  Sources and Intents. A Driver may be backed by software, specialized hardware,
+  or both. The split between precision measurement/protocol/raw-ISR handling and
+  scan handling belongs at that boundary. Meaningful typed events or measurements
+  enter core logic; farm policy is not hidden in the Driver. Capture time,
+  receipt/evaluation time, and quality are three distinct things. A command
+  acknowledgement is not proof of physical operation.
+- **Agreed design amendment, not current implementation:** changes to
+  runtime-adjustable properties are *live events*.
+  - One action that changes several properties is **one atomic event**.
+  - Validate the complete event. If any value is invalid, reject all of it
+    without mutation.
+  - On acceptance, active logic uses the new values when the event is
+    processed, including during active operation. Application is not deferred
+    to another watering cycle, a new run, or stopped mode.
+  - Do not rewrite source, recompile, update firmware/bytecode, or stop/restart
+    the whole controller for this event.
+  - Preserve program and run identity; advance the settings revision/effective
+    event position.
+  - Existing rules may consequently change an output. There is no implicit
+    reset and no automatic reinterpretation of stale program joins.
+  - Settings persist across a real ESP restart; that physical restart still
+    starts a new run identity.
+
+  The diagram below sketches this agreed (not yet implemented) path for one
+  multi-property event.
+
+  ![Agreed live-property event path (proposed, not implemented)](diagrams/behavior-composition-research/live-property-event.svg)
 - **Current-spec conflict:** [`CONSTRAINTS.md`](CONSTRAINTS.md), lines 179–204;
   [`LANGUAGE-SURFACE.md`](LANGUAGE-SURFACE.md), lines 66–69; and
   [`LANGUAGE.md`](LANGUAGE.md), lines 460–461 currently require stopped
-  Configure changes;
-  #89 also contains the prior stopped/new-run proposal. Treat those as older
-  documented behavior to reconcile with the agreed live-property amendment.
-  Do not silently claim the amendment is already normative or implemented.
-  The current source-edit helper is supported behavior: it edits source and
-  recompiles. It is not implementation of the agreed live-property path. #89/#90
-  remain workstream owners. Pending
-  work concerns mechanism, ABI, verification, and spec alignment, not whether
-  the user wants live settings.
-- **Restart and inputs:** restart is a normal event whose reaction is authored
-  by GhostFlow logic. Do not impose global resume/manual policy. Device/Driver
-  retains pre-runtime electrical startup, disconnect, and failure obligations.
-  Input delivery must preserve occurrences and value observations by default
-  within supported capacity, independent of interrupt/scan capture. Latest
-  pending-value replacement is allowed only by explicit per-input opt-in;
-  overflow/loss must be rejected or reported, not silently accepted. This is
-  not unlimited persistent event history or a new incident store. Ordering,
-  event-to-tick mapping, source batching, bounds, and recovery mechanics remain
-  open. No hard deadline or priority scheduler has been specified.
+  Configure changes. #89 also contains the prior stopped/new-run proposal.
+  Treat those as older documented behavior that must be reconciled with the
+  agreed live-property amendment. Do not silently claim the amendment is already
+  normative or implemented. The current source-edit helper is supported
+  behavior: it edits source and recompiles. It is not an implementation of the
+  agreed live-property path. #89/#90 remain the workstream owners. Pending work
+  concerns mechanism, ABI, verification and spec alignment, not whether the user
+  wants live settings.
+- **Restart and inputs:**
+  - Restart is a normal event; GhostFlow logic authors the reaction to it. Do not
+    impose a global resume/manual policy.
+  - Device/Driver keeps the pre-runtime electrical startup, disconnect and
+    failure obligations.
+  - Input delivery must, by default and within supported capacity, preserve
+    occurrences and value observations, whether captured by interrupt or by scan.
+  - Replacing a pending value with the latest one is allowed only with an
+    explicit per-input opt-in.
+  - Overflow or loss must be rejected or reported, never silently accepted.
+
+  This is not an unlimited persistent event history or a new incident store.
+  Ordering, event-to-tick mapping, source batching, bounds and recovery mechanics
+  remain open. No hard deadline or priority scheduler has been specified.
 - **Operational boundary:** behaviors operate independently in normal use.
   An executable program or ESP firmware update uses a controller-wide
-  maintenance stop for that ESP; property events do not. Shared electrical
+  maintenance stop for that ESP; property events do not stop it. Shared electrical
   dependencies belong to installation context. This is not evidence that Device
   implements or verifies the boundary.
 
 Static composition remains a preferred hypothesis, not a selected lowering or
-ABI. Native/WASM conformance checks below are proposed, not newly run. No second
-canonical JSON program, automatic solver, or storage framework is introduced.
+ABI. The native/WASM conformance checks below are proposed, not newly run. This
+work introduces no second canonical JSON program, no automatic solver and no
+storage framework.
 
 ## Product objective
 
 Reduce effort. Increase explainability. Increase traceability.
 
-A farmer should be able to apply a prepared behavior, add another behavior, and
-understand an unexpected result with few technical decisions. Software and hardware
-engineers should be able to investigate the same result without reconstructing its
-history from unrelated logs. A feature must name the user problem and demonstrate
-which effort it removes or which explanation/evidence becomes available.
+- A farmer should be able to apply a prepared behavior, add another behavior,
+  and understand an unexpected result, all with few technical decisions.
+- Software and hardware engineers should be able to investigate the same result
+  without reconstructing its history from unrelated logs.
+- Every feature must name the user problem it solves and show which effort it
+  removes or which explanation/evidence it makes available.
 
 | Participant | Question | Required outcome |
 | --- | --- | --- |
@@ -89,11 +131,13 @@ which effort it removes or which explanation/evidence becomes available.
 | Software engineer / behavior author | Which logic produced the result? | Exact definition/instance, source revision, settings, inputs, state, and constraint decision. |
 | Hardware engineer / installer | What reached the equipment? | Exact installation binding, application result, and available physical observations. |
 
-Measure setup steps, technical decisions, corrections, assistance requests, and
-diagnostic effort. Measure whether users can explain a blocked action and whether
-engineers can reach its supporting evidence. Baselines and numeric improvement
-targets need a recorded walkthrough and subsequent participant validation; neither
-has been measured in this research. A heuristic walkthrough is not a user study.
+What to measure: setup steps, technical decisions, corrections, assistance
+requests and diagnostic effort. Also measure whether users can explain a blocked
+action, and whether engineers can reach its supporting evidence.
+
+Baselines and numeric improvement targets need a recorded walkthrough followed by
+participant validation. Neither has been measured in this research. A heuristic
+walkthrough is not a user study.
 
 ## Completed delegated research
 
@@ -112,10 +156,16 @@ user, Device, or physical acceptance.
 - [R8 incident evidence](research/GF-COMPOSE-R8-INCIDENT-EVIDENCE.md)
 - [R9 acceptance and handoff](research/GF-COMPOSE-R9-ACCEPTANCE.md)
 
-R9 leaves architecture decisions open for compiler/runtime execution and ABI,
-package/import closure and verification, installation-constraint authority,
-instance and deployment identity, binding/applied-evidence contracts, and
-incident/application/Device history evidence. These block their dependent slices.
+R9 leaves these architecture decisions open:
+
+- compiler/runtime execution and ABI;
+- package/import closure and verification;
+- installation-constraint authority;
+- instance and deployment identity;
+- binding/applied-evidence contracts;
+- incident/application/Device history evidence.
+
+Each open decision blocks the slices that depend on it.
 Issue-result publication is handled by the coordinator; this record does not
 claim GitHub issue closure.
 
@@ -150,18 +200,33 @@ External precedents inform recommendations rather than define GhostFlow semantic
 
 ### A1. Explicit authority with linked identities
 
-Canonical `.ghost.md` source and pinned imported sources own executable behavior.
-API-owned records identify revisions, installation context, and deployment.
-Device-owned profiles, drivers, and observations supply physical information.
-The portable Rust core owns execution. Frontends consume semantic descriptors and
-recorded results. A conversational or visual edit becomes a source-change candidate
-when it changes executable rules.
+Each kind of information has exactly one owner:
+
+| Owner | Owns |
+| --- | --- |
+| Canonical `.ghost.md` source and pinned imported sources | Executable behavior. |
+| API-owned records | Revisions, installation context and deployment identity. |
+| Device-owned profiles, drivers and observations | Physical information. |
+| Portable Rust core | Execution. |
+| Frontends | Nothing authoritative; they consume semantic descriptors and recorded results. |
+
+A conversational or visual edit becomes a source-change candidate when it changes
+executable rules.
+
+The diagram below shows these ownership boundaries and the identity links between
+them.
+
+![Authority boundaries with linked identities](diagrams/behavior-composition-research/authority-boundaries.svg)
 
 System installation issue #62 introduces a real unresolved boundary: executable
 installation constraints cannot become a second informal JSON program. Research
-whether the installation contract can reference separately compiled canonical
-constraint source, using the existing constraint path, or whether an explicit
-cross-project boundary revision is required. Do not assume either is accepted.
+two options:
+
+1. The installation contract references separately compiled canonical constraint
+   source, using the existing constraint path.
+2. An explicit cross-project boundary revision is required.
+
+Do not assume either is accepted.
 
 ### A2. Typed relationships and specific graph projections
 
@@ -181,14 +246,23 @@ VMs. Static composition is the preferred hypothesis because it can reuse the
 current execution core. It is not yet a proven lowering or ABI decision.
 
 The comparison must show input sampling and logical time while preserving the
-fixed old/next-state contract: all transitions read the same old-state/input
-snapshot, next-state references occur only in output expressions, and logical
-state/output commit is simultaneous. These semantics are not a composition
-decision. The comparison must also show timer isolation, initialization/reset,
-fault scope, and output resolution. Two
-instances of one definition must have isolated state. Reordering declarations for
-the same instance identities must not change behavior. Feedback across scans needs
-explicit semantics; an instantaneous dependency cycle is not implicitly solved.
+fixed old/next-state contract:
+
+- all transitions read the same old-state/input snapshot;
+- next-state references occur only in output expressions;
+- logical state/output commit is simultaneous.
+
+These semantics are not a composition decision. The comparison must also show:
+
+- timer isolation;
+- initialization/reset;
+- fault scope;
+- output resolution.
+
+Two instances of one definition must have isolated state. Reordering declarations
+for the same instance identities must not change behavior. Feedback across scans
+needs explicit semantics; an instantaneous dependency cycle is not implicitly
+solved.
 
 Retain existing resource limits in the analysis. DI/RO capacity alone says nothing
 about whole-program state, bytecode, expression cost, memory, or target timing.
@@ -222,8 +296,8 @@ independence. General temporal/safety proof is outside the first profile.
 
 ### A6. Keep override lifecycles separate
 
-Record separately: import-time parameters, runtime operator settings, dependency
-selection, and physical bindings. For the agreed live-property path, preserve
+Record these four separately: import-time parameters, runtime operator settings,
+dependency selection, and physical bindings. For the agreed live-property path, preserve
 program/run identity, advance settings revision/effective event position, and
 persist values across ESP restart while assigning the restarted runtime a new
 run identity. Reconcile the older stopped/new-run text with #89; use #90 for
@@ -300,11 +374,18 @@ priorities, not a declaration that implementation or product validation is compl
 | [R9 #108](https://github.com/callin2/ghostflow-language/issues/108) | P1 | Acceptance matrix and implementation handoff order | R1–R8 |
 <!-- compose-issue-index:end -->
 
-Tasks are tracked in GitHub, not a duplicate local checkbox backlog.
+Tasks are tracked in GitHub, not in a duplicate local checkbox backlog.
 [The plan index](../tasks/plan.md) points to this summary and the tracker.
-R1 and R2 can start together. After R2, R3/R4/R6 can proceed independently.
-After R3, explanation research R8 and package research R7 can proceed when their
-other inputs exist. R9 can draft early but cannot finalize before R1–R8.
+
+The hard dependencies form the order shown below:
+
+- R1 and R2 can start together.
+- After R2, R3, R4 and R6 can proceed independently.
+- After R3, explanation research R8 and package research R7 can proceed once
+  their other inputs exist.
+- R9 can draft early but cannot finalize before R1–R8.
+
+![Hard dependencies between research tasks R1–R9](diagrams/behavior-composition-research/research-dependencies.svg)
 
 Related issues are interface references. Their entire completion is not a hard
 dependency of these research documents. An implementation that needs an unfinished
@@ -352,9 +433,10 @@ registered in `tools/verify-language.mjs` and follow `docs/VERIFICATION.md`.
 
 ## Handoff rules for smaller models
 
-Each issue is self-contained: one documentation artifact, exact starting sources,
-fixed constraints, numbered steps, examples, expected table columns, dependencies,
-and three completion checks. It does not require chat history. The expected scope
+Each issue is self-contained. It contains one documentation artifact, exact
+starting sources, fixed constraints, numbered steps, examples, expected table
+columns, dependencies, and three completion checks. It does not require chat
+history. The expected scope
 is one focused research pass, ordinarily one output file of about 80–160 lines.
 
 Use the inspected revision as the evidence baseline; record any relevant difference
@@ -369,10 +451,13 @@ remains a review checkpoint, not a task delegated to a smaller model by implicat
 
 ## Review checkpoints and deferred scope
 
-After R1–R3: review user outcomes, authority, and execution alternatives. After
-R4–R8: review binding, contracts, lifecycle, package compatibility, and the evidence
-chain together. R9 records resolved decisions and exact unresolved implementation
-blockers. Child research completion does not authorize implementation automatically.
+- After R1–R3: review user outcomes, authority, and execution alternatives.
+- After R4–R8: review binding, contracts, lifecycle, package compatibility, and
+  the evidence chain together.
+
+R9 records the resolved decisions and the exact unresolved implementation
+blockers. Completing the child research does not automatically authorize
+implementation.
 
 Defer arbitrary graph querying, a universal ontology, a marketplace, new UI
 renderers, distributed orchestration, general temporal theorem proving, and shared

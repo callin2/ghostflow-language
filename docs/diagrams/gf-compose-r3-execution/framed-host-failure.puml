@@ -1,0 +1,14 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName Helvetica
+skinparam defaultFontSize 13
+title Framed host reset/failure boundary (existing contract)
+
+[*] --> Ready : new host instance\n(new runId)
+Ready --> Ready : frame succeeds /\npublish last completed result
+Ready --> Ready : pre-conditioning validation\nrejected (retry allowed)
+Ready --> Faulted : conditioning or\nVM dispatch fails
+Faulted : fault latched
+Faulted : last committed result\nstays available
+Faulted --> [*] : further steps need\na new host instance
+@enduml

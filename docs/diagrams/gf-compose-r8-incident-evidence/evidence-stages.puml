@@ -1,0 +1,23 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName Helvetica
+skinparam defaultFontSize 13
+skinparam rectangleRoundCorner 8
+left to right direction
+title Proposed causal evidence chain (stages stay separate)
+
+rectangle "Input event\nor observation" as I
+rectangle "Evaluated rule\n(joined to effective\nsettings revision)" as E
+rectangle "Intent" as N
+rectangle "Requested output\n(Rust core trace)" as Q
+rectangle "Safe output\n(Rust safety resolution)" as S
+rectangle "Host / renderer\napplication result\n(#74/#88, undefined in v0)" as A
+rectangle "Physical observation\n(Device / installation,\n#28 proposal)" as P
+
+I --> E
+E --> N
+N --> Q
+Q --> S : constraint\nreference
+S --> A : command ack is\nnot physical proof
+A --> P : recorded applied event\nis not physical proof
+@enduml

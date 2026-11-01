@@ -1,0 +1,21 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName Helvetica
+title One Driver session (epoch), as proposed
+
+participant Host
+participant Driver
+Host -> Driver : gfdrv_negotiate(major 1, max_minor)
+Host -> Driver : describe -> immutable metadata
+note over Host : binding admission\n(compare metadata to Program contract)
+Host -> Driver : open(binding_and_budget)
+Driver --> Host : session (new epoch) or error, no output
+loop each scan
+  Host -> Driver : poll -> ordered input records
+  note over Host : core evaluation and commit
+  Host -> Driver : apply(safe commands) -> receipts
+end
+Host -> Driver : cancel(command_id) -> receipt (optional)
+Host -> Driver : close (exactly once)
+note over Host, Driver : restart = new session epoch,\nre-validate metadata and bindings,\nno implicit resume or replay
+@enduml

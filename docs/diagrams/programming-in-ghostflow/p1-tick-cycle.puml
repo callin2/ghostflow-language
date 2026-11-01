@@ -1,0 +1,24 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName Helvetica
+skinparam defaultFontSize 13
+skinparam componentStyle rectangle
+left to right direction
+title One tick: what to write down before you run
+
+rectangle "Captured inputs\n(one set per tick)" as in
+rectangle "Previous state" as prev
+rectangle "Expressions\n(let, case, if)" as expr
+rectangle "Next state" as next
+rectangle "Requested intent" as req
+rectangle "Safe intent\n(after safety rules)" as safe
+rectangle "Outputs to binding\nand renderer" as out
+
+in --> expr
+prev --> expr
+expr --> next
+expr --> req
+req --> safe
+safe --> out
+next ..> prev : becomes previous\nstate of next tick
+@enduml

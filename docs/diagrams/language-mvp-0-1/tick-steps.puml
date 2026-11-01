@@ -1,0 +1,16 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontSize 12
+start
+:Input snapshot + old state;
+if (any input missing?) then (yes)
+  :Reject input\n(if absence matters, host sends\nan explicit fault/status input);
+  stop
+endif
+:Evaluate all next expressions\n(read old state + inputs)\n-> one candidate state;
+:Evaluate intents\n(unprimed state = old;\nnext.NAME = candidate);
+:Safety constraints\n(requires, mutex)\nrequested -> safe intents;
+:No evaluation error:\ncommit together\ncandidate state + requested/safe intents;
+:Journal: inputs, old/new state,\nboth intents, strategy, faults;
+stop
+@enduml

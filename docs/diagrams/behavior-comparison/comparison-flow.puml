@@ -1,0 +1,23 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontSize 13
+start
+:Capture request\n(baseline, candidate, scenario);
+fork
+  :Compile baseline\n.ghost.md;
+  :Run frozen scenario-v1\nfrom canonical initial state;
+fork again
+  :Compile candidate\n.ghost.md;
+  :Run the same scenario-v1\nfrom canonical initial state;
+end fork
+if (Both runs complete?) then (yes)
+  :Select listed observations\nper scan inside scope;
+  :Evaluate optional assertions;
+  :outcome: completed\n(per-scan values, equal, counts);
+else (no)
+  :outcome: incomplete\n(side errors, partial observations);
+  :Every assertion = unknown;
+endif
+:Report with SHA-256 identities\nphysicalEffects: false;
+stop
+@enduml

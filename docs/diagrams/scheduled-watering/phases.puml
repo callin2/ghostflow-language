@@ -1,0 +1,29 @@
+@startuml
+hide empty description
+skinparam shadowing false
+skinparam defaultFontName Helvetica
+skinparam state {
+  BackgroundColor White
+  BorderColor #555555
+}
+title ScheduledWatering phases
+
+state Idle : all off
+state Open1 : valve1
+state Water1 : valve1 + pump
+state Stop1 : valve1
+state Switch : all off
+state Open2 : valve2
+state Water2 : valve2 + pump
+state Stop2 : valve2
+
+[*] --> Idle
+Idle --> Open1 : starts.due
+Open1 --> Water1 : age >= 2 s
+Water1 --> Stop1 : age >= 5 min
+Stop1 --> Switch : age >= 2 s
+Switch --> Open2 : age >= 2 s
+Open2 --> Water2 : age >= 2 s
+Water2 --> Stop2 : age >= 5 min
+Stop2 --> Idle : age >= 2 s
+@enduml

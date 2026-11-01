@@ -1,0 +1,23 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName Helvetica
+skinparam defaultFontSize 13
+
+participant "Package signer" as P
+participant "Host verifier\n(trust snapshot)" as H
+
+== 1. Trust the next key ==
+H -> H : add next public key to trustedKeys
+note right of H : trusted: current, next
+
+== 2. Publish a co-signed package ==
+P -> H : package signed by current + next
+note right of H : accepted
+
+== 3. Revoke the old key ==
+H -> H : add current key ID to revokedKeyIds
+P -> H : same co-signed package
+note right of H : revoked signature ignored;\nnext-key signature verifies: accepted
+P -> H : package signed only by old key
+note right of H : rejected: no active\ntrusted signature left
+@enduml

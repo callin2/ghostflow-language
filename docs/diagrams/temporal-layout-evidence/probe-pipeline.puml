@@ -1,0 +1,18 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName Helvetica
+skinparam defaultFontSize 13
+skinparam ArrowColor #526d76
+
+start
+:Copy crates/ghostflow-core/src/*.rs
+to build/temporal-layout-probe;
+:Append one size_of export per type
+(copy only; product tree untouched);
+:rustc → wasm32 cdylib probe.wasm;
+:Node instantiates probe and calls exports;
+:Write build/temporal-wasm32-layout.json;
+:Independent JS fixture oracle
+combines widths with declared geometry;
+stop
+@enduml

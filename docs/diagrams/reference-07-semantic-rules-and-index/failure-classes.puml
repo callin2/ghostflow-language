@@ -1,0 +1,38 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontSize 13
+skinparam rectangle {
+  RoundCorner 8
+}
+left to right direction
+
+rectangle "Something went wrong\nor a condition is not met" as start
+
+rectangle "Invalid program\n(name/syntax, type,\nbranch/definition,\nstate boundary)" as invalid #FFE0E0
+rectangle "Fix the source" as fix
+
+rectangle "Value computation error\n(overflow, ÷0, bad conversion)" as calc #FFF0D0
+rectangle "No successful tick;\nno partial commit" as nocommit
+
+rectangle "External data problem\n(sensor fault, schedule Unknown,\nmissing/mismatched observation)" as ext #E0F0FF
+rectangle "Explicit error flow;\nnever False or permission" as flow
+
+rectangle "Settings event problem" as set #E8E0FF
+rectangle "Admission rejected:\nkeep settings + revision" as adm
+rectangle "Payload error:\nfault(SettingsInvalid),\nrevision advances" as pay
+
+rectangle "Known unmet condition" as known #E0FFE0
+rectangle "Normal decision;\nresult is False" as falsev
+
+start --> invalid
+invalid --> fix
+start --> calc
+calc --> nocommit
+start --> ext
+ext --> flow
+start --> set
+set --> adm
+set --> pay
+start --> known
+known --> falsev
+@enduml

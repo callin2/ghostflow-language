@@ -1,0 +1,16 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontSize 13
+hide empty description
+state "Config Result OK" as ok
+ok : Solar admission evaluated normally
+state "Dependent config fault" as fault
+fault : admission = Unknown(SettingsFault)
+fault : (even if a fault branch is true;\nno old value or default used)
+state "Recovery baseline" as base
+base : missed starts are NOT caught up
+[*] --> ok
+ok --> fault : current observation is a fault
+fault --> base : later successful observation
+base --> ok : next eligible crossing\ncan fire once
+@enduml

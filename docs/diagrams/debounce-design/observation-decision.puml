@@ -1,0 +1,28 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontSize 12
+skinparam ActivityBackgroundColor #F7F9FC
+skinparam ActivityBorderColor #4A6FA5
+title Debounce: one observation of the selected root (simplified)
+start
+:Every reachable root updates its own\nhigh-water epoch/ID on the committed scan;
+if (Selected root changed, or\nfresh epoch change?) then (yes)
+  :Reset stable and candidate continuity;
+endif
+if (Result is a fault?) then (yes)
+  :Keep exact reason and origin;\nreset stable and candidate to `initial`;
+  stop
+endif
+if (Fresh observation?\n(tag 0: one per committed scan)) then (no: duplicate,\nlower ID, missing)
+  :Continuity does not advance;
+  stop
+else (yes)
+endif
+if (Candidate held at or beyond\n`stable_for`?) then (yes)
+  :Promote candidate to stable;
+else (no)
+  :Keep timing the candidate\n(sample time or scan logical time);
+endif
+:Forward upstream sample lineage;
+stop
+@enduml

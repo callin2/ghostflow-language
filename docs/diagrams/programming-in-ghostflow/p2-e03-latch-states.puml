@@ -1,0 +1,27 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontSize 13
+skinparam StateBackgroundColor #F7F9FC
+skinparam StateBorderColor #4A6FA5
+title E03: running and restart_blocked (one transition per tick)
+
+state "Stopped\nrunning=false\nrestart_blocked=false" as Stopped
+state "Running\nrunning=true" as Running
+state "RestartBlocked\nrunning=false\nrestart_blocked=true" as Blocked
+
+[*] --> Stopped
+Stopped --> Running : START pressed, STOP released\n(both healthy)
+Running --> Stopped : STOP pressed (healthy),\nno restart block
+Stopped --> Blocked : START or STOP fault
+Running --> Blocked : STOP fault, or stopped\nwhile restart block is set
+Blocked --> Stopped : both healthy and\nSTART released
+Blocked --> Blocked : START still held,\nor any fault
+
+note right of Running
+  A START fault while running keeps
+  running (STOP healthy and released)
+  but sets restart_blocked. It clears
+  when START is seen released
+  while both inputs are healthy.
+end note
+@enduml

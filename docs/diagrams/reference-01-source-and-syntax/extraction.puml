@@ -1,0 +1,19 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontSize 13
+start
+:One canonical .ghost.md document;
+:Parse as CommonMark;
+:Select top-level fenced code blocks\nwhose info string is exactly ghost\n(backtick or tilde fences);
+note right
+  Not executable: prose, tables, front matter,
+  indented code, other info strings,
+  ghost fences nested in lists/quotes or
+  written inside a longer display fence,
+  ghost-python, ghost with attributes
+end note
+:Keep document order;\nend each body with a newline;\nput one blank line between blocks;
+:Parse the result as one program\nwith exactly one root control;
+:Report diagnostics at original\nfile, line and column;
+stop
+@enduml

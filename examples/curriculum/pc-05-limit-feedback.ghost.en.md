@@ -5,23 +5,45 @@
 # PC-05 — Limit feedback and valve direction changes
 
 <!-- ghostflow:anchor id=GF-INT-PC05-LIMIT-FEEDBACK-V1 kind=intent status=confirmed origin=imported -->
-> Learning scenario: A learning scenario based on the limit-switch stage of the
-> user's PLC-replacement curriculum. This document is not a direct user quote.
+> Learning scenario: based on the limit-switch stage of a user-supplied
+> PLC-replacement curriculum. This document is not a direct quote of the user.
 
-The linked original is the sole canonical literate executable source for PC-05. It preserves
-and references lesson [E06 DirectionInterlock](../../docs/ProgrammingInGhostflow.md#e06--두-방향을-동시에-요청하면)
-and the [PC-04 direction-change interlock](./pc-04-direction-interlock.ghost.md).
-E06's `mutex` blocks simultaneous output requests; PC-04's wait state prevents
-an immediate change to the opposite direction. This lesson adds observations
-of the valve's actual end positions.
+**What this lesson adds.** The linked Korean `.ghost.md` file is the only
+canonical, executable literate source for PC-05. It keeps and builds on two
+earlier lessons:
 
-`open_request` and `close_request` are momentary requests that remain true while
-pressed. `open_limit` and `close_limit` are normalized end-position observations;
-when true, they indicate that the open or closed limit respectively has been
-reached. Outputs are logical commands to the open/close contactor coils, not
-evidence that the valve actually moved.
+- [E06 DirectionInterlock](../../docs/ProgrammingInGhostflow.en.md#e06--requesting-both-directions-at-once):
+  `mutex` blocks the two direction outputs from being on at the same time.
+- [PC-04 direction-change interlock](./pc-04-direction-interlock.ghost.en.md):
+  a wait state stops the motor from reversing straight into the opposite direction.
 
-This new producer-quality revision distinguishes unavailable position observations from healthy false. Explicitly unavailable permission or position selects `Stopped`; only two healthy asserted limits mean `SensorConflict`. Request quality gates the existing release/rearm logic. Healthy button values do not infer physical faults, and no new START input is added. The predecessor is retained at `tests/fixtures/history/issue531/pc-05-limit-feedback.ghost.en.md.pre-input.txt`.
+This lesson adds the valve's **actual end positions**, as reported by limit
+switches.
+
+**Inputs and outputs.**
+
+| Name | Kind | Meaning |
+| --- | --- | --- |
+| `open_request`, `close_request` | Momentary request | True only while the button is held. |
+| `open_limit`, `close_limit` | End-position observation (normalized) | True means the valve has reached the open end or the closed end. |
+| `stop_ok`, `overload_ok` | Permission | Both must be healthy and true for the valve to move. |
+| `valve_open_contactor`, `valve_close_contactor` | Output | Logical commands to the open and close contactor coils. |
+
+An output being on is a command, not proof that the valve moved.
+
+**Input quality.** Every input arrives with a quality from its producer:
+`ok(value)` when the reading is available, `fault(_)` when it is not. This
+revision treats "unavailable" differently from a healthy `false`:
+
+- If permission or a position input is explicitly unavailable, the phase is `Stopped`.
+- Only two **healthy** limits that are both true mean `SensorConflict`.
+- Request quality guards the existing release/re-arm logic: a request counts
+  only when both request inputs are available.
+- Healthy button values are never used to guess at physical faults, and no new
+  START input is added.
+
+The previous version of this source is kept at
+`tests/fixtures/history/issue531/pc-05-limit-feedback.ghost.en.md.pre-input.txt`.
 
 ```ghost
 // Source revision: issue531-producer-quality-pc05-v1
@@ -114,28 +136,45 @@ control LimitFeedbackValve {
 }
 ```
 
-If both end positions are true in any state, `SensorConflict` takes priority
-and outputs turn off. Loss of permission or simultaneous requests also selects
-`Stopped` and turns outputs off. The control starts in `Stopped` without
-inventing a physical position. It moves to `Open` or `Closed` only after exactly
-one end position is observed. If the matching limit observation disappears
-while stopped at an end, it returns to `Stopped` rather than trusting old state.
-If only the opposite limit is observed, the end state is reconciled to that
-physical observation.
+**How a request becomes an event.** `request_armed` becomes true only on a scan
+where everything is healthy and permitted and **neither** button is pressed. An
+`open_event` or `close_event` needs `request_armed` from the previous scan plus
+exactly one pressed button. So each press is counted once; to issue another
+request, the operator must release both buttons first.
 
-While moving, observation of the target end position stops motion in that state.
-If a new request for the opposite direction arrives in the same tick, that event
-takes priority over the end position: the phase enters `WaitOpen` or `WaitClose`
-and both commands turn off immediately. Motion resumes only after exactly two
-seconds, so the operator's request is not silently lost. A new opposite request
-during the wait changes the target and restarts the full wait.
+The diagram below shows the main phase transitions. The note lists the checks
+that run first, from every state.
 
-If an end position never arrives, the control remains in `Opening` or `Closing`
-with the command on. This learning example intentionally exposes its missing
-timeout and is not ready for hardware deployment. PC-10 adds timeout, fault
-latch, and reset. `mutex` is only a software backstop; it does not replace actual
-electrical/mechanical interlocks or zero-speed/position-feedback wiring.
+![PC-05 phase transitions for the limit-feedback valve](../../docs/diagrams/pc-05-limit-feedback/phase-states.svg)
 
-`tools/check-pc-05.mjs` creates a fresh WASM `ControlRuntime` for each case and
-does not rebuild the existing WASM. Its result is a compiler/WASM virtual trace,
-not physical evidence of contact closure, valve movement, or fluid flow.
+**Safety checks that win everywhere.** If both end positions are true, in any
+state, `SensorConflict` takes priority and both outputs turn off. Loss of
+permission, or both requests at once, selects `Stopped` and also turns the
+outputs off.
+
+**Starting from an unknown position.** The control starts in `Stopped`. It does
+not invent a physical position. It moves to `Open` or `Closed` only after
+exactly one end position is observed. If the matching limit disappears while the
+valve rests at an end, the control returns to `Stopped` instead of trusting its
+old state. If only the opposite limit is observed, the end state is corrected to
+match that physical observation.
+
+**Reversing while moving.** While moving, the valve stops in `Open` or `Closed`
+when the target end position is observed. If a new request for the opposite
+direction arrives on the same scan, that request wins over the end position:
+the phase enters `WaitOpen` or `WaitClose`, and both commands turn off at once.
+Motion resumes only after two full seconds (`reversal_wait`), so the operator's
+request is not silently lost. Another opposite request during the wait changes
+the target and restarts the full wait.
+
+**Known gap: no timeout.** If an end position never arrives, the control stays
+in `Opening` or `Closing` with the command on. This learning example leaves the
+timeout out on purpose. It is **not** ready for hardware deployment; PC-10 adds
+timeout, fault latch, and reset. `mutex` is only a software backstop. It does not
+replace real electrical or mechanical interlocks, or zero-speed or
+position-feedback wiring.
+
+**What the checker proves.** `tools/check-pc-05.mjs` creates a fresh WASM
+`ControlRuntime` for each case and does not rebuild the existing WASM. Its result
+is a compiler/WASM virtual trace. It is not physical evidence of contact
+closure, valve movement, or fluid flow.

@@ -1,0 +1,19 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontSize 13
+skinparam rectangleBorderColor #555555
+skinparam rectangleBackgroundColor #F7F7F7
+
+rectangle "Markdown prose" as PROSE {
+  rectangle "HTML comment\nghostflow:anchor id=… kind=… status=… origin=…" as ANCHOR
+  rectangle "next top-level paragraph\nor quotation block" as TEXT
+}
+rectangle "ghost fence" as FENCE {
+  rectangle "// ghostflow:link id=… relation=…" as LINK
+  rectangle "next traceable statement" as STMT
+}
+
+ANCHOR --> TEXT : identifies original text
+LINK --> STMT : identifies exactly one
+LINK ..> ANCHOR : refers to id\n(implements | constrains |\nfallback | assumes)
+@enduml

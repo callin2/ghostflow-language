@@ -1,0 +1,20 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName Helvetica
+skinparam defaultFontSize 13
+skinparam rectangleRoundCorner 8
+title Proposed milestone handoffs (subject to architecture-owner review)
+
+rectangle "Architecture-owner review\n(research completion grants\nno implementation authority)" as R
+rectangle "M1: Apply a prepared behavior\ncontract descriptors, input kind,\nexclusive ownership, logical ports,\naccepted/rejected result" as M1
+rectangle "M2: Add another behavior\ninstance-qualified composition,\nisolated state/timers,\npreserved bindings" as M2
+rectangle "M3: Investigate an unexpected result\ninstance-qualified source/constraint\ntrace joined to run/scan" as M3
+rectangle "Owner decision gates\ncompiler/runtime, package/import,\ninstallation constraint, instance/deployment,\nbinding evidence, incident evidence" as G
+
+R --> M1
+M1 --> M2
+M2 --> M3
+G ..> M1 : gates only\nslices that use them
+G ..> M2
+G ..> M3
+@enduml

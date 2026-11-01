@@ -1,0 +1,28 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName Helvetica
+skinparam ArrowColor #555555
+skinparam rectangle {
+  BackgroundColor White
+  BorderColor #555555
+}
+title From compilation to a joined explanation
+
+rectangle "Compiler\n(typed IR + byte writer)" as C
+rectangle "GFB bytes\n(unchanged)" as B
+rectangle "explanationArtifact\n(sidecar)" as S
+rectangle "VM scan\n(instruction witnesses enabled)" as V
+rectangle "TickRecord\n(completed scan only)" as T
+rectangle "prepareOutputExplanation\nproducer.emit" as P
+rectangle "proof" as PR
+rectangle "joinOutputExplanation\n(output snapshot + expected run)" as J
+
+C --> B
+C --> S
+B --> V
+V --> T : evidence attached\nafter scan completes
+S --> P
+T --> P
+P --> PR
+PR --> J
+@enduml

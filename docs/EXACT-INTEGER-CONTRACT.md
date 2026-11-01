@@ -2,27 +2,43 @@
 
 Tracking: language issue #22 / integration `TASK-85.1` / review R14.
 
-This document records the N2–N4 design and its acceptance vectors. `Int` is now
-implemented by the parser, GFB encoder and portable VM. The confirmed product
-principle is that counts and repetition totals remain exact within a declared
-range. Historical recommendation and proposal wording below records the design
-process; the current source contract is the Language Reference.
+This document records the N2–N4 design for exact integers and the acceptance
+vectors that test it. `Int` is now implemented by the parser, the GFB encoder
+and the portable VM.
+
+The confirmed product principle is simple: **counts and repetition totals stay
+exact within a declared range.** Wording below such as "recommend" or
+"proposal" records how the design was reached. The current source contract is
+the Language Reference (see
+[Types, expressions and state](reference/02-types-expressions-state.en.md)).
+
+This document covers, in order:
+
+- the confirmed intent and the current implementation boundary;
+- why `Int` is a fixed signed 32-bit type;
+- how literals get their type;
+- the integer operations and explicit conversions;
+- what happens on a fault, and which stable reason codes are used;
+- the acceptance vectors owned by N2, N3 and N4, and the binary allocation; and
+- what review R14 may still change.
 
 ## Confirmed intent and current boundary
 
-- Counts and measurements are different kinds of values. A count is not made
-  approximate merely because it came from a sensor.
-- Integer values and integer results must remain exact within the supported
+- Counts and measurements are different kinds of values. A count does not
+  become approximate just because it came from a sensor.
+- Integer values and integer results must stay exact within the supported
   range. Precision loss, wrapping and saturation are never silent.
-- Browser/WASM and ESP32 use the same value and fault semantics.
-- The current implementation has `Bool`, `Number` (`f64`) and `Int` (`i32`).
-  GFB encodes Number constants/defaults as eight-byte `f64` and Int
-  constants/defaults as four-byte signed `i32`. The JS/WASM boundary exposes
-  both numeric values as JavaScript `number` with Int range validation.
+- Browser/WASM and ESP32 use the same value semantics and the same fault
+  semantics.
+- The current implementation has three scalar types: `Bool`, `Number` (`f64`)
+  and `Int` (`i32`). GFB encodes Number constants/defaults as eight-byte `f64`
+  and Int constants/defaults as four-byte signed `i32`. The JS/WASM boundary
+  exposes both numeric types as a JavaScript `number`, and validates the Int
+  range.
 - GFB implements checked Int arithmetic, division, remainder and explicit
-  conversions. Division by zero, overflow, invalid conversion or a non-finite
-  Number result rejects the tick before state/intent commit.
-- Date/time, monotonic clock and identifier widths are separate contracts.
+  conversions. Division by zero, overflow, an invalid conversion or a
+  non-finite Number result rejects the tick before state and intents commit.
+- Date/time, the monotonic clock and identifier widths are separate contracts.
   This proposal must not force an epoch timestamp into the integer count type.
 
 ## Minimum type recommendation
@@ -33,10 +49,11 @@ Add one public scalar type, `Int`, with a fixed signed 32-bit representation:
 Int = -2_147_483_648 .. 2_147_483_647
 ```
 
-`Int` means exactly this range on every host; it is not a platform-sized C/Rust
-`int`. Signed storage supports counts, differences and offsets without adding a
-second unsigned type. A non-negative domain such as fruit count is expressed by
-its declared configuration/state bounds, not by another primitive type.
+`Int` means exactly this range on every host. It is not a platform-sized C/Rust
+`int`. Because it is signed, one type covers counts, differences and offsets;
+no second unsigned type is needed. A non-negative domain, such as a fruit
+count, is expressed by the declared configuration/state bounds, not by another
+primitive type.
 
 | Candidate | Benefit | Cost | Decision for the minimum profile |
 | --- | --- | --- | --- |
@@ -45,46 +62,55 @@ its declared configuration/state bounds, not by another primitive type.
 | `Int` backed by `i64` | much larger count range | eight-byte payload, multiword MCU arithmetic, and values beyond JavaScript's exact integer range need a new transport representation | defer until a demonstrated range requires it |
 | separate signed and unsigned primitives | wider non-negative range | more mixed-type and conversion rules | reject for the first profile |
 
-Adding an `i32` variant beside `f64` does not by itself prove that every VM
-stack slot becomes smaller: enum layout is still dominated by its largest
-variant and target alignment. The immediate bounded gains are native-width
-integer operations and four-byte binary constants/defaults. N3 must measure the
-actual ESP32 build rather than claim a whole-VM RAM saving from payload width.
+Adding an `i32` variant beside `f64` does not by itself make every VM stack slot
+smaller. Enum layout is still set by the largest variant and by target
+alignment. The gains we can count on now are native-width integer operations
+and four-byte binary constants/defaults. N3 must measure the actual ESP32 build
+instead of claiming a whole-VM RAM saving from payload width.
 
 ## Literal and type rules
 
-- A whole decimal numeral has exact integer value. With no expected numeric
-  type it defaults to `Int`.
-- A whole numeral may be elaborated directly as a `Number` literal when its
+- A whole decimal numeral has an exact integer value. When no numeric type is
+  expected, it defaults to `Int`.
+- A whole numeral may be elaborated directly as a `Number` literal when the
   surrounding declaration or operand supplies that expected type. This is
   literal typing, not a runtime `Int` to `Number` coercion.
-- A numeral with a decimal point or exponent is `Number`, never `Int`.
+- A numeral with a decimal point or an exponent is `Number`, never `Int`.
 - The first implementation need not add digit separators. The range is checked
-  from the original digits before conversion through JavaScript `Number`.
-- `-2147483648` is accepted as the minimum signed literal. Larger positive
-  or negative magnitudes are compile errors.
-- N2 must recognize the optional leading minus as part of an integer-literal
+  on the original digits, before any conversion through JavaScript `Number`.
+- `-2147483648` is accepted as the minimum signed literal. Any larger positive
+  or negative magnitude is a compile error.
+- N2 must treat the optional leading minus as part of the integer-literal
   boundary check, or implement an equivalent explicit minimum-literal rule. It
   must not first reject positive `2147483648` and then try to lower unary minus
   as `0 - 2147483648`.
 - Variables, inputs, state, results and function values never convert implicitly
-  between `Int` and `Number`. Mixed arithmetic and comparison are compile errors.
+  between `Int` and `Number`. Mixed arithmetic and mixed comparison are compile
+  errors.
 
-These rules preserve readable thresholds such as `temperature < 30` when the
-left operand supplies expected type `Number`, while an untyped `let count = 30`
-is exact `Int`.
+These rules keep readable thresholds such as `temperature < 30` working: the
+left operand supplies the expected type `Number`. Meanwhile an untyped
+`let count = 30` is an exact `Int`.
 
-Expected type reaches a whole literal only from its immediate typed context:
+A whole literal receives an expected type only from its immediate typed context:
 
-- a declared config/state/output initializer or output connection;
+- a declared config/state/output initializer or an output connection;
 - a statically typed function parameter;
 - the other concrete numeric operand of arithmetic or comparison; and
 - an enclosing expected type shared by both `if` branches.
 
 When neither side supplies a type, whole literals default to `Int`; a decimal
-literal makes the same numeric expression `Number`. An untyped `let` is fixed
-from its initializer and later uses do not back-propagate a different type.
-Conflicting contexts are diagnostics, not overload guesses.
+literal makes the same numeric expression `Number`. An untyped `let` takes its
+type from its initializer, and later uses do not back-propagate a different
+type. Conflicting contexts produce diagnostics; the compiler does not guess an
+overload.
+
+| Source | Type | Why |
+| --- | --- | --- |
+| `let count = 30` | `Int` | no expected type; whole literal defaults to `Int` |
+| `let level = 30.0` | `Number` | decimal point |
+| `temperature < 30` (with `temperature: Number`) | `30` is a `Number` literal | the other operand supplies `Number` |
+| `count + 1.5` (with `count: Int`) | compile error | mixed `Int`/`Number` |
 
 ## Operations
 
@@ -98,15 +124,15 @@ Conflicting contexts are diagnostics, not overload guesses.
 | `== != < <= > >=` | `Bool` | allowed for two `Int`s |
 | any `Int`/`Number` mixture | none | compile error until an explicit conversion is present |
 
-For valid division and remainder, `a == (a div b) * b + (a % b)` holds. Integer
-overflow is not converted into `Number`, wrapped or saturated.
+For every valid division and remainder, `a == (a div b) * b + (a % b)` holds.
+Integer overflow is never converted into `Number`, wrapped or saturated.
 
 ## Explicit conversions
 
-The semantic operations are fixed here. `div`, `%` and the following conversion
-names are provisional source spellings for R14. Acceptance-vector IDs describe
-the semantic operations; N2 substitutes the approved spelling before turning
-them into source fixtures.
+This section fixes the semantic operations. The names `div`, `%` and the
+conversion names below were provisional source spellings for review R14.
+Acceptance-vector IDs name the semantic operations, so N2 substitutes the
+approved spelling before turning them into source fixtures.
 
 | Candidate operation | Contract |
 | --- | --- |
@@ -117,41 +143,53 @@ them into source fixtures.
 | `int_trunc(n)` | truncate toward zero, then range check |
 | `int_nearest_even(n)` | nearest integer with ties to even, then range check |
 
-There is no generic conversion with a hidden rounding default. Constant invalid
-conversions are compile errors; input-dependent invalid conversions are runtime
-numeric faults.
+There is no generic conversion with a hidden rounding default. An invalid
+conversion of a constant is a compile error. An invalid conversion that depends
+on input is a runtime numeric fault.
 
 ## Fault and state semantics
 
-Constant overflow, invalid integer literals and statically invalid conversions
-are compile diagnostics. Input-dependent overflow, zero division and invalid
-conversion reject the current scan before new state or intents commit. The host
-enters its existing execution-fault path and retains the last accepted outcome
-as evidence. This language rule does not itself claim that a physical relay has
-turned OFF; renderer safe-output handling and physical confirmation remain
-separate evidence.
+Errors are caught at the earliest point that can see them, as the diagram shows.
 
-Use distinct stable reasons at the runtime boundary:
+![Where Int errors are caught: compile time for constants, scan rejection before commit for input-dependent errors](diagrams/exact-integer-contract/int-error-boundary.svg)
+
+- **Compile time.** Constant overflow, invalid integer literals and statically
+  invalid conversions are compile diagnostics.
+- **Run time.** Input-dependent overflow, division by zero and invalid
+  conversion reject the current scan before any new state or intent commits.
+
+On a runtime rejection the host enters its existing execution-fault path and
+keeps the last accepted outcome as evidence. This language rule does not by
+itself claim that a physical relay has turned OFF. Renderer safe-output
+handling and physical confirmation remain separate evidence.
+
+Use these distinct, stable reasons at the runtime boundary:
 
 - `integer-overflow`
 - `integer-division-by-zero`
 - `integer-conversion-fractional`
 - `integer-conversion-out-of-range`
 
-For the core runtime, a rejected operation leaves the committed tick number,
+In the core runtime, a rejected operation leaves the committed tick number,
 logical time, state, safe intents and journal unchanged. The framed scan adapter
-also clears the rejected candidate inputs and does not advance its accepted scan
-ID or logical time. A consumer may retry that identity only if its host policy
-allows reuse; the current framed Browser host latches a host-entered execution
-fault and requires a fresh instance. Its last accepted outcome remains evidence,
-while the current error reports the rejection. N3 must test both the core
-transaction and the framed-host recovery boundary.
+also clears the rejected candidate inputs and does not advance its accepted
+scan ID or logical time.
+
+A consumer may retry that identity only if its host policy allows reuse. The
+current framed Browser host latches a host-entered execution fault and requires
+a fresh instance. Its last accepted outcome remains evidence, while the current
+error reports the rejection. N3 must test both the core transaction and the
+framed-host recovery boundary.
 
 ## Downstream acceptance vectors
 
-N2 owns literal/type/conversion diagnostics, N3 owns runtime operation behavior,
-and N4 owns exact binary/host exchange. Each ID is stable even if R14 changes a
-surface spelling.
+Ownership is split by stage:
+
+- **N2** owns literal, type and conversion diagnostics.
+- **N3** owns runtime operation behavior.
+- **N4** owns exact binary and host exchange.
+
+Each ID stays stable even if R14 changes a surface spelling.
 
 | ID | Input or operation | Expected result | Owner |
 | --- | --- | --- | --- |
@@ -174,10 +212,10 @@ surface spelling.
 | N1-GFB-02 | old GFB1 presented as the new integer-capable format and vice versa | fail closed; never reinterpret `NUMBER_CONST` as `Int` | N4 |
 | N1-ABI-01 | minimum/maximum `Int` input and output | exact native/WASM exchange and identical trace values | N4 |
 
-The N4 allocation, originally proposed here, is implemented and fixed by
+The N4 allocation, first proposed here, is now implemented and fixed by
 byte-level tests:
 
-| Boundary | Integer-capable proposal |
+| Boundary | Integer-capable contract |
 | --- | --- |
 | Bytecode envelope | magic `GFB1`, little-endian `u16` format version `2`; version `1` remains immutable |
 | Type tag | `3 = Int` (`1 = Bool`, `2 = Number` unchanged) |
@@ -190,24 +228,32 @@ byte-level tests:
 | Package | `GhostFlow/portable-package-v1`; binds bytecode version, manifest and runtime/ABI identities |
 | Trace/outcome JSON | JSON number plus manifest-declared `Int`; decoder requires integral `i32` range before exposing it |
 
-The Browser frame encoder selects type tag `3` from the verified manifest, not
-from whether a JavaScript number happens to be integral; `Number(3.0)` and
-`Int(3)` are distinct. Native and WASM loaders reject unknown format, type or
-opcode values before activation. N4 must publish exact minimum/zero/maximum
-fixtures and their SHA-256 values; the native and WASM consumers load those same
-bytes. It must not reuse version-1 `NUMBER_CONST f64` as an integer encoding.
-Existing version-1 packages remain immutable and are rejected when the host does
-not explicitly support their declared identities.
+The Browser frame encoder picks type tag `3` from the verified manifest, not
+from whether a JavaScript number happens to be integral. `Number(3.0)` and
+`Int(3)` are distinct values. Native and WASM loaders reject unknown format,
+type or opcode values before activation.
 
-Since every `Int` fits the JavaScript safe integer range, JSON-facing adapters
-may use JSON numbers only with strict integral/range validation; no lossy parse
-is permitted. The numeric tag allocation is a technical compatibility decision;
-R14 reviews source spelling rather than byte values.
+N4 must publish exact minimum/zero/maximum fixtures and their SHA-256 values,
+and the native and WASM consumers load those same bytes. N4 must not reuse the
+version-1 `NUMBER_CONST f64` as an integer encoding. Existing version-1 packages
+remain immutable, and are rejected when the host does not explicitly support
+their declared identities.
+
+Every `Int` fits in the JavaScript safe-integer range. So JSON-facing adapters
+may carry it as a JSON number, but only with strict integral and range
+validation; no lossy parse is permitted. The numeric tag allocation is a
+technical compatibility decision: R14 reviews the source spelling, not the byte
+values.
 
 ## R14 review boundary
 
-The technical baseline proposed for implementation is one fixed `Int/i32`,
-checked faults, explicit conversion, `div` for integer quotient and `%` for
-remainder. R14 needs to review only the human-facing spelling (`Int`, `div`, `%`
-and conversion names) using readable examples. It must not reopen the already
+The technical baseline proposed for implementation is:
+
+- one fixed `Int`/`i32` type;
+- checked faults;
+- explicit conversions;
+- `div` for the integer quotient and `%` for the remainder.
+
+R14 needs to review only the human-facing spelling (`Int`, `div`, `%` and the
+conversion names), using readable examples. It must not reopen the already
 confirmed distinction between exact counts and approximate measurements.

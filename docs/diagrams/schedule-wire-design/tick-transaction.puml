@@ -1,0 +1,32 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName Helvetica
+skinparam defaultFontSize 13
+skinparam ArrowColor #526d76
+
+start
+:Receive one immutable ScheduleFacts
+(clock snapshot + one group per schedule);
+:Stage clock gate
+(gap, trust, recovery checks);
+:For each prelude entry, in dependency order:
+evaluate once against old state
+and already staged projections;
+note right
+  More than one newly crossed
+  occurrence for a schedule:
+  record all missed, execute none
+end note
+:Run transitions and intents
+(read staged prelude entries);
+if (Every fallible expression succeeded?) then (yes)
+  :Commit together: windows, clock state,
+  occurrence consumption, schedule
+  observations, scalar state;
+  :TickRecord keeps facts and decisions;
+else (no)
+  :Discard every candidate;
+  :Retry later sees the same crossing;
+endif
+stop
+@enduml

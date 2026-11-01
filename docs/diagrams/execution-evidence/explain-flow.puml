@@ -1,0 +1,23 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName Helvetica
+skinparam defaultFontSize 13
+skinparam componentStyle rectangle
+actor Caller
+rectangle "explainExecution(request)" as API {
+  component "Recompile canonical\n.ghost.md source" as C
+  component "Output explanation +\ncompleted-scan snapshot\n+ proof/snapshot join" as J
+  component "Check device\nidentity and records" as D
+}
+rectangle "execution-evidence-result-v1" as R {
+  card "requested, safe,\nauthored" as R1
+  card "device status" as R2
+}
+Caller --> C : source, runId, outputId
+Caller --> J : accepted scan result
+Caller --> D : expectedDevice,\ndeviceEvidence
+C --> J
+J --> R1
+D --> R2
+note right of API : No new evaluator, no device contact,\nno imports read from disk
+@enduml

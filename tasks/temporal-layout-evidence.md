@@ -1,11 +1,22 @@
 # Temporal target layout evidence
 
-The resource-plan oracle uses target type widths, not a returned resource total
-or a binary search over the budget guard. The probe compiles a copied source
-tree into a separate artifact. It never patches the product tree or adds product
-ABI exports. The ordinary release WASM build does not include the probe.
+This record explains where the wasm32 type widths used by the temporal
+resource-plan oracle come from, and how to reproduce them.
 
-Run from the language repository with its installed Rust toolchain:
+**Key rules:**
+
+- The oracle uses **target type widths**. It does not use a returned resource
+  total, and it does not binary-search the budget guard.
+- The probe compiles a **copied** source tree into a separate artifact. It never
+  patches the product tree and never adds product ABI exports.
+- The ordinary release WASM build does not include the probe.
+
+The pipeline below copies the sources, appends one `size_of` export per type,
+builds a wasm32 probe, and reads the widths back in Node.
+
+![Layout probe pipeline: copy sources, add size_of exports, build wasm32, read widths, feed the oracle](../docs/diagrams/temporal-layout-evidence/probe-pipeline.svg)
+
+Run this from the language repository with its installed Rust toolchain:
 
 ```sh
 python3 - <<'PY'
@@ -65,12 +76,20 @@ Observed wasm32 widths for this implementation:
 | ScanOutcomeV1 | 152 |
 | Vec / VecDeque / usize | 12 / 16 / 4 |
 
-The independent JavaScript fixture oracle combines these widths with declared
-root densities, accumulated horizons, proof geometry, journal capacity, marker
-capacity and adapter return storage. If a type changes, inspect the new target
-layout and the accounting formula before updating expected widths. Do not copy
-a passing budget threshold into the oracle.
+**How the oracle uses them.** The independent JavaScript fixture oracle combines
+these widths with:
 
-These widths exclude allocator metadata. The temporal report is an accounted
-upper bound, including reserved future trace capacity and construction metadata;
-it is not a live process-heap measurement.
+- declared root densities;
+- accumulated horizons;
+- proof geometry;
+- journal capacity;
+- marker capacity;
+- adapter return storage.
+
+**When a type changes,** inspect the new target layout and the accounting
+formula before you update the expected widths. Do not copy a passing budget
+threshold into the oracle.
+
+**What the numbers mean.** These widths exclude allocator metadata. The temporal
+report is an accounted upper bound that includes reserved future trace capacity
+and construction metadata. It is not a measurement of the live process heap.

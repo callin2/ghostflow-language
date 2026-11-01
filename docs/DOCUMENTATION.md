@@ -2,10 +2,22 @@
 
 [한국어](DOCUMENTATION.ko.md) · [Language policy](DOCUMENTATION-LANGUAGES.md)
 
-Each row links to complete English and Korean versions of the same document.
-Existing canonical source paths are preserved. Translated program examples are
-reading projections; compile the original `.ghost.md` document. Reports, generated
-evidence and test inputs have explicit exclusions in [the manifest](translations.json).
+This catalog lists GhostFlow documents that are available in both English and
+Korean. Each row links to the complete English and Korean versions of the
+same document.
+
+How to read the table:
+
+- **Document** is the canonical source path. Existing canonical paths are
+  preserved; a translation never moves the original.
+- **English** and **한국어** link to the two language versions. When the original
+  `NAME.md` is English, the Korean version is `NAME.ko.md`. When the original
+  `NAME.md` is Korean, the English version is `NAME.en.md`. The
+  [language policy](DOCUMENTATION-LANGUAGES.md) explains these rules.
+- Translated program examples are *reading projections* only. To compile a
+  program, always use the original `.ghost.md` document.
+- Reports, generated evidence and test inputs are listed as explicit
+  exclusions, each with its reason, in [the manifest](translations.json).
 
 | Document | English | 한국어 |
 |---|---|---|

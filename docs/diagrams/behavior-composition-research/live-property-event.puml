@@ -1,0 +1,20 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontSize 13
+title Agreed amendment - proposed, NOT implemented
+start
+:One action changes\nseveral properties;
+:Validate the complete event\n(as ONE atomic event);
+if (Every value valid?) then (yes)
+  :Apply all values when the event\nis processed (even during operation);
+  :Keep program and run identity;\nadvance settings revision /\neffective event position;
+  note right
+    No source rewrite, recompile,
+    firmware/bytecode update,
+    or controller stop/restart
+  end note
+else (any invalid)
+  :Reject the whole event;\nno mutation;
+endif
+stop
+@enduml

@@ -1,12 +1,37 @@
 # Target contract query
 
-This pure host API describes a caller-supplied GhostFlow target. It does not contact a Device, discover installed hardware, authenticate reports, or promise future availability. It is tracked by [#562](https://github.com/callin2/ghostflow-language/issues/562) and uses the shared contract work in [#565](https://github.com/callin2/ghostflow-language/issues/565). The [Korean version](TARGET-QUERY.ko.md) has the same contract.
+The target contract query is a pure host API. It describes a GhostFlow target
+that the **caller supplies**: which channels the target declares, whether a
+supplied report says it is installed, and what supplied observations say about
+availability.
 
-`queryTarget(request)` is exported from `tools/target-query.mjs`. `node tools/ghostdescribe.mjs --request request.json --format json` reads a JSON or TOON request and writes a JSON or TOON result. TOON is the CLI default. Malformed input throws `TargetQueryError` from the API; the CLI emits a bounded `rejected` result and exits 1. Neither path uses a clock, filesystem, network, compiler or device in the query itself. The CLI only reads its request file. `asOf` and `maxAgeMs` are mandatory, so the same request yields the same answer.
+What it does **not** do:
+
+- contact a Device or discover installed hardware;
+- authenticate reports;
+- promise future availability.
+
+It is tracked by [#562](https://github.com/callin2/ghostflow-language/issues/562)
+and uses the shared contract work in
+[#565](https://github.com/callin2/ghostflow-language/issues/565). The
+[Korean version](TARGET-QUERY.ko.md) has the same contract.
+
+**Two entry points.**
+
+| Entry point | Input | Output | On malformed input |
+| --- | --- | --- | --- |
+| `queryTarget(request)`, exported from `tools/target-query.mjs` | request object | result object | throws `TargetQueryError` |
+| `node tools/ghostdescribe.mjs --request request.json --format json` | JSON or TOON request file | JSON or TOON result (TOON is the CLI default) | emits a bounded `rejected` result and exits 1 |
+
+**Deterministic by design.** The query itself never uses a clock, filesystem,
+network, compiler, or device on either path; the CLI only reads its request
+file. `asOf` and `maxAgeMs` are mandatory, so the same request always yields
+the same answer.
 
 ## Request
 
-The top-level object has exactly `schema`, `asOf`, `maxAgeMs`, `target`, and optionally `installed`, `observations`, `filter`:
+The top-level object has exactly `schema`, `asOf`, `maxAgeMs`, and `target`,
+plus the optional `installed`, `observations`, and `filter`:
 
 | Field | Shape and meaning |
 | --- | --- |
@@ -18,27 +43,173 @@ The top-level object has exactly `schema`, `asOf`, `maxAgeMs`, `target`, and opt
 | `observations` | Optional array of observation snapshots. Omission means no observations. |
 | `filter` | Optional explicit filters below. Omission selects all declared channels and no examples. |
 
-`target` requires `id`, `release`, `boardProfile`, `installation`, `drivers`, and `channels`; it may include `examples`. `release`, `boardProfile`, and `installation` are the existing `integration-release-v1`, `board-profile-v1`, and `installation-mapping-v1` objects. Their exact pinned identities and SHA-256 hashes are checked by `validateReleaseIdentity`. The profile and mapping are **declared** plans, including planned logical bindings; they are not installation evidence. `id` is an explicit target identifier. Release runtime semantics, protocol, firmware SHA, profile and mapping references appear in the result as declared facts.
+**`target` — the declaration**
 
-`drivers` is an array of unique `{ id, version, sha256 }` objects. Every board profile endpoint's `driver` must have a versioned reference. `channels` contains exactly one record for each profile endpoint, with unique `id` equal to the endpoint name. Each record requires `id` and may provide `unit` (text), `updatePeriodMs` (positive integer), `features` (unique text array), or `resources` (unique text array). Direction and type come from the pinned profile, and logical names come from the pinned mapping. No units, rates, features, resources or hardware defaults are inferred. Resource IDs name caller-defined constraints; this query does not define or discover their physical meaning. Omitted `resources` means constraints are unknown and blocks an `available` conclusion. Explicit `resources: []` says there are no resource constraints in this declaration.
+`target` requires `id`, `release`, `boardProfile`, `installation`, `drivers`,
+and `channels`. It may also include `examples`.
 
-Each optional example is `{ id, ref, tags, channels }`. `id` is unique; `tags` and `channels` are nonempty unique text arrays, and each channel must exist in the declaration. `ref` is an opaque reference. The query neither reads nor validates its content.
+- `id` is an explicit target identifier.
+- `release`, `boardProfile`, and `installation` are the existing
+  `integration-release-v1`, `board-profile-v1`, and `installation-mapping-v1`
+  objects. `validateReleaseIdentity` checks their exact pinned identities and
+  SHA-256 hashes.
+- The profile and mapping are **declared** plans, including planned logical
+  bindings. They are not installation evidence.
+- The result reports the release runtime semantics, protocol, firmware SHA,
+  and profile and mapping references as declared facts.
 
-`installed` requires `{ targetId, bootId, releaseSha256, drivers, observedAt, evidenceRef }`. `releaseSha256` is `jsonSha256(target.release)` from `tools/integration-contract.mjs`, and `drivers` lists the exact declared IDs, versions and SHA-256 digests. The report is `installed_reported` only when identity matches and its time is fresh. It remains a supplied report, not an independently verified installation.
+`drivers` is an array of unique `{ id, version, sha256 }` objects. Every board
+profile endpoint's `driver` must have a versioned reference here.
 
-Each observation requires those same identity fields plus `channels` and `resources`, arrays of unique `{ id, state }` entries. State is `available`, `busy`, or `reserved`. Observations must match the target, installed boot ID, release SHA and complete driver references; the installed report must itself be fresh and matching. Observations without one are `unlinked_installation`. Every observation has an explicit `evidenceRef` and canonical `observedAt`. These are provenance labels supplied by the caller, not authenticated evidence.
+`channels` contains exactly one record per profile endpoint. Each record's
+unique `id` equals the endpoint name. A record requires `id` and may add:
 
-`filter` supports `channels`, `directions`, `types`, `features`, `contractVersions`, and `exampleTags`, each a nonempty unique string array when present. Values within `channels`, `directions`, `types`, and `contractVersions` are OR; different fields are AND. Every requested feature must be declared on a channel. `contractVersions` means the channel driver's exact `version`, not release protocol, bytecode, runtime or firmware version. Unknown values return zero channels. `directions` accepts only `input` and `output`. Examples appear only when `exampleTags` is supplied, at least one requested tag matches, and the example names at least one selected channel. No semantic similarity or inferred relevance is used.
+- `unit` (text);
+- `updatePeriodMs` (positive integer);
+- `features` (unique text array);
+- `resources` (unique text array).
+
+Direction and type come from the pinned profile; logical names come from the
+pinned mapping. The query never infers units, rates, features, resources, or
+hardware defaults.
+
+Resource IDs name caller-defined constraints. The query neither defines nor
+discovers what they mean physically. The difference between omitting and
+emptying `resources` matters:
+
+- **Omitted `resources`:** the constraints are unknown, which blocks an
+  `available` conclusion.
+- **Explicit `resources: []`:** this declaration has no resource constraints.
+
+Each optional example is `{ id, ref, tags, channels }`. `id` is unique. `tags`
+and `channels` are nonempty unique text arrays, and each listed channel must
+exist in the declaration. `ref` is an opaque reference; the query neither reads
+nor validates its content.
+
+**`installed` and `observations` — supplied reports**
+
+`installed` requires
+`{ targetId, bootId, releaseSha256, drivers, observedAt, evidenceRef }`.
+
+- `releaseSha256` is `jsonSha256(target.release)` from
+  `tools/integration-contract.mjs`.
+- `drivers` lists exactly the declared IDs, versions, and SHA-256 digests.
+
+The report counts as `installed_reported` only when its identity matches and
+its time is fresh. Even then, it is a supplied report, not an independently
+verified installation.
+
+Each observation requires the same identity fields, plus `channels` and
+`resources`. Both are arrays of unique `{ id, state }` entries, where `state`
+is `available`, `busy`, or `reserved`.
+
+An observation is used (**linked and fresh**) only when:
+
+- it matches the target, the installed boot ID, the release SHA, and the
+  complete driver references; and
+- the installed report itself is fresh and matching.
+
+Observations without such an installed report are `unlinked_installation`.
+Every observation has an explicit `evidenceRef` and a canonical `observedAt`.
+These are provenance labels supplied by the caller, not authenticated
+evidence.
+
+**`filter` — selecting channels and examples**
+
+`filter` supports `channels`, `directions`, `types`, `features`,
+`contractVersions`, and `exampleTags`. Each one, when present, is a nonempty
+unique string array.
+
+- Values **within** `channels`, `directions`, `types`, or `contractVersions`
+  are combined with OR. **Different** fields are combined with AND.
+- For `features`, every requested feature must be declared on the channel.
+- `contractVersions` means the channel driver's exact `version`. It does not
+  mean the release protocol, bytecode, runtime, or firmware version.
+- `directions` accepts only `input` and `output`.
+- Unknown values select zero channels.
+
+Examples appear only when all of these hold: `exampleTags` is supplied, at
+least one requested tag matches, and the example names at least one selected
+channel. No semantic similarity or inferred relevance is used.
 
 ## Result and limits
 
-The result schema is `GhostFlow/target-query-result-v1`. It contains `asOf`, `targetId`, `requestSha256`, `targetSha256`, `declared`, `installation`, `channels`, `examples`, `diagnostics`, and `suppliedEvidence`. The two SHA-256 fields are canonical JSON digests of the complete supplied request and target declaration, so a result can be tied to exact input. Each selected channel has its declared identity, driver, logical names, optional supplied metadata, `installation`, `observation`, and `availability`. Missing metadata remains absent. Installation is `unknown` or `installed_reported`; observation is `unknown` or `observed` **for that channel**. Availability is `unknown`, `available`, `busy`, `reserved`, or `conflict`. It is available only when that channel has at least one fresh linked state, its resource constraints are explicitly declared, and every declared resource state is present and all agree on available. Any disagreement among fresh linked states yields `conflict`, regardless of report order or recency. A missing state yields unknown unless a conflict already exists. `diagnostics` records invalid report source/index/evidence reference, observed time, target and boot IDs, and codes such as `target_mismatch`, `boot_mismatch`, `release_mismatch`, `driver_mismatch`, `stale`, `future`, and `unlinked_installation`. Invalid reports never supply availability. `suppliedEvidence` retains detached installed and observation reports with their exact reference, time, target, boot, release/driver identities, channel/resource states and `linked_fresh` or `excluded` status. These remain caller-supplied claims.
+The result schema is `GhostFlow/target-query-result-v1`. It contains `asOf`,
+`targetId`, `requestSha256`, `targetSha256`, `declared`, `installation`,
+`channels`, `examples`, `diagnostics`, and `suppliedEvidence`.
 
-The pure API snapshots input and returns data without aliases to the caller's objects. Input must be acyclic JSON data, at most 262,144 serialized UTF-8 bytes, depth 16, 12,000 visited nodes, 1,024 elements or keys per generic container, and 4,096 characters per generic string. Contract-specific lists are smaller: at most 256 channels, 128 observations/drivers/examples, and 32 features/resources/tags per record. Identifiers and references are at most 256 characters. Duplicate IDs or filter values, empty supplied filter arrays, unexpected fields, sparse arrays and noncanonical timestamps are rejected. The CLI also caps its input file at 262,144 bytes before parsing. A complete result is capped at 65,536 UTF-8 bytes. If the expanded result exceeds that bound, the API returns an `outcome: "incomplete"` envelope with `output_limit`, exact input digests and no partial channel answer; the CLI exits 1. Narrow the supplied reports or filters and retry.
+The two SHA-256 fields are canonical JSON digests of the complete supplied
+request and of the target declaration. They tie a result to its exact input.
+
+**Per-channel fields.** Each selected channel has its declared identity,
+driver, logical names, optional supplied metadata, `installation`,
+`observation`, and `availability`. Metadata the caller did not supply stays
+absent.
+
+| Field | Values |
+| --- | --- |
+| `installation` | `unknown` or `installed_reported` |
+| `observation` | `unknown` or `observed` — **for that channel** |
+| `availability` | `unknown`, `available`, `busy`, `reserved`, or `conflict` |
+
+**How availability is decided.** Only fresh, linked states count; invalid
+reports never supply availability.
+
+- If fresh linked reports disagree about the channel, or about any one of its
+  declared resources, the result is `conflict`. Report order and recency do
+  not matter.
+- Otherwise the result is `unknown` when `resources` was omitted, or when the
+  channel or any declared resource has no state.
+- Otherwise the states are combined, and the most restrictive wins:
+  `reserved`, then `busy`. The channel is `available` only when the channel
+  and every declared resource are all `available`.
+
+The diagram shows the same decision for one channel.
+
+![Decision flow for a channel's availability](diagrams/target-query/channel-availability.svg)
+
+**Diagnostics.** `diagnostics` records, for each invalid report, its
+source/index, evidence reference, observed time, target and boot IDs, and
+codes such as `target_mismatch`, `boot_mismatch`, `release_mismatch`,
+`driver_mismatch`, `stale`, `future`, and `unlinked_installation`.
+
+**Supplied evidence.** `suppliedEvidence` keeps detached copies of the
+installed and observation reports: their exact reference, time, target, boot,
+release/driver identities, channel/resource states, and a `linked_fresh` or
+`excluded` status. These remain caller-supplied claims.
+
+**Input limits.** The pure API snapshots its input and returns data that does
+not alias the caller's objects. Input must be acyclic JSON data within these
+limits:
+
+| Limit | Value |
+| --- | --- |
+| serialized size | 262,144 UTF-8 bytes |
+| depth | 16 |
+| visited nodes | 12,000 |
+| elements or keys per generic container | 1,024 |
+| characters per generic string | 4,096 |
+| channels | 256 |
+| observations / drivers / examples | 128 each |
+| features / resources / tags per record | 32 |
+| identifiers and references | 256 characters |
+
+The request is rejected for duplicate IDs or filter values, empty supplied
+filter arrays, unexpected fields, sparse arrays, and noncanonical timestamps.
+The CLI also caps its input file at 262,144 bytes before parsing.
+
+**Output limit.** A complete result is capped at 65,536 UTF-8 bytes. If the
+expanded result would exceed that, the API returns an `outcome: "incomplete"`
+envelope. It contains `output_limit` and the exact input digests, and no
+partial channel answer; the CLI exits 1. Narrow the supplied reports or filters
+and retry.
 
 ## Fictional, executable example
 
-This uses the repository's [fictional integration fixture](../contracts/integration-v1/examples/fictional-fixture.json). Its labels, identities and evidence are invented; it is not a device result or deployable program. Run from the repository root:
+This example uses the repository's
+[fictional integration fixture](../contracts/integration-v1/examples/fictional-fixture.json).
+Its labels, identities, and evidence are invented. It is not a device result
+or a deployable program. Run it from the repository root:
 
 ```sh
 node --input-type=module <<'JS'
@@ -64,4 +235,10 @@ console.log(result.channels[0].availability); // unknown
 JS
 ```
 
-The caller's supplied installed and observed reports can move this query to a current reported state. That state is tied only to `asOf` and the supplied evidence; it is not a reservation, authority check or physical actuation result.
+The result is `unknown` because the request supplies no installed or observed
+reports, and the channels do not declare `resources`.
+
+If the caller supplies installed and observed reports, the query can report a
+current state instead. That state is tied only to `asOf` and the supplied
+evidence. It is not a reservation, an authority check, or a physical actuation
+result.

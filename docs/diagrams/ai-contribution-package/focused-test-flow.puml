@@ -1,0 +1,20 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontSize 13
+start
+:Compile unchanged fixture once\n(numeric-threshold.ghost.md);
+fork
+  :Run native Rust\n(same bytes, same input tape);
+fork again
+  :Run WASM\n(same bytes, same input tape);
+end fork
+:Compare requested/safe results\nwith independent oracle.json;
+:For each in-memory mutant\n("<" -> "<=", condition -> true);
+:Mutant must compile and run\nnormally on both targets;
+:Unchanged oracle assertion\nmust go RED;
+note right
+  Crash, timeout or missing runner
+  does NOT count as a killed mutation
+end note
+stop
+@enduml

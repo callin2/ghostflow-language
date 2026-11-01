@@ -1,0 +1,23 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontSize 12
+skinparam componentStyle rectangle
+left to right direction
+
+rectangle "Canonical .ghost.md (authored)" as doc {
+  card "ghostflow:anchor comment\n+ one paragraph / block quote\n(id, kind, status, origin)" as A
+  card "ghost fence:\nghostflow:link comment\n(id, relation)" as L
+  card "Next top-level\ndeclaration / statement" as N
+}
+rectangle "Compiler\n(validates only what\nthe author supplied)" as comp
+card "GFB bytes, manifest,\nruntime behavior\n(unchanged)" as out
+card "source-trace-v1 companion\nintentAnchors[]\nintentLinks[]" as trace
+
+L --> A : same id
+L --> N : immediately\nfollowing
+A --> comp
+L --> comp
+N --> comp
+comp --> out
+comp --> trace : locations + node ids,\nno copied prose
+@enduml

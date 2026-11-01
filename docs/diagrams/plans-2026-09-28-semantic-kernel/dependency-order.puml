@@ -1,0 +1,35 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontSize 13
+skinparam rectangleBorderColor #555555
+skinparam rectangleBackgroundColor #F7F7F7
+left to right direction
+
+rectangle "Issue 167\nexact dev push\nverification" as I167
+rectangle "Issue 168\ntick contract\ncorrection" as I168
+rectangle "Issue 169\nevidence-backed\nfeature status" as I169
+rectangle "Issue 170\nfinite core +\nevidence matrix" as I170
+rectangle "Issue 171\nexpression\nCore IR" as I171
+rectangle "Issue 172\nmodule\nCore IR" as I172
+rectangle "Issue 173\ncanonical\nirrigation proof" as I173
+rectangle "Issue 178\nretained-core\nreplay" as I178
+rectangle "Issue 179\nstale coverage\ngate" as I179
+rectangle "PR 175\ndev → main" as PR175
+
+I168 --> I169 : disputed row
+I168 --> I170
+I169 --> I170
+I168 --> I171
+I170 --> I171 : frozen scope
+I171 --> I172
+I170 --> I172 : frozen scope
+I170 --> I173 : scope +\nevidence schema
+I172 ..> I170 : proof feeds\nmatrix
+I173 ..> I170 : proof feeds\nmatrix
+note right of PR175
+  Integration: reuse PR #175 after
+  dev review and exact-HEAD
+  verification. #167, #178 and #179
+  have no listed prerequisites.
+end note
+@enduml

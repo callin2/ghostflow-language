@@ -1,0 +1,20 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontSize 13
+skinparam rectangleRoundCorner 8
+rectangle "Scenario source" as src
+rectangle "Compiled module\n(GFB1, compiled once)" as mod
+rectangle "Canonical tape\n(ordered frame attempts)" as tape
+rectangle "Native: scan_tape CLI\n(TSV tape -> ScanDriver::scan)" as nat
+rectangle "WASM: FramedGhostFlowRuntime\n(public framed adapter)" as wasm
+rectangle "Per-attempt results\n(accepted, outcome, error)" as res
+rectangle "Assertions\n1. scenario expectations\n2. exact cross-target equality" as cmp
+src --> mod
+mod --> nat
+mod --> wasm
+tape --> nat : serialized as TSV
+tape --> wasm : exact array
+nat --> res : JSON lines
+wasm --> res
+res --> cmp
+@enduml

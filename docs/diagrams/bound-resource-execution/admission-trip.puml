@@ -1,0 +1,20 @@
+@startuml
+hide empty description
+skinparam shadowing false
+skinparam defaultFontSize 13
+skinparam state {
+  BackgroundColor #F8F8F8
+  BorderColor #555555
+}
+
+state "No admission\nsafe: pump OFF" as Idle
+state "Admitted\nsafe = requested" as Admitted
+state "Tripped\nsafe vector:\npump OFF, valve ON" as Tripped
+
+[*] --> Idle
+Idle --> Admitted : fresh mode claim\npasses the envelope\n(scan 0: automatic, scan 4: manual)
+Admitted --> Tripped : requested pump ON\nwith valve OFF\n(scan 1)
+Tripped --> Tripped : valve request returns\nno automatic restart\n(scan 2)
+Tripped --> Idle : neutral frame:\nall mode claims false\n(scan 3)
+Admitted --> Idle : all mode claims false
+@enduml

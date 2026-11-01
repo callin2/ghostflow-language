@@ -1,0 +1,25 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName Helvetica
+title One irrigation decision (computes watering')
+
+start
+if (STOP requested or STOP faulted?) then (yes)
+  :watering' = false;
+elseif (low water or low_water faulted?) then (yes)
+  :watering' = false;
+elseif (already watering?) then (yes)
+  :watering' = true;
+elseif (healthy START on\nand restart not blocked?) then (yes)
+  :watering' = true;
+else (no)
+  :watering' = false;
+endif
+:pump, valve <- watering';
+stop
+note right
+  restart_blocked' becomes true on any input fault.
+  It clears only when all inputs are healthy
+  and START is off.
+end note
+@enduml

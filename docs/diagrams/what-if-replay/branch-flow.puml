@@ -1,0 +1,27 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontSize 13
+title What-if branch: from recorded prefix to candidate
+
+start
+:prepareWhatIfReplay
+(validate source map, recompile,
+check bytecode + manifest);
+:Build checkpoint
+GhostFlow/replay-prefix-checkpoint-v1;
+:branch({ branchId, runId, synthetic });
+:Fresh runtime replays the prefix
+and verifies the outcome digest;
+:Apply explicit synthetic values;
+if (Every required input/sample\npresent at every future frame?) then (yes)
+  :Execute future frames
+(actual portable core);
+  :Return candidate + receipts
+(recorded / synthetic labels);
+else (no)
+  :Return status 'missing-input'
+(missing names and logical times,
+no branch frames executed);
+endif
+stop
+@enduml

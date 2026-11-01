@@ -1,0 +1,18 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontSize 12
+title after_event tracker staged with the VM scan
+participant "Runtime host\n(ControlRuntime)" as Host
+participant "Rust AfterEventRuntime\n(WASM)" as AE
+participant "Rust VM" as VM
+Host -> AE : stage explicit event facts\nand measured predicate observations
+AE --> Host : Rust-owned any/all results
+Host -> VM : scan with results on private\ngenerated Result inputs
+alt VM scan commits
+  VM --> Host : committed
+  Host -> AE : commit tracker state
+else VM scan rejected
+  VM --> Host : rejected
+  Host -> AE : roll back tracker state
+end
+@enduml

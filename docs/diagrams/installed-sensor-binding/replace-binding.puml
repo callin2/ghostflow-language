@@ -1,0 +1,18 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName Helvetica
+skinparam defaultFontSize 13
+
+start
+:replaceBinding(candidate)\nbetween completed steps;
+:validate the complete candidate against\nthe same source and bytecode;
+:recompute assessment;\nprepare a fresh ControlRuntime\nand activate its strategy;
+if (valid, with unused run ID\nand binding revision?) then (yes)
+  :publish new run;
+  :sensors start NotReady;\nProgram state from source initializers;
+else (no)
+  :reject;
+  :keep previous run, binding,\nconditioner state, assessment\nand latest trace;
+endif
+stop
+@enduml

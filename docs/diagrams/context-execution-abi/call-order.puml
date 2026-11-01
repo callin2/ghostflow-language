@@ -1,0 +1,18 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName Helvetica
+participant Host
+participant "Rust VM\n(context ABI)" as VM
+Host -> VM : gf_activate_context(GFCA1)
+note right of VM : bindings validated;\nterminal capacity 1-4096
+opt only before the first scan
+  Host -> VM : gf_restore_context_checkpoint(GFCX3)
+end
+loop every scan
+  Host -> VM : gf_tick_context(GFSF4/5/6 facts)
+  VM --> Host : outcome and trace (committed only on success)
+end
+Host -> VM : gf_context_checkpoint
+VM --> Host : bytes + effective settings JSON\n(via ptr/len accessors)
+note left of Host : host owns durable storage\nand acknowledgement
+@enduml

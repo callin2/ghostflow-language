@@ -1,0 +1,23 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName Helvetica
+skinparam defaultFontSize 13
+title Proposed stable allocation (hand-worked design, not validator behavior)
+
+start
+:Preserve every explicit existing binding;
+note right: Never moved.\nA request to move one\nbecomes a conflict/change proposal.
+repeat :Next unbound role\n(canonical logical role-name order);
+  if (Input kind / capability explicit?) then (no)
+    :Suitability-unknown:\nstop allocation for this role;
+  elseif (Unused endpoint with matching\ndirection and semantic type?) then (no)
+    :Exhausted capacity:\nreport conflict;
+  else (yes)
+    :Capacity-compatible:\npick first by stable endpoint-ID order;
+    :Proposed binding\n(role, endpoint, revisions,\nsuitability state);
+  endif
+repeat while (More unbound roles?) is (yes)
+->no;
+:Confirmed installation only with\ninstallation owner confirmation\n+ physical evidence;
+stop
+@enduml

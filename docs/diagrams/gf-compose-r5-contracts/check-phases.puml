@@ -1,0 +1,27 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName Helvetica
+skinparam defaultFontSize 13
+left to right direction
+title Proposed first contract profile: where each property is checked
+
+rectangle "Type" as T
+rectangle "Dependency" as D
+rectangle "Parameter bounds" as B
+rectangle "Exclusive owner" as X
+rectangle "Installation-constraint\ncompatibility" as I
+
+rectangle "Compile / static\n(compile, lowering,\nbinding validation)" as C #EEF5FF
+rectangle "Pre-activation\nvalidation / gate" as P #FFF8E6
+rectangle "Runtime\n(request/start or\nstation authorization)" as R #EEFBEF
+
+T --> C : static binding validation
+D --> C : compile/lowering
+D --> P : pre-activation validation
+B --> C : compile validation
+B --> R : request/start authorization
+X --> C : logical authority +\nseparate binding validation
+X --> R : station authorization\nwhere applicable
+I --> P : compatibility gate
+I --> R : only constraints actually\nlowered/enforced
+@enduml

@@ -168,6 +168,8 @@ Root의 `intentEvidence`는 root anchor와 root에 link된 node만 참조할 수
 
 ## 진단과 acceptance vector
 
+<a id="default-behavior-coverage-warnings"></a>
+
 ### 기본 동작 범위 경고 (#553)
 
 compiler, CLI 및 package 생성은 기본적으로 intent-link 범위 경고를 보고한다.

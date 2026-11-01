@@ -1,0 +1,39 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName Helvetica
+skinparam ArrowColor #555555
+hide empty description
+
+[*] --> Stopped
+Stopped --> Opening : open event
+Stopped --> Closing : close event
+Stopped --> Open : only open limit
+Stopped --> Closed : only close limit
+Closed --> Opening : open event
+Open --> Closing : close event
+Opening --> Open : open limit seen
+Closing --> Closed : close limit seen
+Opening --> WaitClose : close event
+Closing --> WaitOpen : open event
+WaitOpen --> Opening : 2 s elapsed
+WaitClose --> Closing : 2 s elapsed
+WaitOpen --> WaitClose : close event
+WaitClose --> WaitOpen : open event
+WaitOpen --> Open : open limit seen
+WaitClose --> Closed : close limit seen
+SensorConflict --> Open : only open limit
+SensorConflict --> Closed : only close limit
+SensorConflict --> Stopped : no limit
+
+state Opening : open contactor ON
+state Closing : close contactor ON
+
+note as N
+Checked first, from every state:
+1. permission or position unavailable -> Stopped
+2. both limits true -> SensorConflict
+3. STOP/overload lost or both
+   requests pressed -> Stopped
+   (not from SensorConflict)
+end note
+@enduml

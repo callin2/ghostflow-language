@@ -1,15 +1,22 @@
 # SunCalc attribution for the portable solar provider
 
-`crates/ghostflow-core/src/solar.rs` is a dependency-free Rust port of the
-sea-level sunrise/sunset calculation in [SunCalc 2.0.2](https://github.com/mourner/suncalc/tree/v2.0.2), specifically its `getTimes` path and its apparent-solar-coordinate helpers.
-It retains the same `suncalc-2.0.2/sea-level` calculation identity used by the
-existing JavaScript reference adapter. Moon calculations and mutable custom
-time configuration are not ported.
+`crates/ghostflow-core/src/solar.rs` is a Rust port of the sea-level
+sunrise/sunset calculation in
+[SunCalc 2.0.2](https://github.com/mourner/suncalc/tree/v2.0.2). It has no
+dependencies.
+
+What the port covers:
+
+- **Ported:** SunCalc's `getTimes` path and its apparent-solar-coordinate
+  helpers.
+- **Not ported:** moon calculations and mutable custom time configuration.
+- **Identity:** the port keeps the same `suncalc-2.0.2/sea-level` calculation
+  identity that the existing JavaScript reference adapter uses.
 
 Copyright (c) 2026, Volodymyr Agafonkin. Redistribution and use in source and
 binary forms, with or without modification, are permitted subject to the
 conditions in the upstream BSD 2-Clause license. The complete retained license
-notice is below.
+notice follows.
 
 ```text
 Copyright (c) 2026, Volodymyr Agafonkin
@@ -36,9 +43,13 @@ TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF TH
 SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 ```
 
-The checked-in vectors are verified by `cargo test`; optionally run
+**Verifying the port.** `cargo test` verifies the checked-in test vectors.
+Optionally, you can also verify where the fixtures came from. Run
 `GHOSTFLOW_SUNCALC_REFERENCE_DIR=/absolute/path/to/suncalc node tools/compare-solar-reference.mjs`
-against an explicit local SunCalc 2.0.2 package to verify the fixture origin.
-The script verifies that the JavaScript provider resolves to that exact package,
-checks its package version, rejects non-finite results, and covers both preview
-and polling fixtures.
+with the variable pointing at an explicit local copy of the SunCalc 2.0.2
+package. The script:
+
+- checks that the JavaScript provider resolves to exactly that package;
+- checks the package version;
+- rejects non-finite results;
+- covers both the preview and the polling fixtures.

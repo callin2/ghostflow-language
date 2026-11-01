@@ -1,0 +1,29 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontSize 12
+skinparam componentStyle rectangle
+left to right direction
+
+rectangle "Caller (external)" as caller {
+  card "Interpretation\n(text, anchorIds, decision)" as I
+  card "Condition\n(statement, scope, nodeIds)" as C
+  card "External check\n(reported result)" as X
+}
+rectangle "compileSource(source,\n{ filename, intentEvidence })" as comp
+card "Compilation\n(GFB, manifest unchanged)" as out
+card "compilation.intentEvidence\nintent-evidence-report-v1" as rep
+
+C --> I : interpretation {id, revision}
+X --> C : condition refs (sha256)
+I --> comp
+C --> comp
+X --> comp
+comp --> out
+comp --> rep : structure, source, links,\nrevision consistency checked
+note bottom of rep
+  No natural-language interpretation,
+  no authority authentication,
+  no condition execution,
+  no device observation
+end note
+@enduml

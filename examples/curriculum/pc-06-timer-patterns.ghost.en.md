@@ -5,24 +5,44 @@
 # PC-06 — Maintained requests and independent timer patterns
 
 <!-- ghostflow:anchor id=GF-INT-PC06-INDEPENDENT-TIMERS-V1 kind=intent status=confirmed origin=imported -->
-> Learning scenario: Learn how to combine delayed ON, delayed OFF, and maximum
-> run time in one control cabinet. This example distinguishes maintained demand,
-> which stays true across scans, from a momentary START event triggered by a press.
+> Learning scenario: learn how to combine delayed ON, delayed OFF, and a maximum
+> run time in one control cabinet. The example separates a maintained demand,
+> which is read again on every scan, from a momentary START event, which starts
+> from a single button change.
 
-The linked original is the sole canonical literate executable source for PC-06. It preserves
-and references lesson [E08 DelayedStart](../../docs/ProgrammingInGhostflow.md#e08--입력이-2초-유지되면-켜기)
-and [tutorial/02-watering](../tutorial/02-watering.ghost.md). E08 introduces a
-state and `elapsed(phase)`; the tutorial shows a watering sequence. This lesson
-extends those ideas to three independent demand channels.
+**What this lesson adds.** The linked Korean `.ghost.md` file is the only
+canonical, executable literate source for PC-06. It keeps and builds on:
 
-`on_delay_request`, `off_delay_request`, and `limited_request` are maintained
-demands, not momentary START events. Each demand remains present while its input
-is true. If `stop_ok` becomes false, all three channels immediately return to a
-safe idle state. `on_delay` and `off_delay` set each channel's delay; `max_run`
-is the LIMIT channel's hard maximum run time. This example guarantees neither
-physical safety devices nor actual load behavior.
+- [E08 DelayedStart](../../docs/ProgrammingInGhostflow.en.md#e08--turning-on-after-an-input-persists-for-two-seconds),
+  which introduces a single state and `elapsed(phase)`;
+- [tutorial/02-watering](../tutorial/02-watering.ghost.md), which shows a real
+  watering sequence.
 
-This explicit input revision consumes producer quality, not physical button diagnostics. Good(false) remains a normal observation. Unknown request/position/mode observations do not establish a new request, released request, position, or mode; existing state is retained where no observation justifies a transition. Existing protection permission requires a confirmed Good(true), and existing hard time limits remain effective. No new START input or global restart policy is added.
+This lesson extends those ideas to **three independent demand channels**.
+
+**Maintained demand, not START events.** `on_delay_request`,
+`off_delay_request`, and `limited_request` are maintained demands. Each demand
+exists for as long as its input stays true. They are not momentary START events.
+
+| Channel | Demand input | Setting | Output behavior |
+| --- | --- | --- | --- |
+| ON-delay | `on_delay_request` | `on_delay = 2s` | `on_delayed` turns on after the demand has held for 2 s. |
+| OFF-delay | `off_delay_request` | `off_delay = 3s` | `off_delayed` is on with the demand and stays on for 3 s after it is released. |
+| LIMIT | `limited_request` | `max_run = 10s` | `limited_run` is on with the demand, but never longer than the hard maximum of 10 s. |
+
+If `stop_ok` is not true, all three channels return to a safe idle state at
+once. This example does not guarantee any physical safety device or real load
+behavior.
+
+**Input quality.** This revision reads the quality that each input's producer
+reports. It does not diagnose physical button faults.
+
+- A healthy `false` (Good(false)) is a normal observation.
+- An unknown request does not count as a new request or as a release. Where no
+  observation justifies a transition, the current state is kept.
+- Protection permission still requires a confirmed Good(true), and the hard time
+  limit still applies.
+- No new START input or global restart policy is added.
 
 ```ghost
 // Source revision: issue531-producer-quality-pc06-v1
@@ -100,14 +120,28 @@ control TimerPatterns {
 }
 ```
 
-Each state and timer is independent. Thus, while the OFF-delay channel waits
-three seconds after its demand is released, LIMIT's ten-second maximum is still
-measured by its own `limit_age`. Once LIMIT reaches `LimitReached`, it does not
-return automatically to `LimitRunning` while demand remains true. The demand
-must be released and requested again to start a new run. Outputs are derived
-from the computed next state, so they reflect a transition in the same tick.
+**Independent channels.** Each channel has its own state and its own timer. So
+while the OFF-delay channel counts its three seconds after the demand is
+released, the LIMIT channel's ten-second maximum is still measured separately by
+`limit_age`.
 
-The checker runs the same logical timestamps and input tape under two wall-clock
-pacing labels, x1 and x1000. It does not actually wait or change VM inputs, and
-the results must match. This comparison shows that the control logic depends on
-logical `nowMs`, not on an accelerated Web-host implementation.
+The timeline below shows all three channels when each demand turns on at 0 s,
+the OFF-delay demand is released at 4 s, and the other two demands are released
+at 12 s. It assumes the control is scanned exactly at each marked time.
+
+![Timeline of the ON-delay, OFF-delay, and LIMIT channels](../../docs/diagrams/pc-06-timer-patterns/channel-timeline.svg)
+
+**The LIMIT channel does not restart by itself.** Once LIMIT reaches
+`LimitReached`, it stays there while the demand remains true; it does not go
+back to `LimitRunning`. To start a new run, the operator must release the demand
+and request it again.
+
+**Outputs follow the next state.** Each output is read from the computed next
+state (for example `on_phase'`), not the current one. So on the scan where a
+state changes, the output already shows the result.
+
+**What the checker proves.** The checker runs the same logical timestamps and
+input tape under two wall-clock pacing labels, x1 and x1000. It does not
+actually wait, and it does not change the VM inputs; the two results must match.
+This comparison shows that the control logic depends on the logical `nowMs`, not
+on an accelerated Web-host implementation.

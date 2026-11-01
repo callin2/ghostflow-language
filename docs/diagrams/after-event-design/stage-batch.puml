@@ -1,0 +1,19 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontSize 13
+skinparam activity {
+  BackgroundColor #F8F8F8
+  BorderColor #555555
+}
+start
+:Expire results whose window end e + d is reached;
+:Acknowledge terminal results;
+:Start new events in source identity order;
+:Apply the predicate observation;
+if (capacity or observation error?) then (yes)
+  :Discard every staged mutation\n(acknowledgements, expiry,\nidentity high-water, clock);
+else (no)
+  :Commit the whole tick;
+endif
+stop
+@enduml

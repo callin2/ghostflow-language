@@ -1,0 +1,22 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName Helvetica
+skinparam ArrowColor #555555
+hide empty description
+
+[*] --> Idle
+Idle --> Filling : low switch dry
+Filling --> Idle : high switch wet
+Idle --> SensorConflict : high wet, low dry
+Filling --> SensorConflict : high wet, low dry
+SensorConflict --> Idle : conflict cleared\n(one scan, pump off)
+
+state Filling : fill_pump ON
+state Idle : fill_pump OFF
+state SensorConflict : fill_pump OFF
+
+note as N
+If either level input is unavailable,
+the phase is kept unchanged.
+end note
+@enduml

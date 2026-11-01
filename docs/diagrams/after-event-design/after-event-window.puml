@@ -1,0 +1,21 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontSize 13
+concise "predicate sample" as P
+concise "Event A: window [0s, 10s)" as A
+concise "Event B: window [4s, 14s)" as B
+
+@0
+P is false
+A is Pending
+B is {-}
+@2
+P is true
+A is Satisfied
+@3
+P is false
+@4
+B is Pending
+@14
+B is Expired
+@enduml

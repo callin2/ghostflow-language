@@ -31,10 +31,10 @@
         "path": "docs/IMPLEMENTATION.md",
         "heading": "Executable path",
         "lines": [
-          21,
-          26
+          36,
+          41
         ],
-        "sha256": "861309e84773754aeeccabb77016a1eb1c33c587cefebde697e9d1e91996c110"
+        "sha256": "551e7a3f102e7c1b5c220b89bec7a500332d87bc7c20e2f154c9b800792a2eb1"
       },
       "layer": "runtime",
       "targets": [
@@ -60,10 +60,10 @@
         "path": "docs/IMPLEMENTATION.md",
         "heading": "Executable path",
         "lines": [
-          21,
-          23
+          36,
+          38
         ],
-        "sha256": "f7a5af48cd0a6ad18fbce35a5f015912a5b8df91fc3092da9e7a4f1cfb05bcea"
+        "sha256": "3ac91d80f6afdf9037504c491628ece9aa4b8b1d4fbe927b1f93d15ebc6b37aa"
       },
       "layer": "integration-boundary",
       "targets": [
@@ -198,8 +198,8 @@
         "path": "docs/LANGUAGE-MVP-0.1.md",
         "heading": "Tick semantics",
         "lines": [
-          42,
-          42
+          50,
+          50
         ],
         "sha256": "909155acbc4e71907554e719ddf7f7747412bb401a2aaaabe3c73f6f2ae0d990"
       },
@@ -220,8 +220,8 @@
         "path": "docs/LANGUAGE-MVP-0.1.md",
         "heading": "Tick semantics",
         "lines": [
-          42,
-          42
+          50,
+          50
         ],
         "sha256": "909155acbc4e71907554e719ddf7f7747412bb401a2aaaabe3c73f6f2ae0d990"
       },
@@ -242,8 +242,8 @@
         "path": "docs/LANGUAGE-MVP-0.1.md",
         "heading": "Tick semantics",
         "lines": [
-          42,
-          42
+          50,
+          50
         ],
         "sha256": "909155acbc4e71907554e719ddf7f7747412bb401a2aaaabe3c73f6f2ae0d990"
       },
@@ -263,10 +263,10 @@
         "path": "docs/LANGUAGE-MVP-0.1.md",
         "heading": "Tick semantics",
         "lines": [
-          48,
-          51
+          57,
+          59
         ],
-        "sha256": "76659f078c5585064f2434722574f689e7f4f2a57645b1b2268ba8287ce9f755"
+        "sha256": "4eff19c75c137f62289e81a2e7a5a4bc780f5e4005486fe8cf82332d5400a99e"
       },
       "layer": "runtime",
       "targets": [
@@ -287,8 +287,8 @@
         "path": "docs/LANGUAGE-MVP-0.1.md",
         "heading": "Tick semantics",
         "lines": [
-          42,
-          42
+          50,
+          50
         ],
         "sha256": "909155acbc4e71907554e719ddf7f7747412bb401a2aaaabe3c73f6f2ae0d990"
       },
@@ -372,8 +372,8 @@
         "path": "docs/BYTECODE.md",
         "heading": "Expression opcodes",
         "lines": [
-          148,
-          152
+          244,
+          248
         ],
         "sha256": "3f3cd61a644026610359422341b388e30dfb36339b6b1c5179f1cb923df68fb3"
       },
@@ -394,10 +394,10 @@
         "path": "docs/BYTECODE.md",
         "heading": "Safety records and host manifest",
         "lines": [
-          334,
-          337
+          483,
+          486
         ],
-        "sha256": "880372d3758ba426290e482974f7eabf3ebf75b4f4159c131631a9c20254427b"
+        "sha256": "1e147b07413192889f0427f91c3c126a8da3ba839e0dcac5193969dfc8aa6ce1"
       },
       "layer": "runtime",
       "targets": [
@@ -415,8 +415,8 @@
         "path": "docs/BYTECODE.md",
         "heading": "Safety records and host manifest",
         "lines": [
-          334,
-          334
+          483,
+          483
         ],
         "sha256": "5bb0a87473dc5357394cb0c1cc770813b53d78dd66c4cbace3ff7e2db9ffec6c"
       },
@@ -437,10 +437,10 @@
         "path": "docs/IMPLEMENTATION.md",
         "heading": "Executable path",
         "lines": [
-          21,
-          27
+          36,
+          42
         ],
-        "sha256": "92c67941b2a3aa2a025b01718a8fa76b93a21baf82c4269295843ca3f00696b8"
+        "sha256": "551e7a3f102e7c1b5c220b89bec7a500332d87bc7c20e2f154c9b800792a2eb1"
       },
       "layer": "compiler",
       "targets": [
@@ -458,10 +458,10 @@
         "path": "docs/IMPLEMENTATION.md",
         "heading": "Executable path",
         "lines": [
-          21,
-          26
+          36,
+          41
         ],
-        "sha256": "861309e84773754aeeccabb77016a1eb1c33c587cefebde697e9d1e91996c110"
+        "sha256": "551e7a3f102e7c1b5c220b89bec7a500332d87bc7c20e2f154c9b800792a2eb1"
       },
       "layer": "integration-boundary",
       "targets": [
@@ -479,8 +479,8 @@
         "path": "docs/IMPLEMENTATION.md",
         "heading": "Limits and consumer responsibilities",
         "lines": [
-          117,
-          117
+          180,
+          180
         ],
         "sha256": "988f17dcdb9eb934346aeab946e9ae1490363aabdc611b09b8604ed9e65e0583"
       },
@@ -500,8 +500,8 @@
         "path": "docs/LANGUAGE-MVP-0.1.md",
         "heading": "Design invariants",
         "lines": [
-          3,
-          3
+          5,
+          5
         ],
         "sha256": "2c3883116854a02532133801730a7593d26454ad9d847dc53d2b5bcf3f350e10"
       },
@@ -520,8 +520,8 @@
         "path": "docs/LANGUAGE-MVP-0.1.md",
         "heading": "Design invariants",
         "lines": [
-          3,
-          3
+          5,
+          5
         ],
         "sha256": "2c3883116854a02532133801730a7593d26454ad9d847dc53d2b5bcf3f350e10"
       },
@@ -540,10 +540,10 @@
         "path": "docs/LANGUAGE-MVP-0.1.md",
         "heading": "Device-query semantics",
         "lines": [
-          28,
-          31
+          34,
+          37
         ],
-        "sha256": "3dc06841aaaa52a06f7e84d8612bce010ea941a4c9f69ff84eb817c789f57390"
+        "sha256": "48619cacf3de0ab8511cf2a28a212e1c6bf785a577e0c20368738f56f6121e21"
       },
       "layer": "runtime",
       "targets": [
@@ -562,10 +562,10 @@
         "path": "docs/LANGUAGE-MVP-0.1.md",
         "heading": "Device-query semantics",
         "lines": [
-          28,
-          30
+          34,
+          36
         ],
-        "sha256": "99f66388fe75e50d17f77e224c35fbae8feb4a1b4cce4053502a6b661b2519f7"
+        "sha256": "48619cacf3de0ab8511cf2a28a212e1c6bf785a577e0c20368738f56f6121e21"
       },
       "layer": "runtime",
       "targets": [
@@ -583,8 +583,8 @@
         "path": "docs/LANGUAGE-MVP-0.1.md",
         "heading": "Tick semantics",
         "lines": [
-          42,
-          43
+          50,
+          51
         ],
         "sha256": "909155acbc4e71907554e719ddf7f7747412bb401a2aaaabe3c73f6f2ae0d990"
       },
@@ -603,10 +603,10 @@
         "path": "docs/LANGUAGE-MVP-0.1.md",
         "heading": "Time travel and ghost execution",
         "lines": [
-          56,
-          58
+          67,
+          69
         ],
-        "sha256": "9389268b60cc640634204ba9e59b85bffb700cd7e92596e9bfccbd7644eb4599"
+        "sha256": "0531abf9038ecebac41155abf30d01f01d21a125dfbb9f89bf291a95ba5f59ff"
       },
       "layer": "runtime",
       "targets": [
@@ -623,10 +623,10 @@
         "path": "docs/LANGUAGE-MVP-0.1.md",
         "heading": "Hot replacement",
         "lines": [
-          67,
-          71
+          77,
+          81
         ],
-        "sha256": "67b531f3f8477b9791212c4753e38dbd7dd5dcaabb515c486f30bf19b1ed75f8"
+        "sha256": "e09144bb321eb77134a69684af0382ef56116d29ca80de54c75c4b373c93969a"
       },
       "layer": "runtime",
       "targets": [
@@ -644,10 +644,10 @@
         "path": "docs/LANGUAGE-MVP-0.1.md",
         "heading": "Error model",
         "lines": [
-          75,
-          78
+          95,
+          98
         ],
-        "sha256": "42593fb0524bd1280ad1d46b9fa6de9be7080496aac04e12c9fb5b8d503c8781"
+        "sha256": "1ef34a2fe3c23043db001af323189cd8411c13ffa7495e8230250c8305f36a2e"
       },
       "layer": "runtime",
       "targets": [
@@ -768,10 +768,10 @@
         "path": "docs/BYTECODE.md",
         "heading": "Module envelope and format decision",
         "lines": [
-          102,
-          109
+          186,
+          193
         ],
-        "sha256": "8dc260c1693c00e06ccbedf8f04d3e421851287e78adff7c2cf30e4b5ed7c174"
+        "sha256": "a8d6839ef6f39b0d51e8de55b0408401291e6b6c6cf4924b4ef444172ac5014c"
       },
       "layer": "artifact",
       "targets": [
@@ -789,10 +789,10 @@
         "path": "docs/BYTECODE.md",
         "heading": "Query opcodes",
         "lines": [
-          320,
-          330
+          469,
+          479
         ],
-        "sha256": "5d064d9b4ca10fc1b97bcda7c990bcff68489321017821957f168f15a77c5efb"
+        "sha256": "46dfc3ce5216a8254c17fee814457e08a66abc1a25770f58615a16fc628f9b59"
       },
       "layer": "artifact",
       "targets": [
@@ -812,10 +812,10 @@
         "path": "docs/BYTECODE.md",
         "heading": "Safety records and host manifest",
         "lines": [
-          334,
-          336
+          483,
+          485
         ],
-        "sha256": "bf6e287dba00081dfafeb4e1c8f2ac832fbb9b18c6ba8159701978f97a70a32b"
+        "sha256": "91048d0c34b8969e35e89b75a61851456b2cebb900efed2f63a04962df98402b"
       },
       "layer": "artifact",
       "targets": [
@@ -833,10 +833,10 @@
         "path": "docs/BYTECODE.md",
         "heading": "Safety records and host manifest",
         "lines": [
-          334,
-          338
+          483,
+          487
         ],
-        "sha256": "38905a13f131769b7f6d39145d50b0af88998fe75b3da1ade3e4db08a4d9734c"
+        "sha256": "1e147b07413192889f0427f91c3c126a8da3ba839e0dcac5193969dfc8aa6ce1"
       },
       "layer": "artifact",
       "targets": [
@@ -856,10 +856,10 @@
         "path": "docs/BYTECODE.md",
         "heading": "Safety records and host manifest",
         "lines": [
-          334,
-          339
+          483,
+          488
         ],
-        "sha256": "a6d2bd71d672ce1cf9413a204c025578aa4f65335901bba1e1a62732a55235af"
+        "sha256": "0ee4132ae946bb93cd842a3e8683701f40e1c42cb4bc66c06c7d47949a995855"
       },
       "layer": "artifact",
       "targets": [
@@ -877,10 +877,10 @@
         "path": "docs/IMPLEMENTATION.md",
         "heading": "Executable path",
         "lines": [
-          21,
-          26
+          36,
+          41
         ],
-        "sha256": "861309e84773754aeeccabb77016a1eb1c33c587cefebde697e9d1e91996c110"
+        "sha256": "551e7a3f102e7c1b5c220b89bec7a500332d87bc7c20e2f154c9b800792a2eb1"
       },
       "layer": "compiler",
       "targets": [
@@ -897,8 +897,8 @@
         "path": "docs/IMPLEMENTATION.md",
         "heading": "Artifacts and versions",
         "lines": [
-          83,
-          86
+          135,
+          138
         ],
         "sha256": "3ec6524fc323397e8db764d16caff93481662ad2987d87521bf43c13744a0161"
       },

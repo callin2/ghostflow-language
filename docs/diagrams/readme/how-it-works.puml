@@ -1,0 +1,27 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName Helvetica
+skinparam defaultFontSize 13
+skinparam ArrowColor #526d76
+skinparam rectangle {
+  BackgroundColor #f1f6f5
+  BorderColor #6d858b
+  FontColor #102b35
+  RoundCorner 10
+}
+left to right direction
+
+rectangle "Person who knows\nthe process" as person
+rectangle "AI assistant\n(optional)" as ai
+rectangle "**.ghost.md document**\nintent + explanation\n+ executable rules" as doc #e2f7f0
+rectangle "Compiler\nvalidates and compiles" as compiler
+rectangle "Runtime\nexecutes decisions\n(no LLM)" as runtime
+rectangle "Derived views\ntraces, source maps,\ndiagrams" as views
+
+person --> doc : writes and reviews
+ai ..> doc : drafts a candidate
+doc --> compiler
+compiler --> runtime : compiled GFB
+runtime --> views : execution evidence
+views ..> doc : explain "why?"\nback to the source
+@enduml

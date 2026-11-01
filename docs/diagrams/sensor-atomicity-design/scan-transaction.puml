@@ -1,0 +1,44 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName Helvetica
+skinparam defaultFontSize 13
+skinparam ArrowColor #526d76
+
+start
+:Capture and validate the complete scan;
+if (Begin every conditioner?) then (all begun)
+else (a begin fails)
+  :Roll back only the handles already begun;
+  stop
+endif
+:Condition inputs, prepare VM input
+committed = false;
+if (Preparation succeeded?) then (yes)
+else (no)
+  :Roll back every begun conditioner;
+  :VM state, time, frame ID unchanged;
+  :Valid retry allowed;
+  stop
+endif
+:committed = null
+call native VM;
+if (Native call returned?) then (yes)
+  :committed = native return value;
+  if (Return value?) then (1)
+    :Commit conditioners,
+    accepted host time and frame ID;
+    :Decode trace/outcome JSON;
+    note right
+      A later error terminates the
+      host but cannot undo the scan
+    end note
+  else (0: known rejection)
+    :Roll back every begun conditioner;
+    :Valid retry allowed;
+  endif
+else (trap / adapter exception)
+  :Status unknown: no rollback claim;
+  :Terminate further steps;
+endif
+stop
+@enduml

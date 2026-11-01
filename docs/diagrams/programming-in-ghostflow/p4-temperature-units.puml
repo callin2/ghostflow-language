@@ -1,0 +1,21 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontSize 13
+skinparam componentStyle rectangle
+title One physical threshold, three source units
+
+rectangle "E16: 18°C" as c
+rectangle "E17: 64.4°F" as f
+rectangle "E18: 291.15K" as k
+component "Exact literal conversion,\nthen binary64 rounding" as conv
+rectangle "Canonical Temperature\n291.15 K" as canon
+component "hysteresis(air, on_below, ...)" as h
+rectangle "Same heater decision" as out
+
+c --> conv
+f --> conv
+k --> conv
+conv --> canon
+canon --> h
+h --> out
+@enduml

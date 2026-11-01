@@ -1,0 +1,31 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName Helvetica
+skinparam defaultFontSize 13
+start
+:Validate domains and consecutive\nmonotonic / positive wall deltas;
+if (Trusted wall time?) then (no)
+  :Unknown(reason, revisions);\nfallback = skip -> .due = false;
+elseif (First use or recovery?) then (yes)
+  :Establish baseline\n(no catch-up, no pulse);
+elseif (Provider coverage complete?) then (no)
+  :Unknown (or reject);\n.due = false;
+else (yes)
+  :Find occurrences crossed between previous\nand current effective wall instant;
+  if (Any newly crossed?) then (none)
+    :.due = false;
+  elseif (delta > gap bound?) then (yes)
+    :Terminalize crossed\noccurrence as ObservationGap;
+  elseif (Two or more crossed?) then (yes)
+    :Terminalize every one\nas missed; admit none;
+  else (exactly one)
+    if (when predicate on\nthis crossing tick?) then (true)
+      :Admit once (.due = true);
+    else (false)
+      :Terminalize as\nConditionsFalseAtPulse;
+    endif
+  endif
+endif
+:Stage high-water, disposition and\nobservation with the VM transaction;
+stop
+@enduml

@@ -1,0 +1,33 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName Helvetica
+
+concise "mode (after scan)" as M
+concise "auto_demand" as D
+binary "request_armed (after scan)" as A
+concise "run_phase (after scan)" as P
+
+@0
+M is Off
+D is true
+A is low
+P is Stopped
+
+@1
+M is Auto
+
+@3
+D is false
+A is high
+
+@4
+D is true
+A is low
+P is Running
+
+@6
+D is false
+A is high
+P is Stopped
+
+@enduml

@@ -1,73 +1,112 @@
 # GF-COMPOSE R3: execution composition
 
+This note compares how two or more behaviors could execute together without
+interfering. It records the current tick, framed-host, and station facts;
+compares exactly two composition options; works through hand-made scan tables
+(isolation, declaration order, one behavior consuming another, a rejected
+cycle, reset/failure); and ends with a recommendation and owners.
+
 ## User problem
 
 Adding a behavior must not alter an existing behavior through hidden ordering,
 shared state, clocks, or fault handling. The design must preserve the goals of
-lower effort, explainability, and traceability. This document compares only
-two options: compiler composition into one executable module, and multiple VM
-instances with explicit coordination.
+lower effort, explainability, and traceability.
+
+This document compares only two options:
+
+1. compiler composition into one executable module;
+2. multiple VM instances with explicit coordination.
+
+![The two compared options; both are proposals](../diagrams/gf-compose-r3-execution/composition-options.svg)
 
 ## Evidence at examined revision
 
 The examined language revision is `ffdbc96461eca67908252507fb851fa4dabd9a2c`.
-The working tree was not changed before this document. `compileSource` accepts
-one canonical `.ghost.md`, lowers it through `compileControl`, emits one GFB1
-byte sequence, and records source/bytecode digests and trace metadata
+The working tree was not changed before this document.
+
+**Compiler.** `compileSource` accepts one canonical `.ghost.md`, lowers it
+through `compileControl`, emits one GFB1 byte sequence, and records
+source/bytecode digests and trace metadata
 ([`tools/compile-source.mjs`](../../tools/compile-source.mjs)). `compileControl`
-lowers one control to one GFB1 `module`; state transitions are evaluated from
-current state, then intents may read `next.*` ([`tools/control.mjs`](../../tools/control.mjs)).
+lowers one control to one GFB1 `module`. State transitions are evaluated from
+current state; then intents may read `next.*`
+([`tools/control.mjs`](../../tools/control.mjs)).
 
-`Runtime::tick` requires every declared input, validates an optional explicit
-`__gf_now_ms`, computes all next state before intents, applies safety, commits
-state and safe intents atomically, clears inputs, and appends a bounded journal
-record. `tick_at` supplies the explicit clock; the VM reads no wall clock
+**Core tick.** `Runtime::tick`, in order:
+
+1. requires every declared input;
+2. validates an optional explicit `__gf_now_ms`;
+3. computes all next state before intents;
+4. applies safety;
+5. commits state and safe intents atomically;
+6. clears inputs;
+7. appends a bounded journal record.
+
+`tick_at` supplies the explicit clock; the VM reads no wall clock
 ([`crates/ghostflow-core/src/lib.rs`](../../crates/ghostflow-core/src/lib.rs)).
-`install` resets inputs, safe intents, active strategy, and the clock; it may
-preserve same-named, same-typed state. `hot_swap` preserves compatible named
-state but clears safe intents and rejects module-name or state-type changes.
 
-These facts describe the core tick and framed complete-frame adapter. They do
-not specify asynchronous CEP ingress or occurrence delivery. Occurrences must
-remain individually meaningful; value observations are independent of
-interrupt/scan capture. By default observations are preserved within supported
-capacity. Latest-pending-value replacement is allowed only when explicitly
-opted in per input. Loss/overflow must be rejected or reported, never silently
-accepted. This agreed delivery requirement does not imply unlimited persistent
-history. Ingress ordering, event-to-tick mapping, declared-source batching,
-bounds, and recovery are unresolved. No hard deadline or priority scheduler
-has been supplied. See [`LANGUAGE-SURFACE.md`](../LANGUAGE-SURFACE.md) and
+**Install and hot swap.**
+
+- `install` resets inputs, safe intents, active strategy, and the clock; it may
+  preserve same-named, same-typed state.
+- `hot_swap` preserves compatible named state but clears safe intents and
+  rejects module-name or state-type changes.
+
+**What these facts do not cover.** They describe the core tick and the framed
+complete-frame adapter. They do not specify asynchronous CEP ingress or
+occurrence delivery. The agreed delivery requirement is:
+
+- Occurrences must remain individually meaningful.
+- Value observations are independent of interrupt/scan capture.
+- By default, observations are preserved within supported capacity.
+- Latest-pending-value replacement is allowed only when explicitly opted in
+  per input.
+- Loss/overflow must be rejected or reported, never silently accepted.
+
+This requirement does not imply unlimited persistent history. Ingress ordering,
+event-to-tick mapping, declared-source batching, bounds, and recovery are
+unresolved. No hard deadline or priority scheduler has been supplied. See
+[`LANGUAGE-SURFACE.md`](../LANGUAGE-SURFACE.md) and
 [`IMPLEMENTATION.md`](../IMPLEMENTATION.md).
 
-The framed host captures one complete input frame, dispatches once, publishes
-the last accepted outcome, and latches a fault after conditioning or dispatch
-failure. Further steps require a new host instance; a rejected pre-conditioning
-validation can still be retried ([`docs/FRAMED-CONTROL-HOST.md`](../FRAMED-CONTROL-HOST.md)).
-Thus “last completed result” and “new run” are existing host contract facts.
+**Framed host.** The framed host captures one complete input frame, dispatches
+once, publishes the last accepted outcome, and latches a fault after
+conditioning or dispatch failure. Further steps require a new host instance; a
+rejected pre-conditioning validation can still be retried
+([`docs/FRAMED-CONTROL-HOST.md`](../FRAMED-CONTROL-HOST.md)). Thus “last
+completed result” and “new run” are existing host contract facts.
 
-The station module is host-driven and bounded. `prepare_start_batch` chooses
-one request from a same-tick snapshot, while `authorize_output` checks a
-durable reservation, owner/session, valve limits, and safe output
+**Station module.** The station module is host-driven and bounded.
+`prepare_start_batch` chooses one request from a same-tick snapshot, while
+`authorize_output` checks a durable reservation, owner/session, valve limits,
+and safe output
 ([`crates/ghostflow-core/src/station.rs`](../../crates/ghostflow-core/src/station.rs)).
 This is a physical pump-station arbiter, not evidence of universal behavior
-composition. GFB1 limits include 128 inputs, 128 states, 32 strategies, 128
-constraints, expression depth/nodes of 128/4096, and bounded expression and
-query sizes ([`tools/gfb1.mjs`](../../tools/gfb1.mjs)).
+composition.
 
-As developed in [R2: authority and identity](GF-COMPOSE-R2-AUTHORITY-IDENTITY.md),
-the source/instance distinction keeps canonical source authoritative
-and an instance needs an opaque identity with isolated state and provenance.
-R2 also fixes that conversational memory is provenance and
-authoring context, not automatic execution-rule or physical-binding authority.
-Memory-to-decision-to-source linkage, retention, and tombstone behavior remain
-R2/API-system questions. Its installation-constraint boundary remains
-unresolved. This document does not select a constraint artifact, overlay, or
-enforcement owner. See also [R5: composition contracts and diagnostics](GF-COMPOSE-R5-CONTRACTS.md)
+**GFB1 limits.** 128 inputs, 128 states, 32 strategies, 128 constraints,
+expression depth/nodes of 128/4096, and bounded expression and query sizes
+([`tools/gfb1.mjs`](../../tools/gfb1.mjs)).
+
+**From R2.** As developed in [R2: authority and identity](GF-COMPOSE-R2-AUTHORITY-IDENTITY.md):
+
+- The source/instance distinction keeps canonical source authoritative, and an
+  instance needs an opaque identity with isolated state and provenance.
+- Conversational memory is provenance and authoring context, not automatic
+  execution-rule or physical-binding authority. Memory-to-decision-to-source
+  linkage, retention, and tombstone behavior remain R2/API-system questions.
+- The installation-constraint boundary remains unresolved. This document does
+  not select a constraint artifact, overlay, or enforcement owner.
+
+See also [R5: composition contracts and diagnostics](GF-COMPOSE-R5-CONTRACTS.md)
 for the related compatibility and evidence proposal.
 
 ## Tables and examples
 
 ### Option comparison
+
+Both rows are proposals. Each column is one property that composition must
+settle.
 
 | Option | Input sampling | Clock | Old/next state visibility | Reset/fault scope | Output resolution | Provenance | Existing limits | New machinery |
 |---|---|---|---|---|---|---|---|---|
@@ -76,9 +115,12 @@ for the related compatibility and evidence proposal.
 
 ### Isolated instances: east and west
 
-The following is a hand-worked example, not execution evidence. Both instances
-use the same definition. Each has independent `running` state and output
-`pump`; `start` is true only for east in scan 1. `t` is supplied equally.
+The following is a hand-worked example, not execution evidence:
+
+- Both instances use the same definition.
+- Each has independent `running` state and output `pump`.
+- `start` is true only for east in scan 1.
+- `t` is supplied equally.
 
 | Scan/read timing | Instance | Inputs | State before | State after | Requested / safe output | Read timing |
 |---|---|---|---|---|---|---|
@@ -87,8 +129,8 @@ use the same definition. Each has independent `running` state and output
 | 2, same complete frame | east | `start=false`, `t=2000` | `running=true` | `running=true` | `pump=true` / `pump=true` | Reads east prior committed state |
 | 2, same complete frame | west | `start=false`, `t=2000` | `running=false` | `running=false` | `pump=false` / `pump=false` | Reads west prior committed state |
 
-Invariant: east start does not start west. This is a proposal for a composed
-execution contract, not a current multi-instance ABI fact.
+**Invariant:** east start does not start west. This is a proposal for a
+composed execution contract, not a current multi-instance ABI fact.
 
 ### Reversed declaration order, unchanged identities
 
@@ -110,13 +152,16 @@ equivalent.
 ### One behavior consuming another result
 
 Hand-worked hypothetical semantics for a separately coordinated pair (not an
-atomic composed-module tick). `producer.ok` is an east result. `consumer`
-requests `valve=producer.ok` and has initial state `running=false`. The table
-makes the read phase explicit because the current compiler has no cross-module
-result reference or lowering rule. “Step” labels are scenario order, not
-native per-instance scan IDs. Row 1's hypothetical producer progress alongside
-consumer rejection does not adopt a partial-progress policy; there is no
-complete composed result for that step.
+atomic composed-module tick):
+
+- `producer.ok` is an east result.
+- `consumer` requests `valve=producer.ok` and has initial state `running=false`.
+- The table makes the read phase explicit because the current compiler has no
+  cross-module result reference or lowering rule.
+- “Step” labels are scenario order, not native per-instance scan IDs.
+- Row 1 shows hypothetical producer progress alongside consumer rejection.
+  This does not adopt a partial-progress policy; there is no complete composed
+  result for that step.
 
 | Scenario step | Inputs | State before → after | Requested / safe output | Read timing |
 |---|---|---|---|---|
@@ -124,17 +169,19 @@ complete composed result for that step.
 | 2 | producer input `sensor=0`; consumer frame complete | producer `true→false`; consumer `false→true` | producer `ok=false`; consumer `valve=true / true` | Consumer reads producer’s last completed scan-1 result |
 
 This hypothetical comparison does not describe executable current behavior:
-the compiler/runtime has no cross-module value reference. A missing required
-value yields no valid evaluation, not an invented fallback. Same-scan
-cross-instance wiring cannot make another instance's `next` value available
-or redefine next-reference rules. Unsupported cross-instance sharing is a
-compile error. The examples contrast values at supported
-completed-scan boundaries; they do not adopt FIFO ingress, same-scan lowering,
-or a scheduler.
+
+- The compiler/runtime has no cross-module value reference.
+- A missing required value yields no valid evaluation, not an invented fallback.
+- Same-scan cross-instance wiring cannot make another instance's `next` value
+  available or redefine next-reference rules.
+- Unsupported cross-instance sharing is a compile error.
+
+The examples contrast values at supported completed-scan boundaries; they do
+not adopt FIFO ingress, same-scan lowering, or a scheduler.
 
 ### Rejected cycle and reset/failure
 
-Rejected cycle *(hand-worked invalid dependency; dependency notation, not
+**Rejected cycle** *(hand-worked invalid dependency; dependency notation, not
 source syntax)*:
 `east.pump[n] <- west.pump[n]` and `west.pump[n] <- east.pump[n]`, where `n`
 identifies the same scan. East's result requires west's result, and west's
@@ -149,27 +196,40 @@ cycle. The current VM evaluates transitions from prior state before committing
 next state. This distinction defines no new cross-instance read or initial-value
 semantics.
 
-Reset/failure *(contract constrained)*: after a successful frame, the framed
-host exposes its last completed result. If conditioning or VM dispatch fails,
-that committed result remains available, the host latches a fault, and another
-step requires a new host instance. A new run must use a new `runId`; `scanId=0`
-in the new run is not the prior occurrence. Composition must preserve this
-boundary. It must not partially reset one instance while presenting a composed
-result as complete. Exact multi-instance fault fan-out is unresolved.
+**Reset/failure** *(contract constrained)*:
+
+- After a successful frame, the framed host exposes its last completed result.
+- If conditioning or VM dispatch fails, that committed result remains
+  available, the host latches a fault, and another step requires a new host
+  instance.
+- A new run must use a new `runId`; `scanId=0` in the new run is not the prior
+  occurrence.
+
+The diagram shows this existing single-host boundary.
+
+![Framed host: success publishes the last completed result; failure latches a fault until a new host instance](../diagrams/gf-compose-r3-execution/framed-host-failure.svg)
+
+Composition must preserve this boundary. It must not partially reset one
+instance while presenting a composed result as complete. Exact multi-instance
+fault fan-out is unresolved.
 
 ## Recommendation
 
 Static compiler composition remains the preferred hypothesis, not a selected
-lowering or ABI. It must preserve existing tick invariants: every transition
-reads the same input/old-state snapshot; next references are legal only in
-output expressions, not other next transitions or lets; logical state and
-output commit is simultaneous; cycles and duplicate output definitions are
-rejected. Each output channel has one authoritative definition. Competing
-direct writers fail compilation and cannot be deployed. This does not remove
-explicit station single-writer resource arbitration: station requests are not
-competing direct writes. Composition does not authorize same-scan
-cross-instance wiring that changes next-reference semantics. Complete-frame
-scheduling does not settle event ingress, ordering, batching, or overflow.
+lowering or ABI. It must preserve existing tick invariants:
+
+- every transition reads the same input/old-state snapshot;
+- next references are legal only in output expressions, not other next
+  transitions or lets;
+- logical state and output commit is simultaneous;
+- cycles and duplicate output definitions are rejected.
+
+Each output channel has one authoritative definition. Competing direct writers
+fail compilation and cannot be deployed. This does not remove explicit station
+single-writer resource arbitration: station requests are not competing direct
+writes. Composition does not authorize same-scan cross-instance wiring that
+changes next-reference semantics. Complete-frame scheduling does not settle
+event ingress, ordering, batching, or overflow.
 
 Do not generalize station reuse. Its same-tick selection and durable output
 authorization can arbitrate a shared pump after behavior results exist, but its

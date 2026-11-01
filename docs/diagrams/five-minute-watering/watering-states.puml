@@ -1,0 +1,19 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName Helvetica
+skinparam defaultFontSize 13
+skinparam ArrowColor #526d76
+skinparam state {
+  BackgroundColor #f1f6f5
+  BorderColor #6d858b
+  FontColor #102b35
+}
+
+[*] --> Off : logical time 0
+Off : watering = false\nRO1 = RO2 = false
+On : watering = true\nRO1 = RO2 = true
+Off --> On : new DI1 false-to-true edge\nand DI2, DI3 released
+On --> Off : DI2 stop or DI3 low water\n(or DI2/DI3 fault)
+On --> Off : age reaches 5min
+Off --> Off : DI1 held, DI2/DI3 cleared,\nor fault recovered (no restart)
+@enduml

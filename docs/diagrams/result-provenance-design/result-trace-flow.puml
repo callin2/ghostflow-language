@@ -1,0 +1,23 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName Helvetica
+skinparam defaultFontSize 13
+skinparam componentStyle rectangle
+component "Compiler\n(transient Result value)" as C
+component "Source metadata\n(site table, permitted origins)" as M
+component "GFB3 opcode 56\ntrace-result <u32 site>" as OP
+component "Rust VM tick\n(candidate)" as VM
+card "resultTrace buffer\n{site, choice, origin}" as B
+component "Committed tick record\n(state + intents + resultTrace)" as R
+component "Journal / replay" as J
+component "Host\n(joins events with verified\nmetadata and sensor quality)" as H
+C --> OP : lowers fallback sites
+C --> M : records sites
+OP --> VM
+VM --> B : append after payload succeeds
+B --> R : tick succeeds
+B ..> VM : later fault discards events
+R --> J
+R --> H
+M --> H
+@enduml
