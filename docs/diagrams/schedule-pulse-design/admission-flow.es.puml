@@ -1,0 +1,31 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName Helvetica
+skinparam defaultFontSize 13
+start
+:Validar dominios y deltas consecutivos\nmonotónicos / de pared positivos;
+if (¿Hora de pared confiable?) then (no)
+  :Unknown(motivo, revisiones);\nfallback = skip -> .due = false;
+elseif (¿Primer uso o recuperación?) then (sí)
+  :Establecer línea base\n(sin recuperar atrasos, sin pulso);
+elseif (¿Cobertura del proveedor completa?) then (no)
+  :Unknown (o rechazo);\n.due = false;
+else (sí)
+  :Buscar ocurrencias cruzadas entre el instante\nde pared efectivo anterior y el actual;
+  if (¿Alguna cruzada nueva?) then (ninguna)
+    :.due = false;
+  elseif (¿delta > límite de gap?) then (sí)
+    :Terminalizar la ocurrencia\ncruzada como ObservationGap;
+  elseif (¿Dos o más cruzadas?) then (sí)
+    :Terminalizar todas\ncomo omitidas; no admitir ninguna;
+  else (exactamente una)
+    if (¿Predicado when en\neste tick de cruce?) then (true)
+      :Admitir una vez (.due = true);
+    else (false)
+      :Terminalizar como\nConditionsFalseAtPulse;
+    endif
+  endif
+endif
+:Preparar high-water, disposición y\nobservación con la transacción de la VM;
+stop
+@enduml

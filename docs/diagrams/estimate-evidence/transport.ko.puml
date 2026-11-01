@@ -1,0 +1,23 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName Helvetica
+skinparam componentStyle rectangle
+title 추정 근거 admission 경로
+
+[호스트\n(identity, history, coverage)] as Host
+[estimate-evidence.mjs\nEstimateEvidenceRuntime\n(인코딩/디코딩만)] as JS
+[Rust 코어\nestimate_evidence::Session\n(레코드 1-64개, 퇴출 없음)] as Core
+[네이티브 적합성 예제\n(같은 GFEE v1 어댑터)] as Native
+
+Host --> JS : 생성 / 평가
+JS --> Core : GFEE v1 패킷\n(kind 0 생성, kind 1 평가)
+Native --> Core : GFEE v1 패킷
+Core --> JS : Verdict 또는 Rejection
+JS --> Host : snapshot (u64는 10진 문자열)
+note right of Core
+  선언된 basis만 admission:
+  수치 추정, 명령,
+  temporal 권한 없음
+  (temporalAdmission: false)
+end note
+@enduml

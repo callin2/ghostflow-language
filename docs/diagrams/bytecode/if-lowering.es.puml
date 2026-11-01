@@ -1,0 +1,24 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName Helvetica
+skinparam ArrowColor #555555
+skinparam rectangle {
+  BackgroundColor White
+  BorderColor #555555
+}
+title Reducción de if condition then yes else no (formato 3+)
+
+rectangle "condition" as C
+rectangle "JUMP_IF_FALSE(length(yes) + 3)" as JF
+rectangle "yes" as Y
+rectangle "JUMP(length(no))" as J
+rectangle "no" as N
+rectangle "fin de la expresión\n(un valor del tipo de resultado)" as E
+
+C --> JF
+JF --> Y : true\n(continúa en secuencia)
+JF --> N : false\n(salto hacia adelante)
+Y --> J
+J --> E : salto hacia adelante
+N --> E
+@enduml

@@ -1,0 +1,31 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName Helvetica
+skinparam defaultFontSize 13
+skinparam ArrowColor #526d76
+skinparam rectangle {
+  BackgroundColor #f1f6f5
+  BorderColor #6d858b
+}
+hide stereotype
+
+rectangle "host-tests\ninjected-fixture" as HS
+rectangle "device-status\ngpio-readback\nregister-readback" as HWS
+rectangle "physical-observation" as PS
+rectangle "host 关口" as H
+rectangle "hardware 关口" as HW
+rectangle "physical 关口" as P
+
+HS --> H
+HWS --> HW
+PS --> P
+H -[hidden]right- HW
+HW -[hidden]right- P
+H ..> HW : 绝不代为填写
+HW ..> P : 回读绝不构成\nphysical pass
+note bottom of P
+  不存在汇总的 pass。
+  每个关口：not_run | pass | fail | unknown。
+  来源 "none" 只允许 not_run / unknown。
+end note
+@enduml

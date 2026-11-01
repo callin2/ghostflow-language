@@ -1,0 +1,21 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontSize 13
+start
+:Leer el estado de autor anterior;
+:Evaluar **ok** de la fuente;
+if (¿ok tuvo éxito?) then (sí)
+  :Evaluar **payload** de forma anticipada,
+  incluso para una observación duplicada
+  (se conservan los fallos de la expresión seleccionada);
+else (no)
+  :Evaluar la rama **fault** / **origin**
+  (payload no se evalúa);
+  note right
+    Las observaciones de densidad
+    y continuidad de las raíces
+    físicas se siguen procesando.
+  end note
+endif
+stop
+@enduml

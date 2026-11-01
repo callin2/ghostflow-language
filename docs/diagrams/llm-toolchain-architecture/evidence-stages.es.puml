@@ -1,0 +1,19 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontSize 12
+left to right direction
+title Evidencia de salida: hechos separados, titulares separados
+rectangle "Núcleo Rust\n(ghostsim / la CLI llega hasta aquí)" as CoreBox {
+  card "Intención solicitada\n(requested)" as Req
+  card "Intención segura\n(safe)" as Safe
+}
+rectangle "Device (firmware farm-device)" as DeviceBox {
+  card "Escritura aplicada (applied)\n(confirmada por el renderizador)" as Applied
+  card "Latch del registro\n(relectura)" as Latch
+}
+card "Efecto confirmado (confirmed)\n(observación independiente;\nel firmware actual no lo informa)" as Confirmed
+Req --> Safe : restricciones
+Safe --> Applied : mapear + escribir
+Applied --> Latch : leer registro
+Latch --> Confirmed : observar contacto/carga
+@enduml

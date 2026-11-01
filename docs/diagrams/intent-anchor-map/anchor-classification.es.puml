@@ -1,0 +1,18 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontSize 12
+hide empty description
+
+state "assumption\nstatus=unconfirmed\n(p. ej. origin=ai)" as AU
+state "intent / premise\nstatus=confirmed" as C
+state "ancla superseded\n(cualquier kind)" as S
+
+[*] --> AU : suposición de la IA\no del autor
+AU --> C : una persona la confirma;\nla fuente se reclasifica
+AU --> S : la suposición antigua\nse conserva como prosa
+C --> S : reemplazada por una\ndeclaración más reciente
+
+AU : solo puede vincularse con\nrelation=assumes
+C : puede vincularse con implements,\nconstrains o fallback
+S : no puede vincularse a\nun nodo actual
+@enduml

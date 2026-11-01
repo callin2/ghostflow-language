@@ -1,0 +1,19 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName "Apple SD Gothic Neo"
+skinparam defaultFontSize 13
+skinparam componentStyle rectangle
+component "고정된 definition\n(config + 타이머)" as D
+package "합쳐진 Program (공유 Rust 코어)" {
+  component "east 인스턴스\n자체 config Result,\nemissionRevision, 타이머 상태" as East
+  component "west 인스턴스\n자체 config Result,\nemissionRevision, 타이머 상태" as West
+}
+component "설정 transaction\n(전역 settingsRevision 하나)" as S
+component "논리 시계\n(같은 제공 시각)" as C
+D --> East : 인스턴스화
+D --> West : 인스턴스화
+S --> East : east config ID 대상 event
+S ..> West : 변화 없음
+C --> East
+C --> West
+@enduml

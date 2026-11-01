@@ -1,0 +1,17 @@
+@startuml
+skinparam defaultFontName "PingFang SC"
+skinparam shadowing false
+skinparam ActivityBackgroundColor #F7F9FC
+skinparam ActivityBorderColor #4A6FA5
+title 连续 Percent 资源策略（示例 P）
+start
+:在同一个输入快照 + 前一状态上\n求值所有请求和上限;
+if (有请求或上限出现故障？) then (是)
+  #FFF4D6:候选值 = 作者编写的 `safe`（0%）\n（`on_unknown = safe`；conditionsKnown = false）;
+else (否)
+  :候选值 = 请求的 `select`（max）\n温度 70%、湿度 40% -> 70%;
+endif
+:钳位到已知上限中的最小值\n（风力 20%）;
+:vent_target 的最终安全意图\n无故障：70% -> 20%；有故障：0%;
+stop
+@enduml

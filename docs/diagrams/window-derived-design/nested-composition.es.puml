@@ -1,0 +1,15 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontSize 12
+left to right direction
+rectangle "Raíz física\n(sourceTag, sourceEpoch, sampleId)\n+ marca de tiempo original" as P
+rectangle "Ventana interior U\nsobre 2 ms" as U
+rectangle "Ventana exterior W\nsobre 10 ms" as W
+P --> U : muestras (0,0) (1,10) (2,20)
+U --> W : eventos derivados (site, revision)\nvalores 0, 5, 15\nquality 3 + sitio de U
+note bottom of W
+  Promedio de 3 eventos derivados = 20/3
+  (NO 10 a partir de hojas físicas aplanadas)
+  Calidad del resultado: Derived (3)
+end note
+@enduml

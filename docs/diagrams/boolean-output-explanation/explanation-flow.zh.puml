@@ -1,0 +1,28 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName Helvetica
+skinparam ArrowColor #555555
+skinparam rectangle {
+  BackgroundColor White
+  BorderColor #555555
+}
+title 从编译到联接后的解释
+
+rectangle "编译器\n（类型化 IR + 字节写入器）" as C
+rectangle "GFB 字节\n（不变）" as B
+rectangle "explanationArtifact\n（sidecar）" as S
+rectangle "VM 扫描\n（已启用指令见证）" as V
+rectangle "TickRecord\n（仅已完成的扫描）" as T
+rectangle "prepareOutputExplanation\nproducer.emit" as P
+rectangle "证明（proof）" as PR
+rectangle "joinOutputExplanation\n（输出快照 + 预期运行）" as J
+
+C --> B
+C --> S
+B --> V
+V --> T : 扫描完成后\n附加证据
+S --> P
+T --> P
+P --> PR
+PR --> J
+@enduml

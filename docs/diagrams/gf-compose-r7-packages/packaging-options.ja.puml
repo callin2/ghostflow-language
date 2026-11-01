@@ -1,0 +1,24 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName "Hiragino Sans"
+skinparam defaultFontSize 13
+title 2 つのパッケージ化の選択肢（どちらも提案であり、いずれも未承認）
+
+package "選択肢 1: ソースバンドルの拡張（レビュー向けに推奨）" {
+  rectangle "ロックされたソース閉包\n（ルート + すべてのインポート、\nリビジョン、ダイジェスト）" as C1
+  rectangle "1 回のコンパイラリプレイ" as R1
+  rectangle "1 つの合成成果物\n（GFB、マニフェスト、ソースマップ）" as A1
+  rectangle "署名済みペイロード" as S1
+  C1 --> R1
+  R1 --> A1
+  A1 --> S1
+}
+
+package "選択肢 2: 合成エンベロープ" {
+  rectangle "エンベロープ\n（固定した参照 + エッジ;\n署名が必須かどうかは未解決）" as E2
+  rectangle "既存パッケージ A\n（固有のソースマップ、署名）" as PA
+  rectangle "既存パッケージ B\n（固有のソースマップ、署名）" as PB
+  E2 --> PA : ダイジェストを固定
+  E2 --> PB : ダイジェストを固定
+}
+@enduml

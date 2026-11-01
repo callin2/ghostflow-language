@@ -1,0 +1,22 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName Helvetica
+skinparam defaultFontSize 13
+
+start
+if (¿qué declara el programa antiguo?) then (sensor)
+  :el compilador rechaza con\nun diagnóstico de migración;
+  :renombrar a `input`, conservar la\npolítica de fallos explícita existente;
+else (entrada escalar plana)
+  if (¿solo entradas Bool independientes,\nobligatorias y sin acondicionar?) then (sí, solicitud explícita)
+    :previewLegacyScalarMigration();
+    :documento nuevo con la directiva\nde admisión de heredados;
+  else (no)
+    :revisar los puntos de uso;
+    :elegir primero la política de fallos;
+    :añadir análisis de casos o\nrecuperación explícita;
+  endif
+endif
+:nueva revisión revisada\n(predecesor conservado intacto);
+stop
+@enduml

@@ -1,0 +1,18 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName "Hiragino Sans"
+skinparam defaultFontSize 12
+skinparam StateBackgroundColor #F7F9FC
+skinparam StateBorderColor #4A6FA5
+title hold_last キャッシュ（measured スライス）
+[*] --> Unavailable : コールドリスタート
+state "利用不可（Unavailable）\navailable=false\n結果：NotReady" as Unavailable
+state "保持中（Held）\navailable=true, held=true\nage < forAtMost\n結果の品質：Held" as Held
+state "期限切れ（Expired）\navailable=true, held=false\n結果：NotReady" as Expired
+Unavailable --> Held : 新しい受理可能なサンプル\n（自身のタイムスタンプでキャッシュ）
+Held --> Held : 新しい受理可能なサンプルがキャッシュを置換。\n重複は経過時間を更新しない。\n故障・選択変更ではキャッシュを保持
+Held --> Expired : 経過時間が forAtMost に到達
+Expired --> Held : 新しい受理可能なサンプル
+Held --> Unavailable : キャッシュ元ルートの epoch が\n置換（未選択でも）
+Expired --> Unavailable : キャッシュ元ルートの\nepoch が置換
+@enduml

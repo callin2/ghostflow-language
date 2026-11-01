@@ -1,0 +1,26 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName Helvetica
+skinparam defaultFontSize 13
+skinparam ArrowColor #526d76
+
+participant "Host" as H
+participant "Primitiva de ledger" as L
+database "Almacenamiento duradero\n(propiedad del host)" as D
+
+H -> L : crear
+note right of L : lecturas Unknown
+H -> L : inicializar vacío (solo primera instalación)
+H -> L : instantánea
+L --> H : bytes + revisión N
+H -> D : escribir los bytes exactos
+D --> H : ok
+H -> L : confirmar recepción de revisión N
+note right of L : lecturas Known
+H -> L : insertar registro
+note right of L : revisión N+1, lecturas Unknown
+H -> L : confirmar revisión obsoleta N
+L --> H : rechazado
+H -> L : instantánea, escritura, confirmación de N+1
+note right of L : lecturas Known de nuevo
+@enduml

@@ -1,0 +1,24 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName Helvetica
+skinparam defaultFontSize 13
+skinparam ArrowColor #526d76
+
+rectangle "Módulo instalado\n+ estrategia + capacidad del journal" as M
+rectangle "Perfil de activación GFTA\n(presupuestos)" as P
+rectangle "Un único plan estructural comprobado\n(geometría, sin arenas temporales)" as SP
+rectangle "Informe\n(fitsBudget, capacidades requeridas)" as R
+rectangle "Activación" as A
+rectangle "Reproducción" as RP
+
+M --> SP
+P --> SP
+SP --> R : plan_temporal /\nplan_current_temporal_replay
+SP --> A : mismo plan
+SP --> RP : mismo plan
+note right of A
+  La capacidad asignada debe mantenerse
+  dentro de la geometría planificada;
+  una discrepancia se rechaza
+end note
+@enduml

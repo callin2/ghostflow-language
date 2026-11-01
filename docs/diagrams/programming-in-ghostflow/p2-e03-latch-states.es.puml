@@ -1,0 +1,27 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontSize 13
+skinparam StateBackgroundColor #F7F9FC
+skinparam StateBorderColor #4A6FA5
+title E03: running y restart_blocked (una transición por tick)
+
+state "Detenido\nrunning=false\nrestart_blocked=false" as Stopped
+state "En marcha\nrunning=true" as Running
+state "Rearranque bloqueado\nrunning=false\nrestart_blocked=true" as Blocked
+
+[*] --> Stopped
+Stopped --> Running : START pulsado, STOP liberado\n(ambos sanos)
+Running --> Stopped : STOP pulsado (sano),\nsin bloqueo de rearranque
+Stopped --> Blocked : fallo de START o STOP
+Running --> Blocked : fallo de STOP, o parada\ncon bloqueo de rearranque activo
+Blocked --> Stopped : ambos sanos y\nSTART liberado
+Blocked --> Blocked : START aún mantenido,\no cualquier fallo
+
+note right of Running
+  Un fallo de START en marcha mantiene
+  la marcha (STOP sano y liberado),
+  pero activa restart_blocked. Se borra
+  cuando se observa START liberado
+  con ambas entradas sanas.
+end note
+@enduml

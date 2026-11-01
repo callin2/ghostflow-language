@@ -1,0 +1,21 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName "Hiragino Sans"
+skinparam defaultFontSize 13
+start
+:変更していないフィクスチャを一度だけコンパイル\n(numeric-threshold.ghost.md);
+fork
+  :ネイティブ Rust で実行\n(同じバイト列、同じ入力テープ);
+fork again
+  :WASM で実行\n(同じバイト列、同じ入力テープ);
+end fork
+:requested/safe の結果を\n独立した oracle.json と比較;
+:メモリ上の各ミュータントについて\n("<" -> "<=", 条件 -> true);
+:ミュータントは両ターゲットで\n正常にコンパイル・実行されなければならない;
+:変更していない oracle のアサーションが\nRED にならなければならない;
+note right
+  クラッシュ、タイムアウト、ランナー欠如は
+  ミュータントを殺したとはみなさない
+end note
+stop
+@enduml

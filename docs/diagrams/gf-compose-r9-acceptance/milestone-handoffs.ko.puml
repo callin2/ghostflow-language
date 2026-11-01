@@ -1,0 +1,20 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName Helvetica
+skinparam defaultFontSize 13
+skinparam rectangleRoundCorner 8
+title 제안된 milestone 인계 (아키텍처 소유자 검토 전제)
+
+rectangle "아키텍처 소유자 검토\n(연구 완료는\n구현 권한을 부여하지 않음)" as R
+rectangle "M1: 준비된 동작 적용\n계약 descriptor, 입력 종류,\n배타적 소유권, 논리 포트,\n수락/거부 결과" as M1
+rectangle "M2: 다른 동작 추가\n인스턴스 한정 조합,\n격리된 상태/타이머,\n보존되는 바인딩" as M2
+rectangle "M3: 예상 밖 결과 조사\n인스턴스 한정 소스/제약\ntrace를 run/scan에 join" as M3
+rectangle "소유자 결정 gate\n컴파일러/런타임, 패키지/import,\n설치 제약, 인스턴스/배포,\n바인딩 증거, incident 증거" as G
+
+R --> M1
+M1 --> M2
+M2 --> M3
+G ..> M1 : 해당 결정을 사용하는\n작업만 gate
+G ..> M2
+G ..> M3
+@enduml

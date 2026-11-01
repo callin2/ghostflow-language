@@ -1,0 +1,44 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName Helvetica
+skinparam defaultFontSize 13
+scale 1 as 70 pixels
+hide time-axis
+
+concise "수신" as R
+concise "Batch" as B
+concise "Instance" as I
+
+@0
+R is "r1"
+B is "열림 (batch N)"
+I is "대기"
+
+@1
+R is "r2"
+
+@2
+R is "latch"
+B is "N 닫힘"
+I is "N 평가"
+
+@3
+R is "r3"
+
+@4
+I is "N 확정 + dispatch"
+
+@5
+R is "r4"
+
+@6
+R is "latch"
+B is "N+1 닫힘: r3, r4"
+I is "N+1 평가"
+
+@7
+R is "-"
+I is "대기"
+
+B@2 <-> @6 : r3와 r4는 latch 이후 도착 -> N+1을 기다림
+@enduml

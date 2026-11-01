@@ -1,0 +1,19 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontSize 13
+skinparam activityBorderColor #4A6FA5
+skinparam activityBackgroundColor #F7F9FC
+title Reemplazo en caliente del Program (§6.9)
+
+start
+:Candidato con nueva revisión de fuente\no nuevo cierre de importación;
+if (¿Compatibilidad de puertos, titularidad, perfil,\nrecursos y estado válida?) then (sí)
+  :Consolidar atómicamente en un límite de tick;
+  :Transferir solo el estado con mismo nombre y mismo tipo\nEstado nuevo = valor predeterminado declarado\nEl estado eliminado desaparece;
+  :Descartar la caché de entradas anterior;\nrecibir una instantánea de entradas completa\npara el nuevo esquema;
+  :Nueva identidad de artefacto/fuente\ny nuevo límite de ejecución (run);
+else (no)
+  :Mantener el Program anterior;
+endif
+stop
+@enduml

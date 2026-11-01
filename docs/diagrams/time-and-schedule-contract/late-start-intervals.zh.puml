@@ -1,0 +1,45 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName Helvetica
+skinparam defaultFontSize 13
+scale 1 as 50 pixels
+hide time-axis
+
+concise "墙钟时间" as T
+concise "Pulse" as P
+concise "Window(5min)" as W
+concise "Run(5min, on_time)" as O
+concise "Run(5min, within(10min))" as R
+
+@0
+T is "07:58"
+P is "-"
+W is "-"
+O is "-"
+R is "-"
+
+@2
+T is "08:00"
+P is "跨越时准入"
+W is "可准入"
+O is "跨越时准入"
+R is "可准入"
+
+@3
+P is "否则错过"
+O is "否则错过"
+
+@7
+T is "08:05"
+W is "已关闭"
+
+@12
+T is "08:10"
+R is "LateStartExpired"
+
+@14
+T is "08:12"
+
+W@2 <-> @7 : [08:00, 08:05)
+R@2 <-> @12 : [08:00, 08:10) 准入宽限期，不是运行时长
+@enduml

@@ -1,0 +1,25 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName Helvetica
+skinparam defaultFontSize 13
+
+start
+:host.replace({ artifact, runId });
+:run ID가 새 값이고 이력 capacity가 남았는지 확인;
+:후보 복사, 정본 소스 + closure 재컴파일,\nsource/manifest/bytecode identity와\n지원 profile 확인;
+if (모든 검사를 통과했는가?) then (아니요)
+  :거부;
+  :이전 Program, state,\nrun, assessment, 마지막 trace 유지;
+  stop
+endif
+:Rust core hotSwap\n(core가 이름·타입이 같은 state 이전);
+if (core 호환성 검사를 통과했는가?) then (아니요)
+  :거부;
+  :이전 Program, state,\nrun, assessment, 마지막 trace 유지;
+  stop
+endif
+:새 source / artifact / run identity를\n다시 계산한 assessment와 함께 공개;
+:마지막 trace 비움, core는 입력 cache를 폐기함;
+:다음 step()에는 완전한\n새 관측 맵이 필요함;
+stop
+@enduml

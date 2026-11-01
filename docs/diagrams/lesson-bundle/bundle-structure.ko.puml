@@ -1,0 +1,24 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName Helvetica
+skinparam rectangleRoundCorner 8
+skinparam ArrowColor #555555
+left to right direction
+
+rectangle "ghostflow-lesson-v1 번들 (JSON)" as B {
+  rectangle "source\n텍스트, sha256,\n미디어 형식" as SRC
+  rectangle "playback\ndurationMs,\n체크포인트" as PB
+  rectangle "scenarios\n프레임: atMs,\ninputs, samples?" as SC
+  rectangle "toolchain\n선언된 ID,\nABI 1" as TC
+  rectangle "bundleSha256" as DG
+}
+rectangle "validateLessonBundle\n필드, 한도, 순서,\n다이제스트" as VAL
+rectangle "compileLessonBundle\nghost 펜스 추출,\n컴파일, 프레임을\nmanifest와 대조" as CMP
+rectangle "소비자 / 런타임\n프레임마다\nruntime.step(...)" as RT
+
+B --> VAL
+VAL --> CMP : 유효한 번들
+CMP --> RT : 컴파일된 프로그램\n+ 검사된 프레임
+PB ..> SRC : sourceSpan 줄
+PB ..> SC : scenarioId
+@enduml

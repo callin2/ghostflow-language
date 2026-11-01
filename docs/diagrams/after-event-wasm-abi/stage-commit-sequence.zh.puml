@@ -1,0 +1,29 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontSize 13
+participant "宿主 (JS)" as H
+participant "WASM 适配器" as W
+participant "Rust AfterEvent<32>" as R
+H -> W : stage(batch)
+W -> W : 编码 GFAE v1 数据包
+W -> R : stage(packet)
+R -> R : 过期、确认、\n加入起点、应用谓词
+alt 暂存成功
+  R --> W : 已暂存（未提交）
+  H -> W : stagedAny() / stagedAll()
+  note over H : results 仍然只显示\n已提交的状态
+  alt 提交
+    H -> W : commit()
+    W -> R : commit
+    note over R : 暂存状态\n变为已提交
+  else 回滚
+    H -> W : rollback()
+    W -> R : rollback
+    note over R : 保留先前的\n结果
+  end
+else 解码或暂存失败
+  R --> W : 错误
+  W --> H : 抛出异常
+  note over R : 不消耗任何东西；\n之前已暂存的批次\n仍可提交/回滚
+end
+@enduml

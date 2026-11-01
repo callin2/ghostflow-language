@@ -1,0 +1,22 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName Helvetica
+skinparam ArrowColor #555555
+title Sustitución comprobada de duplicados adyacentes
+
+start
+:Restricciones de salida Bool reducidas;
+if (¿La lista tiene como máximo 128 entradas?) then (no)
+  :Conservar el original\n(complementos v1);
+  stop
+else (sí)
+endif
+:Generación de candidatos:\nfusionar duplicados exactos adyacentes\n(grupos dentro de 8 nombres únicos / 32 ocurrencias);
+:Verificador finito independiente:\ntodas las instantáneas Bool, conjuntos bloqueados,\ncadenas de fallo, idempotencia;
+if (¿Transformado y comprobado?) then (sí)
+  :Emitir artefacto optimizado\ncon constraintProof\n(source-trace-v2 / source-observation-v2);
+else (sin cambios, no admitido\no fallo del verificador)
+  :Conservar el original\n(complementos v1);
+endif
+stop
+@enduml

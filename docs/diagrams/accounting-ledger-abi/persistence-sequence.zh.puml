@@ -1,0 +1,26 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName Helvetica
+skinparam defaultFontSize 13
+skinparam ArrowColor #526d76
+
+participant "宿主" as H
+participant "账本原语" as L
+database "持久存储\n（由宿主拥有）" as D
+
+H -> L : 创建
+note right of L : 读取为 Unknown
+H -> L : 初始化为空（仅首次安装）
+H -> L : 快照
+L --> H : 字节 + 修订版 N
+H -> D : 按原样写入字节
+D --> H : ok
+H -> L : 确认修订版 N
+note right of L : 读取为 Known
+H -> L : 插入记录
+note right of L : 修订版 N+1，读取为 Unknown
+H -> L : 确认过时的修订版 N
+L --> H : 被拒绝
+H -> L : 快照、写入、确认 N+1
+note right of L : 再次读取为 Known
+@enduml

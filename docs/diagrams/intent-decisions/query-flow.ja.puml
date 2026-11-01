@@ -1,0 +1,30 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName "Hiragino Sans"
+skinparam defaultFontSize 12
+skinparam componentStyle rectangle
+left to right direction
+
+rectangle "intent-decisions-request-v1" as req {
+  card "current\n(source + intentEvidence\n+ 任意の sourceClosure)" as cur
+  card "previous（任意）" as prev
+  card "transitions（任意、\nprevious が必要）" as tr
+  card "requirementContract\n（任意、外部）" as rc
+}
+rectangle "inspectIntentDecisions\n（純粋なクエリ）" as q
+card "既存のコンパイラ:\n再コンパイル + アンカーと\n証拠の検証" as comp
+card "intent-decisions-result-v1\ndecisions, judgments,\nrequirements, comparison, trust" as res
+
+cur --> q
+prev --> q
+tr --> q
+rc --> q
+q --> comp
+comp --> q
+q --> res
+note bottom of res
+  報告のみ。承認、認証、
+  hold/block、ランタイムの
+  変更は行わない。
+end note
+@enduml

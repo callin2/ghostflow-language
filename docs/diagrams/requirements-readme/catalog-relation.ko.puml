@@ -1,0 +1,25 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName Helvetica
+skinparam defaultFontSize 13
+skinparam ArrowColor #526d76
+hide circle
+hide methods
+
+entity "requirements" as R {
+  id : "GF-REQ-" + SHA-256(statement)의 앞 16자리 16진수
+  statement
+  source : 경로, 제목, 행, sha256
+  testIds
+  status / pendingReason
+}
+entity "tests" as T {
+  id
+  locator : 경로, 앵커, 행, sha256
+}
+R }o--o{ T : testIds
+note bottom of R
+  testIds가 없으면 비어 있지 않은
+  pendingReason이 필요합니다
+end note
+@enduml

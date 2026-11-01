@@ -1,0 +1,23 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName Helvetica
+skinparam defaultFontSize 13
+skinparam rectangleRoundCorner 8
+left to right direction
+title 제안된 인과 증거 사슬 (단계는 분리 유지)
+
+rectangle "입력 event\n또는 관측" as I
+rectangle "평가된 rule\n(유효 settings\nrevision에 join)" as E
+rectangle "의도" as N
+rectangle "요청 출력\n(Rust core trace)" as Q
+rectangle "안전 출력\n(Rust 안전 해석)" as S
+rectangle "호스트 / 렌더러\n적용 결과\n(#74/#88, v0에서 미정의)" as A
+rectangle "물리 관측\n(Device / 설치,\n#28 제안)" as P
+
+I --> E
+E --> N
+N --> Q
+Q --> S : 제약\n참조
+S --> A : 명령 ack는\n물리적 증거가 아님
+A --> P : 기록된 applied event는\n물리적 증거가 아님
+@enduml

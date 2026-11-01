@@ -1,0 +1,18 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontSize 12
+title after_event 跟踪器随 VM 扫描暂存
+participant "运行时宿主\n(ControlRuntime)" as Host
+participant "Rust AfterEventRuntime\n(WASM)" as AE
+participant "Rust VM" as VM
+Host -> AE : 暂存显式事件事实\n与测量的谓词观测
+AE --> Host : Rust 所有的 any/all 结果
+Host -> VM : 以私有生成的 Result 输入\n携带结果执行扫描
+alt VM 扫描提交
+  VM --> Host : 已提交
+  Host -> AE : 提交跟踪器状态
+else VM 扫描被拒绝
+  VM --> Host : 被拒绝
+  Host -> AE : 回滚跟踪器状态
+end
+@enduml

@@ -1,0 +1,32 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName Helvetica
+skinparam defaultFontSize 13
+skinparam ArrowColor #526d76
+
+start
+:불변 ScheduleFacts 하나 수신
+(clock snapshot + schedule마다 group 하나);
+:Clock gate 준비
+(gap, 신뢰, 복구 검사);
+:각 prelude 항목을 의존 순서대로:
+이전 상태와 이미 준비된
+projection에 대해 한 번 평가;
+note right
+  한 schedule에서 새로 통과한
+  occurrence가 둘 이상이면:
+  모두 missed로 기록, 아무것도 실행 안 함
+end note
+:Transition과 intent 실행
+(준비된 prelude 항목 읽기);
+if (실패 가능한 모든 식이 성공?) then (예)
+  :함께 commit: window, clock 상태,
+  occurrence 소비, schedule
+  관측, scalar 상태;
+  :TickRecord가 fact와 판단을 보관;
+else (아니오)
+  :모든 후보 폐기;
+  :이후 재시도는 같은 crossing을 봄;
+endif
+stop
+@enduml

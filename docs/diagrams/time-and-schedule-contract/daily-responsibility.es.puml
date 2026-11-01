@@ -1,0 +1,16 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName Helvetica
+skinparam defaultFontSize 13
+
+rectangle "Proveedor de reloj\nRTC / NTP / plataforma" as Clock
+rectangle "Runtime de GhostFlow" as Runtime {
+  rectangle "Cruce de ocurrencias Daily,\nadmisión, ocurrencias omitidas,\nsupresión de duplicados" as Calc
+  rectangle "Libro mayor de programación" as Ledger
+}
+database "Almacenamiento del host" as Store
+
+Clock --> Calc : en cada evaluación:\ninstantáneas de pared + monotónica,\nestado de confianza del reloj de pared
+Calc --> Ledger : gestiona
+Ledger <--> Store : persistido a través de\nreinicios del runtime
+@enduml

@@ -1,0 +1,16 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName "Hiragino Sans"
+skinparam defaultFontSize 12
+rectangle "エンジンの基盤\ntemporal.rs Window、チェックポイント" as A
+rectangle "GFB4 デコーダ/検証器\n（ロードのみ、実行ではない）" as B
+rectangle "GFB4 + ネイティブ実行\nbatch11、REF-04-027/028/029" as C
+rectangle "WASM、ホスト、ソーストレース\nbatch12 全体ゲート" as D
+rectangle "ネストした派生ウィンドウ\nbatch13（window-derived-design.md）" as E
+rectangle "未完了：永続的な復元、\nホットスワップ、推定証拠" as F #FFE0B2
+A --> B
+B --> C
+C --> D
+D --> E
+E --> F
+@enduml

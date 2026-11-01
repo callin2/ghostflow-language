@@ -1,0 +1,25 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontSize 13
+skinparam defaultFontName "Hiragino Sans"
+title 検証済み WASM の受け渡し：生成側と利用側
+
+|CI ワークフロー|
+start
+:PR head または完全な source_sha をチェックアウト;
+:コミット、ツリー、Cargo.lock ハッシュを検証;
+:セットアップ（ネットワーク可）：
+Node 22、Rust stable、npm ci、cargo fetch --locked;
+:CARGO_NET_OFFLINE=true npm test
+（唯一の WASM ビルド）;
+:tools/package-verified-wasm.mjs
+-> wasm + verification.json + manifest.json;
+:アーティファクトをアップロード（保持期間 14 日）;
+|利用側|
+:3 つのファイルをダウンロード;
+:形式、ピン、ツリー、lockfile ハッシュを確認;
+:ハッシュとバイト数を再計算;
+:想定される実行、コミット、ワークフローを確認
+（zip は自分自身を承認できない）;
+stop
+@enduml

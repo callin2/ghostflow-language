@@ -1,0 +1,24 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName "Apple SD Gothic Neo"
+skinparam defaultFontSize 13
+skinparam componentStyle rectangle
+left to right direction
+title 한 tick: 실행 전에 적어 둘 것
+
+rectangle "받아 둔 입력\n(tick마다 한 묶음)" as in
+rectangle "이전 상태" as prev
+rectangle "식\n(let, case, if)" as expr
+rectangle "다음 상태" as next
+rectangle "요청 의도\n(requested intent)" as req
+rectangle "안전 의도 (safe intent)\n(안전 규칙 적용 후)" as safe
+rectangle "binding과 renderer로\n가는 출력" as out
+
+in --> expr
+prev --> expr
+expr --> next
+expr --> req
+req --> safe
+safe --> out
+next ..> prev : 다음 tick의\n이전 상태가 됨
+@enduml

@@ -1,0 +1,27 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName Helvetica
+skinparam ArrowColor #555555
+skinparam ActivityBorderColor #555555
+
+start
+:检索 Reference §1.2、§1.5、§4.7
+（citation + digest）;
+:检查 build/authoring/pump.ghost.md
+的 rev-1-input-v1;
+:检查失败：诊断 span 指向原始文档中的
+pump <- start && ;;
+:编辑同一份文档
+（rev-2-input-v1：pump <- requested';）;
+:检查 rev-2，然后编译
+（GFB + 源映射）;
+:模拟 0、1、2 ms 时的扫描
+（虚拟的请求意图 / 安全意图）;
+:向用户提出未决问题
+（最长运行时间？）;
+note right
+  在用户回答之前
+  不添加定时器。
+end note
+stop
+@enduml

@@ -1,0 +1,31 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName "Hiragino Sans"
+skinparam defaultFontSize 13
+start
+:ドメインと、連続する単調時間 /\n正の壁時計の差分を検証;
+if (信頼済みの壁時計時刻か？) then (いいえ)
+  :Unknown(理由、リビジョン);\nfallback = skip -> .due = false;
+elseif (初回使用または復旧か？) then (はい)
+  :ベースラインを確立\n（追いつきなし、パルスなし）;
+elseif (プロバイダのカバレッジは完全か？) then (いいえ)
+  :Unknown（または拒否）;\n.due = false;
+else (はい)
+  :前回と今回の有効な壁時計時刻の間で\n交差した発生を探す;
+  if (新たに交差した発生があるか？) then (なし)
+    :.due = false;
+  elseif (差分 > gap 上限か？) then (はい)
+    :交差した発生を\nObservationGap として終端化;
+  elseif (2 つ以上交差したか？) then (はい)
+    :すべてを取りこぼし（missed）として\n終端化し、どれも受け入れない;
+  else (ちょうど 1 つ)
+    if (この交差 tick での\nwhen 述語は？) then (true)
+      :1 回だけ受け入れる（.due = true）;
+    else (false)
+      :ConditionsFalseAtPulse として\n終端化;
+    endif
+  endif
+endif
+:high-water、処理結果、観測を\nVM トランザクションとともにステージ;
+stop
+@enduml

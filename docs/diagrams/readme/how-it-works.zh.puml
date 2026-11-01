@@ -1,0 +1,27 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName Helvetica
+skinparam defaultFontSize 13
+skinparam ArrowColor #526d76
+skinparam rectangle {
+  BackgroundColor #f1f6f5
+  BorderColor #6d858b
+  FontColor #102b35
+  RoundCorner 10
+}
+left to right direction
+
+rectangle "了解工艺过程\n的人" as person
+rectangle "AI 助手\n（可选）" as ai
+rectangle "**.ghost.md 文档**\n意图 + 解释\n+ 可执行规则" as doc #e2f7f0
+rectangle "编译器\n校验并编译" as compiler
+rectangle "运行时\n执行判定\n（不依赖 LLM）" as runtime
+rectangle "派生视图\n追踪、源映射、\n图表" as views
+
+person --> doc : 编写并审查
+ai ..> doc : 起草候选文档
+doc --> compiler
+compiler --> runtime : 编译后的 GFB
+runtime --> views : 执行证据
+views ..> doc : 把“为什么？”\n解释回源文件
+@enduml

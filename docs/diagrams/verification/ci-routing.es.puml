@@ -1,0 +1,18 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontSize 13
+title Enrutamiento del workflow Verified WASM (issue #357)
+
+start
+:Clasificar el cambio;
+if (¿Disparo manual?) then (sí)
+  :Verificación completa;
+elseif (¿Solo documentos ordinarios permitidos\n(reglas de diff exacto)?) then (sí)
+  :Comprobaciones de documentación\n(sin compilar WASM);
+else (no)
+  :Verificación completa:\nVerify WASM (current) /\nVerify WASM (frontend-pin);
+endif
+:Verification result
+(siempre se ejecuta; debe estar en verde para el merge);
+stop
+@enduml

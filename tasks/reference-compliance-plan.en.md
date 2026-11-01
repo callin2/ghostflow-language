@@ -1,7 +1,3 @@
-<!-- translation-source: tasks/reference-compliance-plan.md -->
-
-[Korean original](reference-compliance-plan.md)
-
 # GhostFlow Reference compliance implementation plan
 
 This plan tracks the work needed for the GhostFlow compiler **and** runtime to

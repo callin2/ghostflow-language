@@ -1,0 +1,24 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontSize 13
+title E37: minutos después de la hora planificada (planificada = pleamar - 30min; admitida 4 min tarde)
+
+concise "Admisión" as S
+concise "pump (intención de salida)" as P
+
+@0
+S is "abierta: [planificada, planificada+10min)"
+P is "false"
+
+@4
+P is "ejecución de 5min desde la admisión"
+
+@9
+P is "false"
+
+@10
+S is "cerrada (fin excluido)"
+
+S@0 <-> @10 : within(10min)
+P@4 <-> @9 : run(5min)
+@enduml

@@ -1,0 +1,19 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontSize 13
+skinparam rectangleBorderColor #555555
+skinparam rectangleBackgroundColor #F7F7F7
+
+rectangle "Markdown 본문" as PROSE {
+  rectangle "HTML 주석\nghostflow:anchor id=… kind=… status=… origin=…" as ANCHOR
+  rectangle "바로 뒤의 최상위 문단\n또는 인용 블록" as TEXT
+}
+rectangle "ghost fence" as FENCE {
+  rectangle "// ghostflow:link id=… relation=…" as LINK
+  rectangle "바로 뒤의 추적 가능한 문장" as STMT
+}
+
+ANCHOR --> TEXT : 원문을 표시
+LINK --> STMT : 정확히 하나를 표시
+LINK ..> ANCHOR : id를 참조\n(implements | constrains |\nfallback | assumes)
+@enduml

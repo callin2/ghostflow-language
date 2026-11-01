@@ -1,0 +1,20 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName "Hiragino Sans"
+skinparam defaultFontSize 13
+skinparam ActivityBackgroundColor #F8F8F8
+start
+:step(packet, proposal);
+:引数を非公開にコピー;
+:同一性・時刻・来歴・\n権限・容量を検査;
+:各変更を検査：型、グリッド/範囲、\nallowed 範囲、maxStep、ローリング maxChange;
+if (すべての検査に合格？) then (はい)
+  :1 つのアトミックな\nコア設定イベントを送信;
+  :コアの受け入れ後に\n履歴を記録;
+  :コアの結果\n+ 新しいリビジョンを返す;
+else (いずれかが不合格)
+  :outcome: null\n+ 適応トレースを返す;
+  note right: tick・クロック・履歴・\nリビジョンは一切確定されない
+endif
+stop
+@enduml

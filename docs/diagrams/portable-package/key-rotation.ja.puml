@@ -1,0 +1,19 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName "Hiragino Sans"
+skinparam defaultFontSize 13
+participant "パッケージ署名者" as P
+participant "ホストの検証器\n（信頼スナップショット）" as H
+== 1. 次の鍵を信頼する ==
+H -> H : 次の公開鍵を trustedKeys に追加
+note right of H : 信頼済み：現在の鍵、次の鍵
+== 2. 共同署名したパッケージを公開する ==
+P -> H : 現在の鍵 + 次の鍵で署名したパッケージ
+note right of H : 受理
+== 3. 古い鍵を失効させる ==
+H -> H : 現在の鍵 ID を revokedKeyIds に追加
+P -> H : 同じ共同署名パッケージ
+note right of H : 失効した署名は無視。\n次の鍵の署名が検証される：受理
+P -> H : 古い鍵だけで署名したパッケージ
+note right of H : 拒否：有効な信頼済み署名が\n残っていない
+@enduml

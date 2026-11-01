@@ -1,0 +1,26 @@
+@startuml
+hide empty description
+skinparam shadowing false
+skinparam defaultFontName Helvetica
+skinparam state {
+  BackgroundColor White
+  BorderColor #555555
+}
+title Enclavamiento de modo de Station (contrato de instalación del adaptador Station)
+
+state Stopped
+state Auto
+state Manual
+state Configure : sesión de configuración estructural\n(reinicio prohibido)
+state Stopping : detener el trabajo en curso\ninhibir nuevos inicios\nlimpieza, devolver la titularidad
+
+[*] --> Stopped
+Stopped --> Auto : enter(Auto)\nsolo con stopped(station)
+Stopped --> Manual : enter(Manual)\nsolo con stopped(station)
+Stopped --> Configure : enter(Configure)\nsolo con stopped(station)
+Auto --> Stopping : solicitud explícita de parada
+Manual --> Stopping : solicitud explícita de parada
+Stopping --> Stopped : parada completada\n(CommandedStop o VerifiedStop)
+Configure --> Stopped : validar + aplicar atómicamente,\ncerrar la sesión
+note "Sin transición directa Auto <-> Manual\nni operación -> Configure" as N1
+@enduml

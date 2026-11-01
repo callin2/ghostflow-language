@@ -1,0 +1,27 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName "Hiragino Sans"
+skinparam defaultFontSize 12
+hide empty description
+state "実行区間なし" as NoRun
+state "累積中" as Accumulating
+state "充足" as Satisfied
+[*] --> NoRun
+NoRun : 認証済みカバレッジなし
+Accumulating : Measured true の [start,end) の和集合
+Satisfied : カバー済み継続時間 >= duration
+
+NoRun --> Accumulating : Measured true の証明書
+Accumulating --> Accumulating : 接する／重なる\nMeasured true の証明書
+Accumulating --> Satisfied : カバレッジが duration に到達
+Satisfied --> Satisfied : Measured true が継続
+Accumulating --> NoRun : false または非 Measured の証拠、\n品質故障（リセット下限）
+Satisfied --> NoRun : false または非 Measured の証拠、\n品質故障（リセット下限）
+Accumulating --> NoRun : ソースまたはクロックの\nエポック変更（新しいチェーン）
+Satisfied --> NoRun : ソースまたはクロックの\nエポック変更（新しいチェーン）
+note bottom of Accumulating
+  NoObservation：NotReady、カバレッジは加算されない。
+  重複は決してカバレッジを進めない。
+  不正な入力：拒否され、確定済み状態は変わらない。
+end note
+@enduml

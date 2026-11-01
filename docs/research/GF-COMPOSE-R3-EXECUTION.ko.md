@@ -1,188 +1,267 @@
 <!-- translation-source: docs/research/GF-COMPOSE-R3-EXECUTION.md -->
-[영어 원문](GF-COMPOSE-R3-EXECUTION.md)
+[영문 원문](GF-COMPOSE-R3-EXECUTION.md)
 
 # GF-COMPOSE R3: 실행 조합
 
+이 문서는 둘 이상의 동작(behavior)이 서로 간섭하지 않고 함께 실행될 수 있는 방법을
+비교합니다. 현재의 tick, framed host, station에 관한 사실을 기록하고, 정확히 두 가지
+조합 선택지를 비교하며, 손으로 만든 스캔 표(격리, 선언 순서, 한 동작이 다른 동작의
+결과를 소비하는 경우, 거부되는 순환, 리셋/실패)를 풀어 본 뒤 권고와 소유자로
+마무리합니다.
+
 ## 사용자 문제
 
-동작 추가가 숨은 순서, 공유 상태, 시계, fault 처리로 기존 동작을 바꿔서는 안 된다.
-설계는 노력 감소, 설명 가능성, 추적 가능성 목표를 보존해야 한다. 이 문서는 하나의
-실행 module로 compiler가 조합하는 방식과 명시적으로 조정하는 여러 VM instance라는
-두 선택지만 비교한다.
+동작을 추가할 때 숨겨진 순서, 공유 상태, 시계, fault 처리 때문에 기존 동작이 바뀌어서는
+안 됩니다. 설계는 노력 감소, 설명 가능성, 추적 가능성이라는 목표를 지켜야 합니다.
+
+이 문서는 다음 두 선택지만 비교합니다.
+
+1. 컴파일러가 하나의 실행 모듈로 합성하는 방식
+2. 명시적 조정을 갖춘 여러 VM 인스턴스 방식
+
+![비교한 두 선택지. 둘 다 제안입니다](../diagrams/gf-compose-r3-execution/composition-options.ko.svg)
 
 ## 조사한 revision의 증거
 
-조사한 언어 revision은 `ffdbc96461eca67908252507fb851fa4dabd9a2c`다. 이 문서 작성 전에
-working tree를 변경하지 않았다. `compileSource`는 하나의 canonical `.ghost.md`를 받고
-`compileControl`을 거쳐 lowering하며 하나의 GFB1 byte sequence를 내보내고 source/bytecode
-digest와 trace metadata를 기록한다([`tools/compile-source.mjs`](../../tools/compile-source.mjs)).
-`compileControl`은 하나의 control을 하나의 GFB1 `module`로 lowering한다. 현재 상태에서
-state transition을 평가한 뒤 intent가 `next.*`를 읽을 수 있다
+조사한 언어 revision은 `ffdbc96461eca67908252507fb851fa4dabd9a2c`입니다. 이 문서를
+작성하기 전에는 작업 트리를 변경하지 않았습니다.
+
+**컴파일러.** `compileSource`는 하나의 정본 `.ghost.md`를 받아 `compileControl`을 통해
+lowering하고, 하나의 GFB1 바이트 시퀀스를 내보내며, 소스/바이트코드 digest와 trace
+메타데이터를 기록합니다([`tools/compile-source.mjs`](../../tools/compile-source.mjs)).
+`compileControl`은 하나의 control을 하나의 GFB1 `module`로 lowering합니다. 상태 전이는
+현재 상태에서 평가되며, 그다음 의도(intent)가 `next.*`를 읽을 수 있습니다
 ([`tools/control.mjs`](../../tools/control.mjs)).
 
-`Runtime::tick`은 선언된 모든 입력을 요구하고 선택적인 명시적 `__gf_now_ms`를 검증한다.
-intent 전에 모든 next state를 계산하고 safety를 적용하며 state와 safe intent를 atomic하게
-commit한다. 입력을 지우고 상한이 있는 journal record를 추가한다. `tick_at`이 명시적
-clock을 공급한다. VM은 wall clock을 읽지 않는다
+**Core tick.** `Runtime::tick`은 다음 순서로 동작합니다.
+
+1. 선언된 모든 입력을 요구합니다.
+2. 선택적인 명시적 `__gf_now_ms`를 검증합니다.
+3. 의도보다 먼저 모든 다음 상태를 계산합니다.
+4. 안전 처리를 적용합니다.
+5. 상태와 안전 의도를 원자적으로 확정합니다.
+6. 입력을 비웁니다.
+7. 크기가 제한된 journal(저널) 레코드를 추가합니다.
+
+`tick_at`은 명시적 시계를 공급하며, VM은 벽시계를 읽지 않습니다
 ([`crates/ghostflow-core/src/lib.rs`](../../crates/ghostflow-core/src/lib.rs)).
-`install`은 입력, safe intent, active strategy, clock을 reset한다. 같은 이름/타입의 state는
-보존할 수 있다. `hot_swap`은 호환되는 named state를 보존하지만 safe intent를 지우고
-module 이름이나 state 타입 변경을 거부한다.
 
-이 사실은 core tick과 framed complete-frame adapter를 설명한다. 비동기 CEP ingress나
-occurrence 전달을 명세하지 않는다. occurrence는 개별 의미를 유지해야 한다. 값 관측은
-interrupt/scan 포착과 독립적이다. 기본적으로 지원 용량 안에서 관측을 보존한다. 입력별
-명시 opt-in일 때만 latest-pending-value 교체를 허용한다. loss/overflow는 거부하거나
-보고해야 하며 조용히 허용해서는 안 된다. 이 합의된 전달 요구사항은 무제한 영속 history를
-뜻하지 않는다. ingress 순서, event-to-tick 대응, declared-source batching, 상한, 복구는
-미해결이다. hard deadline이나 priority scheduler는 제공되지 않았다.
-[`LANGUAGE-SURFACE.md`](../LANGUAGE-SURFACE.md)와 [`IMPLEMENTATION.md`](../IMPLEMENTATION.md) 참조.
+**설치와 hot swap.**
 
-framed host는 하나의 완전한 input frame을 포착하고 한 번 dispatch하며 마지막 승인 결과를
-게시한다. conditioning이나 dispatch 실패 후 fault를 latch한다. 이후 step에는 새 host
-instance가 필요하다. conditioning 전 거부된 검증은 다시 시도할 수 있다
-([`docs/FRAMED-CONTROL-HOST.md`](../FRAMED-CONTROL-HOST.md)). 따라서 “마지막 완료 결과”와
-“새 run”은 기존 host 계약 사실이다.
+- `install`은 입력, 안전 의도, 활성 전략, 시계를 리셋합니다. 이름과 타입이 같은 상태는
+  보존할 수 있습니다.
+- `hot_swap`은 호환되는 이름 있는 상태를 보존하지만 안전 의도는 비우며, 모듈 이름이나
+  상태 타입 변경은 거부합니다.
 
-station module은 host-driven이며 상한이 있다. `prepare_start_batch`는 같은 tick snapshot에서
-하나의 요청을 고른다. `authorize_output`은 durable reservation, owner/session, valve 상한,
-safe output을 검사한다([`crates/ghostflow-core/src/station.rs`](../../crates/ghostflow-core/src/station.rs)).
-이는 물리 pump-station arbiter이며 범용 동작 조합의 증거가 아니다. GFB1 상한에는 입력 128개,
-상태 128개, strategy 32개, constraint 128개, 식 깊이/node 128/4096과 상한이 있는 식/query
-크기가 포함된다([`tools/gfb1.mjs`](../../tools/gfb1.mjs)).
+**이 사실들이 다루지 않는 것.** 이 사실들은 core tick과 framed 완전 프레임 어댑터를
+설명합니다. 비동기 CEP 입력 수신(ingress)이나 발생(occurrence) 전달은 규정하지
+않습니다. 합의된 전달 요구사항은 다음과 같습니다.
 
-[R2: 권한과 identity](GF-COMPOSE-R2-AUTHORITY-IDENTITY.md)에서 설명했듯 source/instance 구분은
-canonical source의 권위를 유지한다. instance에는 격리된 상태/provenance와 불투명 identity가
-필요하다. R2는 대화 memory가 provenance/작성 문맥이며 자동 실행 규칙 또는 physical binding
-권한이 아니라는 것도 확정한다. memory-to-decision-to-source 연결, retention, tombstone 동작은
-R2/API-system 질문으로 남는다. 설치 constraint 경계도 미해결이다. 이 문서는 constraint
-artifact, overlay, enforcement 소유자를 선택하지 않는다. 관련 호환성/증거 제안은
-[R5: 조합 계약과 진단](GF-COMPOSE-R5-CONTRACTS.md)도 참조한다.
+- 발생은 각각 개별적으로 의미가 유지되어야 합니다.
+- 값 관측은 인터럽트/스캔 캡처와 독립적입니다.
+- 기본적으로 관측은 지원되는 용량 안에서 보존됩니다.
+- 최신 대기 값으로 교체하는 방식은 입력별로 명시적으로 선택(opt-in)한 경우에만
+  허용됩니다.
+- 손실/오버플로는 거부되거나 보고되어야 하며, 결코 조용히 받아들여서는 안 됩니다.
+
+이 요구사항은 무제한의 영구 이력을 의미하지 않습니다. 입력 수신 순서, event에서
+tick으로의 매핑, 선언된 소스별 일괄 처리, 한도, 복구는 해결되지 않았습니다. 하드
+마감 시한이나 우선순위 스케줄러는 제공되지 않았습니다.
+[`LANGUAGE-SURFACE.md`](../LANGUAGE-SURFACE.md)와
+[`IMPLEMENTATION.md`](../IMPLEMENTATION.ko.md)를 참조하세요.
+
+**Framed host.** Framed host는 하나의 완전한 입력 프레임을 캡처하고, 한 번 dispatch하며,
+마지막으로 수락된 결과를 게시하고, 조건화(conditioning)나 dispatch 실패 후에는 fault를
+래치합니다. 이후 step에는 새 호스트 인스턴스가 필요합니다. 조건화 전 검증에서 거부된
+경우에는 다시 시도할 수 있습니다
+([`docs/FRAMED-CONTROL-HOST.md`](../FRAMED-CONTROL-HOST.ko.md)). 따라서 “마지막 완료
+결과”와 “새 실행”은 기존 호스트 계약의 사실입니다.
+
+**Station 모듈.** Station 모듈은 호스트가 구동하며 범위가 제한되어 있습니다.
+`prepare_start_batch`는 같은 tick의 snapshot에서 요청 하나를 고르고,
+`authorize_output`은 영속 예약, 소유자/세션, 밸브 한도, 안전 출력을 검사합니다
+([`crates/ghostflow-core/src/station.rs`](../../crates/ghostflow-core/src/station.rs)).
+이것은 물리 펌프 station의 중재기이며, 범용 동작 조합의 증거가 아닙니다.
+
+**GFB1 한도.** 입력 128개, 상태 128개, 전략 32개, 제약 128개, 식 깊이/노드 수
+128/4096, 그리고 제한된 식 및 질의 크기([`tools/gfb1.mjs`](../../tools/gfb1.mjs)).
+
+**R2에서 이어지는 내용.** [R2: 권한과 identity](GF-COMPOSE-R2-AUTHORITY-IDENTITY.ko.md)에서
+다룬 것처럼:
+
+- 소스/인스턴스 구분은 정본 소스의 권한을 유지하며, 인스턴스에는 격리된 상태와
+  provenance(출처)를 가진 불투명 identity가 필요합니다.
+- 대화 기억은 provenance이자 작성 맥락이며, 실행 규칙이나 물리 바인딩에 대한 자동
+  권한이 아닙니다. 기억→결정→소스 연결, 보존, tombstone 동작은 여전히 R2/API-시스템의
+  질문입니다.
+- 설치 제약 경계는 해결되지 않았습니다. 이 문서는 제약 아티팩트, 오버레이, 집행
+  소유자를 선택하지 않습니다.
+
+관련된 호환성 및 증거 제안은 [R5: 조합 계약과 진단](GF-COMPOSE-R5-CONTRACTS.ko.md)도
+참조하세요.
 
 ## 표와 예
 
 ### 선택지 비교
 
-| 선택지 | Input sampling | Clock | 이전/다음 상태 가시성 | Reset/fault 범위 | 출력 해소 | Provenance | 기존 상한 | 새 mechanism |
+두 행 모두 제안입니다. 각 열은 조합이 결정해야 하는 속성 하나입니다.
+
+| 선택지 | 입력 샘플링 | 시계 | 이전/다음 상태 가시성 | 리셋/fault 범위 | 출력 해석 | Provenance | 기존 한도 | 새로 필요한 장치 |
 |---|---|---|---|---|---|---|---|---|
-| 하나의 실행 module로 compiler 조합 *(제안)* | Complete-frame tick 동작은 있음. 비동기 occurrence/value ingress는 미명세. 공유 이름은 한정 필요 | tick마다 하나의 제공된 logical clock | 모든 전이는 같은 입력/이전 상태 snapshot을 읽음. next 참조는 출력 식에만 있고 다른 next transition이나 let에는 없음 | 하나의 module/runtime 경계. 실패가 조합 scan에 영향 | 하나의 requested-intent bank에 한 safety pass. 중복 권위 출력 정의는 compile error이며 last-writer 정책이 아님 | 하나의 module fingerprint/source closure. R2가 instance 한정 trace 제안 | 합산된 input/state/strategy/constraint budget 하나 | Import/한정 lowering, dependency 검증, ingress 대응, ABI trace 표현 |
-| 명시적 조정이 있는 여러 VM instance *(제안)* | 각 instance ingress는 명시된 전달 규칙으로 occurrence/value 관측 보존 필요. complete-frame snapshot adapter는 batching/순서를 결정하지 않음 | Coordinator가 각 clock 제공. 공유 clock 정책은 명시 필요 | 각 instance가 이전/다음 격리 유지. instance 간 wiring은 next 참조를 재정의하지 못함. 미지원 공유는 compile error | Instance별 VM fault와 coordinator/fan-out 정책. framed failure 경계 정의 필요 | 중복 직접 작성자는 계속 compile error. 명시적으로 모델링한 station 요청만 기존 station arbitration 사용 가능 | Instance별 module fingerprint와 instance/run/scan join | module별 상한 적용. coordinator/전체 자원 상한은 미명세 | Coordinator, ingress-to-tick 대응, 순서 독립 join, 해당될 때 station 통합 |
+| 컴파일러가 하나의 실행 모듈로 합성 *(제안)* | 완전 프레임 tick 동작은 존재함. 비동기 발생/값 입력 수신은 규정되지 않음. 공유 이름은 한정되어야 함 | tick당 공급되는 논리 시계 하나 | 모든 전이가 같은 입력/이전 상태 snapshot을 읽음. next 참조는 출력 식에서만 허용되며 다른 next 전이나 let에서는 불가 | 하나의 모듈/런타임 경계. 실패는 합성된 스캔 전체에 영향 | 하나의 요청 의도 묶음에 대해 안전 처리 한 번. 중복된 권한 있는 출력 정의는 컴파일 오류이며, 결코 마지막 작성자 우선 정책이 아님 | 모듈 fingerprint/소스 폐포 하나, R2가 제안한 인스턴스 한정 trace 포함 | 입력/상태/전략/제약 예산을 합쳐서 하나 | import/이름 한정 lowering, 의존성 검증, 입력 수신 매핑, ABI trace 표현 |
+| 명시적 조정을 갖춘 여러 VM 인스턴스 *(제안)* | 각 인스턴스의 입력 수신은 명시된 전달 규칙에 따라 발생/값 관측을 보존해야 함. 완전 프레임 snapshot 어댑터는 일괄 처리나 순서를 결정하지 않음 | 코디네이터가 각 시계를 공급. 공유 시계 정책은 명시적이어야 함 | 각 인스턴스가 이전/다음 격리를 유지. 인스턴스 간 배선은 next 참조를 재정의할 수 없음. 지원되지 않는 공유는 컴파일 오류 | 인스턴스별 VM fault와 코디네이터/전파 정책. framed 실패 경계를 정의해야 함 | 중복된 직접 작성자는 여전히 컴파일 오류. 명시적으로 모델링된 station 요청만 기존 station 중재를 사용할 수 있음 | 인스턴스별 모듈 fingerprint와 인스턴스/실행/스캔 join | 한도는 모듈별로 적용되지만, 코디네이터와 전체 자원 한도는 규정되지 않음 | 코디네이터, 입력 수신→tick 매핑, 순서에 독립적인 join, 해당하는 경우 station 통합 |
 
-### 격리된 instance: east와 west
+### 격리된 인스턴스: east와 west
 
-다음은 수작업 예이며 실행 증거가 아니다. 두 instance는 같은 정의를 사용한다. 각각 독립
-`running` 상태와 `pump` 출력을 가진다. scan 1에서 `start`는 east에만 true다. `t`는 똑같이 제공된다.
+다음은 손으로 분석한 예제이며 실행 증거가 아닙니다.
 
-| Scan/read 시점 | Instance | 입력 | 이전 상태 | 이후 상태 | Requested / safe output | 읽기 시점 |
+- 두 인스턴스는 같은 정의를 사용합니다.
+- 각각 독립적인 `running` 상태와 출력 `pump`를 가집니다.
+- `start`는 스캔 1에서 east에만 true입니다.
+- `t`는 양쪽에 똑같이 공급됩니다.
+
+| 스캔/읽기 시점 | 인스턴스 | 입력 | 이전 상태 | 이후 상태 | 요청 / 안전 출력 | 읽기 시점 |
 |---|---|---|---|---|---|---|
-| 1, 같은 complete frame | east | `start=true`, `t=1000` | `running=false` | `running=true` | `pump=true` / `pump=true` | east 입력과 east 이전 상태 읽음 |
-| 1, 같은 complete frame | west | `start=false`, `t=1000` | `running=false` | `running=false` | `pump=false` / `pump=false` | west 입력과 west 이전 상태 읽음 |
-| 2, 같은 complete frame | east | `start=false`, `t=2000` | `running=true` | `running=true` | `pump=true` / `pump=true` | east의 이전 committed state 읽음 |
-| 2, 같은 complete frame | west | `start=false`, `t=2000` | `running=false` | `running=false` | `pump=false` / `pump=false` | west의 이전 committed state 읽음 |
+| 1, 같은 완전 프레임 | east | `start=true`, `t=1000` | `running=false` | `running=true` | `pump=true` / `pump=true` | east 입력과 east 이전 상태를 읽음 |
+| 1, 같은 완전 프레임 | west | `start=false`, `t=1000` | `running=false` | `running=false` | `pump=false` / `pump=false` | west 입력과 west 이전 상태를 읽음 |
+| 2, 같은 완전 프레임 | east | `start=false`, `t=2000` | `running=true` | `running=true` | `pump=true` / `pump=true` | east의 이전에 확정된 상태를 읽음 |
+| 2, 같은 완전 프레임 | west | `start=false`, `t=2000` | `running=false` | `running=false` | `pump=false` / `pump=false` | west의 이전에 확정된 상태를 읽음 |
 
-불변조건: east 시작은 west를 시작하지 않는다. 이는 조합 실행 계약의 제안이며 현재
-multi-instance ABI 사실이 아니다.
+**불변식:** east의 시작은 west를 시작시키지 않습니다. 이것은 조합된 실행 계약에 대한
+제안이며, 현재의 다중 인스턴스 ABI 사실이 아닙니다.
 
-### 선언 순서를 반대로 바꿔도 identity 불변
+### 선언 순서를 뒤집어도 identity는 그대로
 
-수작업 제안이다. 같은 east/west instance ID, 입력, frame을 사용한다. 선언 순서만 바뀐다.
-“Trace”는 array 위치가 아니라 identity를 key로 하는 sequence다.
+손으로 분석한 제안입니다. 같은 east와 west 인스턴스 ID, 입력, 프레임을 사용하고 선언
+순서만 바꿉니다. “Trace”는 배열 위치가 아니라 identity를 키로 하는 시퀀스를 뜻합니다.
 
-| 선언 순서 | Instance | 입력 | 이전 → 이후 상태 | Requested / safe | 읽기 시점 |
+| 선언 순서 | 인스턴스 | 입력 | 이전 → 이후 상태 | 요청 / 안전 | 읽기 시점 |
 |---|---|---|---|---|---|
-| east, west | east | `start=true` | `false → true` | `true / true` | frame 1, 이전 east 상태 |
-| east, west | west | `start=false` | `false → false` | `false / false` | frame 1, 이전 west 상태 |
-| west, east | east | `start=true` | `false → true` | `true / true` | frame 1, 이전 east 상태 |
-| west, east | west | `start=false` | `false → false` | `false / false` | frame 1, 이전 west 상태 |
+| east, west | east | `start=true` | `false → true` | `true / true` | 프레임 1, east 이전 상태 |
+| east, west | west | `start=false` | `false → false` | `false / false` | 프레임 1, west 이전 상태 |
+| west, east | east | `start=true` | `false → true` | `true / true` | 프레임 1, east 이전 상태 |
+| west, east | west | `start=false` | `false → false` | `false / false` | 프레임 1, west 이전 상태 |
 
-identity를 key로 하는 trace는 같다. 선언 순서 변경이 암묵 scheduler가 되어서는 안 된다.
-wired dependency를 바꾸는 것이 동등하다는 뜻은 아니다.
+identity를 키로 한 trace는 같습니다. 선언 순서 변경이 암묵적 스케줄러가 되어서는 안
+됩니다. 그렇다고 배선된 의존성을 서로 바꾸는 것이 동등하다는 뜻은 아닙니다.
 
-### 다른 결과를 소비하는 동작
+### 한 동작이 다른 동작의 결과를 소비하는 경우
 
-별도로 조정하는 한 쌍에 대한 수작업 가상 의미이며 atomic composed-module tick이 아니다.
-`producer.ok`는 east 결과다. `consumer`는 `valve=producer.ok`를 요청하고 초기 상태는
-`running=false`다. 현재 compiler에는 cross-module result 참조나 lowering 규칙이 없으므로
-표가 read phase를 명시한다. “Step” label은 scenario 순서이며 native instance별 scan ID가
-아니다. 1행에서 consumer 거부와 함께 보인 가상 producer 진행은 partial-progress 정책을
-채택하지 않는다. 그 step에는 완전한 composed result가 없다.
+별도로 조정되는 한 쌍에 대해 손으로 분석한 가상의 의미입니다(원자적으로 합성된 모듈
+tick이 아님).
 
-| Scenario step | 입력 | 이전 → 이후 상태 | Requested / safe output | 읽기 시점 |
+- `producer.ok`는 east의 결과입니다.
+- `consumer`는 `valve=producer.ok`를 요청하며 초기 상태는 `running=false`입니다.
+- 현재 컴파일러에는 모듈 간 결과 참조나 lowering 규칙이 없으므로, 표는 읽기 단계를
+  명시적으로 보여 줍니다.
+- “단계” 라벨은 시나리오 순서이며, 인스턴스별 고유 스캔 ID가 아닙니다.
+- 1행은 consumer 거부와 함께 producer의 가상 진행을 보여 줍니다. 이것은 부분 진행
+  정책을 채택하는 것이 아닙니다. 그 단계에는 완전한 합성 결과가 없습니다.
+
+| 시나리오 단계 | 입력 | 이전 → 이후 상태 | 요청 / 안전 출력 | 읽기 시점 |
 |---|---|---|---|---|
-| 1 | producer 입력 `sensor=1`; consumer의 나머지 입력은 완전함 | producer `false→true`; 필요한 producer 값이 없으므로 consumer에는 유효한 평가 없음 | producer `ok=true`; consumer에는 requested/safe 결과 없음 | Consumer가 same-scan producer 결과를 읽지 않음. 없는 dependency를 false로 대체하지 않음 |
-| 2 | producer 입력 `sensor=0`; consumer frame 완전함 | producer `true→false`; consumer `false→true` | producer `ok=false`; consumer `valve=true / true` | Consumer가 producer의 마지막 완료 scan-1 결과 읽음 |
+| 1 | producer 입력 `sensor=1`. consumer 입력은 그 외에는 완전함 | producer `false→true`. 필요한 producer 값이 없으므로 consumer에는 유효한 평가가 없음 | producer `ok=true`. consumer에는 요청/안전 결과가 없음 | consumer는 같은 스캔의 producer 결과를 읽지 않음. 없는 의존성을 false로 기본 처리하지 않음 |
+| 2 | producer 입력 `sensor=0`. consumer 프레임 완전함 | producer `true→false`. consumer `false→true` | producer `ok=false`. consumer `valve=true / true` | consumer는 producer의 마지막 완료된 스캔 1 결과를 읽음 |
 
-이 가상 비교는 실행 가능한 현재 동작을 설명하지 않는다. compiler/runtime에는 cross-module
-value 참조가 없다. 필수 값 부재는 유효한 평가 없음이지 만들어 낸 fallback이 아니다.
-same-scan instance 간 wiring은 다른 instance의 `next` 값을 사용할 수 있게 하거나 next 참조
-규칙을 재정의하지 못한다. 미지원 instance 간 공유는 compile error다. 예는 지원되는
-completed-scan 경계의 값을 대비한다. FIFO ingress, same-scan lowering, scheduler를 채택하지 않는다.
+이 가상 비교는 현재 실행 가능한 동작을 설명하지 않습니다.
 
-### 거부되는 cycle과 reset/failure
+- 컴파일러/런타임에는 모듈 간 값 참조가 없습니다.
+- 필요한 값이 없으면 유효한 평가가 없으며, 만들어 낸 fallback 값이 생기지 않습니다.
+- 같은 스캔 안의 인스턴스 간 배선으로 다른 인스턴스의 `next` 값을 사용할 수 있게
+  하거나 next 참조 규칙을 재정의할 수 없습니다.
+- 지원되지 않는 인스턴스 간 공유는 컴파일 오류입니다.
 
-거부되는 cycle *(수작업 invalid dependency. dependency 표기이며 source 문법 아님)*:
-`east.pump[n] <- west.pump[n]` 및 `west.pump[n] <- east.pump[n]`. `n`은 같은 scan을 식별한다.
-east 결과는 west 결과를 요구하고 west 결과는 east 결과를 요구한다. 이 두 edge가 cycle을
-닫는다. dependency 순서로 어느 결과도 먼저 평가할 수 없다. 실행 전에 이 순간 cycle을
-거부한다. 순간 expression cycle과 중복 output 정의는 invalid compiler 입력이며 열린 정책
-질문이 아니다.
+예제는 지원되는 완료 스캔 경계에서의 값을 대조할 뿐이며, FIFO 입력 수신, 같은 스캔
+lowering, 스케줄러를 채택하지 않습니다.
 
-대신 committed prior-scan state를 읽으면 scan `n` 전에 고정된 값을 사용한다. dependency
-하나를 그런 읽기로 교체하면 이 same-scan cycle을 끊는다. 현재 VM은 next state commit 전에
-이전 상태에서 transition을 평가한다. 이 구분이 새 cross-instance read나 초기값 의미를
-정의하지는 않는다.
+### 거부되는 순환과 리셋/실패
 
-Reset/failure *(계약으로 제한됨)*: 성공한 frame 후 framed host는 마지막 완료 결과를 노출한다.
-conditioning이나 VM dispatch가 실패하면 그 committed result는 계속 이용 가능하다. host가
-fault를 latch하고 다음 step에는 새 host instance가 필요하다. 새 run은 새 `runId`를 사용해야
-한다. 새 run의 `scanId=0`은 이전 occurrence가 아니다. 조합은 이 경계를 보존해야 한다.
-한 instance를 부분 reset하면서 composed result를 완전한 것으로 제시해서는 안 된다.
-정확한 multi-instance fault fan-out은 미해결이다.
+**거부되는 순환** *(손으로 분석한 잘못된 의존성. 소스 구문이 아니라 의존성
+표기)*:
+`east.pump[n] <- west.pump[n]`과 `west.pump[n] <- east.pump[n]`, 여기서 `n`은 같은
+스캔을 나타냅니다. east의 결과는 west의 결과를 필요로 하고, west의 결과는 east의
+결과를 필요로 합니다. 이 두 간선이 순환을 닫으며, 의존성 순서상 어느 결과도 먼저
+평가될 수 없습니다. 이 즉시 순환은 실행 전에 거부합니다. 즉시 식 순환과 중복 출력
+정의는 잘못된 컴파일러 입력이며, 열린 정책 질문이 아닙니다.
+
+반면 이전 스캔에서 확정된 상태를 읽는 것은 스캔 `n` 이전에 고정된 값을 사용합니다.
+이 의존성 중 하나를 그런 읽기로 바꾸면 같은 스캔의 순환이 끊어집니다. 현재 VM은 다음
+상태를 확정하기 전에 이전 상태로부터 전이를 평가합니다. 이 구분은 새로운 인스턴스 간
+읽기나 초기값 의미를 정의하지 않습니다.
+
+**리셋/실패** *(계약으로 제약됨)*:
+
+- 프레임이 성공하면 framed host는 마지막 완료 결과를 노출합니다.
+- 조건화나 VM dispatch가 실패하면 확정된 결과는 계속 사용할 수 있고, 호스트는 fault를
+  래치하며, 다음 step에는 새 호스트 인스턴스가 필요합니다.
+- 새 실행은 새 `runId`를 사용해야 합니다. 새 실행의 `scanId=0`은 이전 발생이
+  아닙니다.
+
+다이어그램은 이 기존 단일 호스트 경계를 보여 줍니다.
+
+![Framed host: 성공하면 마지막 완료 결과를 게시하고, 실패하면 새 호스트 인스턴스가 생길 때까지 fault를 래치합니다](../diagrams/gf-compose-r3-execution/framed-host-failure.ko.svg)
+
+조합은 이 경계를 지켜야 합니다. 한 인스턴스만 부분적으로 리셋하면서 합성된 결과를
+완전한 것처럼 제시해서는 안 됩니다. 정확한 다중 인스턴스 fault 전파는 해결되지
+않았습니다.
 
 ## 권고
 
-정적 compiler 조합은 선호 가설이며 선택된 lowering이나 ABI가 아니다. 기존 tick 불변조건을
-보존해야 한다. 모든 transition은 같은 입력/이전 상태 snapshot을 읽는다. next 참조는 output
-expression에만 합법적이며 다른 next transition이나 let에는 허용되지 않는다. 논리 state와
-output commit은 동시다. cycle과 중복 output 정의를 거부한다. 각 출력 채널에는 하나의
-권위 있는 정의가 있다. 경쟁하는 직접 작성자는 컴파일에 실패하며 배포할 수 없다.
-이는 명시적 station 단일 작성자 자원 arbitration을 없애지 않는다. station 요청은 경쟁하는
-직접 쓰기가 아니다. 조합은 next 참조 의미를 바꾸는 same-scan instance 간 wiring을 승인하지
-않는다. complete-frame scheduling이 event ingress, 순서, batching, overflow를 결정하지 않는다.
+정적 컴파일러 합성은 여전히 선호되는 가설이며, 선택된 lowering이나 ABI가 아닙니다. 이
+방식은 기존 tick 불변식을 지켜야 합니다.
 
-station 재사용을 일반화하지 않는다. same-tick 선택과 durable output 권한 검사는 동작 결과가
-생긴 뒤 공유 pump를 중재할 수 있지만 pump/valve 정책은 범용 composition resolver가 아니다.
-더 넓은 arbitration/fallback 의미는 #95의 책임으로 남는다.
+- 모든 전이는 같은 입력/이전 상태 snapshot을 읽습니다.
+- next 참조는 출력 식에서만 허용되며, 다른 next 전이나 let에서는 허용되지 않습니다.
+- 논리 상태와 출력은 동시에 확정됩니다.
+- 순환과 중복 출력 정의는 거부됩니다.
 
-## 미해결 질문과 소유자
+각 출력 채널에는 권한 있는 정의가 하나만 있습니다. 경쟁하는 직접 작성자는 컴파일에
+실패하며 배포할 수 없습니다. 그렇다고 명시적인 station 단일 작성자 자원 중재가
+없어지는 것은 아닙니다. station 요청은 경쟁하는 직접 쓰기가 아니기 때문입니다. 조합은
+next 참조 의미를 바꾸는 같은 스캔 안의 인스턴스 간 배선을 허용하지 않습니다. 완전
+프레임 스케줄링은 event 입력 수신, 순서, 일괄 처리, 오버플로를 결정하지 않습니다.
 
-- Language compiler 소유자: composition이 imported control을 하나의 GFB1 module로 lowering하는지,
-  name, state, input, output, source map을 어떻게 한정하는지 정의. 위 이전/다음 및 cycle
-  규칙 보존. 열린 의미 선택으로 취급하지 않음.
-- Language/runtime ABI 소유자: composed manifest, instance 한정 trace field, result 가시성,
-  하나의 TickRecord가 계속 canonical인지 정의. 현재 ABI field에는 cross-instance result 정의 없음.
-- Language/runtime 소유자: ingress 순서, event-to-tick 대응, declared-source batching, 용량,
-  clock 대응 정의. core tick/framed host는 비동기 ingress를 결정하지 않음. deadline/priority
-  scheduler를 가정하지 않음.
-- Language/runtime 소유자: 중복 직접 output 정의가 compile error라는 불변조건을 유지하면서
-  composed safety 적용 정의. station resource arbitration은 별도로 지원되는 개념 유지.
-- API/deployment 소유자와 R2 소유자: 미해결 설치 constraint 경계 보존. 조합이 별도 constraint
-  컴파일과 명시적 프로젝트 간 경계 revision의 선택을 해결한다고 추론하지 않음.
-- API/시스템 운영 memory 소유자: memory 검색/LLM 해석을 runtime 입력 밖에 유지. R2가 lineage,
-  retention/tombstone, decision 연결을 소유. 이 실행 문서는 해당 lifecycle을 정의하지 않음.
-- #95/station 소유자: 공유 물리 자원과 동작 결과의 상호작용 결정. 기존 station 정책을 범용으로
-  취급해서는 안 됨.
-- Framed-host 소유자: composed fault fan-out, 마지막 완료 결과 게시, 새 run 동작 정의.
-  현재 framed 문서는 하나의 host instance를 명세하며 composed graph를 명세하지 않음.
+station 재사용을 일반화하지 마세요. station의 같은 tick 선택과 영속 출력 승인은 동작
+결과가 나온 뒤 공유 펌프를 중재할 수 있지만, 그 펌프/밸브 정책은 범용 조합 해석기가
+아닙니다. 더 넓은 중재 및 fallback 의미는 #95에 남습니다.
+
+## 해결되지 않은 질문과 소유자
+
+- 언어 컴파일러 소유자: 조합이 import된 control들을 하나의 GFB1 모듈로 lowering할지,
+  그리고 이름, 상태, 입력, 출력, 소스 맵을 어떻게 한정할지 정의합니다. 위의
+  이전/다음 및 순환 규칙을 지키며, 이를 열린 의미 선택으로 다루지 않습니다.
+- 언어/런타임 ABI 소유자: 합성된 manifest, 인스턴스 한정 trace 필드, 결과 가시성,
+  그리고 하나의 TickRecord가 정본으로 남는지를 정의합니다. 현재 어떤 ABI 필드도
+  인스턴스 간 결과를 정의하지 않습니다.
+- 언어/런타임 소유자: 입력 수신 순서, event→tick 매핑, 선언된 소스별 일괄 처리, 용량,
+  시계 매핑을 정의합니다. core tick과 framed host는 비동기 입력 수신을 결정하지
+  않습니다. 마감 시한이나 우선순위 스케줄러를 가정하지 않습니다.
+- 언어/런타임 소유자: 중복 직접 출력 정의는 컴파일 오류라는 불변식을 유지하면서
+  합성된 안전 처리 적용을 정의합니다. station 자원 중재는 별개로 지원되는 개념으로
+  남습니다.
+- API/배포 소유자, R2 소유자와 함께: 해결되지 않은 설치 제약 경계를 유지합니다. 조합이
+  별도 제약 컴파일과 명시적 프로젝트 간 경계 revision 사이의 선택을 결정한다고 추론하지
+  않습니다.
+- API/시스템 운영 기억 소유자: 기억 검색과 LLM 해석을 런타임 입력 밖에 둡니다. 계보,
+  보존/tombstone, 결정 연결은 R2가 소유하며, 이 실행 문서는 그 수명 주기를 정의하지
+  않습니다.
+- #95/station 소유자: 공유 물리 자원이 동작 결과와 어떻게 상호작용할지 결정합니다.
+  기존 station 정책을 범용으로 취급해서는 안 됩니다.
+- Framed host 소유자: 합성된 fault 전파, 마지막 완료 결과 게시, 새 실행 동작을
+  정의합니다. 현재 framed 문서는 합성된 그래프가 아니라 하나의 호스트 인스턴스를
+  규정합니다.
 
 ## 검증
 
-- [x] 조사한 revision 기록: `ffdbc96461eca67908252507fb851fa4dabd9a2c`.
-- [x] 요구된 모든 column에서 정확히 두 선택지를 비교. 현재 사실과 제안 구분.
-- [x] 수작업 scan 표 세 개에 입력, 이전 상태, 이후 상태, requested/safe output, read 시점 포함.
-  격리와 선언 순서 불변조건 명시.
-- [x] Same-scan cycle과 reset/failure 사례 포함. framed last-result/new-run 경계 보존.
-- [x] 현재 상한, station 재사용 경계, 정확한 미답 lowering/ABI 질문 명시. scheduler/ABI 도입 없음.
-- [x] 예에 수작업 표시. runtime 실행 주장 없음.
-- [x] 문서만의 task 요구대로 runtime test suite 미실행. coordinator는 `git diff --check`와
-  상대 link를 검사해야 함.
+- [x] 조사한 revision을 `ffdbc96461eca67908252507fb851fa4dabd9a2c`로 기록했습니다.
+- [x] 정확히 두 선택지를 요청된 모든 열에 걸쳐 비교했으며, 현재 사실과 제안을
+  구분했습니다.
+- [x] 손으로 분석한 스캔 표 세 개에 입력, 이전 상태, 이후 상태, 요청/안전 출력, 읽기
+  시점이 들어 있으며, 격리 및 선언 순서 불변식이 명시되어 있습니다.
+- [x] 같은 스캔 순환과 리셋/실패 사례가 포함되어 있습니다. framed의 마지막 결과 및 새
+  실행 경계를 지켰습니다.
+- [x] 현재 한도, station 재사용 경계, 답이 없는 정확한 lowering/ABI 질문을
+  명시했습니다. 스케줄러나 ABI를 도입하지 않았습니다.
+- [x] 예제에는 손으로 분석했다는 표시가 있으며, 런타임 실행을 주장하지 않습니다.
+- [x] 이 문서 전용 작업의 요구에 따라 런타임 테스트 묶음은 실행하지 않았습니다.
+  코디네이터는 `git diff --check`를 실행하고 상대 링크를 점검해야 합니다.

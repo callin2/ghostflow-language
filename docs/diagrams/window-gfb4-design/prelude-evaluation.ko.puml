@@ -1,0 +1,21 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontSize 13
+start
+:이전 작성 상태를 읽음;
+:Source **ok** 평가;
+if (ok 성공?) then (예)
+  :**payload**를 즉시 평가
+  (중복 관측이어도 평가하며
+  선택 식의 fault를 보존);
+else (아니요)
+  :**fault** / **origin** 분기 평가
+  (payload는 평가하지 않음);
+  note right
+    물리 root의 density와
+    연속성 관측은
+    계속 처리합니다.
+  end note
+endif
+stop
+@enduml

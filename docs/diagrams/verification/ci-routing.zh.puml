@@ -1,0 +1,19 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName "PingFang SC"
+skinparam defaultFontSize 13
+title Verified WASM 工作流路由（issue #357）
+
+start
+:对变更分类;
+if (手动触发？) then (是)
+  :完整验证;
+elseif (仅限白名单中的普通文档\n（精确 diff 规则）？) then (是)
+  :文档检查\n（不构建 WASM）;
+else (否)
+  :完整验证：\nVerify WASM (current) /\nVerify WASM (frontend-pin);
+endif
+:Verification result
+（始终运行；合并前必须为绿色）;
+stop
+@enduml

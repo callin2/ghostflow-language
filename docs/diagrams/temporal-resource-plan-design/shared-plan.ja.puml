@@ -1,0 +1,24 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName "Hiragino Sans"
+skinparam defaultFontSize 13
+skinparam ArrowColor #526d76
+
+rectangle "インストール済みモジュール\n+ 戦略 + ジャーナル容量" as M
+rectangle "GFTA アクティベーションプロファイル\n(予算)" as P
+rectangle "チェック済みの 1 つの構造計画\n(ジオメトリ、時間的アリーナなし)" as SP
+rectangle "レポート\n(fitsBudget、必要な容量)" as R
+rectangle "アクティベーション" as A
+rectangle "リプレイ" as RP
+
+M --> SP
+P --> SP
+SP --> R : plan_temporal /\nplan_current_temporal_replay
+SP --> A : 同じ計画
+SP --> RP : 同じ計画
+note right of A
+  割り当てられる容量は計画された
+  ジオメトリ内に収まらなければならない。
+  不一致は拒否される
+end note
+@enduml

@@ -1,0 +1,28 @@
+@startuml
+skinparam defaultFontName "Hiragino Sans"
+skinparam shadowing false
+skinparam defaultFontSize 13
+skinparam activityBorderColor #4A6FA5
+skinparam activityBackgroundColor #F7F9FC
+title アトミックなライブ設定イベント（§5.2）
+
+start
+:設定イベントが到着\n（対象Program、ベースラインrevision、\n対象集合、ペイロード）;
+if (エンベロープが完全、同じProgram、最新のベースライン、\n対象が既知・空でない・重複なし、\nプロデューサーが認可済み？) then (はい)
+  if (グループ内に異なる明示的な\nfaultコードが混在？) then (はい)
+    #FDECEA:不整合なパケットとして拒否;
+    stop
+  elseif (型・範囲・step・リスト容量の検査に\n失敗したペイロードがある？) then (はい)
+    :すべての対象に\nfault(SettingsInvalid)を発行;
+  elseif (プロデューサーが明示的に利用不可？) then (はい)
+    :すべての対象に\nfault(SettingsUnavailable)を発行;
+  else (いいえ)
+    :すべての対象に\nok(value)を発行;
+  endif
+  :新しい設定revision＋有効位置。\nソース、Program、runIdは同じ。\n状態とタイマーはリセットされない;
+  stop
+else (いいえ)
+  #FDECEA:受け入れ前に拒否\n（どのストリームにも発行しない）;
+  stop
+endif
+@enduml

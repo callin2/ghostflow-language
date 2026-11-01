@@ -1,0 +1,18 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName Helvetica
+skinparam defaultFontSize 13
+
+rectangle "实时运行时" as Live {
+  rectangle "已记录的 tick / 扫描" as Rec
+  rectangle "实时状态、日志、意图、\n追踪/结果、帧序列、\n时钟、最近结果" as State
+}
+rectangle "独立的 ghost 实例" as Ghost
+rectangle "重放结果\n(runtime.replay)" as Result
+actor "调用方" as Caller
+
+Caller --> Ghost : replayTemporal({count, profile,\nmaxPeakTemporalBytes, maxJsonBytes})
+Rec --> Ghost : 最早合格前缀之前的检查点\n+ 记录
+Ghost --> Result : 成功时只替换这里
+Ghost ..> State : 无副作用、\n不做任何更改
+@enduml

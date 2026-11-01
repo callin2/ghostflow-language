@@ -1,0 +1,27 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName Helvetica
+skinparam defaultFontSize 13
+skinparam ArrowColor #526d76
+
+rectangle "客户 / AI 编写工具\n（规范的 .ghost.md：\n意图、主体、front matter）" as C
+rectangle "板卡 / 安装 profile\n（Device）" as B
+rectangle "驱动程序包\n（Drivers）" as D
+rectangle "编译器宿主 / Worker\n（Language）\n无网络、文件或 GPIO" as L
+rectangle "打包宿主\n（Device）" as K
+node "MCU" as M {
+  rectangle "共享通信\n服务" as S
+  rectangle "驱动程序实例" as I
+  rectangle "GhostFlow 运行时" as R
+}
+
+C --> L : 源
+B --> L : 已固定的 profile\n（由调用者提供的闭包）
+D --> L : 设备 profile\n（通道、要求）
+L --> K : 绑定计划\n（与源/profile 哈希绑定）
+D --> K : 模块（ELF）
+K --> M : 部署包\n+ 来源记录
+I --> S : 总线请求\n（串行化、有时间限制）
+I --> R : 值 + 质量/错误
+R --> I : 输出请求
+@enduml

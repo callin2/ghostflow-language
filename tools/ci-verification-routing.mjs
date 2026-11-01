@@ -6,37 +6,46 @@ import { execFileSync } from 'node:child_process';
 import { isDeepStrictEqual } from 'node:util';
 import { fileURLToPath } from 'node:url';
 
-const DOCUMENT_PAIRS = Object.freeze([
-  ['README.md', 'README.ko.md'],
-  ['CONTRIBUTING.md', 'CONTRIBUTING.ko.md'],
-  ['docs/DOCUMENTATION.md', 'docs/DOCUMENTATION.ko.md'],
-]);
+const LANGUAGES = Object.freeze(['en', 'ko', 'zh', 'es', 'ja']);
+const ORDINARY_DOCUMENTS = Object.freeze(['README.md', 'CONTRIBUTING.md', 'docs/DOCUMENTATION.md']);
+const languagePath = (document, language) => language === 'en' ? document : document.replace(/\.md$/, `.${language}.md`);
 const DOC_PATHS = new Set([
-  ...DOCUMENT_PAIRS.flat(), 'INDEX.md', 'docs/INDEX.md',
+  ...ORDINARY_DOCUMENTS.flatMap(document => LANGUAGES.map(language => languagePath(document, language))),
+  'INDEX.md', 'docs/INDEX.md',
   ...['hero', 'intent', 'replay', 'trace'].map(name => `docs/assets/readme-${name}.svg`),
 ]);
 const MANIFEST = 'docs/translations.json';
 const SHA = /^[0-9a-f]{40}$/;
 const HASH = /^[0-9a-f]{64}$/;
 
+function ordinaryFile(document, language, file) {
+  if (!file || typeof file !== 'object' || file.path !== languagePath(document, language) || !HASH.test(file.sha256)) return false;
+  if (language === 'en') return isDeepStrictEqual(Object.keys(file).sort(), ['path', 'sha256']);
+  return isDeepStrictEqual(Object.keys(file).sort(), ['from', 'path', 'sha256', 'sourceSha256'])
+    && file.from === 'en' && HASH.test(file.sourceSha256);
+}
+
 function manifestPolicy(text) {
   const parsed = JSON.parse(text);
-  if (!parsed || parsed.format !== 'GhostFlow/document-translations-v1' || !Array.isArray(parsed.documents)
+  if (!parsed || parsed.format !== 'GhostFlow/document-translations-v2' || !Array.isArray(parsed.documents)
     || !Array.isArray(parsed.exclusions)) throw new Error('invalid translation manifest');
   const ordinary = new Set();
   const documents = parsed.documents.filter(entry => {
-    if (!entry || typeof entry !== 'object' || typeof entry.source !== 'string' || typeof entry.translation !== 'string'
-      || !['en', 'ko'].includes(entry.sourceLanguage) || !HASH.test(entry.sourceSha256) || !HASH.test(entry.translationSha256)) throw new Error('invalid document pair');
-    if (!DOC_PATHS.has(entry.source) && !DOC_PATHS.has(entry.translation)) return true;
-    if (!DOCUMENT_PAIRS.some(([source, translation]) => entry.source === source && entry.translation === translation)
-      || entry.sourceLanguage !== 'en' || !HASH.test(entry.sourceSha256) || !HASH.test(entry.translationSha256)
-      || !isDeepStrictEqual(Object.keys(entry).sort(), ['source', 'sourceLanguage', 'sourceSha256', 'translation', 'translationSha256'])
-      || ordinary.has(entry.source)) throw new Error('invalid ordinary document pair');
-    ordinary.add(entry.source);
+    if (!entry || typeof entry !== 'object' || typeof entry.document !== 'string' || !entry.files
+      || typeof entry.files !== 'object' || Array.isArray(entry.files)) throw new Error('invalid document entry');
+    const paths = Object.values(entry.files).map(file => file?.path);
+    if (!ORDINARY_DOCUMENTS.includes(entry.document) && !paths.some(file => DOC_PATHS.has(file))) return true;
+    if (!ORDINARY_DOCUMENTS.includes(entry.document) || ordinary.has(entry.document)
+      || !isDeepStrictEqual(Object.keys(entry).sort(), ['baseLanguage', 'canonical', 'document', 'files'])
+      || entry.baseLanguage !== 'en' || entry.canonical !== 'en' || !entry.files.en || !entry.files.ko
+      || !Object.entries(entry.files).every(([language, file]) => LANGUAGES.includes(language) && ordinaryFile(entry.document, language, file))) {
+      throw new Error('invalid ordinary document entry');
+    }
+    ordinary.add(entry.document);
     return false;
   });
   if (parsed.exclusions.some(entry => !entry || typeof entry.path !== 'string' || typeof entry.reason !== 'string' || !entry.reason.trim())) throw new Error('invalid exclusion');
-  // All nonordinary pairs and all policy metadata must remain identical.
+  // All nonordinary entries and all policy metadata must remain identical.
   return { ...parsed, documents };
 }
 

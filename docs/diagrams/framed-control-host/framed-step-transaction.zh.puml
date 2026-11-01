@@ -1,0 +1,27 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName Helvetica
+skinparam defaultFontSize 13
+start
+:校验并捕获输入、\n样本和调度计划标志;
+:在每个调理器上开始\n一个由 Rust 拥有的事务;
+:调理输入并构建\n完整的生成输入列表;
+:runtime.scan(显式逻辑时间);
+if (调理失败或\n已知的原生拒绝？) then (是)
+  :回滚调理器；\n保持逻辑时间和帧 ID;
+  :调用方可重试同一帧;
+  stop
+elseif (提交状态未知（trap）？) then (是)
+  :终止宿主\n（不伪造回滚）;
+  stop
+else (扫描成功)
+  :提交调理器、\n逻辑时间和帧 ID;
+  if (提交后失败？) then (是)
+    :终止宿主；\n保留已提交的结果;
+    stop
+  else (否)
+    :返回 {vm, sensors, signals, frame};
+    stop
+  endif
+endif
+@enduml

@@ -1,0 +1,23 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName "Hiragino Sans"
+skinparam defaultFontSize 13
+title バルブ切替の反例（手作業の例であり、実行の証拠ではない）
+
+participant "振る舞い A\n（ポンプセッションのオーナー）" as A
+participant "ステーションポリシー\n（prepare_start_batch,\nauthorize_output）" as S
+participant "振る舞い B" as B
+
+A -> S : ポンプセッションが有効（ValveA）
+A -> S : ポンプを一時的に OFF、\nValveA -> ValveB に切替
+note over S : バルブの後処理の間も\nセッションは保持される
+B -> B : pump=false を観測
+B -> S : 同じ物理ポンプを要求
+S --> B : 拒否（AlreadyOwned）:\nA がまだセッションを所有;\n非アクティブな制御はオーナーを停止できない
+note over A, B
+「ポンプが OFF なので B が開始してよい」という局所的な規則は
+セッション所有権の不変条件を破ります。
+これは限定的なステーションの主張にすぎず、任意の合成された振る舞いが
+リソースを正しく共有することの証明ではありません。
+end note
+@enduml

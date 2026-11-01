@@ -1,0 +1,25 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName Helvetica
+skinparam defaultFontSize 13
+
+start
+:host.replace({ artifact, runId });
+:检查运行 ID 是否为新的，以及历史容量是否仍有剩余;
+:复制候选，重新编译规范源 + 闭包，\n检查源/清单/字节码身份标识\n以及受支持的 profile;
+if (所有检查均通过？) then (否)
+  :拒绝;
+  :保留先前的 Program、状态、\n运行、评估结果和最后的追踪;
+  stop
+endif
+:Rust 核心 hotSwap\n（由核心转移同名、同类型的状态）;
+if (核心兼容性检查通过？) then (否)
+  :拒绝;
+  :保留先前的 Program、状态、\n运行、评估结果和最后的追踪;
+  stop
+endif
+:发布新的源 / 产物 / 运行身份标识\n以及重新计算的评估结果;
+:清除最后的追踪；核心已丢弃其输入缓存;
+:下一次 step() 需要完整的\n新观测映射;
+stop
+@enduml

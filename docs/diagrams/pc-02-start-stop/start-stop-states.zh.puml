@@ -1,0 +1,21 @@
+@startuml
+hide empty description
+skinparam shadowing false
+skinparam defaultFontSize 13
+skinparam state {
+  BackgroundColor #F8F8F8
+  BorderColor #555555
+}
+
+state "空闲（Idle）\nrunning = false\narmed = false" as Idle
+state "已就绪（Armed）\nrunning = false\narmed = true" as Armed
+state "运行（Running）\nrunning = true\nvalve、pump ON" as Running
+
+[*] --> Idle
+Idle --> Armed : 健康的 START 已松开\n且健康的 STOP 允许运行
+Idle --> Idle : START 被按住、STOP 不允许运行\n或任一输入故障
+Armed --> Running : 健康的 START 被按下\n且 STOP 允许运行
+Armed --> Idle : STOP 不允许运行\n或任一输入故障
+Running --> Running : STOP 允许运行\n（START 故障时保持运行）
+Running --> Idle : STOP 不允许运行\n或 STOP 故障
+@enduml

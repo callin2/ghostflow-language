@@ -1,0 +1,25 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName Helvetica
+skinparam defaultFontSize 13
+skinparam ArrowColor #526d76
+
+start
+:엄격한 TOON 요청 디코딩;
+if (필드, operation이 유효하고\nbudgetBytes가 256–1,000,000인가?) then (아니요)
+  :오류 (CLI 종료 상태 2);
+  stop
+endif
+:참조 색인 + 연결된 장 읽기;
+:카탈로그 재생성\n(ref-CC-SS ID, 다이제스트);
+if (선택자가 절과 일치하는가?) then (아니요)
+  :status: no_match\n(CLI 종료 상태 1);
+  stop
+endif
+if (응답이 budgetBytes 안에 들어가는가?) then (아니요)
+  :status: budget_exceeded\n+ requiredBytes (CLI 종료 상태 2);
+  stop
+endif
+:status: ok\n메타데이터 + 정확한 Markdown 발췌;
+stop
+@enduml

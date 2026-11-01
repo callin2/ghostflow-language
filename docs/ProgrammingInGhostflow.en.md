@@ -1,7 +1,3 @@
-<!-- translation-source: docs/ProgrammingInGhostflow.md -->
-
-[Korean original](ProgrammingInGhostflow.md)
-
 # Programming in GhostFlow
 
 **Note on the 2026-10-05 external-input revision.** Declarations that carry quality information now use `input`. Existing conditioning and explicit `Result` fault branches stay as policies written in the source. The earlier `sensor` excerpts are kept under `tests/fixtures/history/issue531/`. An imported source revision needs its own, separately verified source closure.

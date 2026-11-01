@@ -1,0 +1,30 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName "Hiragino Sans"
+skinparam defaultFontSize 13
+participant "ホスト (JS)" as H
+participant "WASM アダプタ" as W
+participant "Rust AfterEvent<32>" as R
+H -> W : stage(batch)
+W -> W : GFAE v1 パケットをエンコード
+W -> R : stage(packet)
+R -> R : 期限切れ処理、確認応答、\n開始の追加、述語の適用
+alt ステージング成功
+  R --> W : ステージ済み（未確定）
+  H -> W : stagedAny() / stagedAll()
+  note over H : results は確定済みの\n状態のみを示す
+  alt commit
+    H -> W : commit()
+    W -> R : commit
+    note over R : ステージ済み状態が\n確定状態になる
+  else rollback
+    H -> W : rollback()
+    W -> R : rollback
+    note over R : 以前の results を\n保持
+  end
+else デコードまたはステージング失敗
+  R --> W : エラー
+  W --> H : 例外を送出
+  note over R : 何も消費されない。\n先にステージされたバッチは\n引き続き commit/rollback 可能
+end
+@enduml

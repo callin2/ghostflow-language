@@ -1,0 +1,23 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName Helvetica
+skinparam defaultFontSize 13
+title 阀门切换反例（手工推演，不是执行证据）
+
+participant "行为 A\n（水泵会话所有者）" as A
+participant "工作站策略\n(prepare_start_batch,\nauthorize_output)" as S
+participant "行为 B" as B
+
+A -> S : 水泵会话活动中（ValveA）
+A -> S : 短暂关闭水泵，\n切换 ValveA -> ValveB
+note over S : 在阀门清理期间\n保留会话
+B -> B : 看到 pump=false
+B -> S : 请求同一台物理水泵
+S --> B : 被拒绝（AlreadyOwned）：\nA 仍拥有该会话；\n非活动的控制不能停止所有者
+note over A, B
+局部规则“水泵已关闭，因此 B 可以启动”
+会破坏会话所有权不变量。
+这只是有边界的工作站结论，
+并不证明任意组合的行为都能正确共享资源。
+end note
+@enduml

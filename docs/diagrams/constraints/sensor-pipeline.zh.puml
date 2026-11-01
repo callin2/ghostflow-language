@@ -1,0 +1,23 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName Helvetica
+skinparam rectangle {
+  BackgroundColor White
+  BorderColor #555555
+}
+left to right direction
+title 湿度示例的传感器处理顺序
+
+rectangle "驱动程序\n新样本 ID + 时间" as drv
+rectangle "输入验证\nvalid = 0% .. 100%" as val
+rectangle "滤波\nmedian(5)" as flt
+rectangle "新鲜度 / 恢复\nstale_after = 3s\nrecover_after = 3 samples" as fr
+rectangle "迟滞\non_below 30%\noff_above 35%" as hy
+rectangle "case dry { ok / fault }\n显式处理" as cs
+
+drv --> val
+val --> flt
+flt --> fr
+fr --> hy : Result<T, SensorFault>
+hy --> cs : 保留质量
+@enduml

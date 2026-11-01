@@ -1,0 +1,25 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName Helvetica
+skinparam defaultFontSize 13
+skinparam ArrowColor #526d76
+hide circle
+hide methods
+
+entity "requirements" as R {
+  id : "GF-REQ-" + primeros 16 hex de SHA-256(statement)
+  statement
+  source : ruta, encabezado, líneas, sha256
+  testIds
+  status / pendingReason
+}
+entity "tests" as T {
+  id
+  locator : ruta, ancla, líneas, sha256
+}
+R }o--o{ T : testIds
+note bottom of R
+  sin testIds => se requiere
+  un pendingReason no vacío
+end note
+@enduml

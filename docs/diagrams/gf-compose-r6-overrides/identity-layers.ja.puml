@@ -1,0 +1,21 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName "Hiragino Sans"
+skinparam defaultFontSize 13
+left to right direction
+title 実行（run）で結合される別個の同一性（提案するレコード）
+
+rectangle "ソース／合成の\nリビジョン" as S
+rectangle "コンパイル済みプログラムの\n同一性（バイト列／ハッシュ）" as P
+rectangle "設定リビジョン／\n有効位置" as G
+rectangle "設置／\nバインディングリビジョン" as I
+rectangle "デプロイパッケージの\n同一性" as K
+rectangle "実行の同一性\n（runId; scanId の順序は\nrun 内でのみ有効）" as R
+
+S --> P : コンパイル
+P --> K
+I --> K : bindingRevision
+K --> R : デプロイで run を開始
+G --> R : 同じ run 上の\nライブイベント
+I --> R : 結合
+@enduml

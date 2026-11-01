@@ -1,0 +1,21 @@
+@startuml
+skinparam defaultFontName "PingFang SC"
+skinparam shadowing false
+skinparam defaultFontSize 13
+hide empty description
+title 带临时覆盖层的单个设置（§5.2）
+
+state "普通" as Ordinary
+state "已覆盖" as Overlaid
+state "不可用" as Unavailable
+[*] --> Ordinary
+Ordinary : 生效值 = 最新普通值
+Ordinary --> Overlaid : 临时事件\n（有效期 Run 或 Until(DateTime)）
+Overlaid : 生效值 = 临时值
+Overlaid : 恢复目标 = 之前\n经过验证的普通值
+Overlaid --> Ordinary : 过期、Run 结束或取消\n（恢复为恢复目标）
+Overlaid --> Ordinary : 新的普通值\n（在同一事件中移除覆盖层）
+Overlaid --> Overlaid : 第二个临时请求：\n被拒绝
+Overlaid --> Unavailable : 恢复失败
+Unavailable : 不记录为成功恢复；\n报告为不可用
+@enduml

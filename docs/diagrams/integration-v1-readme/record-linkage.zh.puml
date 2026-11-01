@@ -1,0 +1,26 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName Helvetica
+skinparam defaultFontSize 13
+skinparam ArrowColor #526d76
+skinparam rectangle {
+  BackgroundColor #f1f6f5
+  BorderColor #6d858b
+}
+hide stereotype
+
+rectangle "release\n(GhostFlow/integration-release-v1)\ntoolchain, runtimeSemanticsVersion,\nbytecodeFormat, protocolVersion,\nfirmwareSha256" as Release
+rectangle "boardProfile\nboardModel, endpoints" as Profile
+rectangle "installation\nboardProfile 引用, bindings\n例如 pump -> relay.1" as Inst
+rectangle "run\nkind, startedAt, finishedAt,\nartifacts (source/module/manifest)" as Run
+rectangle "run.device\n（观测到的身份标识或 null）" as Device
+rectangle "run.gates\nhost | hardware | physical" as Gates
+
+Release --> Profile : 固定 {id, revision, sha256}
+Release --> Inst : 固定 {id, revision, sha256}
+Inst --> Profile : 引用
+Run --> Release : releaseSha256
+Run *-- Device
+Run *-- Gates
+Device ..> Inst : installation 必须等于\nrelease.installation
+@enduml

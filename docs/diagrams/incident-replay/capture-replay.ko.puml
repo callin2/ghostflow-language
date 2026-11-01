@@ -1,0 +1,25 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName Helvetica
+skinparam defaultFontSize 13
+
+start
+if (명령?) then (capture)
+  :프로그램 초기값에서 시나리오 실행\n(ghostsim.runScenario);
+  :GFB, 매니페스트, 소스 맵,\n시나리오, 완료 결과를\n새 디렉터리에 봉인;
+  :captured (exit 0);
+  stop
+else (replay)
+  :매니페스트 seal과 모든\ninventory 해시·크기 검증;
+  :검증한 바이트를\n비공개 임시 디렉터리에 준비;
+  :재실행; 기록과 비교\n(--candidate가 있으면 후보와도 비교);
+  if (결과 분류) then (모든 검사 통과)
+    :completed / compared (exit 0);
+  elseif () then (초기 상태 또는\n아티팩트 누락)
+    :partial (exit 2);
+  else (손상, revision 불일치,\nscan 누락, 시간·boot 오류,\n판단 변경, 후보 실패)
+    :rejected (exit 1);
+  endif
+  stop
+endif
+@enduml

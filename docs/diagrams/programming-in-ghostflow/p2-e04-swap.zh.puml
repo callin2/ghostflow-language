@@ -1,0 +1,23 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontSize 13
+skinparam ActivityBackgroundColor #F7F9FC
+skinparam ActivityBorderColor #4A6FA5
+title E04：两个下一状态读取同一个前一状态
+start
+:前一状态\na = true, b = false;
+fork
+  :a' = b\n-> false;
+fork again
+  :b' = a\n-> true;
+end fork
+:两者一起提交\na = false, b = true;
+:下一个 tick 读取\na = false, b = true;
+fork
+  :a' = b\n-> true;
+fork again
+  :b' = a\n-> false;
+end fork
+:两者一起提交\na = true, b = false;
+stop
+@enduml

@@ -1,0 +1,32 @@
+@startuml
+skinparam defaultFontSize 12
+skinparam shadowing false
+start
+:accepted tick
+(불변 ClockSnapshot 하나);
+if (신뢰할 수 있는 벽시계 시각인가?
+(또는 제한된 hold_trusted)) then (아니요)
+  :Unknown(ClockUnknown)
+fallback이 결정, 새 admission 없음;
+  stop
+else (예)
+endif
+:trigger가 발생을 계획
+(At, Daily, DailySlots, Periodic,
+Cron, Solar, Tide);
+:요일 규칙 / 달력 (on)
+Unknown은 Unknown으로 유지;
+if (ledger에서 이미 admit되었거나
+terminal인 발생인가?) then (예)
+  :새 admission 없음
+(catch-up 없음, replay 없음);
+  stop
+else (아니요)
+endif
+:basis가 admission을 결정
+(pulse, window, run, range)
+when과 gap을 사용;
+:투영 .due / .open / .active / .missed
++ 예약 관측 record;
+stop
+@enduml

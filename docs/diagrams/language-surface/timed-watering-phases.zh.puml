@@ -1,0 +1,16 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName "PingFang SC"
+hide empty description
+
+[*] --> Idle
+Idle --> Open1 : starts.due
+Open1 --> Water1 : age >= 2s
+Water1 --> Stop1 : age >= 5min
+Stop1 --> Idle : age >= 2s
+
+Idle : 阀门关，泵关
+Open1 : 阀门开，泵关
+Water1 : 阀门开，泵开
+Stop1 : 阀门开，泵关
+@enduml

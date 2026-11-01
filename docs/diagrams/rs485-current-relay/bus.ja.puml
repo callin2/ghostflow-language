@@ -1,0 +1,22 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName "Hiragino Sans"
+skinparam rectangle {
+  BackgroundColor White
+  BorderColor #555555
+}
+left to right direction
+title 1 つの RS485 接続に 3 台のデバイス（9600 8N1）
+
+rectangle "ess3h32 ボード\nRS485 接続" as board
+rectangle "meter1\njsy-mk-333\nアドレス 1（プロファイル既定値）" as m1
+rectangle "meter2\njsy-mk-333\nアドレス 2" as m2
+rectangle "relay\nryr408b\nアドレス 3、RO1..RO8" as rl
+
+board -- m1
+board -- m2
+board -- rl
+m1 ..> board : motor1Current
+m2 ..> board : motor2Current
+board ..> rl : motor1Run, motor2Run,\nauxiliary3..8
+@enduml

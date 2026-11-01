@@ -1,0 +1,21 @@
+@startuml
+hide empty description
+skinparam shadowing false
+skinparam defaultFontName Helvetica
+skinparam state {
+  BackgroundColor White
+  BorderColor #555555
+}
+title 共享 Bool 守卫：准入、跳闸与恢复（一个互斥组）
+
+[*] --> Idle
+Idle : 无已准入的活动
+Idle --> Admitted : 新的 true 声明\n+ 满足全部准入条件\n+ 候选满足 safe_output
+Idle --> Idle : 候选违反关系\n（拒绝：无准入，\n无新的受保护输出）
+Admitted : 输出 = 请求候选
+Admitted --> Admitted : 冲突的新来者声明\n（拒绝；保留现有准入和\n之前的安全输出）
+Admitted --> Tripped : 请求候选\n违反强制关系
+Tripped : 输出 = 编写的安全向量\n（例如 pump=false, valve=true）
+Tripped --> Tripped : 输入恢复正常\n（不自动重新启动）
+Tripped --> Idle : 观测到\n所有声明均为 false
+@enduml

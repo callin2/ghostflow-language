@@ -1,0 +1,24 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName Helvetica
+skinparam defaultFontSize 13
+title 两种打包选项（均为提案；均未获批）
+
+package "选项 1：扩展源包（建议评审）" {
+  rectangle "已锁定的源闭包\n（根 + 所有导入、\n修订版、摘要）" as C1
+  rectangle "一次编译器重放" as R1
+  rectangle "一个组合制品\n（GFB、清单、源映射）" as A1
+  rectangle "已签名载荷" as S1
+  C1 --> R1
+  R1 --> A1
+  A1 --> S1
+}
+
+package "选项 2：组合信封" {
+  rectangle "信封\n（已固定的引用 + 边；\n是否必须签名：未解决）" as E2
+  rectangle "现有包 A\n（自身的源映射、签名）" as PA
+  rectangle "现有包 B\n（自身的源映射、签名）" as PB
+  E2 --> PA : 固定摘要
+  E2 --> PB : 固定摘要
+}
+@enduml

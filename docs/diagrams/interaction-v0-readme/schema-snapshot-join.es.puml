@@ -1,0 +1,34 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName Helvetica
+skinparam defaultFontSize 13
+skinparam ArrowColor #526d76
+skinparam rectangle {
+  BackgroundColor #f1f6f5
+  BorderColor #6d858b
+}
+hide stereotype
+
+rectangle ".ghost.md canónico\n(única fuente de control)" as Src
+rectangle "Compilador\n(#71)" as Comp
+rectangle "Interaction Schema\n(descriptores estáticos)" as Schema
+rectangle "Traza nativa/WASM\ncompletada (un escaneo)" as Trace
+rectangle "Productor de snapshots\n(#72, verifica el esquema)" as Prod
+rectangle "Runtime Snapshot\nschema.sha256, module,\nsource, runId, scanId" as Snap
+rectangle "Unión del consumidor\n(validador + identidad esperada)" as Join
+rectangle "válido" as Ok
+rectangle "join.status: stale\n(la identidad difiere\nde la esperada)" as Stale
+rectangle "error de validación\n(los documentos discrepan)" as Err
+
+Src --> Comp
+Comp --> Schema
+Comp --> Trace : el módulo se ejecuta\nen el host
+Schema --> Prod
+Trace --> Prod : proyección de solo lectura
+Prod --> Snap : una observación\npor descriptor
+Schema --> Join
+Snap --> Join
+Join --> Ok
+Join --> Stale
+Join --> Err
+@enduml

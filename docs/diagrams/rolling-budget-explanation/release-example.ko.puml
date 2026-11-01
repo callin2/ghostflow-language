@@ -1,0 +1,28 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName Helvetica
+skinparam defaultFontSize 13
+
+concise "적용 구간 A" as A
+concise "적용 구간 B" as B
+concise "40s 시점의 60s window\n(-20s부터)" as W1
+concise "65s 시점의 60s window\n(5s부터)" as W2
+
+@0
+A is "ON [0,20s]"
+B is {-}
+W1 is "사용 30s, +5s 차단"
+W2 is {-}
+@5
+W2 is "사용 25s, +5s 허용 가능"
+@10
+B is "ON [10,30s]"
+@20
+A is {-}
+@30
+B is {-}
+@40
+W1 is {-}
+@65
+W2 is {-}
+@enduml

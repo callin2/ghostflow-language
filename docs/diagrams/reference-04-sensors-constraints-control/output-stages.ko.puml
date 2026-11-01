@@ -1,0 +1,24 @@
+@startuml
+skinparam defaultFontName "Apple SD Gothic Neo"
+skinparam shadowing false
+skinparam rectangleBorderColor #4A6FA5
+skinparam rectangleBackgroundColor #F7F9FC
+left to right direction
+title 입력에서 확인된 상태까지
+rectangle "입력 +\n이전 state" as IN
+rectangle "요청 의도\n(requested)" as REQ
+rectangle "중재\n+ 제약" as ARB
+rectangle "안전 / 유효 의도\n(safe)" as SAFE
+rectangle "적용됨 (applied)\n(출력 renderer)" as APP
+rectangle "확인됨 (confirmed)\n(피드백)" as CONF
+IN --> REQ : output <- expr
+REQ --> ARB
+ARB --> SAFE : Bool 제약은\ntrue -> false로만 바꿈
+SAFE --> APP : 장치\n적용
+APP --> CONF : encoder, limit switch,\nvision 등
+note bottom of SAFE
+각 단계는 자신의 출처와 품질을
+가진다. 한 단계의 증거가
+다음 단계를 증명하지 않는다.
+end note
+@enduml

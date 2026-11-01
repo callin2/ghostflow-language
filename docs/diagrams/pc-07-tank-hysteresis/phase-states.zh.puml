@@ -1,0 +1,22 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName "PingFang SC"
+skinparam ArrowColor #555555
+hide empty description
+
+[*] --> Idle
+Idle --> Filling : 下限开关变干
+Filling --> Idle : 上限开关变湿
+Idle --> SensorConflict : 上限湿、下限干
+Filling --> SensorConflict : 上限湿、下限干
+SensorConflict --> Idle : 冲突解除\n（一次扫描，泵关闭）
+
+state Filling : fill_pump ON
+state Idle : fill_pump OFF
+state SensorConflict : fill_pump OFF
+
+note as N
+任一水位输入不可用时，
+阶段保持不变。
+end note
+@enduml

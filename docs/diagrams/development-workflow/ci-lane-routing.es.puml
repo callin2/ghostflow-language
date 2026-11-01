@@ -1,0 +1,17 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName Helvetica
+start
+:Calcular el diff exacto\n(PR: merge-base..head;\npush: commit anterior..actual);
+if (¿lanzamiento manual?) then (sí)
+  :Verificación completa;
+elseif (¿diff vacío o sin resolver?) then (sí)
+  :Verificación completa;
+elseif (¿todas las rutas en la lista\npermitida de documentación?) then (sí)
+  :Carril de documentación\n(docs:check, pruebas de doc-index\ny de enrutamiento; sin artefacto WASM);
+else (no: desconocida, mixta, .ghost.md,\nespecificación, contrato, política, modo inseguro)
+  :Verificación completa;
+endif
+:Comprobación Verification result\n(clasificación + carril seleccionado);
+stop
+@enduml

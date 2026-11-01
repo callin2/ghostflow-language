@@ -1,0 +1,16 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName "Hiragino Sans"
+skinparam defaultFontSize 13
+skinparam componentStyle rectangle
+artifact ".ghost.md\n（フロントマター + ghostコード）" as Src
+component "コンパイラ" as C
+artifact "GFB + マニフェスト\n（hardwareによる変更なし）" as G
+artifact "hardwarePlan\n（導出）" as P
+component "デプロイの責任者" as D
+Src --> C
+C --> G
+C --> P
+P --> D
+note right of D : ピン留めされたプロファイル／モジュールを解決し、\nプロバイダのスキーマで設定を検証し、\nアクティベーション前に受け入れをチェック
+@enduml

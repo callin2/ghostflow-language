@@ -1,0 +1,25 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName Helvetica
+skinparam ArrowColor #555555
+title WorkCalendar 工作日/休息日判定顺序
+
+start
+if (快照存在、在覆盖范围内\n且未过期？) then (否)
+  :Unknown\n（CalendarMissing 或\nCalendarOutOfRange）;
+  stop
+else (是)
+endif
+if (有特定日期的工作例外？) then (是)
+  :使用该例外\n（工作或休息）;
+  stop
+else (否)
+endif
+if (公共节假日？) then (是)
+  :应用节假日工作策略;
+  stop
+else (否)
+endif
+:应用每周模式\n（weeklyWorkMask）;
+stop
+@enduml

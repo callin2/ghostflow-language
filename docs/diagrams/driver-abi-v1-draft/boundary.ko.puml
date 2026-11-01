@@ -1,0 +1,25 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName Helvetica
+skinparam componentStyle rectangle
+title 제안된 네이티브 경계 (초안, 미구현)
+
+package "실행 호스트" {
+  [Rust 코어\n(평가, 확정)] as Core
+  [호스트\n(바인딩, 스케줄링, 정책)] as Host
+}
+package "Driver (장치별)" {
+  [엔드포인트 I/O와\n해석] as Drv
+}
+node "Device / 보드\n(물리 I/O, 실패 정책)" as Dev
+
+Host --> Core : 순서가 정해진 입력 레코드
+Core --> Host : safe/effective 의도
+Host --> Drv : gfdrv_api_v1\n(describe, open, poll,\napply, cancel, close)
+Drv ..> Host : gfdrv_host_v1\n(clock, report)
+Drv --> Dev : 엔드포인트 통신
+note bottom of Core
+  이 ABI가 아님: Rust ScanDriver (코어 스캔 어댑터)
+  및 gf_* / gf_frame_* WASM 호스트–코어 ABI
+end note
+@enduml

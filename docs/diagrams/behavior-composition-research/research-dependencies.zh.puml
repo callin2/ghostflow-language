@@ -1,0 +1,30 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontSize 13
+skinparam rectangleBorderColor #555555
+rectangle "R1 用户成果 (P0)" as R1
+rectangle "R2 权限/身份标识 (P0)" as R2
+rectangle "R3 执行 (P0)" as R3
+rectangle "R4 端口/绑定 (P1)" as R4
+rectangle "R5 契约 (P1)" as R5
+rectangle "R6 覆盖 (P1)" as R6
+rectangle "R7 包 (P1)" as R7
+rectangle "R8 事故证据 (P0)" as R8
+rectangle "R9 验收 (P1)" as R9
+R2 --> R3
+R2 --> R4
+R2 --> R6
+R3 --> R5
+R4 --> R5
+R2 --> R7
+R3 --> R7
+R6 --> R7
+R1 --> R8
+R2 --> R8
+R3 --> R8
+R1 --> R9
+R5 --> R9
+R7 --> R9
+R8 --> R9
+note bottom of R9 : 仅在 R1-R8 完成后定稿
+@enduml

@@ -1,0 +1,28 @@
+@startuml
+skinparam defaultFontName "PingFang SC"
+skinparam shadowing false
+skinparam defaultFontSize 13
+skinparam activityBorderColor #4A6FA5
+skinparam activityBackgroundColor #F7F9FC
+title 原子实时设置事件（§5.2）
+
+start
+:设置事件到达\n（目标 Program、基线修订版、\n目标集合、载荷）;
+if (信封完整、同一 Program、基线为最新、\n目标已知、非空、无重复、\n生产者已授权？) then (是)
+  if (组内混有不同的\n显式故障代码？) then (是)
+    #FDECEA:作为不一致数据包拒绝;
+    stop
+  elseif (有载荷未通过类型、范围、\n步长或列表容量检查？) then (是)
+    :向每个目标发出\nfault(SettingsInvalid);
+  elseif (生产者显式声明不可用？) then (是)
+    :向每个目标发出\nfault(SettingsUnavailable);
+  else (否)
+    :向每个目标发出\nok(value);
+  endif
+  :新的设置修订版 + 生效位置。\n源、Program 与 runId 不变。\n状态和定时器不会重置;
+  stop
+else (否)
+  #FDECEA:在准入前拒绝\n（任何流上都不发出值）;
+  stop
+endif
+@enduml

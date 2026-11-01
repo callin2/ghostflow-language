@@ -1,0 +1,22 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName Helvetica
+skinparam ArrowColor #555555
+hide empty description
+
+[*] --> Idle
+Idle --> Filling : 저수위 스위치 dry
+Filling --> Idle : 고수위 스위치 wet
+Idle --> SensorConflict : 고수위 wet, 저수위 dry
+Filling --> SensorConflict : 고수위 wet, 저수위 dry
+SensorConflict --> Idle : 충돌 해소\n(한 스캔, 펌프 OFF)
+
+state Filling : fill_pump ON
+state Idle : fill_pump OFF
+state SensorConflict : fill_pump OFF
+
+note as N
+수위 입력 중 하나라도 사용할 수 없으면
+단계(phase)를 그대로 유지합니다.
+end note
+@enduml

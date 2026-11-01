@@ -1,0 +1,21 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName Helvetica
+skinparam defaultFontSize 13
+skinparam ParticipantPadding 12
+
+participant "Producer" as P
+participant "호스트 ingress\n(직렬화 지점)" as H
+participant "Core\n(평가)" as C
+participant "Renderer /\nDevice" as D
+
+P -> H : 1. 수신\n(receiptSequence 부여)
+H -> H : 2. latch + 불변\nbatch 닫기
+H -> C : 3. 단일 snapshot\n검증 및 평가
+C --> H : 4. 논리 결과\n(확정 또는 실패 attempt)
+H -> H : 5. 확정 증거 캡처\n(hook 이전)
+H -> D : 6. 확정된 안전 의도\ndispatch
+D --> H : 7. effect 결과 =\n상관 식별된 새 수신
+H -> H : 8. 이후 batch: 명시적\ntyped 바인딩만 사용
+note over P, H : 1단계와 7단계는 경계 사이에서\n비동기로 일어날 수 있음
+@enduml

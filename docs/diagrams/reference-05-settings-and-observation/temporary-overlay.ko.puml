@@ -1,0 +1,21 @@
+@startuml
+skinparam defaultFontName "Apple SD Gothic Neo"
+skinparam shadowing false
+skinparam defaultFontSize 13
+hide empty description
+title 임시 overlay가 있는 한 설정 (§5.2)
+
+state "일반" as Ordinary
+state "overlay 적용 중" as Overlaid
+state "unavailable" as Unavailable
+[*] --> Ordinary
+Ordinary : 유효값 = 최신 일반값
+Ordinary --> Overlaid : 임시 event\n(수명 Run 또는 Until(DateTime))
+Overlaid : 유효값 = 임시값
+Overlaid : 복귀 대상 = 직전의\n검증된 일반값
+Overlaid --> Ordinary : 만료, Run 종료 또는 취소\n(복귀 대상으로 복원)
+Overlaid --> Ordinary : 새 일반값\n(같은 event에서 overlay 제거)
+Overlaid --> Overlaid : 두 번째 임시 요청:\n거부
+Overlaid --> Unavailable : 복귀 실패
+Unavailable : 성공한 복귀로 기록하지 않음;\nunavailable로 보고
+@enduml

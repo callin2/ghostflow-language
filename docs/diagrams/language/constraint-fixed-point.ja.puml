@@ -1,0 +1,25 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName "Hiragino Sans"
+skinparam ArrowColor #555555
+skinparam ActivityBorderColor #555555
+
+start
+:候補の bool 出力
+（要求意図）;
+repeat
+  :すべての requires / mutex を
+  同じスナップショットに対して検査;
+  :遮断する出力の和集合を
+  一度に false にする;
+repeat while (変化した出力がある?) is (はい)
+-> いいえ;
+:安全意図
+（すべての制約を満たす）;
+note right
+  出力は true -> false にしか
+  変化しないため、N 個の bool 出力では
+  変化のある反復は最大 N 回。
+end note
+stop
+@enduml

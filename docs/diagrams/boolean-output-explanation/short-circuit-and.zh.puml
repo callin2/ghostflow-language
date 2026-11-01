@@ -1,0 +1,17 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName Helvetica
+skinparam ArrowColor #555555
+skinparam rectangle {
+  BackgroundColor White
+  BorderColor #555555
+}
+title 请求值为 OFF：左操作数为 false 的 AND
+
+rectangle "output = left && right\n值 = false" as AND
+rectangle "left\n已求值，值 = false\nsupportsResult = true" as L #E8F5E9
+rectangle "right（会除以零）\n已跳过：不可用\n无值，绝不支持结果" as R #EEEEEE
+
+AND --> L : 支持边
+AND ..> R : 未求值
+@enduml

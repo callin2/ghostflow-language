@@ -1,0 +1,22 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName Helvetica
+skinparam rectangleRoundCorner 8
+skinparam ArrowColor #555555
+left to right direction
+
+rectangle "Fuente literaria\n.ghost.md\n(Cap. 1)" as SRC
+rectangle "Verificaciones del compilador\ntipos, unidades, nombres\n(Cap. 2, Cap. 7)" as COMP
+rectangle "Cálculo del tick\nentradas + estado anterior\n-> estado siguiente, intenciones\n(Cap. 2, Cap. 3)" as TICK
+rectangle "Sensores y restricciones\ncalidad, enclavamientos, modos\n(Cap. 4)" as CONS
+rectangle "Ajustes y observación\ncambios en vivo, eventos, alarmas\n(Cap. 5)" as OBS
+rectangle "Composición y reproducción\nimport, binding, replay\n(Cap. 6)" as COMPOSE
+rectangle "Runtime, Driver, dispositivos\nresponsabilidades por capa\n(Cap. 8)" as DEV
+
+SRC --> COMP
+COMP --> TICK
+CONS --> TICK : lecturas filtradas,\nsalidas permitidas
+OBS --> TICK : ajustes efectivos
+TICK --> DEV : intenciones de salida
+COMPOSE ..> TICK : combina programas,\nreejecuta ticks grabados
+@enduml

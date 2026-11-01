@@ -1,0 +1,20 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName Helvetica
+skinparam defaultFontSize 13
+skinparam ArrowColor #526d76
+skinparam state {
+  BackgroundColor #f1f6f5
+  BorderColor #6d858b
+  FontColor #102b35
+}
+
+[*] --> unobserved : 观测器已激活
+unobserved : 第一次成功\n扫描之前
+unobserved --> inactive : 第一次提交 false\n（无事件）
+unobserved --> active : 第一次提交 true\n/ “raised”（新 episode）
+inactive --> active : true\n/ “raised”（新 episode）
+active --> inactive : false\n/ “cleared”（同一 episode）
+active --> active : 重复的 true\n（无事件）
+inactive --> inactive : 重复的 false\n（无事件）
+@enduml

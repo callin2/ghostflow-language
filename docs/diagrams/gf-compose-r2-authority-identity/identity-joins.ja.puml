@@ -1,0 +1,26 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName "Hiragino Sans"
+skinparam defaultFontSize 13
+skinparam rectangleRoundCorner 8
+title 区別して保つ同一性（現在の事実と提案）
+
+rectangle "正本ソース\ndocumentId + revisionId + sha256" as SRC
+rectangle "コンパイル済みモジュール\nフィンガープリント + バイトコードダイジェスト" as MOD
+rectangle "振る舞いインスタンス\n不透明な instanceId（提案）" as INST
+rectangle "論理ポート\n作成時の id（インスタンス修飾、提案）" as PORT
+rectangle "物理バインディング\nbindingRevision／ダイジェスト" as BIND
+rectangle "設定リビジョン\n+ 有効イベント位置（提案）" as SET
+rectangle "実行（run）\nrunId" as RUN
+rectangle "オカレンス\nrun + instance + scanId（提案）" as OCC
+rectangle "表示ラベル／ファイル名\n（表示とトレース専用）" as LBL #EEEEEE
+
+SRC --> MOD : コンパイル
+SRC --> INST : 固定された定義リビジョン
+INST --> PORT : 修飾
+PORT --> BIND : 設置によりバインド
+INST --> SET : 結合
+RUN --> OCC : 内部で scanId を順序付け
+INST --> OCC : 修飾
+LBL ..> INST : 同一性ではない
+@enduml

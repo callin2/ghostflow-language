@@ -1,0 +1,20 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName "Hiragino Sans"
+skinparam defaultFontSize 13
+skinparam activityBorderColor #4A6FA5
+skinparam activityBackgroundColor #F7F9FC
+title エラーから学ぶ（付録 B）
+
+start
+:エラー例を 1 つ選ぶ（E90–E102）;
+:診断を予測する：\nどこを指し、どの規則に違反するか;
+:そのフェンスを単独の ghost プログラムとしてコンパイル;
+if (診断は予測と一致したか？) then (はい)
+  :破られた約束と\n対応する Reference の規則を言葉にする;
+else (いいえ)
+  :規則を読み直し、\n理解を修正する;
+endif
+:エラーは一度に 1 つだけ残す;
+stop
+@enduml

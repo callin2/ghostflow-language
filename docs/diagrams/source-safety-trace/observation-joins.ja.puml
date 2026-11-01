@@ -1,0 +1,17 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName "Hiragino Sans"
+skinparam defaultFontSize 13
+skinparam rectangleRoundCorner 8
+rectangle "コンパイラのコンパニオン\ntraceMetadata (source-trace-v1):\nフィンガープリント、バインディング、制約、\n依存関係、windowSites" as meta
+rectangle "ランタイムのトレース\nTickRecord.to_json():\nsafetyTrace, windowTrace" as trace
+rectangle "observeSourceTrace\n(ソース + 安全 + ウィンドウの証拠)" as ost
+rectangle "observeRuntimeValues\n(runtime-values-v1)" as orv
+rectangle "interaction-runtime-snapshot\n(runtime-snapshot-v0)" as snap
+meta --> ost
+trace --> ost
+meta --> orv
+trace --> orv
+orv --> snap : 生成されたタイマーの格納領域を\n内部で解決
+note bottom of ost : 実際のフィールドだけを結合し、\n式を再評価することはない
+@enduml

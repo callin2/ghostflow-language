@@ -1,0 +1,59 @@
+@startuml
+title 物理スキャン: Device の所有権と現在のファームウェアの障害処理
+database "承認済みプロファイル + 設備のバインディング" as Profile
+participant "Device のスキャンホスト / クロック" as Host
+participant "センサ / 入力ドライバ" as Input
+participant "ScanDriver + Rust ランタイム" as Core
+participant "物理出力レンダラー" as Output
+participant "リレー / 負荷" as Load
+participant "ホストの観測ストリーム" as Evidence
+participant "独立した観測" as Observer
+Profile -> Host: エンドポイントの型、極性、アドレス、マッピング、同一性
+Host -> Core: 成果物をインストール。サポートされるケイパビリティを有効化
+Host -> Input: マッピングされたエンドポイントをサンプリング
+Input --> Host: 正規化された型付き入力スナップショット
+Host -> Host: スナップショットをラッチ。スキャン ID と論理時間を割り当て
+Host -> Core: 完全なスキャンフレーム
+alt フレームの拒否またはランタイムの評価エラー
+  Core --> Host: エラー（成功したスキャン結果なし）
+  Host -> Host: アダプタを停止。running=false。故障を記録
+  Host -> Output: OFF マスクを試行（ファームウェアのエラーパス）
+  Output --> Host: 適用結果。物理状態には証拠が必要
+else スキャン成功（制約による故障を含む場合あり）
+  Core -> Core: プログラム状態と requested/safe トレースを確定
+  Core --> Host: 安全意図 + スキャンの同一性 + 故障
+  Host -> Output: 安全な論理意図を設備/極性を通してマッピング
+  Output -> Load: 電気的な出力書き込みを試行
+  alt 書き込みが受理された
+    Output --> Host: 適用マスク = 試行したマスク
+  else 書き込みに失敗
+    Output --> Host: I/O エラー
+    Host -> Host: キャッシュした適用マスク = 不明。キャッシュしたラッチ = 不明
+  end
+  opt レンダラーが利用可能で、リードバックの時期
+    Output -> Load: 出力ラッチ/レジスタを読み取り
+    Load --> Output: 観測されたレジスタ値
+    Output --> Host: 観測範囲付きのリードバック証拠
+  end
+  Host -> Host: record_relay(available, applied, latch)
+  opt 書き込み/リードバックの失敗、ラッチ不一致、またはレンダラー利用不可
+    Host -> Evidence: 試行した安全マスク + 個別の適用/ラッチの証拠を公開
+    Host -> Host: 停止: running=false。故障。アダプタのライブ出力をクリア
+    Host -> Evidence: 停止/故障の観測を公開
+    note over Host,Output
+      次のファームウェアループが、同じレンダラーを通じて OFF を要求する。
+      OFF は受理されるまで適用済みとはみなさない。
+      故障中は再開を拒否し、再デプロイが必要。
+    end note
+  end
+  opt 独立した物理的観測が利用可能
+    Observer -> Load: 接点、端子、または実際に生じた効果を観測
+    Observer --> Host: 記載された範囲についての確認の証拠
+  end
+  note over Host,Core
+    コアの状態は出力の適用前にすでに確定している。
+    レンダラーの障害で、ScanDriver を通じてそのスキャンがロールバックされることはない。
+    Device の停止ポリシーは実装済み。確定したコアの状態は保持される。
+  end note
+end
+@enduml

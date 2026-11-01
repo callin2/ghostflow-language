@@ -1,0 +1,24 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontSize 13
+skinparam defaultFontName "Apple SD Gothic Neo"
+title npm test (tools/verify-language.mjs): 첫 실패에서 멈춤
+
+start
+:사전 검사: Node 22+, POSIX 호스트,
+소스 해시, 카탈로그, 문서 검사;
+:1. 도구 체인 버전 + cargo fmt --check;
+:2. 레거시 픽스처 컴파일 (include_bytes!);
+:3. cargo test --locked --offline --workspace;
+:4. 하나의 코어에서 네이티브 러너,
+릴리스 scan_tape 러너, 릴리스 WASM 빌드;
+:5. Node 언어/통합 제품군
+(네이티브/WASM 테이프 parity 포함);
+:6. 새 러너로 튜토리얼 실행
+(네이티브/WASM 추적 비교);
+:7. 리소스, 러너/WASM 다이제스트,
+소스 해시 기록;
+:build/verification.json 작성
+(+ build/verification-runs/에 고유 사본);
+stop
+@enduml

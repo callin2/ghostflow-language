@@ -1,0 +1,44 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName Helvetica
+skinparam defaultFontSize 13
+skinparam ArrowColor #526d76
+
+start
+:Capturar y validar el escaneo completo;
+if (¿Iniciar (begin) cada acondicionador?) then (todos iniciados)
+else (falla un begin)
+  :Revertir solo los handles ya iniciados;
+  stop
+endif
+:Acondicionar entradas, preparar la entrada de la VM
+committed = false;
+if (¿La preparación tuvo éxito?) then (sí)
+else (no)
+  :Revertir todos los acondicionadores iniciados;
+  :Estado de la VM, tiempo e ID de trama sin cambios;
+  :Se permite un reintento válido;
+  stop
+endif
+:committed = null
+llamar a la VM nativa;
+if (¿Retornó la llamada nativa?) then (sí)
+  :committed = valor de retorno nativo;
+  if (¿Valor de retorno?) then (1)
+    :Consolidar acondicionadores,
+    tiempo de host e ID de trama aceptados;
+    :Decodificar JSON de traza/resultado;
+    note right
+      Un error posterior termina el
+      host, pero no puede deshacer el escaneo
+    end note
+  else (0: rechazo conocido)
+    :Revertir todos los acondicionadores iniciados;
+    :Se permite un reintento válido;
+  endif
+else (trap / excepción del adaptador)
+  :Estado desconocido: no se declara reversión;
+  :Terminar los pasos posteriores;
+endif
+stop
+@enduml

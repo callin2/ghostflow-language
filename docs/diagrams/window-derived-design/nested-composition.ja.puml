@@ -1,0 +1,16 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName "Hiragino Sans"
+skinparam defaultFontSize 12
+left to right direction
+rectangle "物理ルート\n(sourceTag, sourceEpoch, sampleId)\n+ 元のタイムスタンプ" as P
+rectangle "内側ウィンドウ U\nover 2 ms" as U
+rectangle "外側ウィンドウ W\nover 10 ms" as W
+P --> U : サンプル (0,0) (1,10) (2,20)
+U --> W : 派生イベント (site, revision)\n値 0, 5, 15\n品質 3 + U の site
+note bottom of W
+  3 つの派生イベントの平均 = 20/3
+  （平坦化した物理リーフによる 10 ではない）
+  結果の品質：Derived (3)
+end note
+@enduml

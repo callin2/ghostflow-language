@@ -1,0 +1,17 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontSize 12
+skinparam StateBackgroundColor #F7F9FC
+skinparam StateBorderColor #4A6FA5
+title hold_last cache (measured slice)
+[*] --> Unavailable : cold restart
+state "Unavailable\navailable=false\n결과: NotReady" as Unavailable
+state "Held\navailable=true, held=true\nage < forAtMost\n결과 품질: Held" as Held
+state "Expired\navailable=true, held=false\n결과: NotReady" as Expired
+Unavailable --> Held : 새 허용 가능 샘플\n(자체 타임스탬프와 함께 cache)
+Held --> Held : 새 허용 가능 샘플이 cache 대체;\n중복은 age를 갱신하지 않음;\nfault / 선택 변경은 cache 유지
+Held --> Expired : age가 forAtMost에 도달
+Expired --> Held : 새 허용 가능 샘플
+Held --> Unavailable : cache root의 epoch 교체\n(선택되지 않았어도)
+Expired --> Unavailable : cache root의\nepoch 교체
+@enduml

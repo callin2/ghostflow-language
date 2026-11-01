@@ -1,0 +1,21 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName Helvetica
+skinparam defaultFontSize 13
+skinparam rectangleRoundCorner 8
+title 비교한 두 선택지 (둘 다 제안)
+
+package "선택지 A: 컴파일러가 하나의 모듈로 합성" {
+  rectangle "east + west\n(한정된 이름)" as A1
+  rectangle "하나의 GFB1 모듈\ntick당 시계 하나\n안전 검사 한 번" as A2
+  A1 --> A2 : import / 이름 한정\nlowering
+}
+
+package "선택지 B: 여러 VM 인스턴스 + 코디네이터" {
+  rectangle "코디네이터\n(시계, 입력 수신,\nfault 전파 정책 제공)" as C
+  rectangle "VM: east\n자체 모듈, 상태" as VE
+  rectangle "VM: west\n자체 모듈, 상태" as VW
+  C --> VE
+  C --> VW
+}
+@enduml

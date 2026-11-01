@@ -1,0 +1,19 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontSize 13
+skinparam activity {
+  BackgroundColor #F8F8F8
+  BorderColor #555555
+}
+start
+:구간 끝 e + d에 도달한 결과 만료;
+:종료된 결과 확인(acknowledge);
+:새 이벤트를 소스 identity 순서로 시작;
+:predicate 관측 적용;
+if (용량 또는 관측 오류?) then (예)
+  :스테이징된 모든 변경 폐기\n(확인, 만료,\nidentity high-water, 시계);
+else (아니요)
+  :tick 전체를 확정;
+endif
+stop
+@enduml

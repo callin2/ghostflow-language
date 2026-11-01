@@ -1,0 +1,23 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName Helvetica
+skinparam rectangleRoundCorner 8
+skinparam ArrowColor #555555
+left to right direction
+
+rectangle "Host" {
+  rectangle ".ghost.md\nprosa + bloques ghost" as DOC
+  rectangle "Extractor\n(CommonMark,\nsolo ghost de nivel superior)" as EXT
+  rectangle "Mismo analizador y\ncomprobaciones de\ntipo/tiempo/recursos" as CHK
+  rectangle "Mapa de fuente\ngenerado -> original\nlínea/columna" as MAP
+}
+rectangle "MCU" {
+  rectangle "bytecode .gfb\n(sin prosa, sin Markdown)" as GFB
+}
+
+DOC --> EXT
+EXT --> CHK : fuente unida
+EXT --> MAP
+CHK --> GFB : solo el bytecode compilado
+CHK ..> MAP : los diagnósticos apuntan\na la ubicación original
+@enduml

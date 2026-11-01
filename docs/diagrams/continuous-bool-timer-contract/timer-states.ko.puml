@@ -1,0 +1,12 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName "Apple SD Gothic Neo"
+hide empty description
+state "wasTrue = false" as Off
+state "wasTrue = true" as On
+[*] --> Off : 초기 (since = 0)
+Off --> Off : false / 값 0, since' = now
+Off --> On : true / 값 0, since' = now
+On --> On : true / 값 now - since,\nsince' = since
+On --> Off : false / 값 0, since' = now
+@enduml

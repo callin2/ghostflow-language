@@ -1,0 +1,23 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName Helvetica
+skinparam defaultFontSize 13
+
+participant "包签名者" as P
+participant "宿主验证器\n（信任快照）" as H
+
+== 1. 信任下一个密钥 ==
+H -> H : 将下一个公钥加入 trustedKeys
+note right of H : 受信任：当前、下一个
+
+== 2. 发布共同签名的包 ==
+P -> H : 由当前 + 下一个密钥签名的包
+note right of H : 接受
+
+== 3. 吊销旧密钥 ==
+H -> H : 将当前密钥 ID 加入 revokedKeyIds
+P -> H : 同一个共同签名的包
+note right of H : 忽略已吊销的签名；\n下一个密钥的签名验证通过：接受
+P -> H : 仅由旧密钥签名的包
+note right of H : 拒绝：没有剩余的\n有效受信任签名
+@enduml

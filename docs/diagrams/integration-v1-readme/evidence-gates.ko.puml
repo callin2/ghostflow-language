@@ -1,0 +1,31 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName Helvetica
+skinparam defaultFontSize 13
+skinparam ArrowColor #526d76
+skinparam rectangle {
+  BackgroundColor #f1f6f5
+  BorderColor #6d858b
+}
+hide stereotype
+
+rectangle "host-tests\ninjected-fixture" as HS
+rectangle "device-status\ngpio-readback\nregister-readback" as HWS
+rectangle "physical-observation" as PS
+rectangle "host 게이트" as H
+rectangle "hardware 게이트" as HW
+rectangle "physical 게이트" as P
+
+HS --> H
+HWS --> HW
+PS --> P
+H -[hidden]right- HW
+HW -[hidden]right- P
+H ..> HW : 절대 대신 채우지 않음
+HW ..> P : 판독값은 절대\n물리 pass가 아님
+note bottom of P
+  통합 pass는 없음.
+  각 게이트: not_run | pass | fail | unknown.
+  출처 "none"은 not_run / unknown만 허용.
+end note
+@enduml

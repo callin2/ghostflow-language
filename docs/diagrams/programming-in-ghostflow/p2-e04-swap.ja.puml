@@ -1,0 +1,24 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontSize 13
+skinparam ActivityBackgroundColor #F7F9FC
+skinparam ActivityBorderColor #4A6FA5
+title E04：両方の次状態が同じ前状態を読む
+
+start
+:前状態\na = true, b = false;
+fork
+  :a' = b\n-> false;
+fork again
+  :b' = a\n-> true;
+end fork
+:両方をまとめて確定\na = false, b = true;
+:次の tick が読む値\na = false, b = true;
+fork
+  :a' = b\n-> true;
+fork again
+  :b' = a\n-> false;
+end fork
+:両方をまとめて確定\na = true, b = false;
+stop
+@enduml

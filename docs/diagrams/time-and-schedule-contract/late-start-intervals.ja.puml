@@ -1,0 +1,45 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName "Hiragino Sans"
+skinparam defaultFontSize 13
+scale 1 as 50 pixels
+hide time-axis
+
+concise "壁時計の時刻" as T
+concise "Pulse" as P
+concise "Window(5min)" as W
+concise "Run(5min, on_time)" as O
+concise "Run(5min, within(10min))" as R
+
+@0
+T is "07:58"
+P is "-"
+W is "-"
+O is "-"
+R is "-"
+
+@2
+T is "08:00"
+P is "通過時に受け入れ"
+W is "受け入れ可能"
+O is "通過時に受け入れ"
+R is "受け入れ可能"
+
+@3
+P is "それ以外は取りこぼし"
+O is "それ以外は取りこぼし"
+
+@7
+T is "08:05"
+W is "終了"
+
+@12
+T is "08:10"
+R is "LateStartExpired"
+
+@14
+T is "08:12"
+
+W@2 <-> @7 : [08:00, 08:05)
+R@2 <-> @12 : [08:00, 08:10) 受け入れの猶予であり、実行の長さではない
+@enduml

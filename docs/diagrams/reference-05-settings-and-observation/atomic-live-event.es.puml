@@ -1,0 +1,27 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontSize 13
+skinparam activityBorderColor #4A6FA5
+skinparam activityBackgroundColor #F7F9FC
+title Evento atómico de ajustes en vivo (§5.2)
+
+start
+:Llega un evento de ajustes\n(Program destino, revisión base,\nconjunto de destinos, payloads);
+if (¿Sobre íntegro, mismo Program, base vigente,\ndestinos conocidos, no vacío, sin duplicados,\nproductor autorizado?) then (sí)
+  if (¿El grupo mezcla distintos códigos\nde fallo explícitos?) then (sí)
+    #FDECEA:Rechazar como paquete inconsistente;
+    stop
+  elseif (¿Algún payload falla la validación de tipo,\nrango, step o capacidad de lista?) then (sí)
+    :Emitir fault(SettingsInvalid)\na todos los destinos;
+  elseif (¿Productor explícitamente no disponible?) then (sí)
+    :Emitir fault(SettingsUnavailable)\na todos los destinos;
+  else (no)
+    :Emitir ok(value)\na todos los destinos;
+  endif
+  :Nueva revisión de ajustes + posición efectiva.\nMisma fuente, Program y runId.\nEl estado y los temporizadores no se reinician;
+  stop
+else (no)
+  #FDECEA:Rechazar antes de la admisión\n(ninguna emisión en ningún flujo);
+  stop
+endif
+@enduml

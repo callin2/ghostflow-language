@@ -1,0 +1,24 @@
+@startuml
+skinparam defaultFontName Helvetica
+skinparam shadowing false
+skinparam rectangleBorderColor #4A6FA5
+skinparam rectangleBackgroundColor #F7F9FC
+left to right direction
+title De las entradas al estado confirmado
+rectangle "entradas +\nestado anterior" as IN
+rectangle "intención\nsolicitada (requested)" as REQ
+rectangle "arbitraje\n+ restricciones" as ARB
+rectangle "intención segura /\nefectiva (safe)" as SAFE
+rectangle "aplicado (applied)\n(renderizador de salida)" as APP
+rectangle "confirmado (confirmed)\n(retroalimentación)" as CONF
+IN --> REQ : output <- expr
+REQ --> ARB
+ARB --> SAFE : las restricciones Bool solo\nconvierten true -> false
+SAFE --> APP : aplicación en\nel dispositivo
+APP --> CONF : codificador, final de carrera,\nvisión, ...
+note bottom of SAFE
+Cada etapa tiene su propia procedencia
+y calidad. La evidencia de una etapa
+no demuestra la etapa siguiente.
+end note
+@enduml

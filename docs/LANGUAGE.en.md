@@ -1,6 +1,3 @@
-<!-- translation-source: docs/LANGUAGE.md -->
-[Korean original](LANGUAGE.md)
-
 # GhostFlow language contract · design draft
 
 Dated 2026-09-05. This document defines the **common execution contract** of the GhostFlow language: the rules every syntax and every runtime must share.

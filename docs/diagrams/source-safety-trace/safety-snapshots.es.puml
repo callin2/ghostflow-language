@@ -1,0 +1,16 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontSize 13
+start
+:Ronda 0: evaluar la instantánea de las salidas solicitadas;
+repeat
+  :Evaluar cada restricción\n(capturar valores ANTES de las actualizaciones de esta ronda);
+  if (¿primera violación de esta regla?) then (sí)
+    :guardar firstViolation\n{round, values, blocked};
+  endif
+repeat while (¿alguna salida bloqueada en esta ronda?) is (sí: siguiente ronda)
+->no;
+:guardar final {round, values, satisfied}\ndesde la ronda de terminación sin bloqueos;
+note right: como máximo dos instantáneas\npor restricción
+stop
+@enduml

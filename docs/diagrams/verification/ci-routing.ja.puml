@@ -1,0 +1,19 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontSize 13
+skinparam defaultFontName "Hiragino Sans"
+title Verified WASM ワークフローのルーティング（issue #357）
+
+start
+:変更を分類;
+if (手動ディスパッチ？) then (はい)
+  :完全な検証;
+elseif (許可リストの通常ドキュメントのみ\n（厳密な差分ルール）？) then (はい)
+  :ドキュメントチェック\n（WASM ビルドなし）;
+else (いいえ)
+  :完全な検証：\nVerify WASM (current) /\nVerify WASM (frontend-pin);
+endif
+:Verification result
+（常に実行。マージには green が必須）;
+stop
+@enduml

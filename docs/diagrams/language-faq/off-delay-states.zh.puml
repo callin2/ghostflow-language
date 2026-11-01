@@ -1,0 +1,15 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontSize 13
+skinparam stateBorderColor #4A6FA5
+skinparam stateBackgroundColor #F7F9FC
+title OffDelay（问题 6）：enabled 在 Active 和 Holding 中为 true
+
+[*] --> Idle
+Idle --> Active : request && !stop
+Active --> Holding : !request
+Active --> Idle : stop
+Holding --> Active : request
+Holding --> Idle : stop || age >= delay
+note "即使输入未知，Holding 也会到期。\n健康的停止或无效的延时：任意阶段 -> Idle。" as N
+@enduml

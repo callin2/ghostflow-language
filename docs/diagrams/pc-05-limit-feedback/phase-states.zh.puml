@@ -1,0 +1,39 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName "PingFang SC"
+skinparam ArrowColor #555555
+hide empty description
+
+[*] --> Stopped
+Stopped --> Opening : 开启事件
+Stopped --> Closing : 关闭事件
+Stopped --> Open : 仅开启限位
+Stopped --> Closed : 仅关闭限位
+Closed --> Opening : 开启事件
+Open --> Closing : 关闭事件
+Opening --> Open : 检测到开启限位
+Closing --> Closed : 检测到关闭限位
+Opening --> WaitClose : 关闭事件
+Closing --> WaitOpen : 开启事件
+WaitOpen --> Opening : 已过 2 s
+WaitClose --> Closing : 已过 2 s
+WaitOpen --> WaitClose : 关闭事件
+WaitClose --> WaitOpen : 开启事件
+WaitOpen --> Open : 检测到开启限位
+WaitClose --> Closed : 检测到关闭限位
+SensorConflict --> Open : 仅开启限位
+SensorConflict --> Closed : 仅关闭限位
+SensorConflict --> Stopped : 两个限位均未检测到
+
+state Opening : 开启接触器 ON
+state Closing : 关闭接触器 ON
+
+note as N
+在每个状态下最先检查：
+1. 许可或位置不可用 -> Stopped
+2. 两个限位都为 true -> SensorConflict
+3. 失去 STOP/过载许可，或
+   两个请求同时按下 -> Stopped
+   （SensorConflict 状态除外）
+end note
+@enduml

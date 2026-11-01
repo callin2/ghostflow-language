@@ -1,25 +1,43 @@
 <!-- translation-source: docs/INTENT-DECISIONS.md -->
-[영어 원문](INTENT-DECISIONS.md)
+[영문 원문](INTENT-DECISIONS.md)
 
 # 작성된 의도 결정 확인하기
 
-`tools/intent-decisions.mjs`의 `inspectIntentDecisions(request)`는 canonical GhostFlow source와 컴파일러가 검증한 `intent-evidence-v1`을 조회하는 순수 API다. `node tools/ghostdecisions.mjs --request request.json --format json`은 JSON/TOON CLI이며, 기본 출력 형식은 TOON이다. 이 API는 [#565](https://github.com/callin2/ghostflow-language/issues/565)을 사용하여 [#564](https://github.com/callin2/ghostflow-language/issues/564)을 구현한다.
+`tools/intent-decisions.mjs`의 `inspectIntentDecisions(request)`는 정본 GhostFlow 소스와 컴파일러가 검증한 `intent-evidence-v1`에 대한 **순수 조회**입니다.
+`node tools/ghostdecisions.mjs --request request.json --format json`은 JSON/TOON CLI이며, 기본 출력 형식은 TOON입니다.
+이 기능은 [#565](https://github.com/callin2/ghostflow-language/issues/565) 계약을 사용해 [#564](https://github.com/callin2/ghostflow-language/issues/564)를 구현합니다. [영문 버전](INTENT-DECISIONS.md)도 같은 계약을 설명합니다.
 
-이 API는 자연어에서 의도를 추론하거나, 질문을 생성하거나, 결정을 승인하거나, 행위자를 인증하거나, 요구사항을 강제하거나, runtime gate를 바꾸거나, 제어 기본값을 합성하지 않는다. 제공된 각 canonical source를 다시 컴파일하고 기존 컴파일러의 작성된 anchor 및 intent evidence 검증을 사용한다. 원래의 외부 record는 컴파일러의 제한적인 구조 결론과 나란히 계속 표시된다. 네 decision kind는 각각 구분해서 유지한다: `confirmed`, `policy-derived`, `assumption`, `undecided`.
+**하는 일.** 제공된 각 정본 소스를 다시 컴파일하고, 작성된 anchor와 intent evidence에 대한 기존 컴파일러의 검증을 재사용합니다. 원래의 외부 레코드는 컴파일러의 제한적인 구조적 결론과 나란히 그대로 보입니다. 네 가지 decision kind는 항상 구분해서 유지합니다: `confirmed`, `policy-derived`, `assumption`, `undecided`.
+
+**하지 않는 일.** 이 API는 다음을 하지 않습니다.
+
+- 자연어에서 의도를 추론하거나 질문을 생성하는 일.
+- 결정을 승인하거나 행위자를 인증하는 일.
+- 요구사항을 강제하거나 런타임 gate를 바꾸는 일.
+- 제어 기본값을 합성하는 일.
+
+![current, 선택적 previous, transitions, requirement contract로 이루어진 요청이 순수 조회를 거쳐 기존 컴파일러로 재컴파일되고, 보고 전용 결과를 반환합니다](diagrams/intent-decisions/query-flow.ko.svg)
+
+그림은 요청의 구성 요소, 재컴파일 단계, 결과를 보여 줍니다. 결과는 보고만 하며, hold나 block은 외부 소비자에게 맡겨집니다.
 
 ## 요청
 
-최상위 객체에는 `schema: "GhostFlow/intent-decisions-request-v1"`과 `current`가 필요하다. `requirementContract`, `previous`, `transitions`를 제공할 수 있다. `transitions`가 있으면 `previous`가 필요하다.
+최상위 객체에는 `schema: "GhostFlow/intent-decisions-request-v1"`과 `current`가 필요합니다. `requirementContract`, `previous`, `transitions`도 제공할 수 있습니다. `transitions`를 제공하려면 `previous`가 필요합니다.
 
-`current`와 선택적인 `previous`에는 각각 다음 항목이 필요하다.
+**`current`와 `previous`.** `current`와 선택적인 `previous`에는 각각 다음이 필요합니다.
 
-- `source: { text, filename, documentId, revisionId }`. `text`는 완전한 canonical `.ghost.md` 프로그램이고, ID는 작성된 해당 revision을 명시적으로 가리킨다.
-- `intentEvidence`: 완전한 `GhostFlow/intent-evidence-v1` record. source와 독립적으로 컴파일하고 결속한다. 이전 evidence의 source digest, interpretation confirmation digest, condition digest 또는 authored node link가 맞지 않으면 거부한다.
-- 선택적인 `sourceClosure`: `{ filename, revision, text }`의 제한된 배열로, 명시적 import를 위해 컴파일러에 직접 전달한다. 조회는 import 파일을 디스크에서 읽지 않는다.
+- `source: { text, filename, documentId, revisionId }`. `text`는 완전한 정본 `.ghost.md` 프로그램이며, ID는 작성된 해당 revision을 명시적으로 가리킵니다.
+- `intentEvidence`: 완전한 `GhostFlow/intent-evidence-v1` 레코드. 독립적으로 컴파일되어 해당 소스에 결속됩니다. source digest, interpretation confirmation digest, condition digest, 작성된 node link 중 하나라도 오래되어(일치하지 않아) stale인 evidence 레코드는 거부됩니다.
+- 선택적인 `sourceClosure`: 명시적 import를 위해 컴파일러에 직접 전달하는 `{ filename, revision, text }`의 제한된 배열. 조회는 import된 파일을 디스크에서 읽지 않습니다.
 
-Import를 컴파일하면 결과의 `source.sourceClosureSha256`은 import된 document revision과 정확한 text를 포함하는 컴파일러의 canonical closure를 hash한다. Root document/revision ID가 같아도 closure가 바뀌면 `source-revision-reused`에 해당한다. Root source SHA가 바뀌지 않은 경우에도 마찬가지다. Import SHA pin은 컴파일러가 계속 강제한다.
+**Import.** import를 컴파일하면 결과의 `source.sourceClosureSha256`은 import된 문서의 revision과 정확한 텍스트를 포함한 컴파일러의 정본 closure를 hash합니다. root 문서/revision ID가 같은데 closure가 바뀌면, root source SHA가 바뀌지 않았더라도 `source-revision-reused`에 해당합니다. import SHA pin은 여전히 컴파일러가 강제합니다.
 
-`requirementContract`는 선택적이고 외부에서 제공된다. 형태는 `{ id, revision, reference, requirements }`다. 명시적인 빈 `requirements: []`는 충족되지 않은 요구사항이 없는 `supplied` 상태이고, 생략하면 `not-supplied`다. 각 requirement는 다음 필드를 정확히 포함한다.
+**`requirementContract`.** 선택적이며 외부에서 제공됩니다. 형태는 `{ id, revision, reference, requirements }`입니다.
+
+- 명시적인 빈 `requirements: []`는 `supplied`이며, 충족되지 않은 요구사항이 없습니다.
+- contract를 생략하면 `not-supplied`입니다.
+
+모든 requirement는 정확히 다음 필드를 가집니다.
 
 ```json
 {
@@ -33,29 +51,89 @@ Import를 컴파일하면 결과의 `source.sourceClosureSha256`은 import된 do
 }
 ```
 
-`interpretation.id`는 필수이고 `revision`, `sha256`은 정확한 pin을 위한 선택 필드다. digest는 기존 `intentInterpretationDigest`이며, 해석된 내용은 포함하지만 주장된 confirmation은 제외한다. `conditionRefs`는 선택 필드다. 제공하는 경우 해당 interpretation이 소유한 condition의 정확한 id/revision/digest 참조를 담는다. `level`은 `represented` 또는 `confirmed`다. `represented`는 일치하는 interpretation과 제공된 condition 참조만 요구한다. assumption 또는 undecided 상태도 포함할 수 있으며 그 상태를 바꾸지 않는다. `confirmed`는 여기에 더해 컴파일러가 보고한 `recorded` confirmation(현재 상태인 policy-derived decision 포함)과 **제공된 각 condition 참조**의 `recorded` 상태를 요구한다. condition 참조를 제공하지 않으면 interpretation decision만 검사하며, 모든 condition이 확인되었다고 간주하지 않는다. `onUnmet`은 `report`, `hold`, `block` 중 하나다. `actionRefs`와 `claimRefs`는 서로 구분되는 고유 문자열 배열이다. 이는 외부 consumer를 위한 메타데이터로 반환된다. 조회가 hold 또는 block을 실행하지 않는다.
+| 필드 | 의미 |
+|---|---|
+| `interpretation` | `id`는 필수입니다. `revision`과 `sha256`은 선택적인 정확한 pin입니다. digest는 기존 `intentInterpretationDigest`이며, 해석된 내용은 포함하지만 주장된 confirmation은 제외합니다. |
+| `conditionRefs` | 선택 사항입니다. 제공하면 해당 interpretation이 소유한 condition에 대한 정확한 id/revision/digest 참조를 담습니다. |
+| `level` | `represented` 또는 `confirmed`(아래 참조). |
+| `onUnmet` | `report`, `hold`, `block`. |
+| `actionRefs`, `claimRefs` | 서로 구분되는, 고유 문자열 배열. |
 
-미충족 code는 interpretation 누락, interpretation revision/content 불일치, condition 누락 또는 변경, confirmed 범위 밖 condition, `undecided`, `unconfirmed`, `policy-not-current` 같은 decision 상태를 구분한다. 명시적으로 제공된 requirement만 검사한다. contract가 없으면 누락된 requirement를 추론하지 않는다.
+두 level의 차이는 다음과 같습니다.
+
+- **`represented`**는 일치하는 interpretation과, 제공된 condition 참조만 요구합니다. assumption이나 undecided 상태를 포함할 수 있으며 그 상태를 바꾸지 않습니다.
+- **`confirmed`**는 여기에 더해 interpretation에 대해 컴파일러가 보고한 `recorded` confirmation(현재 유효한 policy-derived decision 포함)과, **제공된 각 condition 참조**의 `recorded` 상태를 요구합니다. condition 참조를 제공하지 않으면 `confirmed`는 interpretation decision만 검사합니다. 모든 condition이 확인되었다는 뜻이 결코 아닙니다.
+
+`onUnmet`, `actionRefs`, `claimRefs`는 외부 소비자를 위한 메타데이터로 반환됩니다. 이 조회가 hold나 block을 직접 수행하지는 않습니다.
+
+**미충족 코드**는 다음을 구분합니다.
+
+- interpretation 누락.
+- interpretation revision/내용 불일치.
+- condition 누락 또는 변경.
+- 확인된 범위 밖의 condition.
+- `undecided`, `unconfirmed`, `policy-not-current` 같은 decision 상태.
+
+명시적으로 제공된 requirement만 검사합니다. contract가 없으면 누락된 requirement를 추론하지 않습니다.
 
 ## 이전 revision과 transition
 
-`previous`가 제공되면 독립적으로 컴파일하고 검증한다. 각 interpretation 행에는 다음이 포함된다.
+`previous`를 제공하면 독립적으로 컴파일하고 검증합니다. 각 interpretation 행에는 digest 두 개가 들어갑니다.
 
-- `contentSha256`: decision을 제외한 해석된 내용에 대해 컴파일러가 기존 방식으로 계산하는 digest.
-- `recordSha256`: canonical JSON `{ interpretation, conditions }`의 SHA-256. 완전한 decision과 해당 interpretation이 소유한 **모든 condition**을 포함한다. 따라서 해석 문장이나 bytecode가 바뀌지 않아도 condition만 바뀌면 이 비교 identity가 달라진다.
+| Digest | 대상 |
+|---|---|
+| `contentSha256` | decision을 제외한, 해석된 내용에 대해 컴파일러가 기존 방식으로 계산한 digest. |
+| `recordSha256` | canonical JSON `{ interpretation, conditions }`의 SHA-256. 완전한 decision과 **이 interpretation이 소유한 모든 condition**을 포함합니다. 따라서 해석된 텍스트와 bytecode가 바뀌지 않아도 condition만 바뀌면 이 비교 identity가 달라집니다. |
 
-비교 결과에는 완전한 record 양쪽과 함께 `added`, `removed`, `unchanged`, `changed` 행이 반환된다. ID가 같으면 ID 기준으로 짝을 짓는다. ID가 다른 rename은 모호하지 않은 명시적 transition을 통해서만 짝을 짓는다. Transition은 `{ from: { id, revision, sha256 }, to: { id, revision, sha256 }, actor, recordRef, at }` 형태이며 digest는 전체 `recordSha256` 값이다. 각 pin은 일대일이어야 하며 중복, 모호함, 오래됨, 불일치가 있는 pin은 거부한다. transition이 없는 변경 행에는 `transition-link-missing`이 붙는다. 같은 ID와 revision에서 해석된 내용이 바뀌면 `interpretation-revision-reused`가 붙고, condition ID와 revision이 같은데 condition 내용이 바뀌면 `condition-revision-reused:<id>`가 붙는다. Root 비교는 document ID와 revision ID가 같은데 source bytes가 바뀐 경우 `source-revision-reused`를 표시한다. 이는 진단이며 runtime blocker가 아니다. decision이나 condition만 바뀌면 해석 내용 revision은 그대로 둘 수 있지만, 변경된 전체 record에는 여전히 transition link가 필요하다. 이름 변경에는 동일 ID의 interpretation revision 경고를 적용하지 않는다. 이전 confirmation을 현재 source로 자동 이전하지 않는다.
+**행 짝짓기.** 비교 결과는 `added`, `removed`, `unchanged`, `changed` 행을 반환하며, 각 행에는 양쪽의 완전한 레코드가 들어갑니다.
+
+- ID가 같은 행은 ID로 짝을 짓습니다.
+- ID가 바뀐 이름 변경은 명시적이고 모호하지 않은 transition을 통해서만 짝을 짓습니다.
+- transition의 형태는 `{ from: { id, revision, sha256 }, to: { id, revision, sha256 }, actor, recordRef, at }`입니다. digest는 전체 `recordSha256` 값입니다.
+- pin은 일대일이어야 합니다. 중복되거나, 모호하거나, stale이거나, 일치하지 않는 pin은 거부됩니다.
+
+**진단.** 다음은 진단일 뿐 런타임 blocker가 아닙니다.
+
+| 진단 | 발생 조건 |
+|---|---|
+| `transition-link-missing` | 변경된 행에 transition이 없습니다. |
+| `interpretation-revision-reused` | 같은 ID와 revision에서 해석된 내용이 바뀌었습니다. |
+| `condition-revision-reused:<id>` | 같은 condition ID와 revision에서 condition이 바뀌었습니다. |
+| `source-revision-reused` | root 비교에서, 같은 문서 ID와 revision ID인데 소스 바이트가 바뀌었습니다. |
+
+decision이나 condition만 바꾸면 해석된 내용의 revision은 그대로 둘 수 있지만, 변경된 전체 레코드에는 여전히 transition link가 필요합니다. 이름 변경에는 같은 ID의 interpretation revision 경고가 발생하지 않습니다. 이전 confirmation은 현재 소스로 자동 이전되지 않습니다.
 
 ## 결과와 한도
 
-성공 결과는 `GhostFlow/intent-decisions-result-v1`, `outcome: "completed"`, 정확한 request/source/evidence digest, `current.decisions`, `current.judgments`, `requirements`, `comparison`, `trust`를 반환한다. 각 decision에는 원래 interpretation, 원래 source 참조, decision, 해당 interpretation이 소유한 모든 condition과 confirmation 범위 및 external check ID가 유지된다. 기존 judgment는 `not-evaluated`로 남고, 행위자 권한은 `not-authenticated`로 남는다. Policy의 `current`, `expired`, `unknown`은 원래 record에서 각각 구분되며, expired/unknown은 `confirmed` requirement를 충족할 수 없다. Source와 bytecode hash는 별도로 보고하므로 bytecode가 같더라도 prose 변경을 구별할 수 있다.
+**성공.** 성공한 호출은 `GhostFlow/intent-decisions-result-v1`을 다음과 함께 반환합니다.
 
-입력은 순환이 없는 JSON 데이터이며 직렬화된 UTF-8 기준 524,288 bytes, 깊이 24로 제한된다. Source text는 최대 262,144자다. Source closure는 최대 32개 항목이며, requirements, transition record 및 기타 제한 목록은 최대 128개 항목이다. 희소 배열, 중복 ID/참조, 잘못된 필드, 잘못된 timestamp는 거부된다. API는 컴파일 전에 입력을 복사하며 결과는 호출자 객체와 별칭을 공유하지 않는다. 완전한 출력은 UTF-8 기준 최대 524,288 bytes다. 확장 결과가 이 한도를 넘으면 API는 정확한 request SHA-256과 `output-limit` 진단이 포함된 `outcome: "incomplete"`만 반환하며, 충족 또는 확인된 답변의 일부는 제공하지 않는다. CLI는 종료 코드 1로 끝난다. 형식이 잘못된 입력은 CLI에서 `rejected`를 출력하고 종료 코드 1로 끝난다.
+- `outcome: "completed"`.
+- 정확한 request/source/evidence digest.
+- `current.decisions`, `current.judgments`, `requirements`, `comparison`, `trust`.
 
-저장소 root에서 실행 가능한 허구 regression을 실행한다.
+각 decision은 원래 interpretation, 원래 source 참조, decision, 그리고 확인 범위와 외부 check ID를 포함한 소유 condition 전체를 유지합니다. 다음 사항은 의도적으로 해결하지 않은 채 둡니다.
+
+- 기존 judgment는 `not-evaluated`로, 행위자 권한은 `not-authenticated`로 남습니다.
+- 정책의 `current`, `expired`, `unknown`은 원래 레코드에서 서로 구분됩니다. `expired`와 `unknown`은 `confirmed` requirement를 충족할 수 없습니다.
+- 소스 hash와 bytecode hash를 따로 보고하므로, bytecode가 같은 본문 변경도 식별할 수 있습니다.
+
+**입력 한도.**
+
+| 한도 | 값 |
+|---|---|
+| 입력 | 순환 없는 JSON 데이터, 직렬화된 UTF-8 기준 최대 524,288바이트, 깊이 24 |
+| 소스 텍스트 | 최대 262,144자 |
+| Source closure | 최대 32개 항목 |
+| Requirements, transition 레코드, 기타 제한 목록 | 최대 128개 항목 |
+
+희소 배열, 중복 ID/참조, 잘못된 필드, 잘못된 timestamp는 거부됩니다. API는 컴파일 전에 입력을 복사하므로, 결과가 호출자 객체와 별칭(alias)을 공유하지 않습니다.
+
+**출력 한도.** 완전한 출력은 UTF-8 기준 524,288바이트로 제한됩니다. 확장 결과가 이 한도를 넘으면 API는 `outcome: "incomplete"`, 정확한 request SHA-256, `output-limit` 진단만 반환합니다. 부분적인 충족 또는 확인 답변은 반환하지 않으며, CLI는 종료 코드 1로 끝납니다. 형식이 잘못된 입력에 대해 CLI는 `rejected`를 출력하고 종료 코드 1로 끝납니다.
+
+저장소 root에서 실행 가능한 가상 회귀 테스트를 실행합니다.
 
 ```sh
 node --test tests/intent-decisions.test.mjs
 ```
 
-이 테스트는 네 decision 상태, 일부만 확인된 상태, 명시적 requirement 정책, source 변경, 정확한 transition, 한도, JSON/TOON parity를 다룬다. Fixture의 행위자와 참조는 만들어낸 값이며, 외부 권한이나 device 동작을 입증하지 않는다.
+이 테스트는 네 가지 decision 상태, 부분 확인, 명시적 requirement 정책, 소스 drift, 정확한 transition, 한도, JSON/TOON parity를 다룹니다. Fixture의 행위자와 참조는 지어낸 것이며, 이 테스트는 외부 권한이나 장치 동작을 입증하지 않습니다.

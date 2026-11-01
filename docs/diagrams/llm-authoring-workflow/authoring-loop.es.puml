@@ -1,0 +1,27 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName Helvetica
+skinparam ArrowColor #555555
+skinparam ActivityBorderColor #555555
+
+start
+:Recuperar la Referencia §1.2, §1.5, §4.7
+(citation + digest);
+:Comprobar rev-1-input-v1
+de build/authoring/pump.ghost.md;
+:La comprobación falla: el span del diagnóstico
+señala pump <- start && ;  en el documento original;
+:Editar el mismo documento
+(rev-2-input-v1: pump <- requested';);
+:Comprobar rev-2 y luego compilar
+(GFB + mapa de fuente);
+:Simular escaneos a 0, 1 y 2 ms
+(intenciones virtuales solicitada / segura);
+:Plantear al usuario la pregunta abierta
+(¿duración máxima de marcha?);
+note right
+  No se añade ningún temporizador
+  hasta que el usuario responda.
+end note
+stop
+@enduml

@@ -1,0 +1,23 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontSize 12
+skinparam componentStyle rectangle
+left to right direction
+
+rectangle "Fuente canónica .ghost.md (escrita por el autor)" as doc {
+  card "comentario ghostflow:anchor\n+ un párrafo / cita en bloque\n(id, kind, status, origin)" as A
+  card "bloque ghost:\ncomentario ghostflow:link\n(id, relation)" as L
+  card "Siguiente declaración /\nsentencia de nivel superior" as N
+}
+rectangle "Compilador\n(solo valida lo que\naportó el autor)" as comp
+card "Bytes GFB, manifiesto,\ncomportamiento en runtime\n(sin cambios)" as out
+card "complemento source-trace-v1\nintentAnchors[]\nintentLinks[]" as trace
+
+L --> A : mismo id
+L --> N : inmediatamente\nsiguiente
+A --> comp
+L --> comp
+N --> comp
+comp --> out
+comp --> trace : ubicaciones + id de nodos,\nsin copiar la prosa
+@enduml

@@ -1,0 +1,29 @@
+@startuml
+hide empty description
+skinparam shadowing false
+skinparam defaultFontName Helvetica
+skinparam state {
+  BackgroundColor White
+  BorderColor #555555
+}
+title #74にマッピングした場合のProcessライフサイクルの観測
+
+state received
+state rejected : 理由コード + 詳細\n（開始前に受け入れられたキャンセルを含む）
+state started
+state completed
+state cancelled : 理由は任意\nドメインのキャンセル証拠が必要
+state failed : 理由コード + 詳細
+
+[*] --> received
+received --> rejected
+received --> started : 宣言された開始の証拠
+started --> completed : 宣言された完了の証拠
+started --> cancelled
+started --> failed
+rejected --> [*]
+completed --> [*]
+cancelled --> [*]
+failed --> [*]
+note "終端状態には後続がない。\n#115の順序で最初の有効な終端が勝つ。" as N1
+@enduml

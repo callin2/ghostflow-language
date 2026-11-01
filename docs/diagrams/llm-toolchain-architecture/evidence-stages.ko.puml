@@ -1,0 +1,19 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontSize 12
+left to right direction
+title 출력 증거: 분리된 사실, 분리된 소유자
+rectangle "Rust 코어\n(ghostsim / CLI는 여기까지)" as CoreBox {
+  card "요청 의도" as Req
+  card "안전 의도" as Safe
+}
+rectangle "Device (farm-device 펌웨어)" as DeviceBox {
+  card "적용된 쓰기\n(renderer 응답)" as Applied
+  card "레지스터 래치\n(읽기 확인)" as Latch
+}
+card "확인된 효과\n(독립 관측;\n현재 펌웨어는 보고하지 않음)" as Confirmed
+Req --> Safe : 제약
+Safe --> Applied : 매핑 + 쓰기
+Applied --> Latch : 레지스터 읽기
+Latch --> Confirmed : 접점/부하 관측
+@enduml

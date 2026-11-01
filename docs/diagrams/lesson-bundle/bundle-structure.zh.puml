@@ -1,0 +1,24 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName Helvetica
+skinparam rectangleRoundCorner 8
+skinparam ArrowColor #555555
+left to right direction
+
+rectangle "ghostflow-lesson-v1 课程包（JSON）" as B {
+  rectangle "source\n文本、sha256、\nmediaType" as SRC
+  rectangle "playback\ndurationMs、\n检查点" as PB
+  rectangle "scenarios\n帧：atMs、\ninputs、samples?" as SC
+  rectangle "toolchain\n声明的 ID、\nABI 1" as TC
+  rectangle "bundleSha256" as DG
+}
+rectangle "validateLessonBundle\n字段、限制、顺序、\n摘要" as VAL
+rectangle "compileLessonBundle\n提取 ghost 围栏、\n编译、对照清单\n检查帧" as CMP
+rectangle "使用方 / 运行时\n每帧调用\nruntime.step(...)" as RT
+
+B --> VAL
+VAL --> CMP : 有效的课程包
+CMP --> RT : 已编译程序\n+ 已检查的帧
+PB ..> SRC : sourceSpan 行
+PB ..> SC : scenarioId
+@enduml

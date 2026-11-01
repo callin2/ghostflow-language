@@ -1,0 +1,25 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName "Hiragino Sans"
+skinparam ArrowColor #555555
+skinparam rectangle {
+  BackgroundColor White
+  BorderColor #555555
+}
+title カレンダーの層と実行経路
+
+rectangle "レビュー済みデータセット\nkr-public-2026-2027.json" as D
+rectangle "HolidayCalendar\ncreateKoreanHolidayCalendar" as H
+rectangle "WorkCalendar\ncreateWorkCalendar\n（週間マスク、祝日ポリシー）" as W
+rectangle "合成カレンダー\ncomposeCalendar\n（新しい ID + リビジョン）" as O
+rectangle "設置バインディング\n（カレンダー ID、タイムゾーン）" as B
+rectangle "tick ごとのコンテキスト事実\n（クロック、カバレッジ、行、\nenvelope.snapshot）" as F
+rectangle "共有 Rust コア\n（日フィルタ、受け入れ、\nギャップ/復旧、重複抑止）" as R
+
+D --> H
+H --> W : ベース
+W --> O : ベース + オーバーライド
+O --> B
+B --> F
+F --> R
+@enduml

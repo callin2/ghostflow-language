@@ -1,0 +1,14 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName Helvetica
+skinparam defaultFontSize 13
+title Framed host 리셋/실패 경계 (기존 계약)
+
+[*] --> Ready : 새 호스트 인스턴스\n(새 runId)
+Ready --> Ready : 프레임 성공 /\n마지막 완료 결과 게시
+Ready --> Ready : 조건화 전 검증\n거부 (재시도 가능)
+Ready --> Faulted : 조건화 또는\nVM dispatch 실패
+Faulted : fault 래치
+Faulted : 마지막으로 확정된 결과는\n계속 사용 가능
+Faulted --> [*] : 이후 step에는\n새 호스트 인스턴스 필요
+@enduml

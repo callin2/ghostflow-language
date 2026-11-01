@@ -1,0 +1,32 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName "Hiragino Sans"
+skinparam defaultFontSize 13
+skinparam ArrowColor #526d76
+
+start
+:イミュータブルな ScheduleFacts を 1 つ受け取る
+（クロックスナップショット + スケジュールごとに 1 グループ）;
+:クロックゲートをステージング
+（gap、信頼、復旧のチェック）;
+:各プレリュードエントリを依存関係の順に、
+古い状態とステージング済みの射影に対して
+1 回だけ評価する;
+note right
+  1 つのスケジュールで新たに通過した
+  発生が複数ある場合:
+  すべて取りこぼしとして記録し、どれも実行しない
+end note
+:遷移と意図を実行する
+（ステージング済みのプレリュードエントリを読む）;
+if (失敗しうる式がすべて成功した？) then (はい)
+  :まとめて確定: window、クロック状態、
+  発生の消費、スケジュールの観測、
+  スカラー状態;
+  :TickRecord が事実と判断を保持する;
+else (いいえ)
+  :すべての候補を破棄する;
+  :後のリトライでも同じ通過が見える;
+endif
+stop
+@enduml

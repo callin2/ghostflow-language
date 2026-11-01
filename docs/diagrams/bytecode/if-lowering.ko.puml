@@ -1,0 +1,24 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName Helvetica
+skinparam ArrowColor #555555
+skinparam rectangle {
+  BackgroundColor White
+  BorderColor #555555
+}
+title if condition then yes else no의 lowering (형식 3 이상)
+
+rectangle "condition" as C
+rectangle "JUMP_IF_FALSE(length(yes) + 3)" as JF
+rectangle "yes" as Y
+rectangle "JUMP(length(no))" as J
+rectangle "no" as N
+rectangle "식의 끝\n(결과 타입 값 하나)" as E
+
+C --> JF
+JF --> Y : true\n(그대로 진행)
+JF --> N : false\n(앞으로 점프)
+Y --> J
+J --> E : 앞으로 점프
+N --> E
+@enduml

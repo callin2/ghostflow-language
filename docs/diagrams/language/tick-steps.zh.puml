@@ -1,0 +1,30 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName Helvetica
+skinparam ArrowColor #555555
+skinparam ActivityBorderColor #555555
+
+start
+:1. 冻结策略、配置档修订版、
+输入以及旧状态;
+:2. 计算 let/with 和每个 next
+（读取旧状态 + 相同输入）;
+:3. 构建完整的候选状态
+（无转移 = 保持旧值）;
+:4. 计算 intent/emit
+（state = 旧值，next = 候选值）;
+:5. 应用安全约束
+（requested -> safe 意图）;
+if (tick 失败？) then (是)
+  :不提交任何内容;
+  :宿主应用其
+  安全输出策略;
+  stop
+else (否)
+  :6. 一起提交状态、输出
+  和记录;
+  :7. 仅真实宿主：把
+  安全意图应用到渲染器;
+  stop
+endif
+@enduml

@@ -1,0 +1,24 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontSize 13
+skinparam defaultFontName "Hiragino Sans"
+title npm test（tools/verify-language.mjs）：最初の失敗で停止
+
+start
+:事前チェック：Node 22+、POSIX ホスト、
+ソースハッシュ、カタログ、ドキュメントチェック;
+:1. ツールチェーンのバージョン + cargo fmt --check;
+:2. レガシーフィクスチャをコンパイル（include_bytes!）;
+:3. cargo test --locked --offline --workspace;
+:4. 1 つのコアからネイティブランナー、release scan_tape
+ランナー、release WASM をビルド;
+:5. Node 言語/統合スイート
+（ネイティブ/WASM テープパリティを含む）;
+:6. 新しいランナーでチュートリアルを実行
+（ネイティブ/WASM トレースを比較）;
+:7. リソース、ランナー/WASM の
+ダイジェスト、ソースハッシュを記録;
+:build/verification.json を書き込み
+（+ build/verification-runs/ に一意のコピー）;
+stop
+@enduml

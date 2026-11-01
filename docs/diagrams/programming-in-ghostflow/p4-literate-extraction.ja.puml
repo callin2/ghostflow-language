@@ -1,0 +1,20 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName "Hiragino Sans"
+skinparam defaultFontSize 13
+skinparam componentStyle rectangle
+title 文芸的ドキュメント：実行されるのはトップレベルの ghost ブロックだけ
+
+file "follow-switch.ghost.md\n（編集可能な原本）" as doc
+rectangle "説明の段落、\n他の info string、\n入れ子のフェンス" as prose
+rectangle "トップレベルの ```ghost ブロック\n（ドキュメント順）" as blocks
+component "コンパイラがブロックを結合し\n1つのルート control にする" as cc
+file "GFB + マニフェスト + ソースマップ\n（派生成果物）" as out
+
+doc --> prose
+doc --> blocks
+prose ..> cc : 実行されない\n（リビジョンだけが変わる）
+blocks --> cc
+cc --> out
+out ..> doc : エラー位置は\nここを指す
+@enduml

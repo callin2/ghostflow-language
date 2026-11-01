@@ -1,0 +1,21 @@
+@startuml
+skinparam shadowing false
+skinparam ArrowColor #555555
+hide empty description
+
+[*] --> Idle
+Idle --> Filling : 下限スイッチが乾く
+Filling --> Idle : 上限スイッチが濡れる
+Idle --> SensorConflict : 上限が濡れ、下限が乾いている
+Filling --> SensorConflict : 上限が濡れ、下限が乾いている
+SensorConflict --> Idle : 競合が解消\n（1 スキャン、ポンプ停止）
+
+state Filling : fill_pump ON
+state Idle : fill_pump OFF
+state SensorConflict : fill_pump OFF
+
+note as N
+どちらかの水位入力が取得不能なら、
+phase は変わらずに保持されます。
+end note
+@enduml

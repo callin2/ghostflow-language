@@ -1,0 +1,31 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName "Hiragino Sans"
+title E01の遷移シナリオ：離す、押す、離す、故障、押す（1ステップ = 1 tick）
+
+concise "switch_on" as S
+binary "lamp" as L
+scale 1 as 120 pixels
+
+@1
+S is "ok(false)"
+L is low
+
+@2
+S is "ok(true)"
+L is high
+
+@3
+S is "ok(false)"
+L is low
+
+@4
+S is "fault(Stale)"
+L is low
+
+@5
+S is "ok(true)"
+L is high
+
+@6
+@enduml

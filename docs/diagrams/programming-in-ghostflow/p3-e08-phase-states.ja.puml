@@ -1,0 +1,15 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName "Hiragino Sans"
+hide empty description
+
+[*] --> Idle
+Idle --> Waiting : start\n（age は 0 から再開）
+Waiting --> Idle : !start
+Waiting --> Running : start && age >= value\n（delay が ok(value) のとき）
+Running --> Idle : !start
+Waiting --> Idle : delay が fault(_)
+Running --> Idle : delay が fault(_)
+
+note "1 tick で行う遷移は最大 1 つです。\nobserved_start が fault なら phase は値を保持します。\nmotor <- phase' == Running" as N
+@enduml

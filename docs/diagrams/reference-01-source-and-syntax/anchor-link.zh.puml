@@ -1,0 +1,19 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontSize 13
+skinparam rectangleBorderColor #555555
+skinparam rectangleBackgroundColor #F7F7F7
+
+rectangle "Markdown 正文" as PROSE {
+  rectangle "HTML 注释\nghostflow:anchor id=… kind=… status=… origin=…" as ANCHOR
+  rectangle "紧随其后的顶层段落\n或引用块" as TEXT
+}
+rectangle "ghost 围栏" as FENCE {
+  rectangle "// ghostflow:link id=… relation=…" as LINK
+  rectangle "紧随其后的可追踪语句" as STMT
+}
+
+ANCHOR --> TEXT : 标识原文
+LINK --> STMT : 恰好标识一条
+LINK ..> ANCHOR : 引用 id\n(implements | constrains |\nfallback | assumes)
+@enduml

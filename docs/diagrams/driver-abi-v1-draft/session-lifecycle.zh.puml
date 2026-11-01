@@ -1,0 +1,21 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName Helvetica
+title 一个 Driver 会话（epoch）——按提议
+
+participant "宿主" as Host
+participant Driver
+Host -> Driver : gfdrv_negotiate(major 1, max_minor)
+Host -> Driver : describe -> 不可变元数据
+note over Host : 绑定准入\n（将元数据与 Program 契约比较）
+Host -> Driver : open(binding_and_budget)
+Driver --> Host : 会话（新 epoch）或错误，无输出
+loop 每次扫描
+  Host -> Driver : poll -> 有序输入记录
+  note over Host : 核心求值与提交
+  Host -> Driver : apply(安全命令) -> 回执
+end
+Host -> Driver : cancel(command_id) -> 回执（可选）
+Host -> Driver : close（恰好一次）
+note over Host, Driver : 重启 = 新的会话 epoch，\n重新验证元数据和绑定，\n不隐式恢复，不重放
+@enduml

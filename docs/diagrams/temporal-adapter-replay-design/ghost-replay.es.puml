@@ -1,0 +1,27 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName Helvetica
+skinparam defaultFontSize 13
+skinparam ArrowColor #526d76
+
+rectangle "Runtime en vivo" as L {
+  rectangle "Journal\n(registros retenidos)" as J
+  rectangle "Estado, entradas pendientes,\nintenciones, reloj, IDs de trama" as S
+  rectangle "Traza en vivo /\nresultado encuadrado" as T
+}
+rectangle "Instancia ghost" as G {
+  rectangle "Bifurcación del módulo\ninstalado + capacidades" as F
+}
+rectangle "Búfer de resultados de reproducción\n(gf_replay_ptr/len,\ngf_frame_replay_ptr/len)" as B
+actor "Sumideros de efectos /\nactuadores" as A
+
+J --> F : punto de control antes del prefijo\n+ los `count` registros más antiguos
+F --> B : reemplaza solo si tiene éxito
+F ..> A : sin despacho de efectos
+F ..> S : sin cambios en vivo
+F ..> T : nunca se sobrescribe
+note bottom of G
+  Nunca despacha efectos ni
+  cambia el estado, el journal o las salidas en vivo
+end note
+@enduml

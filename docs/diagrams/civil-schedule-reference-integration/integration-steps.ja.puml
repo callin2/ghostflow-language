@@ -1,0 +1,17 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName "Hiragino Sans"
+skinparam defaultFontSize 13
+skinparam activity {
+  BackgroundColor #F8F8F8
+  BorderColor #555555
+}
+start
+:完了：構造的 pulse スライス\n（構文解析、型検査、チェッカーのディスクリプタ）;
+:1. 暦上の発生の事実\n（プロバイダは事実を供給し、.due は決して計算しない）;
+:2. Solar 以外にも対応する\nポータブルな受け入れディスクリプタ;
+:3. 検証済みバイトコード、WASM/ネイティブの\nアクティベーション、プレリュード実行;
+:4. ソース -> 成果物 -> 実行を証明し、\n生成時の拒否とホストの .due を削除;
+:5. ポリシーを Window/Run、\nキャンセル、保持クロックへ拡張;
+stop
+@enduml

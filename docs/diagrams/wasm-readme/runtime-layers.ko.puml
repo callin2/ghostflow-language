@@ -1,0 +1,21 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontSize 13
+skinparam rectangle {
+  BackgroundColor #F8F8F8
+  BorderColor #555555
+}
+
+rectangle "호스트 (브라우저 또는 Node)\n영속성, 물리적 정지, 페일세이프 담당" as Host
+rectangle "station.mjs / policy.mjs\n공유 펌프 경계, 제약 템플릿" as Station
+rectangle "control-runtime.mjs\n가상 출력, 센서 엔진,\n입력 타입 검사, 추적에 품질 기록" as Control
+rectangle "ghostflow-runtime.mjs\n원시 ABI용 무의존성 래퍼" as Wrapper
+rectangle "ghostflow-wasm cdylib (C ABI)\nESP-IDF와 같은 ghostflow-core" as Wasm
+rectangle ".gfb + 신뢰된 .manifest.json" as Artifact
+
+Host --> Station
+Host --> Control
+Control --> Wrapper
+Wrapper --> Wasm : gf_alloc, .gfb 복사,\nexport 호출
+Artifact --> Control
+@enduml

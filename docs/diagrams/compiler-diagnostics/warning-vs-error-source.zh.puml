@@ -1,0 +1,15 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontSize 13
+rectangle "导入文档中的警告\n（编译成功）" as W {
+  card "source = 根文档" as WS
+  card "span.file = 导入的文档" as WF
+  card "sourceClosure 保留子文档身份标识" as WC
+}
+rectangle "导入文档中的错误\n（编译失败）" as E {
+  card "source = 子文档\n（文件名 + SHA-256）" as ES
+  card "requestSource = 根请求" as ER
+  card "span.file = 子文档" as EF
+}
+W -[hidden]right- E
+@enduml

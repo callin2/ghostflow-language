@@ -1,0 +1,24 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName Helvetica
+skinparam rectangleRoundCorner 8
+skinparam ArrowColor #555555
+left to right direction
+
+rectangle "El host suministra\ninput, lecturas de sensor\n(valor o fallo)" as IN
+rectangle "Estado anterior\nwatering" as PREV
+rectangle "Cálculo puro\nlet, fn, if, case" as CALC
+rectangle "Estado siguiente\nwatering'" as NEXT
+rectangle "Conexiones de salida\npump <- ...;" as OUT
+rectangle "Restricciones require\nbloquean salidas bool" as REQ
+rectangle "Host / renderizador\naplica las salidas,\nes dueño del fail-safe" as HOST
+
+IN --> CALC
+PREV --> CALC
+CALC --> NEXT
+CALC --> OUT
+NEXT --> OUT : las expresiones de salida\npueden leer el estado siguiente
+OUT --> REQ : intenciones candidatas
+REQ --> HOST : intención solicitada / segura
+NEXT ..> PREV : se consolidan juntos\nal final del tick
+@enduml

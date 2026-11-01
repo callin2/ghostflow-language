@@ -1,0 +1,29 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontSize 12
+title 설정 emission: admission과 그 결과 Result
+start
+:설정 패킷 도착
+(운영자 편집 또는 producer 관측);
+if (형식 오류, 인식할 수 없는 대상,\nstale Program/base revision\n또는 권한 거부?) then (예)
+  :admission 전에 거부;
+  note right: 관측이 만들어지지 않음
+  stop
+else (아니요)
+endif
+if (한 aggregate 안에서\n명시적 fault 코드 충돌?) then (예)
+  :패킷 거부;
+  stop
+else (아니요)
+endif
+if (균일한 명시적 fault?) then (예)
+  :지정된 그룹에 그 fault\n(예: SettingsUnavailable);
+elseif (모든 payload가 함께 검증됨?) then (예)
+  :지정된 모든 config에 ok(value);
+else (아니요)
+  :지정된 그룹에\nfault(SettingsInvalid);
+endif
+:수락된 emission이\n설정 관측 revision을 진행;
+:이 평가 위치의 모든 소비자가\n같은 현재 Result를 읽음;
+stop
+@enduml

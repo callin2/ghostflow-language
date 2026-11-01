@@ -1,0 +1,31 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName "Hiragino Sans"
+skinparam defaultFontSize 13
+skinparam rectangleBorderColor #555555
+rectangle "R1 ユーザーの成果 (P0)" as R1
+rectangle "R2 権限/同一性 (P0)" as R2
+rectangle "R3 実行 (P0)" as R3
+rectangle "R4 ポート/バインディング (P1)" as R4
+rectangle "R5 契約 (P1)" as R5
+rectangle "R6 オーバーライド (P1)" as R6
+rectangle "R7 パッケージ (P1)" as R7
+rectangle "R8 インシデント証拠 (P0)" as R8
+rectangle "R9 受け入れ (P1)" as R9
+R2 --> R3
+R2 --> R4
+R2 --> R6
+R3 --> R5
+R4 --> R5
+R2 --> R7
+R3 --> R7
+R6 --> R7
+R1 --> R8
+R2 --> R8
+R3 --> R8
+R1 --> R9
+R5 --> R9
+R7 --> R9
+R8 --> R9
+note bottom of R9 : R1〜R8 の後にのみ確定
+@enduml

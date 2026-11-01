@@ -1,0 +1,28 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName "Hiragino Sans"
+skinparam defaultFontSize 13
+title オペレーターのプロパティイベント（承認済みの設計、未実装）
+
+start
+:オペレーターが 1 つの操作を送信\n（1 つ以上のプロパティ値）;
+:イベント全体を検証:
+同一性の結合（プログラム同一性が古いか？）
+とすべての値（型、有限値、min/max/step）;
+if (古い、またはいずれかの値が無効か？) then (はい)
+  :イベント全体を拒否;\n変更なし; 以前の値を維持;
+  stop
+else (すべて有効)
+  :有効なイベント位置で\n適用;
+  :新しい設定リビジョン／\n有効位置;
+endif
+note right
+不変: プログラム／ソース／バイトコード、
+run の同一性、デプロイパッケージ。
+再コンパイル、再パッケージ化、
+コントローラ全体の保守停止はなし。
+未解決: 永続性と障害時の順序。
+end note
+:有効なロジックが既存の\n規則のもとで応答;
+stop
+@enduml

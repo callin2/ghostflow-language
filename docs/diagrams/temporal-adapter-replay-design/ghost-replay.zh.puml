@@ -1,0 +1,27 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName Helvetica
+skinparam defaultFontSize 13
+skinparam ArrowColor #526d76
+
+rectangle "实时运行时" as L {
+  rectangle "日志\n（保留的记录）" as J
+  rectangle "状态、待处理输入、\nintent、时钟、帧 ID" as S
+  rectangle "实时 trace /\n帧式结果" as T
+}
+rectangle "ghost 实例" as G {
+  rectangle "派生已安装的\n模块 + 能力" as F
+}
+rectangle "重放结果缓冲区\n(gf_replay_ptr/len,\ngf_frame_replay_ptr/len)" as B
+actor "效果接收端 /\n执行器" as A
+
+J --> F : 前缀之前的检查点\n+ 最早的 `count` 条记录
+F --> B : 仅在成功时替换
+F ..> A : 不分派效果
+F ..> S : 不改变实时内容
+F ..> T : 绝不覆盖
+note bottom of G
+  绝不分派效果，也绝不改变
+  实时状态、日志或输出
+end note
+@enduml

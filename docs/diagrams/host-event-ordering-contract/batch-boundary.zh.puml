@@ -1,0 +1,44 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName Helvetica
+skinparam defaultFontSize 13
+scale 1 as 70 pixels
+hide time-axis
+
+concise "接收记录" as R
+concise "批次" as B
+concise "实例" as I
+
+@0
+R is "r1"
+B is "开放（批次 N）"
+I is "空闲"
+
+@1
+R is "r2"
+
+@2
+R is "锁存"
+B is "N 已关闭"
+I is "求值 N"
+
+@3
+R is "r3"
+
+@4
+I is "提交 + 分发 N"
+
+@5
+R is "r4"
+
+@6
+R is "锁存"
+B is "N+1 已关闭：r3, r4"
+I is "求值 N+1"
+
+@7
+R is "-"
+I is "空闲"
+
+B@2 <-> @6 : r3 和 r4 在锁存之后到达 -> 等待 N+1
+@enduml

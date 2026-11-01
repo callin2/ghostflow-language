@@ -1,0 +1,23 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontSize 13
+title npm test (tools/verify-language.mjs): se detiene en el primer fallo
+
+start
+:Comprobaciones previas: Node 22+, host POSIX,
+hashes de fuentes, catálogo, comprobación de docs;
+:1. Versiones de la cadena de herramientas + cargo fmt --check;
+:2. Compilar el fixture heredado (include_bytes!);
+:3. cargo test --locked --offline --workspace;
+:4. Compilar runner nativo, runner scan_tape
+release y WASM release desde un mismo núcleo;
+:5. Suite de Node de lenguaje/integración
+(incl. paridad de cinta nativa/WASM);
+:6. Tutorial con runners recién compilados
+(comparación de trazas nativa/WASM);
+:7. Registrar recursos, digests de
+runners/WASM y hashes de fuentes;
+:Escribir build/verification.json
+(+ copia única en build/verification-runs/);
+stop
+@enduml

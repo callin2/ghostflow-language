@@ -1,0 +1,21 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName Helvetica
+skinparam defaultFontSize 13
+skinparam ParticipantPadding 12
+
+participant "Productores" as P
+participant "Ingreso del host\n(punto de serialización)" as H
+participant "Núcleo\n(evaluar)" as C
+participant "Renderizador /\nDevice" as D
+
+P -> H : 1. recepciones\n(se asigna receiptSequence)
+H -> H : 2. cerrar el lote\ninmutable
+H -> C : 3. validar y evaluar\nuna instantánea
+C --> H : 4. resultado lógico\n(consolidación o intento fallido)
+H -> H : 5. capturar evidencia\nconsolidada (antes de ganchos)
+H -> D : 6. despachar la intención\nsegura consolidada
+D --> H : 7. resultado del efecto =\nnueva recepción correlacionada
+H -> H : 8. lote posterior: solo\nvinculación tipada explícita
+note over P, H : Los pasos 1 y 7 pueden ocurrir\nde forma asíncrona entre fronteras
+@enduml

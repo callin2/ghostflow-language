@@ -1,0 +1,19 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName "Apple SD Gothic Neo"
+skinparam defaultFontSize 13
+title hysteresis(moisture, on_below: 30%, off_above: 35%, initial: false)
+
+[*] --> NotReady
+state "준비 전 / fault\n(공개 결과는 fault,\n처리 상태는 initial로 초기화)" as NotReady
+state "dry = false" as F
+state "dry = true" as T
+
+NotReady --> F : 복구·필터 조건을 충족한\n정상 샘플 (initial false)
+F --> T : 값 < 30%
+T --> F : 값 > 35%
+F --> F : 값이 [30%,35%] 안
+T --> T : 값이 [30%,35%] 안
+F --> NotReady : Disconnected/Stale/Invalid
+T --> NotReady : Disconnected/Stale/Invalid
+@enduml

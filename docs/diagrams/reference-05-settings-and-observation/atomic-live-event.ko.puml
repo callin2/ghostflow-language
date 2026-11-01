@@ -1,0 +1,28 @@
+@startuml
+skinparam defaultFontName "Apple SD Gothic Neo"
+skinparam shadowing false
+skinparam defaultFontSize 13
+skinparam activityBorderColor #4A6FA5
+skinparam activityBackgroundColor #F7F9FC
+title atomic live 설정 event (§5.2)
+
+start
+:설정 event 도착\n(대상 Program, 기준 revision,\n대상 집합, payload);
+if (envelope 정상, 같은 Program, 최신 기준 revision,\n대상이 식별됨·비어 있지 않음·중복 없음,\nproducer 권한 확인?) then (예)
+  if (묶음에 서로 다른\n명시 fault code가 섞였는가?) then (예)
+    #FDECEA:불일치 packet으로 거부;
+    stop
+  elseif (타입·범위·step·목록 capacity 검증에\n실패한 payload가 있는가?) then (예)
+    :모든 대상에\nfault(SettingsInvalid) emit;
+  elseif (producer가 명시적으로 unavailable인가?) then (예)
+    :모든 대상에\nfault(SettingsUnavailable) emit;
+  else (아니요)
+    :모든 대상에\nok(value) emit;
+  endif
+  :새 settings revision + effective position.\n소스, Program, runId는 그대로.\nstate와 timer는 초기화하지 않음;
+  stop
+else (아니요)
+  #FDECEA:admission 전에 거부\n(어떤 stream에도 emission 없음);
+  stop
+endif
+@enduml

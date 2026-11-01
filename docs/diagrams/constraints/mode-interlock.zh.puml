@@ -1,0 +1,26 @@
+@startuml
+hide empty description
+skinparam shadowing false
+skinparam defaultFontName Helvetica
+skinparam state {
+  BackgroundColor White
+  BorderColor #555555
+}
+title Station 模式互锁（Station 适配器设施契约）
+
+state Stopped
+state Auto
+state Manual
+state Configure : 结构性设置会话\n（禁止重新启动）
+state Stopping : 停止正在进行的工作\n禁止新的启动\n收尾，归还所有权
+
+[*] --> Stopped
+Stopped --> Auto : enter(Auto)\n仅当 stopped(station)
+Stopped --> Manual : enter(Manual)\n仅当 stopped(station)
+Stopped --> Configure : enter(Configure)\n仅当 stopped(station)
+Auto --> Stopping : 显式停止请求
+Manual --> Stopping : 显式停止请求
+Stopping --> Stopped : 停止完成\n（CommandedStop 或 VerifiedStop）
+Configure --> Stopped : 验证 + 原子应用，\n关闭会话
+note "不允许 Auto <-> Manual 直接转换\n也不允许 运行 -> Configure 直接转换" as N1
+@enduml

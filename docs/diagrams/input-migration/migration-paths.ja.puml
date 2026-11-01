@@ -1,0 +1,22 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName "Hiragino Sans"
+skinparam defaultFontSize 13
+
+start
+if (古いプログラムの宣言は?) then (sensor)
+  :コンパイラが移行診断で\n拒否;
+  :`input` に変更し、既存の\n明示的な故障ポリシーを維持;
+else (プレーンなスカラー入力)
+  if (スタンドアロンで必須の\nコンディショニングなし Bool 入力のみ?) then (はい、明示的な要求)
+    :previewLegacyScalarMigration();
+    :レガシー受け入れ\nディレクティブ付きの新しい文書;
+  else (いいえ)
+    :使用箇所をレビュー;
+    :まず故障ポリシーを選ぶ;
+    :case 分析または\n明示的な recover を追加;
+  endif
+endif
+:レビュー済みの新しいリビジョン\n（前のリビジョンはそのまま保持）;
+stop
+@enduml

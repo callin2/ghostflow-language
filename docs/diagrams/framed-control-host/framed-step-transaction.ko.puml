@@ -1,0 +1,28 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName Helvetica
+skinparam defaultFontSize 13
+
+start
+:입력, 샘플, 예약 플래그를\n검증하고 캡처;
+:모든 conditioner에 대해 Rust 소유\n트랜잭션 하나 시작;
+:입력 conditioning 후 완전한\n생성 입력 목록 구성;
+:runtime.scan(명시적 논리 시간);
+if (conditioning 실패 또는\n알려진 네이티브 거부?) then (예)
+  :conditioner 롤백;\n논리 시간과 프레임 ID 유지;
+  :호출자는 같은 프레임 재시도 가능;
+  stop
+elseif (확정 여부 불명 (trap)?) then (예)
+  :호스트 종료\n(롤백을 꾸며내지 않음);
+  stop
+else (성공한 스캔)
+  :conditioner, 논리 시간,\n프레임 ID 확정;
+  if (확정 후 실패?) then (예)
+    :호스트 종료;\n확정된 결과 유지;
+    stop
+  else (아니요)
+    :{vm, sensors, signals, frame} 반환;
+    stop
+  endif
+endif
+@enduml

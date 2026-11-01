@@ -1,0 +1,16 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontSize 12
+start
+:입력 snapshot + 이전 상태;
+if (누락된 입력이 있는가?) then (예)
+  :입력 거부\n(부재가 중요하면 호스트가\n명시적 fault/status 입력을 보냄);
+  stop
+endif
+:모든 next 식 평가\n(이전 상태 + 입력 읽기)\n-> 하나의 후보 상태;
+:intent 평가\n(프라임 없는 state = 이전;\nnext.NAME = 후보);
+:안전 제약\n(requires, mutex)\nrequested -> safe 의도;
+:평가 오류 없음:\n후보 상태 + requested/safe 의도를\n함께 확정;
+:journal: 입력, 이전/새 상태,\n두 의도, 전략, fault;
+stop
+@enduml

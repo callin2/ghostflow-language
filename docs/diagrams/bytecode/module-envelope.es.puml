@@ -1,0 +1,26 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName Helvetica
+skinparam rectangle {
+  BackgroundColor White
+  BorderColor #555555
+}
+title Envolvente del módulo GFB: orden de los campos base
+
+rectangle "magic GFB1" as M
+rectangle "versión de formato u16" as F
+rectangle "nombre del módulo, versión u32" as N
+rectangle "entradas: u16 count + (name, type)" as I
+rectangle "estados: u16 count + (name, type, default)" as S
+rectangle "solo formato 4: nowInput, timeEpochInput, tabla de raíces" as H
+rectangle "estrategias: u16 count + registros de estrategia\n(nombre, prioridad, blob de consulta,\n[formato 4: ventanas], transiciones, intenciones)" as ST
+rectangle "restricciones de seguridad: u16 count + registros" as K
+
+M -down-> F
+F -down-> N
+N -down-> I
+I -down-> S
+S -down-> H
+H -down-> ST
+ST -down-> K
+@enduml

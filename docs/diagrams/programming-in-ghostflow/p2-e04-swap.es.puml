@@ -1,0 +1,24 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontSize 13
+skinparam ActivityBackgroundColor #F7F9FC
+skinparam ActivityBorderColor #4A6FA5
+title E04: ambos estados siguientes leen el mismo estado anterior
+
+start
+:Estado anterior\na = true, b = false;
+fork
+  :a' = b\n-> false;
+fork again
+  :b' = a\n-> true;
+end fork
+:Consolidar ambos a la vez\na = false, b = true;
+:El siguiente tick lee\na = false, b = true;
+fork
+  :a' = b\n-> true;
+fork again
+  :b' = a\n-> false;
+end fork
+:Consolidar ambos a la vez\na = true, b = false;
+stop
+@enduml

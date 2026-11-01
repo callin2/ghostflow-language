@@ -1,0 +1,21 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName Helvetica
+skinparam defaultFontSize 13
+skinparam rectangleRoundCorner 8
+title 比较的两个选项（均为提议）
+
+package "选项 A：编译器组合为一个模块" {
+  rectangle "east + west\n（限定名称）" as A1
+  rectangle "一个 GFB1 模块\n每个 tick 一个时钟\n一次安全处理" as A2
+  A1 --> A2 : 导入 / 限定\nlowering
+}
+
+package "选项 B：多个 VM 实例 + 协调器" {
+  rectangle "协调器\n（提供时钟、输入接入、\n故障扇出策略）" as C
+  rectangle "VM：east\n自有模块、状态" as VE
+  rectangle "VM：west\n自有模块、状态" as VW
+  C --> VE
+  C --> VW
+}
+@enduml

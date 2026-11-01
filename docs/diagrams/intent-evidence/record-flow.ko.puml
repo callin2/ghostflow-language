@@ -1,0 +1,29 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontSize 12
+skinparam componentStyle rectangle
+left to right direction
+
+rectangle "호출자 (외부)" as caller {
+  card "해석(Interpretation)\n(text, anchorIds, decision)" as I
+  card "조건(Condition)\n(statement, scope, nodeIds)" as C
+  card "외부 검사\n(보고된 결과)" as X
+}
+rectangle "compileSource(source,\n{ filename, intentEvidence })" as comp
+card "컴파일 결과\n(GFB, manifest 변경 없음)" as out
+card "compilation.intentEvidence\nintent-evidence-report-v1" as rep
+
+C --> I : interpretation {id, revision}
+X --> C : 조건 참조 (sha256)
+I --> comp
+C --> comp
+X --> comp
+comp --> out
+comp --> rep : 구조, 소스, 링크,\nrevision 일관성 검사
+note bottom of rep
+  자연어 해석 없음,
+  권한 인증 없음,
+  조건 실행 없음,
+  장치 관측 없음
+end note
+@enduml

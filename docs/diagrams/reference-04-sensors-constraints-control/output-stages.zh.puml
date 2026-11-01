@@ -1,0 +1,24 @@
+@startuml
+skinparam defaultFontName "PingFang SC"
+skinparam shadowing false
+skinparam rectangleBorderColor #4A6FA5
+skinparam rectangleBackgroundColor #F7F9FC
+left to right direction
+title 从输入到已确认状态
+rectangle "输入 +\n前一状态" as IN
+rectangle "请求意图\n(requested)" as REQ
+rectangle "仲裁\n+ 约束" as ARB
+rectangle "安全 / 有效意图\n(safe)" as SAFE
+rectangle "已应用 (applied)\n（输出渲染器）" as APP
+rectangle "已确认 (confirmed)\n（反馈）" as CONF
+IN --> REQ : output <- expr
+REQ --> ARB
+ARB --> SAFE : Bool 约束只会\n把 true -> false
+SAFE --> APP : 设备\n应用
+APP --> CONF : 编码器、限位开关、\n视觉等
+note bottom of SAFE
+每个阶段都有自己的来源
+和质量。一个阶段的证据
+不能证明下一个阶段。
+end note
+@enduml

@@ -1,0 +1,27 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName Helvetica
+skinparam defaultFontSize 13
+skinparam ArrowColor #526d76
+
+rectangle "Cliente / herramienta de autoría con IA\n(.ghost.md canónico:\nintención, cuerpo, front matter)" as C
+rectangle "Perfil de placa / instalación\n(Device)" as B
+rectangle "Paquete de driver\n(Drivers)" as D
+rectangle "Host del compilador / Worker\n(Language)\nsin red, archivos ni GPIO" as L
+rectangle "Host de empaquetado\n(Device)" as K
+node "MCU" as M {
+  rectangle "Servicio de comunicación\ncompartido" as S
+  rectangle "Instancias de driver" as I
+  rectangle "Runtime de GhostFlow" as R
+}
+
+C --> L : fuente
+B --> L : perfiles fijados\n(cierre aportado por quien llama)
+D --> L : perfiles de dispositivo\n(canales, requisitos)
+L --> K : plan de vinculación\n(ligado a hashes de fuente/perfil)
+D --> K : módulos (ELF)
+K --> M : paquete de despliegue\n+ procedencia
+I --> S : solicitudes al bus\n(serializadas, con límite de tiempo)
+I --> R : valores + calidad/errores
+R --> I : solicitudes de salida
+@enduml

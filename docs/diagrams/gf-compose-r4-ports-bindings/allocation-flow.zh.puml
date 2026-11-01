@@ -1,0 +1,23 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName Helvetica
+skinparam defaultFontSize 13
+title 提议的稳定分配（手工推演的设计，不是验证器行为）
+
+start
+:保留每一个现有的显式绑定;
+note right: 绝不移动。\n移动请求会变为\n冲突/变更提案。
+repeat :下一个未绑定角色\n（按规范逻辑角色名称顺序）;
+  if (输入种类/能力是否显式？) then (否)
+    :适用性未知：\n停止该角色的分配;
+  elseif (是否有方向和语义类型\n都匹配的未使用端点？) then (否)
+    :容量耗尽：\n报告冲突;
+  else (是)
+    :容量兼容：\n按稳定端点 ID 顺序选第一个;
+    :提议绑定\n（角色、端点、修订版、\n适用性状态）;
+  endif
+repeat while (还有未绑定角色？) is (是)
+->否;
+:仅在有安装负责方确认\n+ 物理证据时才成为已确认安装;
+stop
+@enduml

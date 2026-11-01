@@ -1,0 +1,15 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontSize 12
+skinparam rectangleBorderColor #4A6FA5
+skinparam rectangleBackgroundColor #F7F9FC
+left to right direction
+title GF-COMPOSE 研究波次（父 issue #99）
+rectangle "第 1 波\n#100 用户成果\n#101 权限/身份标识" as W1
+rectangle "第 2 波\n#102 执行\n#103 绑定\n#105 覆盖" as W2
+rectangle "第 3 波\n#104 契约\n#106 包\n#107 事故证据" as W3
+rectangle "第 4 波\n#108 验收/交接" as W4
+W1 --> W2 : #101 研究交接
+W2 --> W3 : 显式依赖已就绪
+W3 --> W4 : #100–#107 产出已评审
+@enduml

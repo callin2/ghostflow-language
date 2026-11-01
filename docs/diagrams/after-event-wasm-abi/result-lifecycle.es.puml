@@ -1,0 +1,15 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontSize 13
+hide empty description
+[*] --> pending : inicio en event.atMs\nidentidad (sourceTag, sourceEpoch, id)
+pending --> satisfied : observación medida verdadera\nantes de event.atMs + windowMs\n(fija satisfiedAtMs)
+pending --> expired : se alcanza el fin de la ventana\n(el fin se excluye)
+satisfied --> [*] : acuse de recibo explícito
+expired --> [*] : acuse de recibo explícito
+note right of pending
+  No se puede acusar recibo
+  antes de su límite terminal.
+  Se retiene (máx. 32) hasta el acuse.
+end note
+@enduml

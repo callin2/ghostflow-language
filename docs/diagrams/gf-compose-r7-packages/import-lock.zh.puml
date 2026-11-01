@@ -1,0 +1,21 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName Helvetica
+skinparam defaultFontSize 13
+title 概念性导入锁（示意，不是已接受的模式）
+
+rectangle "根组合\nfarm-irrigation@composition-rev-17\nsha256:ROOT...17" as ROOT
+rectangle "实例 east-zone-01\n（各自的状态、定时器、端口、\n设置、绑定、来源）" as E
+rectangle "实例 west-zone-02\n（各自的状态、定时器、端口、\n设置、绑定、来源）" as W
+rectangle "定义\nirrigation-controller@rev-42\nsha256:DEF...42" as DEF
+rectangle "rain-policy@rev-8\nsha256:RAIN...08" as RAIN
+
+ROOT --> E
+ROOT --> W
+E --> DEF : 固定
+W --> DEF : 固定（相同摘要）
+DEF --> RAIN : 导入（传递）
+note bottom of RAIN
+传递闭包：ROOT...17, DEF...42, RAIN...08
+end note
+@enduml

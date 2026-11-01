@@ -1,0 +1,15 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontSize 12
+skinparam rectangleBorderColor #4A6FA5
+skinparam rectangleBackgroundColor #F7F9FC
+left to right direction
+title GF-COMPOSE 연구 차수 (상위 #99)
+rectangle "1차\n#100 사용자 결과\n#101 권한/identity" as W1
+rectangle "2차\n#102 실행\n#103 바인딩\n#105 override" as W2
+rectangle "3차\n#104 계약\n#106 package\n#107 incident 증거" as W3
+rectangle "4차\n#108 수용/인계" as W4
+W1 --> W2 : #101 연구 인계
+W2 --> W3 : 명시적 의존성 준비됨
+W3 --> W4 : #100–#107 출력 검토 완료
+@enduml

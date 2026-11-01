@@ -1,0 +1,23 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontSize 12
+skinparam componentStyle rectangle
+left to right direction
+
+rectangle "정본 .ghost.md (작성자 작성)" as doc {
+  card "ghostflow:anchor 주석\n+ 문단 / 인용 블록 하나\n(id, kind, status, origin)" as A
+  card "ghost 펜스:\nghostflow:link 주석\n(id, relation)" as L
+  card "바로 다음 최상위\n선언 / 문장" as N
+}
+rectangle "컴파일러\n(작성자가 제공한 것만\n검증)" as comp
+card "GFB 바이트, manifest,\n런타임 동작\n(변경 없음)" as out
+card "source-trace-v1 companion\nintentAnchors[]\nintentLinks[]" as trace
+
+L --> A : 같은 id
+L --> N : 바로\n다음
+A --> comp
+L --> comp
+N --> comp
+comp --> out
+comp --> trace : 위치 + node id,\n본문 복사 없음
+@enduml

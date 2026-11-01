@@ -1,0 +1,20 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName Helvetica
+skinparam defaultFontSize 13
+skinparam rectangleRoundCorner 8
+title Traspasos de hitos propuestos (sujetos a revisión del responsable de arquitectura)
+
+rectangle "Revisión del responsable de arquitectura\n(completar la investigación no otorga\nautoridad de implementación)" as R
+rectangle "M1: Aplicar un comportamiento preparado\ndescriptores de contrato, tipo de entrada,\ntitularidad exclusiva, puertos lógicos,\nresultado aceptado/rechazado" as M1
+rectangle "M2: Añadir otro comportamiento\ncomposición calificada por instancia,\nestado/temporizadores aislados,\nvinculaciones preservadas" as M2
+rectangle "M3: Investigar un resultado inesperado\ntraza de fuente/restricción calificada\npor instancia, vinculada a ejecución/escaneo" as M3
+rectangle "Puertas de decisión de los responsables\ncompilador/runtime, paquete/importación,\nrestricción de instalación, instancia/despliegue,\nevidencia de vinculación, evidencia de incidentes" as G
+
+R --> M1
+M1 --> M2
+M2 --> M3
+G ..> M1 : solo condicionan\nlos tramos que las usan
+G ..> M2
+G ..> M3
+@enduml

@@ -1,0 +1,28 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName "Hiragino Sans"
+skinparam defaultFontSize 13
+
+concise "適用区間 A" as A
+concise "適用区間 B" as B
+concise "40s 時点の 60s ウィンドウ\n（-20s から）" as W1
+concise "65s 時点の 60s ウィンドウ\n（5s から）" as W2
+
+@0
+A is "ON [0,20s]"
+B is {-}
+W1 is "使用 30s、+5s はブロック"
+W2 is {-}
+@5
+W2 is "使用 25s、+5s は受け入れ可能"
+@10
+B is "ON [10,30s]"
+@20
+A is {-}
+@30
+B is {-}
+@40
+W1 is {-}
+@65
+W2 is {-}
+@enduml

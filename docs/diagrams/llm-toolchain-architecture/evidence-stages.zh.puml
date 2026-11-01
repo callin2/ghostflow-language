@@ -1,0 +1,19 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontSize 12
+left to right direction
+title 输出证据：事实分离，所有者分离
+rectangle "Rust 核心\n（ghostsim / CLI 止步于此）" as CoreBox {
+  card "请求意图（requested）" as Req
+  card "安全意图（safe）" as Safe
+}
+rectangle "Device（farm-device 固件）" as DeviceBox {
+  card "已应用写入（applied）\n（渲染器已确认收到）" as Applied
+  card "寄存器锁存\n（回读）" as Latch
+}
+card "已确认效果（confirmed）\n（独立观测；\n当前固件不报告）" as Confirmed
+Req --> Safe : 约束
+Safe --> Applied : 映射 + 写入
+Applied --> Latch : 读取寄存器
+Latch --> Confirmed : 观测触点/负载
+@enduml

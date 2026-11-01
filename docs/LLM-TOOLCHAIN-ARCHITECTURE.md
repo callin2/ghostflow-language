@@ -266,7 +266,7 @@ Host --> Author: one TOON/JSON result + hashes + all scan rows
 @enduml
 ```
 
-![Offline timer sequence](assets/llm-toolchain-timer.svg)
+![Offline timer sequence](diagrams/llm-toolchain-architecture/llm-toolchain-timer.svg)
 
 **How this sequence can fail.**
 
@@ -335,7 +335,7 @@ Host --> Human: TOON result (no console presentation envelope)
 @enduml
 ```
 
-![Piped console pump sequence](assets/llm-toolchain-console.svg)
+![Piped console pump sequence](diagrams/llm-toolchain-architecture/llm-toolchain-console.svg)
 
 **What a recording keeps.** A recording keeps logical input/key actions and
 virtual scan times. The profile digest and DI/RO binding roster are added to the
@@ -431,7 +431,7 @@ end
 @enduml
 ```
 
-![Physical scan boundary sequence](assets/llm-toolchain-device.svg)
+![Physical scan boundary sequence](diagrams/llm-toolchain-architecture/llm-toolchain-device.svg)
 
 **How to read this diagram.** It combines the ownership contract with the
 current `farm-device` firmware failure path. It is not a connection that

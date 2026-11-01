@@ -1,0 +1,15 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontSize 13
+skinparam stateBorderColor #4A6FA5
+skinparam stateBackgroundColor #F7F9FC
+title OffDelay (질문 6): enabled는 Active와 Holding에서 true
+
+[*] --> Idle
+Idle --> Active : request && !stop
+Active --> Holding : !request
+Active --> Idle : stop
+Holding --> Active : request
+Holding --> Idle : stop || age >= delay
+note "입력을 알 수 없어도 Holding은 만료됩니다.\n정상 정지 또는 유효하지 않은 delay: 모든 단계 -> Idle." as N
+@enduml

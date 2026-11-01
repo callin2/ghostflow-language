@@ -1,0 +1,21 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName Helvetica
+skinparam defaultFontSize 13
+title Bloqueo de importación conceptual (ilustrativo, no un esquema aceptado)
+
+rectangle "composición raíz\nfarm-irrigation@composition-rev-17\nsha256:ROOT...17" as ROOT
+rectangle "instancia east-zone-01\n(estado, temporizadores, puertos,\najustes, vinculación y procedencia propios)" as E
+rectangle "instancia west-zone-02\n(estado, temporizadores, puertos,\najustes, vinculación y procedencia propios)" as W
+rectangle "definición\nirrigation-controller@rev-42\nsha256:DEF...42" as DEF
+rectangle "rain-policy@rev-8\nsha256:RAIN...08" as RAIN
+
+ROOT --> E
+ROOT --> W
+E --> DEF : fija
+W --> DEF : fija (mismo digest)
+DEF --> RAIN : import (transitivo)
+note bottom of RAIN
+cierre transitivo: ROOT...17, DEF...42, RAIN...08
+end note
+@enduml

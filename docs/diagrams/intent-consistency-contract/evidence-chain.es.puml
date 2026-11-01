@@ -1,0 +1,25 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontSize 12
+left to right direction
+
+card "Solicitud\noriginal" as O
+card "Interpretación" as I
+card "Decisión\n(categoría §3)" as D
+card "Condición de\nverificación" as C
+card "Código\n(.ghost.md, GFB)" as P
+card "Ejecución\n(run / scan)" as E
+card "Dispositivo real\n(observación)" as R
+
+O --> I : sistema de autoría externo
+I --> D : flujo de confirmación /\naplicador de políticas
+D --> C : autor /\ndiseñador de verificación
+C --> P : herramienta de autoría\n+ compilador
+P --> E : herramienta de ejecución /\nverificación
+E --> R : dispositivo / host /\nobservador
+note bottom of D
+  Cada eslabón lleva sus propias revisiones.
+  Un eslabón ausente deja como desconocidas
+  solo las afirmaciones que dependen de él.
+end note
+@enduml

@@ -1,6 +1,3 @@
-<!-- translation-source: docs/CONSTRAINTS.md -->
-[Korean original](CONSTRAINTS.md)
-
 # GhostFlow common constraints and sensor signal contract
 
 This is the **common design contract** (2026-09-24) for constraints and sensor

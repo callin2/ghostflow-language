@@ -1,0 +1,20 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName "Hiragino Sans"
+skinparam defaultFontSize 13
+
+title 提案するオプティマイザ境界（設計のみ、未実装）
+start
+:構文解析、型検査、名前 /\nenum / 次状態の解決（既存の必須チェック）;
+:1. 不変の型付き意味 IR + ソースマッピング\n+ 制約の効果 + 検証結果\n（元の実行可能コードをフォールバックとして保持）;
+:2. 任意の型付き SMT 性質チェック\n（明示的な領域と仮定）;
+:3. 対象となる純粋・全域の\nBoolean 領域に限り BDD 候補を生成;
+:4. 独立した等価性チェックと\n証明書チェック;
+if (義務が成立した?) then (はい)
+  :検査済みの候補を使用\n+ 変換/証明の関係;
+else (SAT の不一致、Unknown、タイムアウト、\n無効な証明書、...)
+  :変更しない元のものを保持\n+ 有界のスキップ理由 / 診断;
+endif
+:5. 最終バイトコードを出力し、リソース上限を確認し、\n来歴の関係を検証;
+stop
+@enduml

@@ -1,0 +1,16 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontSize 13
+hide empty description
+state "Result de configuración OK" as ok
+ok : admisión Solar evaluada con normalidad
+state "Fallo de configuración dependiente" as fault
+fault : admisión = Unknown(SettingsFault)
+fault : (aunque una rama fault sea verdadera;\nsin valor antiguo ni predeterminado)
+state "Línea base de recuperación" as base
+base : los arranques omitidos NO se recuperan
+[*] --> ok
+ok --> fault : la observación actual es un fallo
+fault --> base : observación exitosa posterior
+base --> ok : el siguiente cruce elegible\npuede dispararse una vez
+@enduml

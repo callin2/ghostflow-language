@@ -1,7 +1,3 @@
-<!-- translation-source: docs/PROFILE-FRONT-MATTER.md -->
-
-[Korean original](PROFILE-FRONT-MATTER.md)
-
 # Profile-based Front Matter Design
 
 [English](PROFILE-FRONT-MATTER.en.md) · [Issue #555](https://github.com/callin2/ghostflow-language/issues/555)

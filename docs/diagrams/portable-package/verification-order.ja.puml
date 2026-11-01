@@ -1,0 +1,20 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName "Hiragino Sans"
+skinparam defaultFontSize 13
+start
+:パッケージのバイト列 + trustedKeys + revokedKeyIds\n+ ホスト入力 + verifyBytecode コールバック;
+:1. 正確な package/payload スキーマ、サポート対象のバージョン;
+:2. 正準な payload ダイジェスト、\n有効な信頼済み署名が 1 つ以上;
+:3. コンパイラのリビジョン、ランタイムの意味論、\nランタイム ABI、バインディングのリビジョン;
+:4. マニフェスト形式、必須ケイパビリティを\nホスト入力と照合;
+:5. ソース / GFB / マニフェスト / ソースマップの\nダイジェストと相互リンク;
+:6. source-trace メタデータを\nソースと GFB の同一性と照合;
+:7. ホストの verifyBytecode（GFB、凍結済みマニフェスト、\nソースマップ、同一性）;
+if (すべてのチェックに合格し、\nコールバックがちょうど true を返した?) then (はい)
+  :検証済みの結果\n（アクセスごとに bytecode.copy()）;
+else (いいえ)
+  :安定した code を持つ PortablePackageError\n（バイトコードは公開せず、フォールバックもなし）;
+endif
+stop
+@enduml

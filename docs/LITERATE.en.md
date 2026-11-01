@@ -1,6 +1,3 @@
-<!-- translation-source: docs/LITERATE.md -->
-[Korean original](LITERATE.md)
-
 # GhostFlow literate source
 
 **Status:** implemented. Extraction is based on CommonMark 0.31.2, and control compilation and original-location mapping work.

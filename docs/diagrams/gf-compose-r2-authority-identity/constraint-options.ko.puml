@@ -1,0 +1,29 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName Helvetica
+skinparam defaultFontSize 13
+skinparam rectangleRoundCorner 8
+title #62 설치 제약: 열려 있는 두 선택지 (선택되지 않음)
+
+package "선택지 1: 별도의 정본 제약 컴파일" {
+  rectangle "동작 패키지\n(정본 .ghost.md)" as B1
+  rectangle "제약 아티팩트\n(이름 있는 제약 경로)" as C1
+  rectangle "API join\n두 digest 모두 고정" as J1
+  rectangle "설치자가 제약\n아티팩트를 집행" as E1
+  B1 --> J1
+  C1 --> J1
+  J1 --> E1
+}
+
+package "선택지 2: 명시적 프로젝트 간 경계 revision" {
+  rectangle "설치 경계 revision\n(API/시스템 소유자가 게시)" as R2
+  rectangle "동작 revision" as B2
+  rectangle "제약 revision" as C2
+  rectangle "바인딩" as BD2
+  rectangle "집행 소유자" as EO2
+  R2 --> B2 : 참조
+  R2 --> C2 : 참조
+  R2 --> BD2 : 참조
+  R2 --> EO2 : 지정
+}
+@enduml

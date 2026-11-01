@@ -1,0 +1,27 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName "Hiragino Sans"
+skinparam defaultFontSize 13
+skinparam ArrowColor #526d76
+
+rectangle "ライブのランタイム" as L {
+  rectangle "ジャーナル\n(保持されたレコード)" as J
+  rectangle "状態、保留中の入力、\n意図、クロック、フレーム ID" as S
+  rectangle "ライブのトレース /\nフレーム化された結果" as T
+}
+rectangle "ゴーストインスタンス" as G {
+  rectangle "インストール済みモジュール +\nケイパビリティのフォーク" as F
+}
+rectangle "リプレイ結果バッファ\n(gf_replay_ptr/len,\ngf_frame_replay_ptr/len)" as B
+actor "効果シンク /\nアクチュエータ" as A
+
+J --> F : プレフィックス直前のチェックポイント\n+ 最も古い `count` 件のレコード
+F --> B : 成功時のみ置き換え
+F ..> A : 効果をディスパッチしない
+F ..> S : ライブを変更しない
+F ..> T : 決して上書きしない
+note bottom of G
+  効果を決してディスパッチせず、ライブの状態、
+  ジャーナル、出力を決して変更しない
+end note
+@enduml

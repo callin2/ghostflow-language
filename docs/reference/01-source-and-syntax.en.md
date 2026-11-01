@@ -1,6 +1,3 @@
-<!-- translation-source: docs/reference/01-source-and-syntax.md -->
-[Korean original](01-source-and-syntax.md)
-
 # 1. Source and syntax
 
 [Complete contents](../LANGUAGE-REFERENCE.en.md) · [Next: Types, expressions, and state](02-types-expressions-state.en.md)

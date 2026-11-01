@@ -1,22 +1,22 @@
 <!-- translation-source: examples/authoring/pump-rev-1.ghost.md -->
-[English original](pump-rev-1.ghost.md)
-> 읽기용 번역본입니다. 컴파일할 때는 링크된 원본 `.ghost.md`를 사용하세요.
+[영문 원문](pump-rev-1.ghost.md)
 
 # 허가 조건이 있는 펌프 요청
 
-문서 `GF-EXAMPLE-PUMP`의 개정 1이다. 완전한 리터레이트 후보 문서다. 사용자는
-정지가 우선하며 허가가 없으면 펌프의 안전 의도가 차단된다고 확인했다.
+이 파일은 문서 `GF-EXAMPLE-PUMP`의 revision `rev-1-input-v1`입니다. 수정하기 전에
+검사하는 완전한 문서형 소스(literate source) 후보입니다. 사용자는 두 가지 규칙을 확인했습니다.
+STOP이 우선하며, 허가가 없으면 펌프의 안전 의도(safe)가 차단됩니다.
 
 <!-- ghostflow:anchor id=GF-INT-PUMP-REQUEST kind=intent status=confirmed origin=user -->
-> START는 펌프를 요청한다. STOP은 요청을 취소한다.
+> START는 펌프를 요청합니다. STOP은 요청을 취소합니다.
 
 <!-- ghostflow:anchor id=GF-INT-PUMP-PERMIT kind=intent status=confirmed origin=user -->
-> 허가가 없으면 펌프를 차단해야 한다.
+> 허가가 없으면 펌프를 차단해야 합니다.
 
 <!-- ghostflow:anchor id=GF-ASM-PUMP-MAX-RUN kind=assumption status=unconfirmed origin=ai -->
-> 최대 운전 시간이 필요할 수 있다. 값과 재시작 규칙은 제공되지 않았다. 타이머를 추가하기 전에 사용자에게 확인한다.
+> 최대 운전 시간이 필요할 수 있습니다. 그 값과 재시작 규칙은 제공되지 않았습니다. 타이머를 추가하기 전에 사용자에게 확인합니다.
 
-입력 품질을 명시하는 새 리비전 rev-1-input-v1입니다. 알 수 없는 요청은 기존 상태를 유지하며 새 요청을 만들지 않습니다. 정상 STOP 또는 해제된 START는 요청을 취소합니다. 원본 이력과 기존 측정값은 별도로 보존합니다.
+이 소스는 입력 품질을 명시하는 input-quality-v1 revision입니다. 각 입력은 생산자(producer)가 제공한 품질(`ok` 또는 `fault`)을 함께 전달합니다. 알 수 없는(fault) 요청은 저장된 요청 상태를 유지하며, 새 요청을 만들 수는 없습니다. 품질이 확인된 STOP, 또는 품질이 확인된 상태에서 해제된 START는 요청을 취소합니다. 원본 소스 바이트와 날짜가 기록된 벤치마크 증거는 별도로 보존합니다. 아래의 `pump` 대입은 의도적으로 불완전하게 작성했습니다(`pump <- start && ;`). `ghostc`는 이를 `GF_PARSE` 진단으로 거부하며, [개정 2](pump-rev-2.ghost.ko.md)에서 이를 수정합니다.
 
 ```ghost
 control PumpRequest {

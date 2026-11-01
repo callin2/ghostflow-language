@@ -1,0 +1,20 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontSize 13
+start
+:변경하지 않은 fixture를 한 번 컴파일\n(numeric-threshold.ghost.md);
+fork
+  :native Rust 실행\n(같은 bytes, 같은 input tape);
+fork again
+  :WASM 실행\n(같은 bytes, 같은 input tape);
+end fork
+:requested/safe 결과를\n독립 oracle.json과 비교;
+:메모리 안의 각 mutant에 대해\n("<" -> "<=", 조건 -> true);
+:mutant는 두 target 모두에서\n정상적으로 컴파일·실행되어야 함;
+:변경하지 않은 oracle assertion이\nRED가 되어야 함;
+note right
+  crash, timeout, runner 누락은
+  mutation을 잡은 것으로 치지 않음
+end note
+stop
+@enduml

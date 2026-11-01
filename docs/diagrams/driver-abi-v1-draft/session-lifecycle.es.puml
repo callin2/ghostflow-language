@@ -1,0 +1,21 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName Helvetica
+title Una sesión de Driver (época), según la propuesta
+
+participant Host
+participant Driver
+Host -> Driver : gfdrv_negotiate(major 1, max_minor)
+Host -> Driver : describe -> metadatos inmutables
+note over Host : admisión de la vinculación\n(comparar metadatos con el contrato del Program)
+Host -> Driver : open(binding_and_budget)
+Driver --> Host : sesión (nueva época) o error, sin salida
+loop cada escaneo
+  Host -> Driver : poll -> registros de entrada ordenados
+  note over Host : evaluación y consolidación del núcleo
+  Host -> Driver : apply(comandos seguros) -> recibos
+end
+Host -> Driver : cancel(command_id) -> recibo (opcional)
+Host -> Driver : close (exactamente una vez)
+note over Host, Driver : reinicio = nueva época de sesión,\nrevalidar metadatos y vinculaciones,\nsin reanudación ni reproducción implícitas
+@enduml

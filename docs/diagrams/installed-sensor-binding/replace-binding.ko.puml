@@ -1,0 +1,18 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName Helvetica
+skinparam defaultFontSize 13
+
+start
+:완료된 step 사이에서\nreplaceBinding(candidate);
+:같은 소스와 바이트코드에 대해\n완전한 후보 검증;
+:평가 재계산;\n새 ControlRuntime 준비\n및 전략 활성화;
+if (유효하며, 사용되지 않은 run ID와\n바인딩 revision인가?) then (예)
+  :새 run 게시;
+  :센서는 NotReady에서 시작;\nProgram 상태는 소스 초기값에서 시작;
+else (아니요)
+  :거부;
+  :이전 run, 바인딩,\nconditioner 상태, 평가,\n최근 trace 유지;
+endif
+stop
+@enduml

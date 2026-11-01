@@ -1,6 +1,3 @@
-<!-- translation-source: docs/reference/02-types-expressions-state.md -->
-[Korean original](02-types-expressions-state.md)
-
 # 2. Types, expressions, and state
 
 [Complete contents](../LANGUAGE-REFERENCE.en.md) · [Previous: Source and syntax](01-source-and-syntax.en.md) · [Next: Time and schedules](03-time-and-schedules.en.md)

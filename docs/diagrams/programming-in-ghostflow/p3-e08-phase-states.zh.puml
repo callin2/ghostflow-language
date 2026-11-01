@@ -1,0 +1,15 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName "PingFang SC"
+hide empty description
+
+[*] --> Idle
+Idle --> Waiting : start\n（age 从 0 重新开始）
+Waiting --> Idle : !start
+Waiting --> Running : start && age >= value\n（delay 为 ok(value)）
+Running --> Idle : !start
+Waiting --> Idle : delay 为 fault(_)
+Running --> Idle : delay 为 fault(_)
+
+note "每个 tick 最多进行一次转换。\n若 observed_start 为 fault，phase 保持原值。\nmotor <- phase' == Running" as N
+@enduml

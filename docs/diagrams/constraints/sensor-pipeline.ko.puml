@@ -1,0 +1,23 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName Helvetica
+skinparam rectangle {
+  BackgroundColor White
+  BorderColor #555555
+}
+left to right direction
+title 수분 센서 예제의 센서 처리 순서
+
+rectangle "드라이버\n새 샘플 ID + 시각" as drv
+rectangle "입력 검증\nvalid = 0% .. 100%" as val
+rectangle "필터\nmedian(5)" as flt
+rectangle "freshness / 복구\nstale_after = 3s\nrecover_after = 3 samples" as fr
+rectangle "히스테리시스\non_below 30%\noff_above 35%" as hy
+rectangle "case dry { ok / fault }\n명시적 처리" as cs
+
+drv --> val
+val --> flt
+flt --> fr
+fr --> hy : Result<T, SensorFault>
+hy --> cs : 품질 보존
+@enduml

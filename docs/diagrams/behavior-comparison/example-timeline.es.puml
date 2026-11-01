@@ -1,0 +1,17 @@
+@startuml
+scale 5000 as 120 pixels
+binary "baseline expired (10 s)" as B
+binary "candidate expired (15 s)" as C
+@0
+B is low
+C is low
+@10000
+B is high
+@15000
+C is high
+@20000
+B is high
+C is high
+B@10000 <-> @20000 : {10000 ms verdadero}
+C@15000 <-> @20000 : {5000 ms verdadero}
+@enduml

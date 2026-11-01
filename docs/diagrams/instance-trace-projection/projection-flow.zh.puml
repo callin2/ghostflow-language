@@ -1,0 +1,19 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName Helvetica
+skinparam defaultFontSize 13
+left to right direction
+
+artifact "已编译制品\n（源、闭包、字节码、\nmanifest、源映射）" as A
+artifact "展示信息\n（标签、\npresentationRevision）" as L
+rectangle "激活\n（校验标识、\n重新编译、检查标签）" as ACT
+artifact "运行时追踪\n（observeSourceTrace）" as T
+rectangle "projectTrace(trace)\n（检查模块指纹）" as PT
+artifact "冻结条目\n（实例 ID、标签、节点、\n符号、追踪字段）" as OUT
+
+A --> ACT
+L --> ACT
+ACT --> PT
+T --> PT
+PT --> OUT
+@enduml

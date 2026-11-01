@@ -1,0 +1,22 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName Helvetica
+skinparam ArrowColor #555555
+title 검증된 인접 중복 대체
+
+start
+:lowering된 Bool 출력 제약;
+if (목록 항목이 128개 이하인가?) then (아니요)
+  :원본 유지\n(v1 companion);
+  stop
+else (예)
+endif
+:후보 생성:\n인접한 정확한 중복을 병합\n(그룹당 고유 이름 8개 / 등장 32회 이내);
+:독립 유한 checker:\n모든 Bool snapshot, 차단 집합,\nfault 문자열, 멱등성;
+if (변환되고 검사를 통과했는가?) then (예)
+  :constraintProof와 함께\n최적화된 artifact 생성\n(source-trace-v2 / source-observation-v2);
+else (변경 없음, 미지원\n또는 checker 실패)
+  :원본 유지\n(v1 companion);
+endif
+stop
+@enduml

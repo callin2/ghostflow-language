@@ -1,0 +1,17 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName Helvetica
+skinparam defaultFontSize 13
+left to right direction
+
+rectangle "Productor\n(Driver, USB, software)" as P
+rectangle "samples[name] =\n{epoch, id, timestampMs,\nquality, value}" as S
+rectangle "Acondicionamiento\n(filtros, obsolescencia,\nrecuentos de recuperación)" as C
+rectangle "input name: T\nse lee como\nResult<T, SensorFault>" as R
+rectangle "Política de fallos del autor\n(análisis de casos o recover)" as F
+
+P --> S
+S --> C
+C --> R
+R --> F
+@enduml

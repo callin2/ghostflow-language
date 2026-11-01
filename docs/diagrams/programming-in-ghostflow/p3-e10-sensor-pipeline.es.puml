@@ -1,0 +1,22 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName Helvetica
+
+start
+:El host suministra una muestra nueva\n(marca de tiempo original, identidad);
+if (¿Sana, dentro de valid = 0%..100%,\nedad < stale_after = 3s?) then (sí)
+  :median(3) de las tres últimas\nmuestras nuevas y válidas;
+  if (¿La ventana tiene tres valores?) then (sí)
+    :hysteresis\non_below 30%, off_above 35%;
+    :dry = ok(value);
+  else (no)
+    :dry = fault(NotReady);
+  endif
+else (no)
+  :Vaciar la ventana del filtro;\nrestablecer hysteresis a initial: false;
+  :dry = fault(...);
+endif
+:need_water = case dry\nok(value) => value\nfault(_) => false;
+:solicitud de pump = enabled && need_water\n(conserva la última solicitud mientras enabled está en fallo);
+stop
+@enduml

@@ -1,0 +1,16 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontSize 12
+start
+:入力スナップショット + 旧状態;
+if (欠落した入力がある？) then (はい)
+  :入力を拒否\n（欠落が重要なら、ホストが\n明示的な fault/status 入力を送る）;
+  stop
+endif
+:すべての next 式を評価\n（旧状態 + 入力を読む）\n-> 1 つの候補状態;
+:意図を評価\n（プライムなしの state = 旧状態、\nnext.NAME = 候補状態）;
+:安全制約\n(requires, mutex)\n要求意図 -> 安全意図;
+:評価エラーなし:\n候補状態 + 要求意図/安全意図を\nまとめて確定;
+:ジャーナル: 入力、旧/新状態、\n両方の意図、strategy、fault;
+stop
+@enduml

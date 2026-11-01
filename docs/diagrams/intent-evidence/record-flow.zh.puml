@@ -1,0 +1,29 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontSize 12
+skinparam componentStyle rectangle
+left to right direction
+
+rectangle "调用方（外部）" as caller {
+  card "解释\n(text, anchorIds, decision)" as I
+  card "条件\n(statement, scope, nodeIds)" as C
+  card "外部检查\n（报告的结果）" as X
+}
+rectangle "compileSource(source,\n{ filename, intentEvidence })" as comp
+card "编译结果\n（GFB、清单不变）" as out
+card "compilation.intentEvidence\nintent-evidence-report-v1" as rep
+
+C --> I : interpretation {id, revision}
+X --> C : 条件引用 (sha256)
+I --> comp
+C --> comp
+X --> comp
+comp --> out
+comp --> rep : 检查结构、源、链接、\n修订版一致性
+note bottom of rep
+  不解释自然语言，
+  不验证权限，
+  不执行条件，
+  不观测设备
+end note
+@enduml

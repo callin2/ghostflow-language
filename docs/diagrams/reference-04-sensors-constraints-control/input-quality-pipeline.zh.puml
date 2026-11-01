@@ -1,0 +1,42 @@
+@startuml
+skinparam defaultFontName "PingFang SC"
+skinparam shadowing false
+skinparam ActivityBackgroundColor #F7F9FC
+skinparam ActivityBorderColor #4A6FA5
+title 输入处理顺序（单个输入）
+start
+:驱动程序交付样本\n（来源 ID、纪元、样本 ID、时间戳、质量）;
+if (驱动程序报告 Disconnected？) then (是)
+  #FFE5E5:Result = fault(Disconnected)\n（立即传播）;
+  stop
+else (否)
+endif
+if (是新的物理样本？) then (否：重复 / 仅时钟)
+  :不参与滤波或恢复;\n不刷新新鲜度;
+else (是)
+  if (载荷、单位和 `valid` 范围正常？) then (否)
+    #FFE5E5:Result = fault(Invalid);
+    stop
+  else (是)
+    :更新滤波状态;
+  endif
+endif
+if (滤波已就绪且满足 `recover_after`？) then (否)
+  #FFF4D6:Result = fault(NotReady);
+  stop
+else (是)
+endif
+note right: 任何故障都会清空滤波窗口；\n恢复需要新鲜的有效样本。
+if (最后有效样本的年龄 < `stale_after`？) then (否)
+  #FFE5E5:Result = fault(Stale);
+  stop
+else (是)
+  :有状态谓词\n（hysteresis、debounce 等）;
+  :Result = ok(value)\n并保留质量;
+endif
+stop
+legend bottom
+每个 Result（无论 ok 还是 fault）都会交给作者，
+由作者用 `case` 或 `recover` 选择控制值。
+end legend
+@enduml

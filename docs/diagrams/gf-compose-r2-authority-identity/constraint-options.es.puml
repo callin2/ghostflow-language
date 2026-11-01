@@ -1,0 +1,29 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName Helvetica
+skinparam defaultFontSize 13
+skinparam rectangleRoundCorner 8
+title Restricciones de instalación de #62: dos opciones abiertas (ninguna elegida)
+
+package "Opción 1: compilación canónica separada de restricciones" {
+  rectangle "Paquete de comportamiento\n(.ghost.md canónico)" as B1
+  rectangle "Artefacto de restricciones\n(ruta de restricciones con nombre)" as C1
+  rectangle "Unión en la API\nfija ambos digests" as J1
+  rectangle "El instalador aplica el\nartefacto de restricciones" as E1
+  B1 --> J1
+  C1 --> J1
+  J1 --> E1
+}
+
+package "Opción 2: revisión explícita de frontera entre proyectos" {
+  rectangle "Revisión de frontera de instalación\n(publicada por el titular de API/sistema)" as R2
+  rectangle "Revisión del comportamiento" as B2
+  rectangle "Revisión de restricciones" as C2
+  rectangle "Vinculaciones" as BD2
+  rectangle "Titular de la aplicación" as EO2
+  R2 --> B2 : referencia
+  R2 --> C2 : referencia
+  R2 --> BD2 : referencia
+  R2 --> EO2 : nombra
+}
+@enduml

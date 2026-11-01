@@ -1,0 +1,25 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName Helvetica
+skinparam componentStyle rectangle
+title Frontera nativa propuesta (borrador, no implementada)
+
+package "Host de ejecución" {
+  [Núcleo Rust\n(evaluación, consolidación)] as Core
+  [Host\n(vinculaciones, planificación, política)] as Host
+}
+package "Driver (específico del dispositivo)" {
+  [E/S de endpoints e\ninterpretación] as Drv
+}
+node "Device / placa\n(E/S física, política de fallos)" as Dev
+
+Host --> Core : registros de entrada ordenados
+Core --> Host : intención segura/efectiva
+Host --> Drv : gfdrv_api_v1\n(describe, open, poll,\napply, cancel, close)
+Drv ..> Host : gfdrv_host_v1\n(clock, report)
+Drv --> Dev : comunicación con endpoints
+note bottom of Core
+  No es esta ABI: ScanDriver de Rust (adaptador de escaneo del núcleo)
+  ni la ABI WASM host-núcleo gf_* / gf_frame_*
+end note
+@enduml

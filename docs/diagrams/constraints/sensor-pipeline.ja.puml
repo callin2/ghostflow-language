@@ -1,0 +1,23 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName "Hiragino Sans"
+skinparam rectangle {
+  BackgroundColor White
+  BorderColor #555555
+}
+left to right direction
+title 土壌水分の例におけるセンサ処理の順序
+
+rectangle "ドライバ\n新しいサンプル ID + 時刻" as drv
+rectangle "入力の検証\nvalid = 0% .. 100%" as val
+rectangle "フィルタ\nmedian(5)" as flt
+rectangle "鮮度 / 復旧\nstale_after = 3s\nrecover_after = 3 samples" as fr
+rectangle "ヒステリシス\non_below 30%\noff_above 35%" as hy
+rectangle "case dry { ok / fault }\n明示的な処理" as cs
+
+drv --> val
+val --> flt
+flt --> fr
+fr --> hy : Result<T, SensorFault>
+hy --> cs : 品質を保持
+@enduml

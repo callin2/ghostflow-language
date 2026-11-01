@@ -1,0 +1,19 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontSize 13
+hide empty description
+state "En configuración" as Configuring
+state "Activo" as Active
+[*] --> Configuring : gf_frame_create
+Configuring : es dueño de un Runtime
+Configuring : load / add_capability
+Configuring : validate / initialize_restart
+Configuring --> Configuring : activación fallida\n(estado conservado)
+Configuring --> Active : gf_frame_activate\n(Runtime trasladado una vez)
+Active : es dueño de un ScanDriver
+Active : gf_frame_scan
+Active : load / add / activate rechazados
+Active --> Active : escaneo fallido\n(se conservan el último resultado\ny el estado de la VM)
+Configuring --> [*] : gf_frame_destroy
+Active --> [*] : gf_frame_destroy
+@enduml

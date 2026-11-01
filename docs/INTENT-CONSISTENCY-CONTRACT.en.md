@@ -1,7 +1,5 @@
-<!-- translation-source: docs/INTENT-CONSISTENCY-CONTRACT.md -->
 # Responsibility and Evidence Contract for Intent Consistency
 
-[원문](INTENT-CONSISTENCY-CONTRACT.md)
 
 Status: shared design contract for [#565](https://github.com/callin2/ghostflow-language/issues/565).
 The five follow-up features in [#559](https://github.com/callin2/ghostflow-language/issues/559) apply this contract to their inputs, results, and completion criteria.

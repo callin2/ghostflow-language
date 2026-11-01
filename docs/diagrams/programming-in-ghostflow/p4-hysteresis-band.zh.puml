@@ -1,0 +1,19 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName "PingFang SC"
+skinparam defaultFontSize 13
+title hysteresis(moisture, on_below: 30%, off_above: 35%, initial: false)
+
+[*] --> NotReady
+state "未就绪 / fault\n(公开结果为 fault；\n处理状态重置为 initial)" as NotReady
+state "dry = false" as F
+state "dry = true" as T
+
+NotReady --> F : 满足恢复/滤波要求的\n良好样本 (initial false)
+F --> T : 值 < 30%
+T --> F : 值 > 35%
+F --> F : 值在 [30%,35%] 内
+T --> T : 值在 [30%,35%] 内
+F --> NotReady : Disconnected/Stale/Invalid
+T --> NotReady : Disconnected/Stale/Invalid
+@enduml

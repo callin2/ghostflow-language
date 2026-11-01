@@ -1,0 +1,20 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName "Apple SD Gothic Neo"
+skinparam defaultFontSize 13
+skinparam activityBorderColor #4A6FA5
+skinparam activityBackgroundColor #F7F9FC
+title 오류로 배우기 (부록 B)
+
+start
+:오류 예제 하나 고르기 (E90–E102);
+:진단 예측하기:\n어디를 가리키고 어떤 규칙을 어기는가;
+:fence를 단독 ghost 프로그램으로 컴파일;
+if (진단이 예측과 일치하는가?) then (예)
+  :어긴 약속과\nReference 규칙 이름 붙이기;
+else (아니요)
+  :규칙을 다시 읽고\n이해를 고치기;
+endif
+:한 번에 한 오류만 남기기;
+stop
+@enduml

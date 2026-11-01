@@ -1,0 +1,23 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontSize 12
+title 有界イベントジャーナル: 発行・保持・読み取り
+participant "信頼された\nプロデューサ" as P
+participant "イベントジャーナル\n（リファレンスホスト）" as J
+participant "コンシューマ" as C
+P -> J: publish({completion, trace, settingsState?, events})
+alt いずれかの検査に失敗
+  J --> P: 拒否。ジャーナルは変更なし（再試行可）
+else バッチ全体が有効
+  J -> J: シーケンス N+1..N+k を割り当て\n（events = [] なら割り当てなし）
+  J -> J: 最新の `capacity` 件のイベントを保持
+  J -> J: 最新スナップショットを置き換え
+  J --> P: 発行済みレコード + スナップショット + nextCursor
+end
+C -> J: read({cursor: afterSequence = 10})
+J --> C: gaps [11..13, "retention"]\n14 以降のイベント\n最新スナップショット（別枠）\nnextCursor
+note right of C
+  11-13 の合成イベントはなし。
+  nextCursor は処理後にのみ保存する。
+end note
+@enduml

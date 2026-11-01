@@ -1,0 +1,19 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName Helvetica
+skinparam defaultFontSize 13
+skinparam componentStyle rectangle
+
+artifact ".ghost.md\n(front matter + ghost 코드)" as Src
+component "컴파일러" as C
+artifact "GFB + manifest\n(하드웨어와 무관하게 동일)" as G
+artifact "hardwarePlan\n(파생)" as P
+component "배포 소유자" as D
+
+Src --> C
+C --> G
+C --> P
+P --> D
+
+note right of D : 고정된 프로필/모듈 해석,\nprovider schema로 config 검증,\n활성화 전 admission 검사
+@enduml

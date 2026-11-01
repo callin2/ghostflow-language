@@ -1,0 +1,20 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName Helvetica
+skinparam defaultFontSize 13
+skinparam rectangleRoundCorner 8
+title 拟议的里程碑交接（须经架构负责人评审）
+
+rectangle "架构负责人评审\n（研究完成不授予\n任何实现权限）" as R
+rectangle "M1：应用一个预制行为\n契约描述符、输入种类、\n独占所有权、逻辑端口、\n接受/拒绝结果" as M1
+rectangle "M2：再添加一个行为\n实例限定的组合、\n隔离的状态/定时器、\n保留的绑定" as M2
+rectangle "M3：调查意外结果\n实例限定的源码/约束\n追踪，关联到运行/扫描" as M3
+rectangle "负责人决策关卡\n编译器/运行时、包/导入、\n设施约束、实例/部署、\n绑定证据、事故证据" as G
+
+R --> M1
+M1 --> M2
+M2 --> M3
+G ..> M1 : 仅约束\n使用它们的切片
+G ..> M2
+G ..> M3
+@enduml

@@ -1,0 +1,22 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName "Hiragino Sans"
+skinparam defaultFontSize 13
+title 最初のジャーニー（提案。農家にインポートやグラフは不要）
+
+|農家|
+start
+:準備済みの振る舞いを選ぶ;
+:平易な言葉の要件を確認する;
+:農場／設置の事実を確定する;
+:適用する;
+if (結果は？) then (受け入れ)
+  :具体的な受け入れ結果;
+else (ブロック)
+  :具体的なブロック要因\n+ 次の対応;
+endif
+|エンジニア／設置者|
+:同じインシデントを開く;
+:技術的な証拠を見る\n（ソース、リビジョン、インスタンス、\n入力、制約、実行、バインディング）;
+stop
+@enduml

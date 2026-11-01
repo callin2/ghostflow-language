@@ -1,0 +1,21 @@
+@startuml
+hide empty description
+skinparam shadowing false
+skinparam defaultFontSize 13
+skinparam state {
+  BackgroundColor #F8F8F8
+  BorderColor #555555
+}
+
+state "Idle\nrunning = false\narmed = false" as Idle
+state "Armed\nrunning = false\narmed = true" as Armed
+state "Running\nrunning = true\nvalve, pump ON" as Running
+
+[*] --> Idle
+Idle --> Armed : 正常な START が離され\n正常な STOP が許可
+Idle --> Idle : START 保持中、STOP 不許可、\nまたはいずれかの入力故障
+Armed --> Running : 正常な START が押され\nSTOP が許可
+Armed --> Idle : STOP 不許可\nまたはいずれかの入力故障
+Running --> Running : STOP が許可\n(START 故障でも運転継続)
+Running --> Idle : STOP 不許可\nまたは STOP 故障
+@enduml

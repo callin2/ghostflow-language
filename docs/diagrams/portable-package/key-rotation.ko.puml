@@ -1,0 +1,23 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName Helvetica
+skinparam defaultFontSize 13
+
+participant "패키지 서명자" as P
+participant "호스트 검증기\n(신뢰 snapshot)" as H
+
+== 1. 다음 키 신뢰 ==
+H -> H : 다음 공개 키를 trustedKeys에 추가
+note right of H : 신뢰: 현재, 다음
+
+== 2. 공동 서명 패키지 게시 ==
+P -> H : 현재 + 다음 키로 서명한 패키지
+note right of H : 수락
+
+== 3. 이전 키 폐기 ==
+H -> H : 현재 키 ID를 revokedKeyIds에 추가
+P -> H : 같은 공동 서명 패키지
+note right of H : 폐기된 서명은 무시,\n다음 키 서명이 검증됨: 수락
+P -> H : 이전 키로만 서명한 패키지
+note right of H : 거부: 남은 활성\n신뢰 서명이 없음
+@enduml

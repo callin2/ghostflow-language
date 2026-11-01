@@ -1,0 +1,25 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontSize 13
+skinparam componentStyle rectangle
+title E19–E21: demanda por VPD del aire condicionada por la luz
+
+rectangle "air: Temperature" as air
+rectangle "humidity: RelativeHumidity" as rh
+rectangle "light: PPFD" as light
+component "climate = air_vpd(t, rh)\n(fault si cualquiera de las entradas falla)" as climate
+component "state demand\nON / OFF / se mantiene en la banda muerta\n(fault -> false)" as demand
+component "daylight = ppfd >= umbral\n(fault -> false)" as day
+rectangle "air_vpd_value\n(0 ante fault: marcador de visualización)" as vpd
+rectangle "vpd_valid" as valid
+rectangle "*_demand = daylight && demand'" as out
+
+air --> climate
+rh --> climate
+climate --> demand
+climate --> vpd
+climate --> valid
+light --> day
+demand --> out
+day --> out
+@enduml

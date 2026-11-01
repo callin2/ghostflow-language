@@ -1,0 +1,39 @@
+@startuml
+skinparam defaultFontName "Apple SD Gothic Neo"
+skinparam shadowing false
+skinparam defaultFontSize 13
+skinparam rectangle {
+  RoundCorner 8
+}
+left to right direction
+
+rectangle "문제가 생겼거나\n조건을 만족하지 않음" as start
+
+rectangle "잘못된 프로그램\n(이름·구문, 타입,\n분기·정의,\n상태 경계)" as invalid #FFE0E0
+rectangle "소스를 고침" as fix
+
+rectangle "값 계산의 오류\n(범위 초과, ÷0, 잘못된 변환)" as calc #FFF0D0
+rectangle "성공한 tick 없음;\n부분 확정 없음" as nocommit
+
+rectangle "외부 자료 문제\n(센서 fault, 예약 Unknown,\n관측 부재·불일치)" as ext #E0F0FF
+rectangle "명시적 오류 흐름;\nFalse나 허가로 다루지 않음" as flow
+
+rectangle "설정 event 문제" as set #E8E0FF
+rectangle "admission 거절:\n설정과 revision 유지" as adm
+rectangle "payload 오류:\nfault(SettingsInvalid),\nrevision 진행" as pay
+
+rectangle "알려진 불충족" as known #E0FFE0
+rectangle "정상 판단;\n결과는 False" as falsev
+
+start --> invalid
+invalid --> fix
+start --> calc
+calc --> nocommit
+start --> ext
+ext --> flow
+start --> set
+set --> adm
+set --> pay
+start --> known
+known --> falsev
+@enduml

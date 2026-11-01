@@ -1,6 +1,3 @@
-<!-- translation-source: docs/reference/07-semantic-rules-and-index.md -->
-[Korean original](07-semantic-rules-and-index.md)
-
 # 7. Semantic preservation rules and syntax index
 
 [Language Reference](../LANGUAGE-REFERENCE.en.md) · [Previous: Composition and replay](06-composition-and-replay.en.md) · [Next: Layer responsibilities](08-language-runtime-and-device-boundaries.en.md)

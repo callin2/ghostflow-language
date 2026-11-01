@@ -1,0 +1,23 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontSize 12
+skinparam componentStyle rectangle
+left to right direction
+
+rectangle "规范 .ghost.md（作者编写）" as doc {
+  card "ghostflow:anchor 注释\n+ 一个段落 / 块引用\n(id, kind, status, origin)" as A
+  card "ghost 围栏：\nghostflow:link 注释\n(id, relation)" as L
+  card "紧随其后的顶层\n声明 / 语句" as N
+}
+rectangle "编译器\n（只校验作者\n提供的内容）" as comp
+card "GFB 字节、清单、\n运行时行为\n（不变）" as out
+card "source-trace-v1 伴随文件\nintentAnchors[]\nintentLinks[]" as trace
+
+L --> A : 相同 id
+L --> N : 紧随其后
+A --> comp
+L --> comp
+N --> comp
+comp --> out
+comp --> trace : 位置 + 节点 id，\n不复制散文
+@enduml

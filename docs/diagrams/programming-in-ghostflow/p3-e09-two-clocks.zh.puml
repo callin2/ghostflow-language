@@ -1,0 +1,17 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName "PingFang SC"
+
+rectangle "日历时钟\n（时区、DST、可信时钟）" as civil
+rectangle "schedule starts:\nDailySlots<15min>\n06:00, 18:45" as sched
+rectangle "starts.due\n（触发实例到达的\ntick 上为 true）" as due
+rectangle "phase: Idle -> Watering" as start
+rectangle "单调时钟\nage = elapsed(phase)" as mono
+rectangle "age >= 5min:\nWatering -> Idle" as stop
+
+civil --> sched : 墙钟时间
+sched --> due : 已准入的触发实例
+due --> start
+start --> mono : age 从 0 重新开始
+mono --> stop : 首个达到或超过 5min 的 tick
+@enduml

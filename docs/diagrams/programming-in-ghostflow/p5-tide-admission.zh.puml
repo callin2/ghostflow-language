@@ -1,0 +1,25 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName "PingFang SC"
+skinparam defaultFontSize 13
+title E37：计划时刻之后的分钟数（计划 = 高潮 - 30 分钟；晚 4 分钟准入）
+
+concise "准入" as S
+concise "pump（输出意图）" as P
+
+@0
+S is "开放：[计划, 计划+10 分钟)"
+P is "false"
+
+@4
+P is "自准入起运行 5 分钟"
+
+@9
+P is "false"
+
+@10
+S is "关闭（不含终点）"
+
+S@0 <-> @10 : within(10min)
+P@4 <-> @9 : run(5min)
+@enduml

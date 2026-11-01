@@ -1,0 +1,29 @@
+@startuml
+hide empty description
+skinparam shadowing false
+skinparam defaultFontName Helvetica
+skinparam state {
+  BackgroundColor White
+  BorderColor #555555
+}
+title Observaciones del ciclo de vida del Process al mapearse a #74
+
+state received
+state rejected : código de motivo + detalle\n(incl. cancelación aceptada antes del inicio)
+state started
+state completed
+state cancelled : motivo opcional\nrequiere evidencia de cancelación del dominio
+state failed : código de motivo + detalle
+
+[*] --> received
+received --> rejected
+received --> started : evidencia de inicio declarada
+started --> completed : evidencia de finalización declarada
+started --> cancelled
+started --> failed
+rejected --> [*]
+completed --> [*]
+cancelled --> [*]
+failed --> [*]
+note "Los estados terminales no tienen sucesor.\nGana el primer terminal válido en el orden de #115." as N1
+@enduml

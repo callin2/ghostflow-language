@@ -1,0 +1,22 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName Helvetica
+skinparam defaultFontSize 13
+hide empty description
+state "Sin línea base" as None
+state "BootBaseline" as Boot
+state "ClockUnknown" as Unknown
+state "RecoveryBaseline" as Recovery
+state "Seguimiento confiable\n(compara deltas con gap)" as Tracking
+[*] --> None : construct(gap, run epoch)
+None --> Boot : primera hora de pared confiable
+None --> Unknown : hora de pared ausente\no no confiable
+Boot --> Tracking
+Recovery --> Tracking
+Tracking --> Tracking : delta <= gap
+Tracking --> Tracking : delta > gap\n/ ObservationGap
+Tracking --> Unknown : hora de pared ausente\no no confiable
+Unknown --> Recovery : de nuevo hora de pared confiable
+note right of Boot : Las líneas base nunca son\npulsos de admisión
+note bottom of Tracking : Un fallo de validación (rango, época,\nregresión monotónica) deja\nel estado sin cambios
+@enduml

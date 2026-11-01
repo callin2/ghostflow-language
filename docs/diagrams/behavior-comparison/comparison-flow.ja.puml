@@ -1,0 +1,24 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName "Hiragino Sans"
+skinparam defaultFontSize 13
+start
+:リクエストを取得\n(baseline, candidate, scenario);
+fork
+  :baseline の\n.ghost.md をコンパイル;
+  :凍結された scenario-v1 を\n正準初期状態から実行;
+fork again
+  :candidate の\n.ghost.md をコンパイル;
+  :同じ scenario-v1 を\n正準初期状態から実行;
+end fork
+if (両方の実行が完了？) then (はい)
+  :スコープ内のスキャンごとに\n列挙された観測を選択;
+  :任意のアサーションを評価;
+  :outcome: completed\n(スキャンごとの値、equal、件数);
+else (いいえ)
+  :outcome: incomplete\n(各側のエラー、部分的な観測);
+  :すべてのアサーション = unknown;
+endif
+:SHA-256 同一性付きでレポート\nphysicalEffects: false;
+stop
+@enduml

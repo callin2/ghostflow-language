@@ -1,0 +1,26 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName Helvetica
+skinparam rectangle {
+  BackgroundColor White
+  BorderColor #555555
+}
+title GFB 模块封装：基本字段顺序
+
+rectangle "magic GFB1" as M
+rectangle "格式版本 u16" as F
+rectangle "模块名称、版本 u32" as N
+rectangle "输入：u16 count + (name, type)" as I
+rectangle "状态：u16 count + (name, type, default)" as S
+rectangle "仅格式 4：nowInput、timeEpochInput、根表" as H
+rectangle "策略：u16 count + 策略记录\n（名称、优先级、query blob、\n[格式 4：窗口]、转换、意图）" as ST
+rectangle "安全约束：u16 count + 记录" as K
+
+M -down-> F
+F -down-> N
+N -down-> I
+I -down-> S
+S -down-> H
+H -down-> ST
+ST -down-> K
+@enduml

@@ -1,0 +1,20 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontSize 13
+skinparam rectangleRoundCorner 8
+rectangle "编译后的 GFB\n+ 已校验的源码映射" as gfb
+rectangle "场景（TOON）\n带 atMs 的动作" as sc
+rectangle "ghostsim" as sim
+rectangle "原生 framed 运行器\n（普通输入程序）\nKeyboardMapper + ScanDriver" as nat
+rectangle "Rust/WASM 控制宿主\n（传感器、虚拟执行器、\n认证区间、Solar）" as wasm
+rectangle "可移植的 Rust\n求值核心" as core
+rectangle "GhostFlow/scenario-result-v1\n（TOON 或 JSON）" as res
+gfb --> sim
+sc --> sim
+sim --> nat
+sim --> wasm
+nat --> core
+wasm --> core
+sim --> res
+note bottom of core : 不打开任何物理设备驱动程序
+@enduml

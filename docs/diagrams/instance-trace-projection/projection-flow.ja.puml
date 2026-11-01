@@ -1,0 +1,19 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName "Hiragino Sans"
+skinparam defaultFontSize 13
+left to right direction
+
+artifact "コンパイル済み成果物\n（ソース、クロージャ、バイトコード、\nマニフェスト、ソースマップ）" as A
+artifact "プレゼンテーション\n（ラベル、\npresentationRevision）" as L
+rectangle "アクティベーション\n（同一性の検証、\n再コンパイル、ラベルの確認）" as ACT
+artifact "ランタイムトレース\n(observeSourceTrace)" as T
+rectangle "projectTrace(trace)\n（モジュールの指紋を確認）" as PT
+artifact "凍結されたエントリ\n（インスタンス ID、ラベル、ノード、\nシンボル、トレースフィールド）" as OUT
+
+A --> ACT
+L --> ACT
+ACT --> PT
+T --> PT
+PT --> OUT
+@enduml

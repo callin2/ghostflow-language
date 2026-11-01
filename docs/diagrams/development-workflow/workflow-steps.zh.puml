@@ -1,0 +1,11 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName "PingFang SC"
+start
+:1. 建立工作上下文\n（从 dev 开始，记录基准 SHA，\n阅读 AGENTS.md，docs:find）;
+:2. 设定一份任务契约\n（结果、范围、验收标准、\n前提条件、聚焦检查）;
+:3. 分派完整且有界的交接\n（每个单元一个执行者）;
+:4. 以合适的深度验证一次\n（静态 -> 聚焦 -> 完整 CI）;
+:5. 结束任务\n（报告证据，提升可重复性）;
+stop
+@enduml

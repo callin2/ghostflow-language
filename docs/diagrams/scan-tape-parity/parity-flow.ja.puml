@@ -1,0 +1,21 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName "Hiragino Sans"
+skinparam defaultFontSize 13
+skinparam rectangleRoundCorner 8
+rectangle "シナリオのソース" as src
+rectangle "コンパイル済みモジュール\n(GFB1、1 回だけコンパイル)" as mod
+rectangle "正準テープ\n(順序付きのフレーム試行)" as tape
+rectangle "Native: scan_tape CLI\n(TSV テープ -> ScanDriver::scan)" as nat
+rectangle "WASM: FramedGhostFlowRuntime\n(公開のフレーム付きアダプタ)" as wasm
+rectangle "試行ごとの結果\n(accepted, outcome, error)" as res
+rectangle "アサーション\n1. シナリオの期待値\n2. ターゲット間の完全一致" as cmp
+src --> mod
+mod --> nat
+mod --> wasm
+tape --> nat : TSV として直列化
+tape --> wasm : 同一の配列
+nat --> res : JSON lines
+wasm --> res
+res --> cmp
+@enduml

@@ -1,0 +1,22 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName Helvetica
+skinparam ArrowColor #555555
+hide empty description
+
+[*] --> Idle
+Idle --> Filling : interruptor bajo seco
+Filling --> Idle : interruptor alto mojado
+Idle --> SensorConflict : alto mojado, bajo seco
+Filling --> SensorConflict : alto mojado, bajo seco
+SensorConflict --> Idle : conflicto resuelto\n(un escaneo, bomba apagada)
+
+state Filling : fill_pump ON
+state Idle : fill_pump OFF
+state SensorConflict : fill_pump OFF
+
+note as N
+Si alguna entrada de nivel no está disponible,
+la fase se mantiene sin cambios.
+end note
+@enduml

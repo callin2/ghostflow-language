@@ -1,0 +1,20 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontSize 13
+title 합의된 수정 - 제안 단계, 미구현
+start
+:한 번의 동작이\n여러 property를 변경;
+:event 전체를 검증\n(하나의 원자적 event로);
+if (모든 값이 유효?) then (예)
+  :event 처리 시점에 모든 값 적용\n(운전 중에도);
+  :프로그램과 run identity 유지;\nsettings revision /\n유효 event 위치 전진;
+  note right
+    소스 재작성, 재컴파일,
+    firmware/bytecode 갱신,
+    컨트롤러 정지/재시작 없음
+  end note
+else (하나라도 무효)
+  :event 전체 거부;\n변경 없음;
+endif
+stop
+@enduml

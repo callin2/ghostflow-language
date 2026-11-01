@@ -1,0 +1,20 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontSize 13
+skinparam rectangleRoundCorner 8
+rectangle "컴파일된 GFB\n+ 검증된 source map" as gfb
+rectangle "시나리오 (TOON)\natMs가 있는 액션" as sc
+rectangle "ghostsim" as sim
+rectangle "Native framed 러너\n(일반 입력 프로그램)\nKeyboardMapper + ScanDriver" as nat
+rectangle "Rust/WASM 제어 호스트\n(센서, 가상 액추에이터,\n인증 구간, Solar)" as wasm
+rectangle "이식 가능한 Rust\n평가 코어" as core
+rectangle "GhostFlow/scenario-result-v1\n(TOON 또는 JSON)" as res
+gfb --> sim
+sc --> sim
+sim --> nat
+sim --> wasm
+nat --> core
+wasm --> core
+sim --> res
+note bottom of core : 물리 장치 드라이버는 열지 않음
+@enduml

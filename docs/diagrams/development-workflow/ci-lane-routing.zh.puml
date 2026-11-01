@@ -1,0 +1,17 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName "PingFang SC"
+start
+:计算精确差异\n（PR：merge-base..head；\npush：上一个..当前提交）;
+if (手动触发？) then (是)
+  :完整验证;
+elseif (差异为空或无法解析？) then (是)
+  :完整验证;
+elseif (所有路径都在\n文档允许列表中？) then (是)
+  :文档通道\n（docs:check、doc-index 与\n路由测试；无 WASM 产物）;
+else (否：未知、混合、.ghost.md、\nspec、契约、策略、不安全模式)
+  :完整验证;
+endif
+:验证结果检查\n（分类 + 所选通道）;
+stop
+@enduml

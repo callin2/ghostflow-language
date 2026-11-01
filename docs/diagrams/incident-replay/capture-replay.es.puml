@@ -1,0 +1,25 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName Helvetica
+skinparam defaultFontSize 13
+
+start
+if (¿comando?) then (capture)
+  :ejecutar el escenario desde los\ninicializadores del programa\n(ghostsim.runScenario);
+  :sellar GFB, manifiesto, mapa de fuente,\nescenario y resultado completado\nen un directorio nuevo;
+  :captured (salida 0);
+  stop
+else (replay)
+  :verificar el sello del manifiesto y\nel hash y tamaño de cada entrada\ndel inventario;
+  :preparar los bytes verificados en\nun directorio temporal privado;
+  :volver a ejecutar; comparar con el registro\n(y con --candidate, si se indica);
+  if (clasificar el resultado) then (todas las comprobaciones OK)
+    :completed / compared (salida 0);
+  elseif () then (falta el estado inicial\no faltan artefactos)
+    :partial (salida 2);
+  else (corrupción, discrepancia de revisión,\nbrecha de escaneo, error de tiempo o arranque,\ndecisión modificada, fallo del candidato)
+    :rejected (salida 1);
+  endif
+  stop
+endif
+@enduml

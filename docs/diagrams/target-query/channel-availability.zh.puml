@@ -1,0 +1,35 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName Helvetica
+skinparam defaultFontSize 13
+title 单个选定通道的可用性
+
+start
+:只保留新鲜且已关联的观测
+（无效报告被排除，
+并记录在 diagnostics 中）;
+:收集该通道以及
+每个已声明资源的状态;
+if (报告之间对该通道或
+任一资源是否存在分歧？) then (是)
+  :conflict;
+  stop
+endif
+if (该通道是否声明了 `resources`？) then (否)
+  :unknown;
+  stop
+endif
+if (该通道和每个已声明资源
+是否都至少有一个状态？) then (否)
+  :unknown;
+  stop
+endif
+if (是否有任一状态为 reserved？) then (是)
+  :reserved;
+elseif (是否有任一状态为 busy？) then (是)
+  :busy;
+else (全部 available)
+  :available;
+endif
+stop
+@enduml

@@ -1,0 +1,18 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontSize 12
+hide empty description
+
+state "assumption\nstatus=unconfirmed\n（例如 origin=ai）" as AU
+state "intent / premise\nstatus=confirmed" as C
+state "superseded 锚点\n（任意 kind）" as S
+
+[*] --> AU : AI 或作者的猜测
+AU --> C : 由人确认；\n源文件重新分类
+AU --> S : 旧假设作为\n散文保留
+C --> S : 被更新的\n陈述取代
+
+AU : 只能通过\nrelation=assumes 链接
+C : 可以通过 implements、\nconstrains 或 fallback 链接
+S : 不能链接到\n当前节点
+@enduml

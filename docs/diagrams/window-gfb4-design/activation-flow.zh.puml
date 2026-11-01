@@ -1,0 +1,24 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontSize 13
+participant "宿主\n(ControlRuntime)" as Host
+participant "WASM 适配器" as Adapter
+participant "Rust 解码器" as Decoder
+participant "Runtime" as RT
+
+Host -> Host : 在异步工作开始前\n捕获 options.temporal
+Host -> Adapter : activateTemporal(profile)
+Adapter -> Decoder : GFTA 数据包（24+16N 字节）
+Decoder -> Decoder : 逐一独立检查每个字段
+alt 有效
+  Decoder -> RT : activate_with_temporal(&TemporalActivation)
+  RT -> RT : 预分配引擎、缓冲区\n和 J+1 个检查点
+  RT --> Host : 已激活
+  loop 每次扫描
+    Host -> RT : 以固定的 timeEpoch 扫描
+  end
+else 被拒绝
+  Decoder --> Host : 错误；保留配置中状态
+end
+note over Host, RT : 新的时间纪元需要新的会话。
+@enduml

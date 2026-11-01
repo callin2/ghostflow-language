@@ -1,0 +1,19 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontSize 13
+hide empty description
+state "구성 중 (Configuring)" as Configuring
+state "활성 (Active)" as Active
+[*] --> Configuring : gf_frame_create
+Configuring : Runtime 소유
+Configuring : load / add_capability
+Configuring : validate / initialize_restart
+Configuring --> Configuring : 활성화 실패\n(상태 보존)
+Configuring --> Active : gf_frame_activate\n(Runtime을 한 번 이전)
+Active : ScanDriver 소유
+Active : gf_frame_scan
+Active : load / add / activate 거부
+Active --> Active : 스캔 실패\n(마지막 결과와 VM 상태 유지)
+Configuring --> [*] : gf_frame_destroy
+Active --> [*] : gf_frame_destroy
+@enduml

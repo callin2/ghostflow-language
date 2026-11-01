@@ -1,0 +1,25 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName "Hiragino Sans"
+skinparam defaultFontSize 13
+skinparam componentStyle rectangle
+left to right direction
+title E01：各値はどこから来るか
+
+rectangle "スイッチ接点\n（a接点またはb接点）" as contact
+rectangle "配線 / DI入力モジュール\n極性を正規化" as di
+rectangle "入力ドライバ\n+ バインディング（DI1）" as drv
+package "GhostFlowプログラム" {
+  rectangle "input switch_on\nResult<Bool, SensorFault>" as sw
+  rectangle "output lamp: Bool" as lamp
+}
+rectangle "バインディング（RO1）\n+ 出力レンダラー" as rend
+rectangle "リレー / LED" as relay
+
+contact --> di
+di --> drv
+drv --> sw : 品質付きの\n観測
+sw --> lamp : recover(false)
+lamp --> rend : 要求値
+rend --> relay
+@enduml

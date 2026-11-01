@@ -1,0 +1,23 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontSize 13
+start
+:request 캡처\n(baseline, candidate, scenario);
+fork
+  :baseline\n.ghost.md 컴파일;
+  :고정된 scenario-v1을\n정본 초기 상태에서 실행;
+fork again
+  :candidate\n.ghost.md 컴파일;
+  :같은 scenario-v1을\n정본 초기 상태에서 실행;
+end fork
+if (두 실행 모두 완료?) then (예)
+  :scope 안의 scan별로\n나열된 관측 선택;
+  :선택적 assertion 평가;
+  :outcome: completed\n(scan별 값, equal, 개수);
+else (아니요)
+  :outcome: incomplete\n(각 측 오류, 부분 관측);
+  :모든 assertion = unknown;
+endif
+:SHA-256 identity와 함께 보고\nphysicalEffects: false;
+stop
+@enduml

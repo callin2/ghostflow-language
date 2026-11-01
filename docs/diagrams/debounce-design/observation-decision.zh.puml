@@ -1,0 +1,28 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontSize 12
+skinparam ActivityBackgroundColor #F7F9FC
+skinparam ActivityBorderColor #4A6FA5
+title Debounce：所选根的一次观测（简化）
+start
+:每个可达根在已提交的扫描中\n更新自己的高水位 epoch/ID;
+if (所选根发生变化，或\n出现新的 epoch 变化？) then (是)
+  :重置 stable 与 candidate 连续性;
+endif
+if (Result 为故障？) then (是)
+  :保留确切的原因与来源；\n将 stable 与 candidate 重置为 `initial`;
+  stop
+endif
+if (是新观测？\n（tag 0：每个已提交扫描一次）) then (否：重复、\nID 更小、缺失)
+  :连续性不推进;
+  stop
+else (是)
+endif
+if (candidate 保持时间达到或超过\n`stable_for`？) then (是)
+  :将 candidate 提升为 stable;
+else (否)
+  :继续为 candidate 计时\n（样本时间或扫描逻辑时间）;
+endif
+:转发上游样本谱系;
+stop
+@enduml

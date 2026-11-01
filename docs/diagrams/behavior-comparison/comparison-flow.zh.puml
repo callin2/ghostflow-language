@@ -1,0 +1,23 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontSize 13
+start
+:捕获请求\n（基线、候选、场景）;
+fork
+  :编译基线\n.ghost.md;
+  :从规范初始状态运行\n冻结的 scenario-v1;
+fork again
+  :编译候选\n.ghost.md;
+  :从规范初始状态运行\n同一个 scenario-v1;
+end fork
+if (两次运行都完成？) then (是)
+  :在范围内按扫描\n选取列出的观测项;
+  :对可选断言求值;
+  :outcome: completed\n（每次扫描的值、equal、计数）;
+else (否)
+  :outcome: incomplete\n（各侧错误、部分观测）;
+  :每个断言 = unknown;
+endif
+:报告带 SHA-256 身份标识\nphysicalEffects: false;
+stop
+@enduml

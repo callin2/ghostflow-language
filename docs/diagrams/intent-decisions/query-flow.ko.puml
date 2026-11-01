@@ -1,0 +1,29 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontSize 12
+skinparam componentStyle rectangle
+left to right direction
+
+rectangle "intent-decisions-request-v1" as req {
+  card "current\n(source + intentEvidence\n+ 선택적 sourceClosure)" as cur
+  card "previous (선택)" as prev
+  card "transitions (선택,\nprevious 필요)" as tr
+  card "requirementContract\n(선택, 외부 제공)" as rc
+}
+rectangle "inspectIntentDecisions\n(순수 조회)" as q
+card "기존 컴파일러:\n재컴파일 + anchor와\nevidence 검증" as comp
+card "intent-decisions-result-v1\ndecisions, judgments,\nrequirements, comparison, trust" as res
+
+cur --> q
+prev --> q
+tr --> q
+rc --> q
+q --> comp
+comp --> q
+q --> res
+note bottom of res
+  보고만 합니다. 승인, 인증,
+  hold/block, 런타임 변경을
+  하지 않습니다.
+end note
+@enduml

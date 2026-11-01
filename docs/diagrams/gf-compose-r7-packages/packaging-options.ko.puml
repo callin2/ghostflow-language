@@ -1,0 +1,24 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName Helvetica
+skinparam defaultFontSize 13
+title 두 가지 패키징 선택지 (둘 다 제안이며 어느 쪽도 승인되지 않음)
+
+package "선택지 1: 확장된 소스 번들 (검토용 권고안)" {
+  rectangle "잠긴 소스 closure\n(루트 + 모든 import,\nrevision, digest)" as C1
+  rectangle "컴파일러 재생 1회" as R1
+  rectangle "조합된 아티팩트 1개\n(GFB, manifest, 소스 맵)" as A1
+  rectangle "서명된 payload" as S1
+  C1 --> R1
+  R1 --> A1
+  A1 --> S1
+}
+
+package "선택지 2: 조합 envelope" {
+  rectangle "Envelope\n(고정된 참조 + edge;\n서명 의무 여부: 미해결)" as E2
+  rectangle "기존 패키지 A\n(자체 소스 맵, 서명)" as PA
+  rectangle "기존 패키지 B\n(자체 소스 맵, 서명)" as PB
+  E2 --> PA : digest 고정
+  E2 --> PB : digest 고정
+}
+@enduml

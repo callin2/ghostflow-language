@@ -1,0 +1,45 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName Helvetica
+skinparam defaultFontSize 13
+scale 1 as 50 pixels
+hide time-axis
+
+concise "Hora de pared" as T
+concise "Pulse" as P
+concise "Window(5min)" as W
+concise "Run(5min, on_time)" as O
+concise "Run(5min, within(10min))" as R
+
+@0
+T is "07:58"
+P is "-"
+W is "-"
+O is "-"
+R is "-"
+
+@2
+T is "08:00"
+P is "admitir en el cruce"
+W is "puede admitir"
+O is "admitir en el cruce"
+R is "puede admitir"
+
+@3
+P is "si no, omitida"
+O is "si no, omitida"
+
+@7
+T is "08:05"
+W is "cerrada"
+
+@12
+T is "08:10"
+R is "LateStartExpired"
+
+@14
+T is "08:12"
+
+W@2 <-> @7 : [08:00, 08:05)
+R@2 <-> @12 : [08:00, 08:10) gracia de admisión, no duración del Run
+@enduml

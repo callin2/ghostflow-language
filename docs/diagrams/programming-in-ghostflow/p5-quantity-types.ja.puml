@@ -1,0 +1,24 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName "Hiragino Sans"
+skinparam defaultFontSize 13
+skinparam rectangleBorderColor #4A6FA5
+skinparam rectangleBackgroundColor #F7F9FC
+title 単位は表記にすぎず、意味は型が担う
+
+rectangle "25°C   77°F   298.15K" as TL
+rectangle "Temperature\n（正準単位 K）" as T
+rectangle "5Δ°C   9Δ°F" as DL
+rectangle "TemperatureDelta\n（正準単位 ΔK）" as TD
+rectangle "Irradiance\n（W/m2、放射パワー）" as IR
+rectangle "PPFD\n（umol/m2/s、光子）" as PP
+rectangle "Lux センサの読み値\n（Lux 型はない）" as LX
+rectangle "検証済みの換算\n（バインディング/前処理の境界）" as CV
+
+TL --> T : 同じ型、\n正準単位に換算
+DL --> TD : 同じ型
+T ..> TD : Temperature - Temperature
+IR -[#B03A2E]- PP : <color:#B03A2E>直接比較できない</color>
+LX --> CV : スペクトル、校正、光学系
+CV --> PP : 検証後に限る
+@enduml

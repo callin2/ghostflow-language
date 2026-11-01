@@ -1,0 +1,25 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontSize 13
+skinparam componentStyle rectangle
+title Runner del tutorial: un ejemplo, dos VM
+
+file "NN-name.ghost.md" as src
+component "compileSource\n(compilador real)" as cc
+file "build/tutorial/NN-name.gfb\n+ .manifest.json, .map.json" as gfb
+component "Runtime WASM\n(host Node)" as wasm
+file ".inputs.csv\n(instantáneas de entrada\nregistradas de la VM)" as csv
+component "Runner nativo\n(target/debug/examples/run)" as nat
+file ".trace.json" as trace
+node "verificar: trazas de VM iguales" as cmp
+
+src --> cc
+cc --> gfb
+gfb --> wasm
+wasm --> csv : registra las entradas exactas
+gfb --> nat
+csv --> nat
+wasm --> trace
+wasm --> cmp : traza de VM
+nat --> cmp : traza de VM (JSON)
+@enduml

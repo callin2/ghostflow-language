@@ -1,0 +1,18 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName Helvetica
+skinparam defaultFontSize 13
+
+rectangle "Runtime en vivo" as Live {
+  rectangle "Ticks / escaneos registrados" as Rec
+  rectangle "Estado en vivo, journal, intenciones,\ntraza/resultado, secuencia de tramas,\nreloj, último resultado" as State
+}
+rectangle "Instancia ghost separada" as Ghost
+rectangle "resultado de reproducción\n(runtime.replay)" as Result
+actor "Quien llama" as Caller
+
+Caller --> Ghost : replayTemporal({count, profile,\nmaxPeakTemporalBytes, maxJsonBytes})
+Rec --> Ghost : checkpoint previo al prefijo\nelegible más antiguo + registros
+Ghost --> Result : el éxito reemplaza solo esto
+Ghost ..> State : sin efectos,\nsin cambios
+@enduml

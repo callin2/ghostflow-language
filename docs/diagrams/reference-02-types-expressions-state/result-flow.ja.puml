@@ -1,0 +1,21 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontSize 13
+skinparam rectangleBorderColor #4A6FA5
+skinparam rectangleBackgroundColor #F7F9FC
+left to right direction
+title moisture |> map(below(35%)) |> recover(false)
+
+rectangle "moisture\nResult<Percent, SensorFault>" as M
+rectangle "map(below(35%))\nResult<Bool, SensorFault>" as MAP
+rectangle "recover(false)\nBool" as R
+rectangle "ok(x) -> ok(x < 35%)" as OKP
+rectangle "fault(e) -> fault(e)\n（そのまま通過）" as ERRP
+rectangle "ok(b) -> b\nfault(e) -> false\n（故障は記録に残る）" as REC
+
+M --> MAP
+MAP --> R
+MAP .. OKP
+MAP .. ERRP
+R .. REC
+@enduml

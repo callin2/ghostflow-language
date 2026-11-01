@@ -1,0 +1,18 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontSize 12
+start
+:이전 authored 상태를 기준으로\nprelude를 의존 순서대로 한 번 평가;
+:소비자 W가 선언된 모든 upstream window의\nhighwater revision을 준비\n(선택 여부·성공 여부와 무관);
+if (선택된 upstream 결과가 성공\n그리고 revision > 저장된 highwater?) then (예)
+  :derived event 하나를 admission\n식별자 (site, admissionRevision)\n+ 소유한 proof tree;
+else (아니요)
+  :새 하류 point 없음\n(만료, 재선택, 재평가);
+endif
+if (scan 전체가 성공?) then (예)
+  :window, proof, highwater를 commit;
+else (아니요: source, density,\n산술 또는 intent 오류)
+  :모두 rollback;\n재시도는 같은 freshness를 봄;
+endif
+stop
+@enduml

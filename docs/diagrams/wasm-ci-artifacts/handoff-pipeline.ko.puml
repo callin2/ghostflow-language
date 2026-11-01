@@ -1,0 +1,25 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontSize 13
+skinparam defaultFontName "Apple SD Gothic Neo"
+title 검증된 WASM 인계: 생산자와 소비자
+
+|CI 워크플로|
+start
+:PR head 또는 전체 source_sha 체크아웃;
+:커밋, 트리, Cargo.lock 해시 검증;
+:설정 (네트워크 허용):
+Node 22, Rust stable, npm ci, cargo fetch --locked;
+:CARGO_NET_OFFLINE=true npm test
+(유일한 WASM 빌드);
+:tools/package-verified-wasm.mjs
+-> wasm + verification.json + manifest.json;
+:아티팩트 업로드 (14일 보존);
+|소비자|
+:세 파일 다운로드;
+:형식, 핀, 트리, 잠금 파일 해시 확인;
+:해시와 바이트 수 다시 계산;
+:예상 실행, 커밋, 워크플로 확인
+(zip이 스스로를 승인할 수 없음);
+stop
+@enduml

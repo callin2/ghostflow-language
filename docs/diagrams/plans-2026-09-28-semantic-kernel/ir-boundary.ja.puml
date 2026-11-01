@@ -1,0 +1,22 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName "Hiragino Sans"
+skinparam defaultFontSize 13
+skinparam rectangleBorderColor #555555
+skinparam rectangleBackgroundColor #F7F7F7
+
+rectangle "既存のソース AST\n+ コンパイラのエントリポイント\n（公開 API は変更なし）" as AST
+rectangle "型付き式 IR（#171）\n同一性／型は解決済み\nオペコードやバイトなし" as EIR
+rectangle "型付きモジュール IR（#172）\n入力、状態、遷移、\n意図、制約" as MIR
+rectangle "型付き拡張ディスクリプタ\nウィンドウ、スケジュール、true_for、\n設定ストリーム、使用量計上、PID" as EXT
+rectangle "単一の GFB エミッタ\n（フォーマットを選び、バイトを\n書き出す唯一の場所）" as EMIT
+rectangle "既存の GFB バイト\n（エンベロープ、命令、\n拡張レコード）" as GFB
+
+AST --> EIR
+AST --> MIR
+EIR --> MIR
+AST --> EXT
+EXT --> MIR : 個別の拡張レコード\nとして保持
+MIR --> EMIT
+EMIT --> GFB
+@enduml

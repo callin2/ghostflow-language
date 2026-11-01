@@ -1,0 +1,19 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontSize 13
+start
+:Tomar una única instantánea inmutable\n(entradas + estado consolidado anterior);
+:Evaluar todas las transiciones a la vez\n→ estado candidato;
+:Evaluar las intenciones solicitadas\n(x sin prima = estado anterior, x' = candidato);
+:Aplicar las restricciones booleanas\n→ intenciones seguras;
+note right
+  Una restricción que fuerza una salida
+  a su valor seguro NO es un escaneo fallido.
+end note
+if (¿Evaluación y validación correctas?) then (sí)
+  :Consolidar atómicamente el estado candidato\ny el registro de escaneo solicitado/seguro;
+else (no)
+  :Revertir: conservar el estado consolidado previo;\nno exponer ningún candidato parcial;
+endif
+stop
+@enduml

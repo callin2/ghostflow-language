@@ -1,0 +1,22 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName Helvetica
+skinparam defaultFontSize 13
+skinparam activityBackgroundColor #F7F9FC
+start
+:含 Int 值的源代码;
+if (常量溢出、非法字面量、\nInt/Number 混用，或\n静态可判定的无效转换？) then (是)
+  :编译诊断;
+  stop
+else (否)
+endif
+:编码 GFB 并执行一次扫描;
+if (依赖输入的溢出、\n除数为零或无效转换？) then (是)
+  :拒绝本次扫描\n（稳定原因码，如 integer-overflow）;
+  :不提交新的状态或意图；\n最后被接受的结果保留为证据;
+  stop
+else (否)
+  :提交精确的 Int 结果;
+  stop
+endif
+@enduml

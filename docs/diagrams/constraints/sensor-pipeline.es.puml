@@ -1,0 +1,23 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName Helvetica
+skinparam rectangle {
+  BackgroundColor White
+  BorderColor #555555
+}
+left to right direction
+title Orden de procesamiento del sensor en el ejemplo de humedad
+
+rectangle "Driver\nID de muestra nueva + tiempo" as drv
+rectangle "Validación de entrada\nvalid = 0% .. 100%" as val
+rectangle "Filtro\nmedian(5)" as flt
+rectangle "Frescura / recuperación\nstale_after = 3s\nrecover_after = 3 samples" as fr
+rectangle "Histéresis\non_below 30%\noff_above 35%" as hy
+rectangle "case dry { ok / fault }\ntratamiento explícito" as cs
+
+drv --> val
+val --> flt
+flt --> fr
+fr --> hy : Result<T, SensorFault>
+hy --> cs : calidad preservada
+@enduml

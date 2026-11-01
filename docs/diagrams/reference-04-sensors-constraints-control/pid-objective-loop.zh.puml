@@ -1,0 +1,24 @@
+@startuml
+skinparam defaultFontName "PingFang SC"
+skinparam shadowing false
+skinparam rectangleBorderColor #4A6FA5
+skinparam rectangleBackgroundColor #F7F9FC
+title 连续控制目标回路
+rectangle "target\n（设定值）" as T
+rectangle "measure\n（过程值）" as M
+rectangle "PID 控制器\nP + I + D + bias" as PID
+rectangle "请求值 (requested)\n（钳位到输出范围）" as R
+rectangle "仲裁 +\n安全约束" as C
+rectangle "安全目标" as S
+rectangle "输出渲染器\n（已应用）" as A
+rectangle "过程 +\n反馈" as P
+T --> PID
+M --> PID
+PID --> R
+R --> C
+C --> S
+S --> A
+A --> P
+P --> M : 下一个样本
+S ..> PID : 抗积分饱和与\n无扰跟踪\n使用安全目标
+@enduml

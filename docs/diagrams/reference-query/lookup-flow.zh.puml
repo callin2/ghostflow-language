@@ -1,0 +1,25 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName Helvetica
+skinparam defaultFontSize 13
+skinparam ArrowColor #526d76
+
+start
+:解码严格的 TOON 请求;
+if (字段、operation 有效，\nbudgetBytes 为 256–1,000,000？) then (否)
+  :错误（CLI 退出码 2）;
+  stop
+endif
+:读取参考索引 + 被链接的章节;
+:重建目录\n（ref-CC-SS ID、摘要）;
+if (选择器匹配到某一节？) then (否)
+  :status: no_match\n（CLI 退出码 1）;
+  stop
+endif
+if (响应不超过 budgetBytes？) then (否)
+  :status: budget_exceeded\n+ requiredBytes（CLI 退出码 2）;
+  stop
+endif
+:status: ok\n元数据 + 精确的 Markdown 切片;
+stop
+@enduml

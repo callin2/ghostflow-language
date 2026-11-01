@@ -1,0 +1,25 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontSize 12
+start
+:node tools/ghostsim-console.mjs program.gfb --bind ...;
+if (stdin は端末か？) then (はい: ライブモード)
+  :stderr も端末であることを要求;
+  :0 ms でスキャンし、パネルを描画;
+  repeat
+    :100 ms タイマー、またはキー 1-8 / :toggle;
+    :現在の経過時間で 1 回スキャン;
+  repeat while (:exit または Ctrl-C？) is (いいえ)
+  :画面を復元し、短い要約を表示;
+  note right: --record と --format は拒否
+else (いいえ: パイプ再生)
+  repeat
+    :1 行につき 1 コマンドを読む;
+    :仮想時間でトグル / scan N;
+    :パネルを stderr に表示;
+  repeat while (exit または入力終端？) is (いいえ)
+  :scenario-result-v1 を 1 件 stdout に出力\n（既定は TOON、--format json）;
+  note right: --record はリプレイ可能な TOON シナリオを書き出す
+endif
+stop
+@enduml

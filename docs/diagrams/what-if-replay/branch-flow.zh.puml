@@ -1,0 +1,28 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName "PingFang SC"
+skinparam defaultFontSize 13
+title What-if 分支：从记录的前缀到候选结果
+
+start
+:prepareWhatIfReplay
+（验证源映射、重新编译、
+检查字节码 + 清单）;
+:构建检查点
+GhostFlow/replay-prefix-checkpoint-v1;
+:branch({ branchId, runId, synthetic });
+:新运行时重放前缀
+并验证结果摘要;
+:应用显式合成值;
+if (每个未来帧都具备\n所有必需的输入/样本？) then (是)
+  :执行未来帧
+（实际的可移植核心）;
+  :返回候选结果 + 回执
+（recorded / synthetic 标签）;
+else (否)
+  :返回 status 'missing-input'
+（缺失的名称和逻辑时间，
+不执行任何分支帧）;
+endif
+stop
+@enduml

@@ -1,0 +1,22 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName Helvetica
+skinparam defaultFontSize 13
+title 첫 journey (제안; 농부에게 import나 그래프 없음)
+
+|농부|
+start
+:준비된 동작 선택;
+:쉬운 말로 된 요구사항 검토;
+:농장 / 설치 사실 확인;
+:적용;
+if (결과?) then (승인)
+  :구체적인 승인 결과;
+else (차단)
+  :구체적인 차단 원인\n+ 다음 행동;
+endif
+|엔지니어 / 설치자|
+:같은 incident 열기;
+:기술 증거 확인\n(소스, revision, 인스턴스,\n입력, 제약, 실행, 바인딩);
+stop
+@enduml

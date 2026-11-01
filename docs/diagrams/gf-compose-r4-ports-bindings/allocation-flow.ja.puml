@@ -1,0 +1,23 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName "Hiragino Sans"
+skinparam defaultFontSize 13
+title 提案する安定割り当て（手作業の設計であり、バリデータの動作ではない）
+
+start
+:既存の明示的バインディングを\nすべて保持する;
+note right: 決して移動しない。\n移動を求める要求は\n競合／変更提案になる。
+repeat :次の未バインドのロール\n（正準な論理ロール名の順）;
+  if (入力の種類／ケイパビリティは明示的か？) then (いいえ)
+    :suitability-unknown:\nこのロールの割り当てを停止;
+  elseif (方向と意味型が一致する\n未使用エンドポイントがあるか？) then (いいえ)
+    :容量枯渇:\n競合を報告;
+  else (はい)
+    :capacity-compatible:\n安定したエンドポイントID順で先頭を選択;
+    :proposed binding\n（ロール、エンドポイント、リビジョン、\n適合性の状態）;
+  endif
+repeat while (未バインドのロールが残っているか？) is (はい)
+->いいえ;
+:confirmed installation は\n設置オーナーの確認\n＋物理的証拠がある場合のみ;
+stop
+@enduml

@@ -1,0 +1,28 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName Helvetica
+skinparam defaultFontSize 13
+title 运营者属性事件（获批设计，尚未实现）
+
+start
+:运营者提交一次操作\n（一个或多个属性值）;
+:验证整个事件：
+身份标识关联（程序身份标识是否过时？）
+以及每一个值（类型、有限、min/max/step）;
+if (过时或有任一值无效？) then (是)
+  :拒绝整个事件；\n不做变更；保留先前的值;
+  stop
+else (全部有效)
+  :在其生效\n事件位置应用;
+  :新的设置修订版 /\n生效位置;
+endif
+note right
+不变：程序/源/字节码、
+运行身份标识、部署包。
+不重新编译、不重新打包，
+也没有整个控制器范围的维护停机。
+开放问题：持久性与失败顺序。
+end note
+:活动中的逻辑按\n现有规则作出响应;
+stop
+@enduml

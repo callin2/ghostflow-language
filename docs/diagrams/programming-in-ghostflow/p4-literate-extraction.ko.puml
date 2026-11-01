@@ -1,0 +1,20 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName "Apple SD Gothic Neo"
+skinparam defaultFontSize 13
+skinparam componentStyle rectangle
+title 문서형 소스: 최상위 ghost 블록만 실행된다
+
+file "follow-switch.ghost.md\n(편집 원본)" as doc
+rectangle "설명 문단,\n다른 info string,\n중첩 fence" as prose
+rectangle "최상위 ```ghost 블록\n(문서 순서대로)" as blocks
+component "컴파일러가 블록을 이어\nroot control 하나로 만듦" as cc
+file "GFB + manifest + source map\n(파생 산출물)" as out
+
+doc --> prose
+doc --> blocks
+prose ..> cc : 실행되지 않음\n(revision만 바뀜)
+blocks --> cc
+cc --> out
+out ..> doc : 오류 위치는\n이 원본을 가리킴
+@enduml

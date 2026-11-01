@@ -1,0 +1,20 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName "Hiragino Sans"
+skinparam defaultFontSize 13
+skinparam ArrowColor #526d76
+skinparam state {
+  BackgroundColor #f1f6f5
+  BorderColor #6d858b
+  FontColor #102b35
+}
+
+[*] --> unobserved : オブザーバを有効化
+unobserved : 最初の成功した\nスキャンより前
+unobserved --> inactive : 最初に確定したfalse\n（イベントなし）
+unobserved --> active : 最初に確定したtrue\n/ "raised"（新しいエピソード）
+inactive --> active : true\n/ "raised"（新しいエピソード）
+active --> inactive : false\n/ "cleared"（同じエピソード）
+active --> active : trueの繰り返し\n（イベントなし）
+inactive --> inactive : falseの繰り返し\n（イベントなし）
+@enduml

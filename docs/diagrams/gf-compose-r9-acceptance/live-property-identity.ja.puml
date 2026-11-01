@@ -1,0 +1,14 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName "Hiragino Sans"
+skinparam defaultFontSize 13
+title ライブプロパティイベントと再起動をまたぐ同一性（提案中の受け入れ基準）
+
+[*] --> RunA : 実行開始\n（runId A、設定 rev N）
+RunA --> RunA : 有効なライブプロパティイベント\nすべての値を1つのイベントとして適用。\n設定 rev N -> N+1。\nソース/プログラムのハッシュと runId は不変
+RunA --> RunA : 無効な複数プロパティのイベント\nイベント全体を拒否。\nどのプロパティも変化しない
+RunA --> RunB : 実際の再起動\n（GhostFlow の再起動イベント）
+RunB : 新しい runId B
+RunB : 受け入れた設定は持続
+RunB : 応答 = 記述された GhostFlow のロジック\n（グローバルな再開/手動ポリシーなし）
+@enduml

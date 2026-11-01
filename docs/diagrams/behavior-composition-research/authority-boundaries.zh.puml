@@ -1,0 +1,15 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontSize 13
+skinparam componentStyle rectangle
+component "规范 .ghost.md +\n固定版本的导入源" as SRC
+component "API 所拥有的记录\n（修订版、设施\n上下文、部署）" as API
+component "Device 所拥有的配置档、\n驱动程序、观测" as DEV
+component "可移植 Rust 核心" as CORE
+component "前端" as FE
+SRC --> CORE : 可执行行为
+API ..> SRC : 标识修订版
+DEV --> CORE : 物理信息
+CORE --> FE : 语义描述符、\n已记录的结果
+FE ..> SRC : 改变规则的编辑 =\n源变更候选
+@enduml

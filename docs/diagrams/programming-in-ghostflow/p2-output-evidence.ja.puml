@@ -1,0 +1,27 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontSize 13
+skinparam ActivityBackgroundColor #F7F9FC
+skinparam ActivityBorderColor #4A6FA5
+title 要求意図から物理的な証拠まで（E05 の最終行）
+
+start
+:要求意図（requested）\n（<- 接続）\npump=true, valve=false;
+:出力制約\nrequire pump => valve;
+:安全意図（safe）\n（本章でいう「最終出力」）\npump=false, valve=false;
+note right
+  制約は true を false に
+  下げるだけです。ランタイムが
+  規則を満たすためにバルブを
+  オンにすることはありません。
+end note
+:適用済み（applied）\n（レンダラーの証拠：\nコマンドが書き込まれた）;
+:確認済み（confirmed）\n（フィードバックの証拠：\nリミット、エンコーダなど）;
+note right
+  適用済みと確認済みは、言語の
+  出力意図の範囲外です。
+  safe=true はポンプが運転した
+  ことを証明しません。
+end note
+stop
+@enduml

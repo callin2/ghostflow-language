@@ -1,0 +1,23 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName Helvetica
+skinparam defaultFontSize 13
+skinparam rectangleRoundCorner 8
+left to right direction
+title Cadena causal de evidencia propuesta (las etapas se mantienen separadas)
+
+rectangle "Evento de entrada\nu observación" as I
+rectangle "Regla evaluada\n(vinculada a la revisión\nde ajustes efectiva)" as E
+rectangle "Intención" as N
+rectangle "Salida solicitada\n(traza del núcleo Rust)" as Q
+rectangle "Salida segura\n(resolución de seguridad Rust)" as S
+rectangle "Resultado de aplicación\ndel host / renderizador\n(#74/#88, no definido en v0)" as A
+rectangle "Observación física\n(Device / instalación,\npropuesta #28)" as P
+
+I --> E
+E --> N
+N --> Q
+Q --> S : referencia a\nla restricción
+S --> A : el acuse del comando\nno es prueba física
+A --> P : un evento aplicado registrado\nno es prueba física
+@enduml

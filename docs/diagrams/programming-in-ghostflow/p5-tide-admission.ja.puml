@@ -1,0 +1,25 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName "Hiragino Sans"
+skinparam defaultFontSize 13
+title E37：予定時刻からの経過分（予定 = 満潮 - 30 分、4 分遅れて受け入れ）
+
+concise "受け入れ" as S
+concise "pump（出力意図）" as P
+
+@0
+S is "開：[予定, 予定+10 分)"
+P is "false"
+
+@4
+P is "受け入れから 5 分間実行"
+
+@9
+P is "false"
+
+@10
+S is "閉（終端は含まない）"
+
+S@0 <-> @10 : within(10min)
+P@4 <-> @9 : run(5min)
+@enduml

@@ -1,0 +1,25 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName Helvetica
+skinparam ArrowColor #555555
+skinparam ActivityBorderColor #555555
+
+start
+:후보 bool 출력
+(요청 의도);
+repeat
+  :모든 requires / mutex를
+  같은 snapshot으로 검사;
+  :끌 출력의 합집합을
+  한꺼번에 false로 설정;
+repeat while (바뀐 출력이 있는가?) is (예)
+-> 아니오;
+:안전 의도
+(모든 제약을 만족);
+note right
+  출력은 true -> false로만 바뀌므로
+  bool 출력이 N개이면 변경이 있는
+  라운드는 최대 N번입니다.
+end note
+stop
+@enduml

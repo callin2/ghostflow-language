@@ -1,0 +1,19 @@
+@startuml
+skinparam defaultFontName "PingFang SC"
+concise "条件" as C
+robust "值 (ms)" as V
+V has 0,100,900
+@0
+C is T
+V is 0
+@900
+V is 900
+@901
+C is F
+V is 0
+@1200
+C is T
+V is 0
+@1300
+V is 100
+@enduml

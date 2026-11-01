@@ -1,0 +1,21 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName Helvetica
+skinparam defaultFontSize 13
+
+start
+:包字节 + trustedKeys + revokedKeyIds\n+ 宿主输入 + verifyBytecode 回调;
+:1. 确切的 package/payload schema，受支持的版本;
+:2. 规范的 payload 摘要，\n>= 1 个有效的受信任签名;
+:3. 编译器修订版、运行时语义、\n运行时 ABI、绑定修订版;
+:4. 清单格式、必需能力\n与宿主输入的比对;
+:5. 源 / GFB / 清单 / 源映射的\n摘要及交叉链接;
+:6. source-trace 元数据与\n源和 GFB 身份标识的比对;
+:7. 宿主 verifyBytecode（GFB、冻结的清单、\n源映射、身份标识）;
+if (所有检查均通过且\n回调恰好返回 true？) then (是)
+  :已验证的结果\n（每次访问时 bytecode.copy()）;
+else (否)
+  :带稳定 code 的 PortablePackageError\n（不暴露字节码，不回退）;
+endif
+stop
+@enduml

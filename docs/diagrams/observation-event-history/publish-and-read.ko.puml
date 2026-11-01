@@ -1,0 +1,23 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontSize 12
+title 보존 범위가 있는 event journal: 게시, 보존, 읽기
+participant "신뢰하는 producer" as P
+participant "Event journal\n(참조 호스트)" as J
+participant "소비자" as C
+P -> J: publish({completion, trace, settingsState?, events})
+alt 검사 하나라도 실패
+  J --> P: 거부; journal 변경 없음 (재시도 가능)
+else 배치 전체가 유효
+  J -> J: 순번 N+1..N+k 부여\n(events = []이면 없음)
+  J -> J: 가장 최근 `capacity`개 event 보존
+  J -> J: 최신 snapshot 교체
+  J --> P: 게시된 record + snapshot + nextCursor
+end
+C -> J: read({cursor: afterSequence = 10})
+J --> C: gaps [11..13, "retention"]\n14부터의 event\n최신 snapshot (별도)\nnextCursor
+note right of C
+  11-13에 대한 합성 event는 없다.
+  처리를 마친 뒤에만 nextCursor를 저장한다.
+end note
+@enduml

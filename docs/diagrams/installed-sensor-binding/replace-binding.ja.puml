@@ -1,0 +1,18 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName "Hiragino Sans"
+skinparam defaultFontSize 13
+
+start
+:完了したステップの間で\nreplaceBinding(candidate);
+:候補全体を同じソースと\nバイトコードに照らして検証;
+:アセスメントを再計算;\n新しい ControlRuntime を準備し\nその戦略をアクティベート;
+if (有効で、未使用の実行 ID と\nバインディングリビジョンか?) then (はい)
+  :新しい実行を公開;
+  :センサは NotReady で開始;\nProgram の状態はソースの初期化子から;
+else (いいえ)
+  :拒否;
+  :以前の実行、バインディング、\nコンディショナの状態、アセスメント、\n最新のトレースを維持;
+endif
+stop
+@enduml

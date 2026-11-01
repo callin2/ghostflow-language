@@ -1,0 +1,28 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontSize 13
+skinparam ActivityBackgroundColor #F7F9FC
+skinparam ActivityBorderColor #4A6FA5
+title 一个 tick：读取快照，计算候选值，一并提交
+
+start
+:读取输入快照\n+ 前一状态;
+:计算所有下一状态\n（全部读取前一值）;
+:构建完整的候选状态;
+:计算请求意图\n（<- 表达式可以读取 state'）;
+:应用输出约束\n-> 安全意图;
+if (是否发生运行时故障？\n（溢出、percent-out-of-range 等）) then (是)
+  :拒绝该 tick;
+  note right
+    什么都不提交：
+    无候选状态，
+    无意图，
+    无成功的日志（journal）条目
+  end note
+  stop
+else (否)
+  :一并提交状态与\n逻辑结果;
+  :已提交的状态成为下一个\ntick 的“前一状态”;
+  stop
+endif
+@enduml

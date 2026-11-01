@@ -1,0 +1,24 @@
+@startuml
+skinparam defaultFontName "Hiragino Sans"
+skinparam shadowing false
+skinparam rectangleBorderColor #4A6FA5
+skinparam rectangleBackgroundColor #F7F9FC
+title 連続制御目標のループ
+rectangle "target\n（目標値）" as T
+rectangle "measure\n（プロセス値）" as M
+rectangle "PIDコントローラ\nP + I + D + bias" as PID
+rectangle "要求値 (requested)\n（出力範囲にクランプ）" as R
+rectangle "調停 +\n安全制約" as C
+rectangle "安全ターゲット" as S
+rectangle "出力レンダラー\n（適用済み）" as A
+rectangle "プロセス +\nフィードバック" as P
+T --> PID
+M --> PID
+PID --> R
+R --> C
+C --> S
+S --> A
+A --> P
+P --> M : 次のサンプル
+S ..> PID : アンチワインドアップと\nバンプレスな追従は\n安全ターゲットを使う
+@enduml

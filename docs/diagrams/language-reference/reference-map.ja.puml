@@ -1,0 +1,22 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName "Hiragino Sans"
+skinparam rectangleRoundCorner 8
+skinparam ArrowColor #555555
+left to right direction
+
+rectangle "文芸的ソース\n.ghost.md\n（第1章）" as SRC
+rectangle "コンパイラの検査\n型・単位・名前\n（第2章・第7章）" as COMP
+rectangle "tick の計算\n入力 + 前状態\n-> 次状態・意図\n（第2章・第3章）" as TICK
+rectangle "センサと制約\n品質・インターロック・モード\n（第4章）" as CONS
+rectangle "設定と観測\nライブ変更・イベント・アラーム\n（第5章）" as OBS
+rectangle "合成とリプレイ\nimport・バインディング・リプレイ\n（第6章）" as COMPOSE
+rectangle "ランタイム・Driver・デバイス\n層ごとの責任\n（第8章）" as DEV
+
+SRC --> COMP
+COMP --> TICK
+CONS --> TICK : フィルタ済みの読み取り、\n許可された出力
+OBS --> TICK : 有効な設定値
+TICK --> DEV : 出力意図
+COMPOSE ..> TICK : プログラムを組み合わせ、\n記録した tick を再実行
+@enduml

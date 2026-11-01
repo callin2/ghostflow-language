@@ -1,0 +1,20 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName "Hiragino Sans"
+skinparam defaultFontSize 13
+hide empty description
+state "保留中" as Pending
+state "保留なし" as Consumed
+
+[*] --> Pending : ホストが起動イベントの\n保留を報告
+[*] --> Consumed : ホストが保留イベント\nなしを報告
+Pending --> Pending : スキャンが拒否\n（イベントは保持）
+Pending --> Consumed : 最初に確定に\n成功したスキャン\n(restart_event = true)
+Consumed --> Consumed : 以降のスキャン\n(restart_event = false)
+Consumed --> Consumed : プログラムの置き換え\n（新しい起動イベントなし）
+
+note bottom of Pending
+  restart_reason は実行中ずっと固定
+  （ホストに証拠がなければ Unknown）。
+end note
+@enduml

@@ -1,0 +1,26 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName Helvetica
+skinparam defaultFontSize 13
+skinparam rectangleRoundCorner 8
+title 구분해서 유지하는 identity (현재 사실 vs. 제안)
+
+rectangle "정본 소스\ndocumentId + revisionId + sha256" as SRC
+rectangle "컴파일된 모듈\nfingerprint + 바이트코드 digest" as MOD
+rectangle "동작 인스턴스\n불투명 instanceId (제안)" as INST
+rectangle "논리 포트\n작성자 지정 id (인스턴스 한정, 제안)" as PORT
+rectangle "물리 바인딩\nbindingRevision / digest" as BIND
+rectangle "설정 revision\n+ 유효 event 위치 (제안)" as SET
+rectangle "실행\nrunId" as RUN
+rectangle "발생\nrun + instance + scanId (제안)" as OCC
+rectangle "표시 라벨 / 파일 이름\n(표시용, trace 전용)" as LBL #EEEEEE
+
+SRC --> MOD : 컴파일 결과
+SRC --> INST : 고정된 정의 revision
+INST --> PORT : 한정
+PORT --> BIND : 설치에서 바인딩
+INST --> SET : join
+RUN --> OCC : 내부에서 scanId 순서 지정
+INST --> OCC : 한정
+LBL ..> INST : 절대 identity 아님
+@enduml

@@ -1,0 +1,28 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName Helvetica
+skinparam defaultFontSize 13
+title 운영자 속성 이벤트 (승인된 설계이며 미구현)
+
+start
+:운영자가 하나의 동작을 제출\n(하나 이상의 속성 값);
+:이벤트 전체 검증:
+identity 결합 (오래된 프로그램 identity?)
+및 모든 값 (타입, 유한값, min/max/step);
+if (stale이거나 무효한 값이 있는가?) then (예)
+  :이벤트 전체 거부;\n변경 없음; 이전 값 유지;
+  stop
+else (모두 유효)
+  :유효 이벤트 위치에서\n적용;
+  :새 설정 revision /\n유효 위치;
+endif
+note right
+변경 없음: 프로그램/소스/바이트코드,
+실행 identity, 배포 패키지.
+재컴파일, 재패키징,
+컨트롤러 전체 유지보수 정지 없음.
+미해결: 내구성과 실패 순서.
+end note
+:활성 로직이 기존 규칙에\n따라 반응;
+stop
+@enduml

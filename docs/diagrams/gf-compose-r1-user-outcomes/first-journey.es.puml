@@ -1,0 +1,22 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName Helvetica
+skinparam defaultFontSize 13
+title Primer recorrido (propuesto; sin importaciones ni grafo para el agricultor)
+
+|Agricultor|
+start
+:Seleccionar un comportamiento preparado;
+:Revisar los requisitos en lenguaje sencillo;
+:Confirmar los datos de la granja / instalación;
+:Aplicar;
+if (¿Resultado?) then (aceptado)
+  :Resultado aceptado específico;
+else (bloqueado)
+  :Bloqueo específico\n+ siguiente acción;
+endif
+|Ingeniero / instalador|
+:Abrir el mismo incidente;
+:Ver la evidencia técnica\n(fuente, revisión, instancia,\nentradas, restricción, ejecución, vinculación);
+stop
+@enduml

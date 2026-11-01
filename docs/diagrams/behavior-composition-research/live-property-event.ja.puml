@@ -1,0 +1,21 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName "Hiragino Sans"
+skinparam defaultFontSize 13
+title 合意済みの修正案 - 提案段階、未実装
+start
+:1 つの操作で\n複数のプロパティを変更;
+:イベント全体を検証\n(1 つのアトミックなイベントとして);
+if (すべての値が有効？) then (はい)
+  :イベント処理時に全値を適用\n(運転中であっても);
+  :プログラムと実行の同一性を維持。\n設定リビジョン /\n有効イベント位置を進める;
+  note right
+    ソースの書き換え、再コンパイル、
+    ファームウェア/バイトコード更新、
+    コントローラの停止/再起動は不要
+  end note
+else (いずれかが無効)
+  :イベント全体を拒否。\n変更は一切なし;
+endif
+stop
+@enduml

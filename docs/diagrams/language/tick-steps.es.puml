@@ -1,0 +1,30 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName Helvetica
+skinparam ArrowColor #555555
+skinparam ActivityBorderColor #555555
+
+start
+:1. Congelar estrategia, revisión del perfil,
+entradas y estado anterior;
+:2. Calcular let/with y cada next
+(lee estado anterior + mismas entradas);
+:3. Construir el estado candidato completo
+(sin transición = conservar valor anterior);
+:4. Calcular intent/emit
+(state = anterior, next = candidato);
+:5. Aplicar restricciones de seguridad
+(intención solicitada -> segura);
+if (¿falló el tick?) then (sí)
+  :No consolidar nada;
+  :El host aplica su
+  política de salida segura;
+  stop
+else (no)
+  :6. Consolidar estado, salidas
+  y registros a la vez;
+  :7. Solo host real: aplicar la
+  intención segura al renderizador;
+  stop
+endif
+@enduml

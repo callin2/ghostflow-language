@@ -1,0 +1,38 @@
+@startuml
+skinparam shadowing false
+skinparam ArrowColor #555555
+hide empty description
+
+[*] --> Stopped
+Stopped --> Opening : 開イベント
+Stopped --> Closing : 閉イベント
+Stopped --> Open : 開リミットのみ
+Stopped --> Closed : 閉リミットのみ
+Closed --> Opening : 開イベント
+Open --> Closing : 閉イベント
+Opening --> Open : 開リミットを観測
+Closing --> Closed : 閉リミットを観測
+Opening --> WaitClose : 閉イベント
+Closing --> WaitOpen : 開イベント
+WaitOpen --> Opening : 2 秒経過
+WaitClose --> Closing : 2 秒経過
+WaitOpen --> WaitClose : 閉イベント
+WaitClose --> WaitOpen : 開イベント
+WaitOpen --> Open : 開リミットを観測
+WaitClose --> Closed : 閉リミットを観測
+SensorConflict --> Open : 開リミットのみ
+SensorConflict --> Closed : 閉リミットのみ
+SensorConflict --> Stopped : リミットなし
+
+state Opening : 開側接触器 ON
+state Closing : 閉側接触器 ON
+
+note as N
+すべての状態から最初に確認:
+1. 許可または位置が取得不能 -> Stopped
+2. 両方のリミットが true -> SensorConflict
+3. STOP/過負荷の許可喪失、または
+   両方の要求が押された -> Stopped
+   （SensorConflict からは除く）
+end note
+@enduml

@@ -1,0 +1,24 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName Helvetica
+skinparam rectangleRoundCorner 8
+skinparam ArrowColor #555555
+left to right direction
+
+rectangle "paquete ghostflow-lesson-v1 (JSON)" as B {
+  rectangle "source\ntext, sha256,\nmediaType" as SRC
+  rectangle "playback\ndurationMs,\ncheckpoints" as PB
+  rectangle "scenarios\nframes: atMs,\ninputs, samples?" as SC
+  rectangle "toolchain\nID declarados,\nABI 1" as TC
+  rectangle "bundleSha256" as DG
+}
+rectangle "validateLessonBundle\ncampos, límites, orden,\ndigests" as VAL
+rectangle "compileLessonBundle\nextrae bloques ghost,\ncompila, comprueba frames\ncontra el manifiesto" as CMP
+rectangle "Consumidor / runtime\nruntime.step(...)\npor frame" as RT
+
+B --> VAL
+VAL --> CMP : paquete válido
+CMP --> RT : programa compilado\n+ frames comprobados
+PB ..> SRC : líneas de sourceSpan
+PB ..> SC : scenarioId
+@enduml

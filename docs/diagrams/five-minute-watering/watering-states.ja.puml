@@ -1,0 +1,19 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName "Hiragino Sans"
+skinparam defaultFontSize 13
+skinparam ArrowColor #526d76
+skinparam state {
+  BackgroundColor #f1f6f5
+  BorderColor #6d858b
+  FontColor #102b35
+}
+
+[*] --> Off : 論理時間 0
+Off : watering = false\nRO1 = RO2 = false
+On : watering = true\nRO1 = RO2 = true
+Off --> On : DI1 の新しい false→true エッジ\nかつ DI2、DI3 が解除
+On --> Off : DI2 停止または DI3 低水位\n（または DI2/DI3 の故障）
+On --> Off : age が 5min に到達
+Off --> Off : DI1 押し続け、DI2/DI3 解除、\nまたは故障から復旧（再開しない）
+@enduml

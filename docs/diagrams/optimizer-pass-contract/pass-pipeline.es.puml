@@ -1,0 +1,20 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName Helvetica
+skinparam defaultFontSize 13
+
+title Límite propuesto del optimizador (solo diseño, no implementado)
+start
+:Analizar, comprobar tipos, resolver nombres /\nenumeraciones / estado siguiente\n(comprobaciones obligatorias existentes);
+:1. IR semántica tipada inmutable + mapeo de la fuente\n+ efectos de restricción + resultados de validación\n(ejecutable original conservado como respaldo);
+:2. Comprobaciones opcionales de propiedades SMT tipadas\n(dominios y supuestos explícitos);
+:3. Candidato BDD solo para regiones\nbooleanas puras y totales elegibles;
+:4. Comprobación independiente de\nequivalencia y certificado;
+if (¿Obligación establecida?) then (sí)
+  :Usar el candidato comprobado\n+ relaciones de transformación/demostración;
+else (discrepancia SAT, Unknown, tiempo agotado,\ncertificado no válido, ...)
+  :Conservar el original sin cambios\n+ motivo de omisión acotado / diagnóstico;
+endif
+:5. Emitir el bytecode final, comprobar los límites\nde recursos, validar las relaciones de procedencia;
+stop
+@enduml

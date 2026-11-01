@@ -1,0 +1,19 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName "Hiragino Sans"
+skinparam defaultFontSize 13
+title hysteresis(moisture, on_below: 30%, off_above: 35%, initial: false)
+
+[*] --> NotReady
+state "未準備 / 故障\n（公開結果は fault、\n処理は initial にリセット）" as NotReady
+state "dry = false" as F
+state "dry = true" as T
+
+NotReady --> F : 復旧/フィルタ条件を満たした\n良好なサンプル（initial false）
+F --> T : 値 < 30%
+T --> F : 値 > 35%
+F --> F : 値が [30%,35%] 内
+T --> T : 値が [30%,35%] 内
+F --> NotReady : Disconnected/Stale/Invalid
+T --> NotReady : Disconnected/Stale/Invalid
+@enduml

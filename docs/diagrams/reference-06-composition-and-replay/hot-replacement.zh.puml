@@ -1,0 +1,20 @@
+@startuml
+skinparam defaultFontName "PingFang SC"
+skinparam shadowing false
+skinparam defaultFontSize 13
+skinparam activityBorderColor #4A6FA5
+skinparam activityBackgroundColor #F7F9FC
+title Program 热替换（§6.9）
+
+start
+:具有新源修订版\n或导入闭包的候选;
+if (端口、所有权、profile、资源\n和状态兼容性有效？) then (是)
+  :在 tick 边界原子地提交;
+  :只迁移同名、同类型的状态\n新状态 = 声明的默认值\n已删除的状态消失;
+  :丢弃旧的输入缓存；\n接收新模式的\n完整输入快照;
+  :新的制品/源身份标识\n以及新的运行边界;
+else (否)
+  :保留之前的 Program;
+endif
+stop
+@enduml

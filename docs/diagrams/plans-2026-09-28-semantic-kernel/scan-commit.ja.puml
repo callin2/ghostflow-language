@@ -1,0 +1,20 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName "Hiragino Sans"
+skinparam defaultFontSize 13
+start
+:不変なスナップショットを 1 つ取る\n（入力 + 確定済みの旧状態）;
+:すべての遷移を同時に評価\n→ 候補状態;
+:要求意図を評価\n（プライムなし x = 旧状態、x' = 候補）;
+:Boolean 制約を適用\n→ 安全意図;
+note right
+  出力を安全側に強制する制約は
+  スキャンの失敗では「ない」。
+end note
+if (評価と検証は成功したか？) then (はい)
+  :候補状態と requested/safe の\nスキャン記録をアトミックに確定;
+else (いいえ)
+  :ロールバック：以前の確定状態を保持;\n部分的な候補は公開しない;
+endif
+stop
+@enduml

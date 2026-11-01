@@ -1,0 +1,23 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName Helvetica
+skinparam defaultFontSize 13
+skinparam rectangleRoundCorner 8
+left to right direction
+title 拟议的因果证据链（各阶段保持分离）
+
+rectangle "输入事件\n或观测" as I
+rectangle "已求值的规则\n（关联到生效的\n设置修订版）" as E
+rectangle "意图" as N
+rectangle "请求输出\n（Rust 核心追踪）" as Q
+rectangle "安全输出\n（Rust 安全决议）" as S
+rectangle "宿主 / 渲染器\n应用结果\n（#74/#88，v0 中未定义）" as A
+rectangle "物理观测\n（Device / 设施，\n#28 提案）" as P
+
+I --> E
+E --> N
+N --> Q
+Q --> S : 约束\n引用
+S --> A : 命令确认\n不是物理证明
+A --> P : 已记录的应用事件\n不是物理证明
+@enduml

@@ -1,16 +1,27 @@
 <!-- translation-source: docs/DOCUMENTATION.md -->
-
-[English original](DOCUMENTATION.md) · [언어 정책](DOCUMENTATION-LANGUAGES.ko.md)
+[영문 원문](DOCUMENTATION.md) · [언어 정책](DOCUMENTATION-LANGUAGES.ko.md)
 
 # 문서 목록
 
-각 행은 같은 문서의 완전한 영어와 한국어 버전으로 연결된다.
-기존 정본 소스 경로는 보존한다. 번역된 프로그램 예제는 읽기용 문서다.
-컴파일할 때는 원본 `.ghost.md`를 사용한다. 보고서, 생성된 증거와 테스트 입력의
-개별 제외 사유는 [목록 파일](translations.json)에 기록한다.
+이 목록은 영어와 한국어로 모두 제공되는 GhostFlow 문서를 모아 둔 것입니다.
+각 행은 같은 문서의 완전한 영어 버전과 한국어 버전으로 연결됩니다.
+
+표를 읽는 방법은 다음과 같습니다.
+
+- **문서** 열은 정본 소스 경로입니다. 기존 정본 경로는 그대로 보존하며,
+  번역 때문에 원본이 다른 곳으로 옮겨지지 않습니다.
+- **English** 열과 **한국어** 열은 두 언어 버전으로 연결됩니다. 원본 `NAME.md`가
+  영어이면 한국어 버전은 `NAME.ko.md`입니다. 원본 `NAME.md`가 한국어이면
+  영어 버전은 `NAME.en.md`입니다. 이 규칙은 [언어 정책](DOCUMENTATION-LANGUAGES.ko.md)에서
+  설명합니다.
+- 번역된 프로그램 예제는 *읽기용 투영*일 뿐입니다. 프로그램을 컴파일할 때는
+  항상 원본 `.ghost.md` 문서를 사용해야 합니다.
+- 보고서, 생성된 증거와 테스트 입력은 명시적 제외 항목으로 분류되며, 각 항목의
+  제외 사유는 [목록 파일](translations.json)에 기록되어 있습니다.
 
 | 문서 | English | 한국어 |
 |---|---|---|
+| `docs/HARDWARE-FRONT-MATTER.md` | [English](HARDWARE-FRONT-MATTER.md) | [한국어](HARDWARE-FRONT-MATTER.ko.md) |
 | `AGENTS.md` | [English](../AGENTS.md) | [한국어](../AGENTS.ko.md) |
 | `README.md` | [English](../README.md) | [한국어](../README.ko.md) |
 | `CONTRIBUTING.md` | [English](../CONTRIBUTING.md) | [한국어](../CONTRIBUTING.ko.md) |
@@ -144,4 +155,3 @@
 | `tasks/window-gfb4-design.md` | [English](../tasks/window-gfb4-design.md) | [한국어](../tasks/window-gfb4-design.ko.md) |
 | `tests/reference/DECISIONS.md` | [English](../tests/reference/DECISIONS.en.md) | [한국어](../tests/reference/DECISIONS.md) |
 | `tests/reference/README.md` | [English](../tests/reference/README.en.md) | [한국어](../tests/reference/README.md) |
-| `docs/HARDWARE-FRONT-MATTER.md` | [English](HARDWARE-FRONT-MATTER.md) | [한국어](HARDWARE-FRONT-MATTER.ko.md) |

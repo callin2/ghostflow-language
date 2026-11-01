@@ -1,0 +1,31 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName Helvetica
+skinparam defaultFontSize 13
+start
+:验证各个域以及连续的\n单调 / 正墙钟增量;
+if (墙钟时间可信？) then (否)
+  :Unknown(原因, 修订版);\nfallback = skip -> .due = false;
+elseif (首次使用或恢复？) then (是)
+  :建立基线\n（不追补，无脉冲）;
+elseif (provider 覆盖完整？) then (否)
+  :Unknown（或拒绝）;\n.due = false;
+else (是)
+  :查找在前一个与当前有效\n墙钟时刻之间被跨越的触发实例;
+  if (有新跨越的吗？) then (无)
+    :.due = false;
+  elseif (增量 > gap 上限？) then (是)
+    :将被跨越的触发实例\n终结为 ObservationGap;
+  elseif (跨越两个或更多？) then (是)
+    :将每一个终结为\nmissed；不准入任何一个;
+  else (恰好一个)
+    if (该跨越 tick 上的\nwhen 谓词？) then (true)
+      :准入一次（.due = true）;
+    else (false)
+      :终结为\nConditionsFalseAtPulse;
+    endif
+  endif
+endif
+:将高水位、处置结果和观测\n与 VM 事务一起暂存;
+stop
+@enduml

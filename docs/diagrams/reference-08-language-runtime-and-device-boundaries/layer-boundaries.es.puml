@@ -1,0 +1,32 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontSize 13
+skinparam componentStyle rectangle
+
+package "Significado" {
+  [Fuente canónica\n(.ghost.md)] as src
+  [Compilador / herramientas] as tools
+}
+package "Decisión" {
+  [Runtime de control\n(Program / run)] as rt
+}
+package "Entorno de ejecución (host)" {
+  [Relojes, calendarios,\npredicciones, libros mayores,\npuntos de control, almacén de ajustes] as env
+}
+package "Device" {
+  [Driver de entrada] as drv
+  [Renderizador de salida] as rnd
+  [Perfil / vinculación\nde la instalación] as bind
+}
+[Cabinet-view / UI] as ui
+
+src --> tools : interpretar, comprobar
+tools --> rt : Program ejecutable
+env --> rt : tiempo, instantáneas de datos
+drv --> rt : muestras\n(valor, instante, calidad)
+rt --> rnd : intención de salida segura
+bind ..> drv : papel lógico -> punto final
+bind ..> rnd : papel lógico -> punto final
+rt --> ui : descriptores,\nobservaciones
+ui --> rt : solicitudes de ajustes tipadas
+@enduml

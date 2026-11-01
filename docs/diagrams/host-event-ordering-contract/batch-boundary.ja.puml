@@ -1,0 +1,44 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName "Hiragino Sans"
+skinparam defaultFontSize 13
+scale 1 as 70 pixels
+hide time-axis
+
+concise "レシート" as R
+concise "バッチ" as B
+concise "インスタンス" as I
+
+@0
+R is "r1"
+B is "オープン（バッチ N）"
+I is "待機"
+
+@1
+R is "r2"
+
+@2
+R is "ラッチ"
+B is "N クローズ"
+I is "N を評価"
+
+@3
+R is "r3"
+
+@4
+I is "N を確定 + ディスパッチ"
+
+@5
+R is "r4"
+
+@6
+R is "ラッチ"
+B is "N+1 クローズ：r3, r4"
+I is "N+1 を評価"
+
+@7
+R is "-"
+I is "待機"
+
+B@2 <-> @6 : r3 と r4 はラッチ後に到着 -> N+1 を待つ
+@enduml

@@ -1,0 +1,23 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName Helvetica
+skinparam componentStyle rectangle
+title Ruta de admisión de la evidencia de estimación
+
+[Host\n(identidades, historial, cobertura)] as Host
+[estimate-evidence.mjs\nEstimateEvidenceRuntime\n(solo codificar/decodificar)] as JS
+[Núcleo Rust\nestimate_evidence::Session\n(1-64 registros, sin desalojo)] as Core
+[Ejemplo nativo de conformidad\n(mismo adaptador GFEE v1)] as Native
+
+Host --> JS : create / evaluate
+JS --> Core : paquete GFEE v1\n(kind 0 create, kind 1 evaluate)
+Native --> Core : paquete GFEE v1
+Core --> JS : Verdict o Rejection
+JS --> Host : instantánea (u64 como cadenas decimales)
+note right of Core
+  Solo admite una base declarada:
+  ninguna estimación numérica, comando
+  ni permiso temporal
+  (temporalAdmission: false)
+end note
+@enduml

@@ -1,0 +1,26 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName "Hiragino Sans"
+skinparam defaultFontSize 13
+skinparam ArrowColor #526d76
+
+participant "ホスト" as H
+participant "プロバイダ" as P
+participant "ネイティブ VM\n(Runtime)" as R
+database "永続ストレージ" as D
+participant "出力" as O
+
+H -> P : インストール済み Solar ディスクリプタの\n事実を要求
+P --> H : 発生の事実\n(due ビットなし)
+H -> R : tick_with_solar(clock, facts)
+R -> R : 受け入れをステージングし、when を評価し、\nクロック、台帳、状態、出力、\nジャーナルをまとめて確定
+R --> H : 結果 + schedule_trace
+H -> R : solar_checkpoint()
+R --> H : GFSO v1 バイト列
+H -> D : チェックポイントを永続化
+alt 保存に成功
+  H -> O : ON を公開 / 適用
+else 保存に失敗
+  H -> O : 停止して出力をクリア
+end
+@enduml

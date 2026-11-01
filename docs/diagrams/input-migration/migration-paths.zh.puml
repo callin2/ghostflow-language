@@ -1,0 +1,22 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName Helvetica
+skinparam defaultFontSize 13
+
+start
+if (旧程序声明的是？) then (sensor)
+  :编译器以迁移诊断\n拒绝;
+  :改为 `input`，保留现有的\n显式故障策略;
+else (普通标量输入)
+  if (仅有独立、必需、\n未经调理的 Bool 输入？) then (是，显式请求)
+    :previewLegacyScalarMigration();
+    :带有旧版准入\n指令的新文档;
+  else (否)
+    :审查使用位置;
+    :先选择故障策略;
+    :添加 case 分析或\n显式恢复;
+  endif
+endif
+:经审查的新修订版\n（前一修订版保持不变）;
+stop
+@enduml

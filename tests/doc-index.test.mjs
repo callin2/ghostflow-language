@@ -78,7 +78,7 @@ test('repository root index covers every manifest source and translation and bot
   const manifest = JSON.parse(fs.readFileSync(path.join(root, 'docs/translations.json')));
   const index = fs.readFileSync(path.join(root, 'INDEX.md'), 'utf8');
   for (const document of manifest.documents) {
-    for (const file of [document.source, document.translation]) assert.ok(index.includes(`[${file}]`), file);
+    for (const file of Object.values(document.files).map(entry => entry.path)) assert.ok(index.includes(`[${file}]`), file);
   }
   const found = run('docs-find', ['--limit', '8', 'AGENTS']);
   assert.equal(found.status, 0, found.stderr);

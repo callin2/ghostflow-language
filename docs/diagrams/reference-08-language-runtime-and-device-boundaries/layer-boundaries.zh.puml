@@ -1,0 +1,33 @@
+@startuml
+skinparam defaultFontName "PingFang SC"
+skinparam shadowing false
+skinparam defaultFontSize 13
+skinparam componentStyle rectangle
+
+package "含义" {
+  [规范源\n(.ghost.md)] as src
+  [编译器 / 工具] as tools
+}
+package "判定" {
+  [控制运行时\n(Program / run)] as rt
+}
+package "执行环境（宿主）" {
+  [时钟、日历、\n预测、账本、\n检查点、设置存储] as env
+}
+package "设备" {
+  [输入驱动程序] as drv
+  [输出渲染器] as rnd
+  [设施 profile /\n绑定] as bind
+}
+[Cabinet view / UI] as ui
+
+src --> tools : 解释、检查
+tools --> rt : 可执行 Program
+env --> rt : 时间、数据快照
+drv --> rt : 样本\n（值、时间、质量）
+rt --> rnd : 安全输出意图
+bind ..> drv : 逻辑角色 -> 端点
+bind ..> rnd : 逻辑角色 -> 端点
+rt --> ui : 描述符、\n观测
+ui --> rt : 带类型的设置请求
+@enduml

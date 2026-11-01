@@ -1,0 +1,19 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontSize 13
+skinparam rectangleBorderColor #4A6FA5
+skinparam rectangleBackgroundColor #F7F9FC
+left to right direction
+title 각 종류의 변경을 처리하는 곳 (질문 33-40)
+
+rectangle "GhostFlow 소스 (.ghost.md)\n논리 입출력,\n입력 계약, 제어 규칙" as SRC
+rectangle "운영 설정\n(config 값)" as CFG
+rectangle "설치 바인딩\n논리 포트 -> 핀 / 채널 / 주소" as BIND
+rectangle "입력 Driver /\n출력 renderer\n프로토콜, 원시값, 극성" as DRV
+rectangle "물리 장치\n센서, 버튼, 릴레이,\n확장 보드" as DEV
+
+CFG --> SRC : live 이벤트,\n같은 Program
+SRC --> BIND : 논리 포트
+BIND --> DRV
+DRV --> DEV
+@enduml

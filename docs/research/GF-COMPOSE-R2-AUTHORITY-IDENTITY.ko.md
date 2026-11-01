@@ -1,187 +1,253 @@
 <!-- translation-source: docs/research/GF-COMPOSE-R2-AUTHORITY-IDENTITY.md -->
-[영어 원문](GF-COMPOSE-R2-AUTHORITY-IDENTITY.md)
+[영문 원문](GF-COMPOSE-R2-AUTHORITY-IDENTITY.md)
 
 # GF-COMPOSE R2: 권한과 identity
 
+이 문서는 조합(composition)의 각 개념에 대해 누가 권한(authority)을 갖는지, 그리고
+어떤 identity를 서로 분리해 유지해야 하는지 결정합니다. 현재 증거, 권한 매트릭스,
+identity 변경 규칙, 투영(projection)별 그래프·순환 정책, 운영 기억(#68) 맥락을 포함한
+열린 설치 제약 충돌(#62), 그리고 그에 따른 권고와 소유자를 다룹니다.
+
 ## 사용자 문제
 
-화면의 pump, 엔지니어의 trace, 물리 설치를 조용히 같은 것으로 취급해서는 안 된다.
-조합에는 연결된 identity가 필요하지만 graph view를 두 번째 실행 source로 만들어서는
-안 된다. 아래 권고는 canonical `.ghost.md` 규칙의 권위를 유지하고 Rust core에서
-실행하며 API, Device, frontend 책임을 명시한다.
+화면에 표시된 펌프, 엔지니어의 trace, 물리 설치를 암묵적으로 같은 것으로 취급해서는
+안 됩니다. 조합에는 그래프 보기를 두 번째 실행 소스로 만들지 않으면서도 서로 **연결된**
+identity가 필요합니다.
+
+아래 권고는 다음을 따릅니다.
+
+- 정본 `.ghost.md` 규칙의 권한을 유지합니다.
+- 실행은 Rust core에 둡니다.
+- API, Device, 프런트엔드의 책임을 명시합니다.
 
 ## 조사한 revision의 증거
 
-증거는 `ffdbc96461eca67908252507fb851fa4dabd9a2c`(working-tree `HEAD`)에서 조사했다.
-`compileSource`는 하나의 canonical literate source를 받고 `sourceDocument`
-(`format`, `kind`, `filename`, `text`, `sha256`)를 저장하며 `documentId`와 `revisionId`를
-포함하는 interaction identity를 내보낼 수 있다. compiler는 module fingerprint/bytecode
-provenance와 source map도 내보낸다. filename과 source 위치는 trace 좌표이며 공개 identity가 아니다.
+증거는 `ffdbc96461eca67908252507fb851fa4dabd9a2c`(작업 트리 `HEAD`)에서
+조사했습니다. 이 절의 내용은 모두 구현된 코드나 계약의 사실이며, 조합 제안이 아닙니다.
 
-interaction 계약은 현재 정적 descriptor와 완료된 snapshot을 source document/revision,
-module ID/fingerprint/bytecode digest, schema digest, `runId`로 join한다. `scanId`는 한 run
-안에서만 순서가 있다. reset이나 새 run은 `runId`를 바꿔야 한다. 따라서 두 run의
-`scanId=0`은 같은 occurrence가 아니다. 이는 구현된 계약 사실이며 조합 제안이 아니다.
+**컴파일러.** `compileSource`는 하나의 정본 문서형 소스를 받아 `sourceDocument`
+(`format`, `kind`, `filename`, `text`, `sha256`)를 저장합니다. `documentId`와
+`revisionId`를 담은 interaction identity를 내보낼 수 있습니다. 컴파일러는 모듈
+fingerprint/바이트코드 provenance(출처)와 소스 맵도 내보냅니다. 파일 이름과 소스 위치는
+trace 좌표이며 공개 identity가 아닙니다.
 
-intent-anchor map은 생성된 provenance가 편집 가능한 source가 아니며 intent를 추론하거나
-승인하지 않는다고 명시한다. `docs/CONSTRAINTS.md`는 host 소유의 범위가 한정된 named-constraint
-경로를 설명하고 설치 binding이 control source 외부에 있다고 명시한다. 현재 control
-parser는 `constraints` construct를 거부하고 standalone constraints parser는 의도적으로
-제한돼 있다. 이 문서는 통합된 constraint runtime을 주장하지 않는다.
+**상호작용(interaction) 계약.** 현재 정적 descriptor와 완료된 snapshot을 다음으로
+join합니다.
+
+- 소스 문서/revision
+- 모듈 ID/fingerprint/바이트코드 digest
+- schema digest
+- `runId`
+
+`scanId`는 하나의 실행(run) 안에서만 순서를 가집니다. 리셋이나 새 실행은 `runId`를
+바꿔야 합니다. 따라서 두 실행의 `scanId=0`은 하나의 발생(occurrence)이 아닙니다.
+
+**의도 앵커와 제약.** 의도 앵커 맵은 생성된 provenance가 편집 가능한 소스가 아니며
+의도를 추론하거나 승인하지 않는다고 말합니다. `docs/CONSTRAINTS.md`는 제한된,
+호스트 소유의 이름 있는 제약 경로를 설명하고, 설치 바인딩이 제어 소스 외부에 있다고
+명시합니다. 현재 제어 파서는 `constraints` 구문을 거부하며, 독립 constraints 파서는
+의도적으로 제한되어 있습니다. 이 문서는 통합된 제약 런타임을 주장하지 않습니다.
 
 ## 표와 예
 
-### 권한 matrix
+### 권한 매트릭스
 
-| 개념 | 현재 권위 있는 소유자 | 기존 identity field | 제안된 조합 추가 사항 | 증거 참조 |
+각 행은 하나의 개념, 오늘 그것을 소유한 주체, 이미 존재하는 identity 필드, 그리고
+조합이 추가할 내용(제안일 뿐)을 나타냅니다.
+
+| 개념 | 현재 권한을 가진 소유자 | 기존 identity 필드 | 제안하는 조합 추가 사항 | 증거 참조 |
 |---|---|---|---|---|
-| Canonical source | Language/API source revision 저장소 | `documentId`, `revisionId`, source `sha256`, `kind=literate` | 정확한 source closure와 각 imported revision 유지. filename이나 label 사용 금지 | [`compile-source.mjs`](../../tools/compile-source.mjs); [`interaction-v0`](../../contracts/interaction-v0/README.md) |
-| Imported definition revision | 언어 검증을 수반하는 API package/revision orchestration | Source document/revision과 compiled module identity | 정확한 revision으로 고정한 불변 import edge 추가. 표시 이름으로 import 금지 | [`interaction-v0`](../../contracts/interaction-v0/README.md); [`PORTABLE-PACKAGE.md`](../PORTABLE-PACKAGE.md) |
-| 동작 instance | API composition/deployment 기록. Rust core가 실행 | 현재 공개 instance field는 확립되지 않음 | 불투명한 `instanceId`를 추가하고 definition revision에 연결. instance state/provenance 격리 필요 | Interaction 계약에는 run identity가 있지만 composition instance field는 없음. 제안 |
-| Logical port | Language manifest/compiler 선언 | 작성된 descriptor `id`/`name`, kind, type, source-map provenance | 안정적인 작성 port ID 유지. 표시 경로 이름 변경이 아니라 instance 한정 추가 | [`interaction-v0`](../../contracts/interaction-v0/README.md); [`integration-v1`](../../contracts/integration-v1/README.md) |
-| 물리 설비/binding | Device profile과 API 설치 문맥 | `bindingRevision`, board/profile과 명시적 logical-name-to-endpoint mapping | 조합 join에 binding revision/digest 추가. physical ID는 logical port ID가 아님 | [`integration-v1`](../../contracts/integration-v1/README.md); [`PORTABLE-PACKAGE.md`](../PORTABLE-PACKAGE.md) |
-| Settings | API/operator 설치 문맥. 실행 default는 source 소유로 유지 | 여기에는 일반 composition settings identity가 구현되지 않음 | source/program/run identity와 구분되는 settings revision/effective event position으로 runtime property join. import parameter는 별개 유지 | [`CONSTRAINTS.md`](../CONSTRAINTS.md); #89/#90 |
-| Runtime occurrence | Host/runtime snapshot 생산자 | `runId`, 완료 `scanId`, logical time | run + instance + scan에서 도출한 instance 한정 occurrence key 추가. `runId` 대체나 `scanId` 재정의 금지 | [`interaction-v0`](../../contracts/interaction-v0/README.md) |
+| 정본 소스 | 언어/API 소스 revision 저장소 | `documentId`, `revisionId`, 소스 `sha256`, `kind=literate` | 정확한 소스 폐포(closure)와 import된 각 revision을 유지. 파일 이름이나 라벨은 절대 사용하지 않음 | [`compile-source.mjs`](../../tools/compile-source.mjs); [`interaction-v0`](../../contracts/interaction-v0/README.ko.md) |
+| import된 정의 revision | API 패키지/revision 오케스트레이션, 언어 측 검증 포함 | 소스 문서/revision과 컴파일된 모듈 identity | 정확한 revision에 고정된 불변 import 간선을 추가. 표시 이름으로 import하지 않음 | [`interaction-v0`](../../contracts/interaction-v0/README.ko.md); [`PORTABLE-PACKAGE.md`](../PORTABLE-PACKAGE.ko.md) |
+| 동작 인스턴스 | API 조합/배포 레코드. Rust core가 실행 | 확립된 공개 인스턴스 필드 없음 | 불투명 `instanceId`를 추가하고 정의 revision에 연결. 인스턴스 상태/provenance는 격리되어야 함 | interaction 계약에는 실행 identity는 있지만 조합 인스턴스 필드는 없음. 제안 |
+| 논리 포트 | 언어 manifest/컴파일러 선언 | 작성자가 지정한 descriptor `id`/`name`, 종류, 타입, 소스 맵 provenance | 안정적인 작성자 지정 포트 ID를 유지. 이름을 바꾼 표시 경로가 아니라 인스턴스 한정을 추가 | [`interaction-v0`](../../contracts/interaction-v0/README.ko.md); [`integration-v1`](../../contracts/integration-v1/README.ko.md) |
+| 물리 장비/바인딩 | Device 프로필과 API 설치 맥락 | `bindingRevision`, 보드/프로필, 논리 이름에서 엔드포인트로의 명시적 매핑 | 조합 join에 바인딩 revision/digest를 추가. 물리 ID는 논리 포트 ID가 아님 | [`integration-v1`](../../contracts/integration-v1/README.ko.md); [`PORTABLE-PACKAGE.md`](../PORTABLE-PACKAGE.ko.md) |
+| 설정 | API/운영자 설치 맥락. 실행 기본값은 소스가 소유 | 일반적인 조합 설정 identity는 여기서 구현되지 않음 | 런타임 속성을 설정 revision과 유효 event 위치로 join하되, 소스/프로그램/실행 identity와 구분. import 파라미터는 별개로 유지 | [`CONSTRAINTS.md`](../CONSTRAINTS.md); #89/#90 |
+| 런타임 발생 | 호스트/런타임 snapshot 생산자 | `runId`, 완료 `scanId`, 논리 시간 | 실행 + 인스턴스 + 스캔에서 도출한 인스턴스 한정 발생 키를 추가. `runId`를 대체하거나 `scanId`를 재정의하지 않음 | [`interaction-v0`](../../contracts/interaction-v0/README.ko.md) |
 
-제안된 field는 설계 권고일 뿐이다. 이 연구는 새 identifier generator, wire schema,
-ABI를 승인하지 않는다.
+제안된 필드는 설계 권고일 뿐입니다. 이 연구는 새로운 식별자 생성기, wire schema,
+ABI를 승인하지 않습니다.
 
-정정 사항 (2026-09-20): identity join은 program/run identity와 live settings revision 및
-effective event position을 구분해야 한다. runtime에서 조정 가능한 property는 승인된
-live event다. 하나의 다중 property 동작을 atomic하게 검증하고 모든 property를 바꾸거나
-하나도 바꾸지 않는다. 승인된 변경은 활성 논리 실행 중에도 처리 시점에 적용된다.
-재컴파일, 새 program/run, 전체 controller 정지가 필요하지 않다. 실제 ESP 재시작 후에도
-property는 유지되지만 물리 재시작은 새 run identity를 만든다. 합의된 설계 수정이며 구현된
-동작이 아니다. [`CONSTRAINTS.md`](../CONSTRAINTS.md)와 [`LANGUAGE.md`](../LANGUAGE.md)의
-이전 정지된 Configure 요구사항은 #89/#90에서 조정해야 한다. 현재 source-rewrite/recompile
-helper는 이 live 경로가 아니다. 암묵 reset이나 stale-program join 재해석을 뜻하지 않는다.
-durability, 순서, ABI, 검증은 설계의 미해결 부분으로 남는다.
+다이어그램은 이 identity들이 어떻게 연결되는지 요약합니다. “제안”으로 표시된 상자는
+현재 어떤 계약에도 존재하지 않습니다.
 
-### Identity 변경 matrix
+![서로 구분되는 identity와 그 join. 라벨과 파일 이름은 절대 identity가 아닙니다](../diagrams/gf-compose-r2-authority-identity/identity-joins.ko.svg)
 
-| Event | 안정적인 logical identity | 정확한 revision / occurrence 영향 |
+**정정 메모(2026-09-20).** identity join은 프로그램/실행 identity를 live 설정
+revision 및 유효 event 위치와 구분해야 합니다. 이것은 합의된 설계 수정이며, 구현된
+동작이 **아닙니다**.
+
+- 런타임에 조정 가능한 속성은 승인된 live event입니다. 여러 속성을 바꾸는 하나의
+  조작은 원자적으로 검증되며, 모든 속성을 바꾸거나 하나도 바꾸지 않습니다.
+- 수락된 변경은 처리되는 시점에 적용되며, 로직이 동작 중일 때도 마찬가지입니다.
+  재컴파일, 새 프로그램/실행, 컨트롤러 전체 정지가 필요하지 않습니다.
+- 속성은 실제 ESP 재시작 후에도 유지되지만, 물리적 재시작은 새 실행 identity를
+  만듭니다.
+- [`CONSTRAINTS.md`](../CONSTRAINTS.md)와 [`LANGUAGE.md`](../LANGUAGE.md)에 있는
+  이전의 “정지 상태에서 Configure” 요구사항은 #89/#90에서 조정되어야 합니다.
+- 현재의 소스 재작성/재컴파일 helper는 이 live 경로가 아닙니다.
+- 암묵적 리셋이나 오래된(stale) 프로그램 join의 재해석은 의미하지 않습니다.
+- 내구성, 순서, ABI, 검증은 여전히 설계 공백입니다.
+
+### identity 변경 매트릭스
+
+각 사건에 대해 가운데 열은 무엇이 그대로인지, 오른쪽 열은 무엇이 바뀌는지 말합니다.
+
+| 사건 | 안정적인 논리 identity | 정확한 revision / 발생에 미치는 영향 |
 |---|---|---|
-| 표시 이름 변경 | definition, instance, logical port, binding 불변 | UI label만 변경. 새 physical binding 승인 아님 |
-| Source 위치 이동 | 같은 저장 문서를 옮기면 document identity 불변 | Revision/source digest는 불변일 수 있음. source 좌표는 변경 가능. 새 작성 revision에는 새 `revisionId`와 digest 필요 |
-| 하나의 정의에 instance 두 개 | 같은 definition revision. 서로 다른 `instanceId`와 격리된 state/timer/provenance | 각 instance는 자체 binding/settings join과 runtime occurrence namespace를 받음 |
-| Source upgrade | API가 continuity를 명시적으로 선언할 때만 같은 logical definition | 새 `revisionId`, source digest와 일반적으로 새 module/artifact identity. deployment가 새 revision을 명시적으로 선택해야 함 |
-| Binding 변경 | Logical port와 동작 instance는 안정적 유지 | 새 binding revision/digest와 새 installation/deployment 결정. physical endpoint identity 변경 |
-| 재시작 | Definition, instance, binding은 안정적으로 유지 가능 | 새 `runId`. `scanId`는 0으로 돌아갈 수 있음. runtime occurrence를 `scanId`만으로 식별하지 않음 |
+| 표시 이름 변경 | 정의, 인스턴스, 논리 포트, 바인딩은 변하지 않음 | UI 라벨만 바뀜. 새로운 물리 바인딩을 승인하지 않음 |
+| 소스 위치 이동 | 같은 저장 문서를 옮긴 것이라면 문서 identity는 변하지 않음 | revision/소스 digest는 그대로일 수 있고 소스 좌표는 바뀔 수 있음. 새로 작성한 revision은 새 `revisionId`와 digest를 가져야 함 |
+| 한 정의의 인스턴스 두 개 | 같은 정의 revision. 서로 다른 `instanceId`와 격리된 상태/타이머/provenance | 각 인스턴스는 자기만의 바인딩/설정 join과 런타임 발생 네임스페이스를 받음 |
+| 소스 업그레이드 | API가 연속성을 명시적으로 선언한 경우에만 같은 논리 정의 | 새 `revisionId`, 소스 digest, 보통은 모듈/아티팩트 identity도 새로 생김. 배포는 새 revision을 명시적으로 선택해야 함 |
+| 바인딩 변경 | 논리 포트와 동작 인스턴스는 안정적으로 유지 | 새 바인딩 revision/digest와 새 설치/배포 결정. 물리 엔드포인트 identity가 바뀜 |
+| 재시작 | 정의, 인스턴스, 바인딩은 안정적으로 유지될 수 있음 | 새 `runId`. `scanId`는 0으로 돌아갈 수 있음. 런타임 발생은 절대 `scanId`만으로 식별하지 않음 |
 
-풀이 예(수작업 분석이며 실행 증거 아님): `east-irrigation`과 `west-irrigation`은 하나의
-불변 definition revision을 참조한다. instance ID, state/timer 저장소, settings join,
-provenance는 서로 다르다. 화면의 east pump 이름 변경은 binding이나 logical port를
-바꾸지 않는다. 재시작 후 `run-A/scanId=0`과 `run-B/scanId=0`은 다른 occurrence다.
+**풀이 예제**(손으로 분석한 것이며 실행 증거가 아님):
 
-### Graph projection과 cycle 정책
+- `east-irrigation`과 `west-irrigation`은 하나의 불변 정의 revision을 참조합니다.
+- 둘은 서로 다른 인스턴스 ID, 상태/타이머 저장소, 설정 join, provenance를 가집니다.
+- 표시된 동쪽 펌프의 이름을 바꿔도 그 바인딩이나 논리 포트는 바뀌지 않습니다.
+- 재시작 후 `run-A/scanId=0`과 `run-B/scanId=0`은 서로 다른 발생입니다.
 
-범용 ontology 대신 여러 typed projection이 있어야 한다.
+### 그래프 투영과 순환 정책
 
-| Projection | 허용 edge 의미 | Cycle 정책 |
+하나의 범용 온톨로지가 아니라 타입이 있는 여러 투영이 있어야 합니다. 각 투영은 자기만의
+간선 의미와 순환 규칙을 가집니다.
+
+| 투영 | 허용되는 간선 의미 | 순환 정책 |
 |---|---|---|
-| Import 의존성 | Definition revision이 정확한 definition revision을 import | 권고: 컴파일 전에 dependency cycle 거부. display/reference cycle은 실행 import cycle이 아님 |
-| Scan 내부 평가 | 식, port, output 사이 read/dependency edge | 기존 불변조건: 순간 dependency cycle 거부. state feedback은 scan 간 기존 이전 상태/다음 상태 의미를 통해서만 합법적 |
-| Explanation | Result/decision이 source node, anchor, constraint 판단, 정확한 문맥을 가리킴 | 권고: 수렴하는 참조와 반복 증거 허용. cycle은 data error이며 runtime feedback이 아님 |
-| 설비 관계 | Logical port가 endpoint/설비에 bind되거나 설비가 자원 공유 | 권고: 명시적 relation type의 설비 graph 허용. topology에서 실행 순서 추론 금지. 모호한 소유권 거부 |
-| 시간에 걸친 history | 같은 run, instance, 시간 순서에서 occurrence가 이전 occurrence를 뒤따름 | 권고: 반복 event로서 temporal cycle 허용. 순서 있는 occurrence 좌표 필수. 여러 재시작을 하나의 history로 합치지 않음 |
+| import 의존성 | 정의 revision이 정확한 정의 revision을 import함 | 권고: 컴파일 전에 의존성 순환을 거부. 표시/참조 순환은 실행 가능한 import 순환이 아님 |
+| 스캔 내 평가 | 식, 포트, 출력 사이의 읽기/의존성 간선 | 기존 불변식: 즉시 의존성 순환은 거부. 상태 피드백은 스캔에 걸친 기존 이전 상태/다음 상태 의미를 통해서만 허용 |
+| 설명 | 결과/판단이 소스 노드, 앵커, 제약 판단, 정확한 맥락을 가리킴 | 권고: 수렴하는 참조와 반복되는 증거는 허용. 순환은 데이터 오류이며 런타임 피드백이 아님 |
+| 장비 관계 | 논리 포트가 엔드포인트/장비에 바인딩되거나, 장비들이 자원을 공유함 | 권고: 명시적 관계 타입을 가진 장비 그래프를 허용. 위상에서 실행 순서를 추론하지 않음. 모호한 소유권은 거부 |
+| 시간에 걸친 이력 | 발생이 같은 실행, 인스턴스, 시간 순서 안의 이전 발생을 뒤따름 | 권고: 시간적 순환은 반복 event로 허용하되 순서가 있는 발생 좌표를 요구. 재시작을 하나의 이력으로 합치지 않음 |
 
-이 edge 의미는 범위가 한정된 권고다. 범용 graph database, serialization이나 프로젝트 간
-ontology를 정의하지 않는다.
+이 간선 의미들은 범위가 한정된 권고입니다. 범용 그래프 데이터베이스, 직렬화, 프로젝트
+간 온톨로지를 정의하지 않습니다.
 
-승인된 live property event는 data 값만 바꾼다. 검증된 실행 graph를 바꾸지 않고 모든
-기존 cycle/phase 제한을 보존한다. dependency 검증 우회를 만들거나 다음 상태를 읽을 수
-있는 식을 바꾸지 못한다. stale-program join을 조용히 재해석하지 않는다.
+승인된 live 속성 event는 데이터 값만 바꿉니다. 이 event는 다음과 같습니다.
 
-### 설치 constraint 충돌
+- 검증된 실행 그래프를 바꾸지 않고, 기존의 모든 순환 및 단계(phase) 제한을 유지합니다.
+- 의존성 검증을 우회하는 경로를 만들거나 어떤 식이 다음 상태 값을 읽을 수 있는지
+  바꿀 수 없습니다.
+- 오래된(stale) 프로그램 join을 암묵적으로 재해석하지 않습니다.
 
-시스템 설치 이슈 #62는 독립적으로 강제되며 약화할 수 없는 설치 constraint를 제안한다.
-운영 memory 이슈 #68은 이제 근거 있는 아키텍처 문맥을 제공한다. 원본 대화와 구조화된
-memory 주장은 분리되며 정확한 source span/provenance로 연결된다. 확인 상태는 관측,
-추론, 농부 확인, 거부, superseded 정보를 구분한다. memory는 자동으로 현재의 진실이
-되지 않는다. memory는 결정이 존재하는 이유를 설명할 수 있지만 대화는 실행 source가
-아니다. GhostFlow revision을 바꾸기 전에 확인된 결정이 필요하다. 이는 시스템/API 제안
-증거이며 이 저장소에 구현된 언어 계약이 아니다.
+### 설치 제약 충돌
 
-#68은 memory → decision → source → program/settings/installation contract → execution/outcome의
-추적 가능성도 요구한다. 전체 대화 전달 대신 상한이 있는 provenance-aware 검색을 요구하며,
-검색이나 LLM 실패가 유효한 program 또는 local control을 손상하지 못하도록 failure 격리를
-요구한다. 원본 및 구조화 memory는 export/delete/local archive와 별도의 AI 학습 동의를
-지원해야 한다. 이 요구사항은 provenance 연결과 privacy/retention 경계를 추가한다.
-memory, label, frontend graph에 권한을 추가하지 않는다.
+**배경: #62.** 시스템 설치 이슈 #62는 독립적으로 집행되며 약화할 수 없는 설치 제약을
+제안합니다.
 
-충돌은 구체적이다. 이 저장소는 canonical `.ghost.md`가 실행 규칙을 소유한다고 명시하지만
-설치 constraint는 설치 경계에서 강제할 수 있어야 한다. 두 선택지가 남아 있다.
+**배경: #68.** 운영 기억 이슈 #68은 이제 뒷받침되는 아키텍처 맥락을 제공합니다. 이것은
+시스템/API 제안 증거이며, 이 저장소에 구현된 언어 계약이 아닙니다.
 
-1. **별도의 canonical constraint 컴파일.** 설치 constraint를 기존 named-constraint source
-   경로에 유지한다. API는 별도로 컴파일한 constraint artifact를 canonical 동작 package에
-   join하고 두 digest를 고정한다. installer가 constraint artifact를 강제한다. 영향:
-   두 실행 artifact에는 명시적인 join, lifecycle, trust, failure 계약이 필요하다.
-   어느 쪽도 다른 쪽을 조용히 override해서는 안 된다.
-2. **명시적인 프로젝트 간 경계 revision.** API/시스템 소유자가 canonical 동작 revision,
-   constraint revision, binding, enforcement 소유자를 참조하는 설치 경계 revision을
-   게시한다. 영향: 이 저장소는 계속 동작 의미를 소유하지만 acceptance는 프로젝트 간
-   계약과 revision이 있는 경계 artifact에 의존한다.
+- 원본 대화와 구조화된 기억 주장(claim)은 분리되어 있으며, 정확한 소스 구간과
+  provenance로 연결됩니다.
+- 확인 상태는 관측됨, 추론됨, 농부가 확인함, 거부됨, 대체됨을 구분합니다.
+- 기억이 자동으로 현재의 사실이 되지는 않습니다. 기억은 왜 어떤 결정이 존재하는지
+  설명할 수 있지만, 대화는 실행 가능한 소스가 아니며 GhostFlow revision을 바꾸려면
+  확인된 결정이 필요합니다.
 
-어느 선택지도 여기서 선택하지 않는다. #62 시스템 아키텍처 소유자가 언어 소유자 및
-API/deployment 소유자와 함께 constraint가 별도 compiled artifact인지 명시적 경계 revision
-아래의 참조인지 결정해야 한다. JSON overlay를 승인되지 않은 두 번째 source로 채택해서는
-안 된다.
+이슈 #68은 다음도 요구합니다.
 
-#68 memory 연결은 이 선택을 해결하지 않는다. 선택된 constraint artifact나 경계 revision이
-확인된 결정에서 참조되고 원래 memory provenance를 유지하면서 canonical `.ghost.md` 규칙을
-보존하도록 요구한다. API/시스템 소유자는 사용자가 privacy/retention 제어를 행사할 때 memory
-참조를 보존, 편집 삭제, 삭제 중 어떻게 처리할지도 정의해야 한다. 삭제된 memory를 조용히
-현재 증거로 취급하지 않으면서 source/runtime identity는 유효하게 남아야 한다.
+- 기억 → 결정 → 소스 → 프로그램/설정/설치 계약 → 실행/결과에 걸친 추적 가능성
+- 대화 전체를 보내는 대신 제한되고 provenance를 고려한 검색
+- 장애 격리. 검색이나 LLM 실패가 유효한 프로그램이나 로컬 제어를 손상시킬 수 없어야
+  합니다.
+- 원본 및 구조화된 기억의 내보내기/삭제/로컬 보관, 그리고 별도의 AI 학습 동의
+
+이 요구사항은 provenance 연결과 개인정보/보존 경계를 추가할 뿐, 기억, 라벨, 프런트엔드
+그래프에 권한을 추가하지 않습니다.
+
+**충돌.** 이 저장소는 정본 `.ghost.md`가 실행 규칙을 소유한다고 말하는 반면, 설치
+제약은 설치 경계에서 집행 가능해야 합니다. 두 가지 선택지가 남아 있습니다.
+
+1. **별도의 정본 제약 컴파일.** 설치 제약을 기존의 이름 있는 제약 소스 경로에
+   유지합니다. API는 별도로 컴파일된 제약 아티팩트를 정본 동작 패키지에 join하고 두
+   digest를 모두 고정하며, 설치자는 제약 아티팩트를 집행합니다. 결과: 두 실행
+   아티팩트에는 명시적인 join, 수명 주기, 신뢰, 실패 계약이 필요합니다. 어느 쪽도
+   다른 쪽을 암묵적으로 덮어써서는 안 됩니다.
+2. **명시적 프로젝트 간 경계 revision.** API/시스템 소유자가 정본 동작 revision, 제약
+   revision, 바인딩, 집행 소유자를 참조하는 설치 경계 revision을 게시합니다. 결과: 이
+   저장소는 여전히 동작 의미를 소유하지만, 승인은 프로젝트 간 계약과 revision이 붙은
+   경계 아티팩트에 의존합니다.
+
+다이어그램은 두 형태를 대조합니다. 어느 쪽도 선택되지 않았습니다.
+
+![#62 설치 제약에 대한 열린 두 선택지](../diagrams/gf-compose-r2-authority-identity/constraint-options.ko.svg)
+
+여기서는 어느 선택지도 고르지 않습니다. #62의 시스템 아키텍처 소유자가 언어 소유자 및
+API/배포 소유자와 함께, 제약을 별도로 컴파일된 아티팩트로 할지 명시적 경계 revision
+아래의 참조로 할지 결정해야 합니다. JSON 오버레이를 승인되지 않은 두 번째 소스로
+채택해서는 안 됩니다.
+
+#68의 기억 체인은 이 선택을 해결하지 않습니다. 무엇을 선택하든 다음을 지켜야 합니다.
+
+- 선택된 제약 아티팩트나 경계 revision은 확인된 결정이 참조해야 하고, 원래의 기억
+  provenance를 유지해야 하며, 정본 `.ghost.md` 규칙을 보존해야 합니다.
+- API/시스템 소유자는 사용자가 개인정보나 보존 통제를 행사할 때 기억 참조를 유지할지,
+  가릴지(redact), 삭제할지도 정의해야 합니다.
+- 소스와 런타임 identity는 삭제된 기억을 현재 증거로 암묵적으로 취급하지 않으면서
+  유효하게 유지되어야 합니다.
 
 ## 권고
 
-권한 matrix와 identity 변경 규칙을 composition 검토 baseline으로 채택한다. 조합은 불변
-definition revision을 고정하고 불투명 instance identity를 추가하며 작성된 logical port
-ID를 보존해야 한다. installation, settings, module, schema, source, run identity를 혼동하지
-않고 join해야 한다. projection별 edge/cycle 규칙을 사용한다. #62 경계 결정과 instance
-identity를 위한 명시적 계약 확장 후에만 구현을 시작한다. label과 filename은 표시/trace
-data로 유지한다.
+권한 매트릭스와 identity 변경 규칙을 조합 검토의 기준선으로 채택합니다. 조합은 다음을
+해야 합니다.
 
-## 미해결 질문과 소유자
+- 불변 정의 revision을 고정합니다.
+- 불투명한 인스턴스 identity를 추가합니다.
+- 작성자가 지정한 논리 포트 ID를 보존합니다.
+- 설치, 설정, 모듈, schema, 소스, 실행 identity를 뒤섞지 않고 join합니다.
+- 투영별 간선과 순환 규칙을 사용합니다.
+- 라벨과 파일 이름은 표시/trace 데이터로 유지합니다.
 
-- API/deployment 소유자: instance lifecycle, source upgrade의 continuity, settings
-  revision/effective-event-position 표현 정의. mechanism 설계이며 live settings 존재
-  여부에 관한 미결 결정이 아니다.
-- Language + API 소유자: 두 번째 편집 가능 source 없이 imported source closure를 고정하고
-  표현하는 방법 결정.
-- #62 설치/시스템 소유자와 language/API 소유자: 위 선택지 1 또는 2를 선택하고 enforcement,
-  trust, failure join 정의.
-- Device 소유자: 물리 설비 identity, binding revision, 적용된 binding을 구성하는 증거 정의.
-  이 저장소가 추론해서는 안 된다.
-- 계약 소유자: instance 한정 runtime occurrence의 향후 wire 표현 결정. 현재 v0에는 해당
-  field가 없다.
-- #68 API/시스템 운영 memory 소유자: memory-record identity, 정확한 원본 span/구조화 주장
-  provenance, 확인/supersession join, retention/export/delete 동작, memory-to-decision 연결 정의.
-- API/system + language 소유자: 민감한 내용을 보존하지 않으면서 source provenance에 충분한
-  tombstone과 digest를 삭제/편집 삭제 후 보존할지 결정.
+구현은 #62 경계 결정과 인스턴스 identity에 대한 명시적 계약 확장이 나온 뒤에만
+시작합니다.
 
-### 인접 연구에 대한 영향
+## 해결되지 않은 질문과 소유자
 
-- **R3:** 조합된 실행 identity를 확인된 결정/source revision과 비교한다. memory 검색이나
-  LLM 해석은 실행 전 문맥이며 runtime 입력이 아니다. 재시작과 instance 격리는 core 실행
-  질문으로 남는다.
-- **R4:** logical port/physical binding 증거를 memory 주장과 분리한다. 기억된 설비 사실이나
-  예외는 설치 계약과 현재 device 증거 없이 binding 변경을 승인하지 못한다.
-- **R6:** memory 유래 결정, import parameter, runtime settings, installation revision을
-  별도 lifecycle로 모델링한다. source/settings 변경은 확인된 결정을 참조하고 원본/구조화
-  provenance를 보존해야 한다. stale 또는 superseded memory가 활성 settings를 조용히 갱신하면
-  안 된다.
+- API/배포 소유자: 인스턴스 수명 주기, 소스 업그레이드 시의 연속성, 설정 revision/유효
+  event 위치의 표현을 정의합니다. 이것은 메커니즘 설계이며, live 설정이 존재해야
+  하는지에 대한 보류 중인 결정이 아닙니다.
+- 언어 + API 소유자: 두 번째 편집 가능 소스 없이 import된 소스 폐포를 어떻게 고정하고
+  표현할지 결정합니다.
+- #62 설치/시스템 소유자, 언어/API 소유자와 함께: 위 선택지 1 또는 2를 고르고 집행,
+  신뢰, 실패 join을 정의합니다.
+- Device 소유자: 물리 장비 identity, 바인딩 revision, 그리고 어떤 증거가 적용된
+  바인딩을 구성하는지 정의합니다. 이 저장소가 이를 추론해서는 안 됩니다.
+- 계약 소유자: 인스턴스 한정 런타임 발생의 향후 wire 표현을 결정합니다. 현재 v0에는
+  그런 필드가 없습니다.
+- #68 API/시스템 운영 기억 소유자: 기억 레코드 identity, 정확한 원본 구간/구조화 주장
+  provenance, 확인 및 대체 join, 보존/내보내기/삭제 동작, 기억에서 결정으로의 연결을
+  정의합니다.
+- API/시스템 + 언어 소유자: 삭제/가림 처리가 민감한 내용을 보관하지 않으면서도 소스
+  provenance에 충분한 tombstone과 digest를 보존할지 결정합니다.
+
+### 인접 연구에 대한 함의
+
+- **R3:** 조합된 실행 identity를 확인된 결정 및 소스 revision과 비교합니다. 기억
+  검색이나 LLM 해석은 실행 전 맥락이며 결코 런타임 입력이 아닙니다. 재시작과 인스턴스
+  격리는 여전히 core 실행의 문제입니다.
+- **R4:** 논리 포트와 물리 바인딩 증거를 기억 주장과 분리합니다. 기억된 장비 사실이나
+  예외는 설치 계약과 현재 장치 증거 없이 바인딩 변경을 승인할 수 없습니다.
+- **R6:** 기억에서 도출된 결정, import 파라미터, 런타임 설정, 설치 revision을 서로 다른
+  수명 주기로 모델링합니다. 소스/설정 변경은 확인된 결정을 참조하고 원본/구조화
+  provenance를 보존해야 합니다. 오래되었거나 대체된 기억이 활성 설정을 암묵적으로
+  갱신해서는 안 됩니다.
 
 ## 검증
 
-- [x] 조사한 commit 기록: `ffdbc96461eca67908252507fb851fa4dabd9a2c`.
-- [x] 권한/identity 표가 명시된 모든 개념과 event를 다룸. label과 filename을 identity로
-  사용하지 않음.
-- [x] Graph 정책은 projection별 범위로 한정. state feedback과 순간 dependency cycle 구분.
-- [x] Constraint 충돌에 구체적 선택지 두 개, 영향, 명시된 소유자가 있음. 새 권한, wire
-  schema, ABI, runtime을 선택하지 않음.
-- [x] Code/계약의 주장과 제안, 미해결 이슈 문구, 수작업 예를 구분.
-- [x] #68에서 제공된 결과는 시스템/API 제안 문맥으로 기록. 구현된 언어 동작 아님.
-  실제 소유권/privacy 질문은 미해결 유지.
-- [x] 문서만의 범위 보존. Runtime suite를 실행하거나 주장하지 않음. `git diff --check`와
-  link/source 검토가 coordinator의 최종 acceptance 검사임. 이 문서는 구현 주장을 포함하지 않음.
+- [x] 조사한 커밋을 기록했습니다: `ffdbc96461eca67908252507fb851fa4dabd9a2c`.
+- [x] 권한 표와 identity 표가 이름 붙은 모든 개념과 사건을 다룹니다. 라벨과 파일 이름은
+  identity로 사용하지 않습니다.
+- [x] 그래프 정책은 투영별로 범위가 정해져 있습니다. 상태 피드백과 즉시 의존성 순환은
+  구분됩니다.
+- [x] 제약 충돌에는 구체적인 두 선택지, 결과, 이름이 붙은 소유자가 있습니다. 새로운
+  권한, wire schema, ABI, 런타임은 선택하지 않았습니다.
+- [x] 코드/계약에서 나온 주장을 제안, 해결되지 않은 이슈 본문, 손으로 분석한 예제와
+  구분했습니다.
+- [x] 이슈 #68이 제공한 발견 사항은 구현된 언어 동작이 아니라 시스템/API 제안 맥락으로
+  기록했습니다. 실제 소유권과 개인정보 관련 질문은 여전히 해결되지 않았습니다.
+- [x] 문서 전용 범위를 지켰습니다. 런타임 테스트 묶음은 실행하거나 주장하지
+  않았습니다. `git diff --check`와 링크/소스 점검은 코디네이터의 최종 승인 검사이며, 이
+  문서에는 구현 주장이 없습니다.

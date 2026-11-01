@@ -1,0 +1,18 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontSize 12
+start
+:Evaluar el preludio una vez, en orden de dependencias,\ncontra el estado autorado anterior;
+:El consumidor W prepara la revisión highwater de\nCADA ventana aguas arriba declarada\n(seleccionada o no, exitosa o no);
+if (¿Resultado aguas arriba seleccionado exitoso\nY su revisión > highwater guardada?) then (sí)
+  :Admitir UNA identidad de evento derivado\n(site, admissionRevision)\n+ árbol de prueba propio;
+else (no)
+  :Ningún punto nuevo aguas abajo\n(vencimiento, reselección, reevaluación);
+endif
+if (¿Todo el escaneo tiene éxito?) then (sí)
+  :Consolidar ventanas, pruebas, highwaters;
+else (no: error de fuente, densidad,\naritmético o de intención)
+  :Revertir todo;\nel reintento ve la misma frescura;
+endif
+stop
+@enduml

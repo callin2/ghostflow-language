@@ -1,0 +1,27 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontSize 13
+skinparam activityBackgroundColor #F8F8F8
+skinparam activityBorderColor #555555
+
+start
+:Leer el caso de cases/*.json;
+switch (¿estado?)
+case (executable)
+  :Ejecutar tools/ghostc.mjs\n(--check y generación de artefactos);
+  if (¿El resultado coincide con accept/reject?) then (sí)
+    :Aprobado;
+  else (no)
+    :Fallo (se mantiene fallando,\nnunca se omite);
+  endif
+case (specified)
+  if (¿Oráculo externo activo vinculado\nen el catálogo feature-status?) then (sí)
+    :externally-covered;
+  else (no)
+    :TODO (pendingCatalog);
+  endif
+case (decision)
+  :TODO (pendingCatalog)\ndecisión requerida en reason;
+endswitch
+stop
+@enduml

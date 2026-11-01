@@ -1,0 +1,21 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName "Hiragino Sans"
+skinparam rectangle {
+  BackgroundColor White
+  BorderColor #555555
+}
+left to right direction
+title 論理マッピングの検証（実行はしない）
+
+rectangle "この .ghost.md\n(SharedPumpPolicy)" as src
+rectangle "compileSourceSync\n検査済みディスクリプタ\n+ ハッシュ" as comp
+rectangle "設置マッピング\n同一性、型付きポート、\nモード、ハッシュ" as map
+rectangle "validateResourceConstraintBinding" as val
+rectangle "executable: false" as out
+
+src --> comp
+comp --> val
+map --> val
+val --> out
+@enduml

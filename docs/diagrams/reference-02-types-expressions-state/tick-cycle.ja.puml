@@ -1,0 +1,28 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontSize 13
+skinparam ActivityBackgroundColor #F7F9FC
+skinparam ActivityBorderColor #4A6FA5
+title 1 つの tick：スナップショットを読み、候補を計算し、まとめて確定する
+
+start
+:入力スナップショット\n+ 前状態を読む;
+:すべての次状態を計算\n（いずれも前の値を読む）;
+:完全な候補状態を構築;
+:要求された出力意図を計算\n（<- の式は state' を読める）;
+:出力の制約を適用\n-> 安全意図;
+if (実行時の故障があるか？\n（overflow、percent-out-of-range など）) then (はい)
+  :tick を拒否;
+  note right
+    何も確定しない：
+    候補状態も、
+    意図も、
+    成功したジャーナルエントリもなし
+  end note
+  stop
+else (いいえ)
+  :状態と論理的な結果を\nまとめて確定;
+  :確定した状態が次の tick の\n「前状態」になる;
+  stop
+endif
+@enduml

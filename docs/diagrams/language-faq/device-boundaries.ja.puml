@@ -1,0 +1,20 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName "Hiragino Sans"
+skinparam defaultFontSize 13
+skinparam rectangleBorderColor #4A6FA5
+skinparam rectangleBackgroundColor #F7F9FC
+left to right direction
+title 変更の種類ごとの扱い場所（質問 33〜40）
+
+rectangle "GhostFlow ソース（.ghost.md）\n論理入出力、\n入力契約、制御規則" as SRC
+rectangle "運用設定\n（config の値）" as CFG
+rectangle "設置バインディング\n論理ポート -> ピン / チャネル / アドレス" as BIND
+rectangle "入力ドライバ /\n出力レンダラー\nプロトコル、生の値、極性" as DRV
+rectangle "物理デバイス\nセンサ、ボタン、リレー、\n拡張ボード" as DEV
+
+CFG --> SRC : ライブイベント、\n同じプログラム
+SRC --> BIND : 論理ポート
+BIND --> DRV
+DRV --> DEV
+@enduml

@@ -1,0 +1,24 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontSize 13
+participant "Host\n(ControlRuntime)" as Host
+participant "Adaptador WASM" as Adapter
+participant "Decodificador Rust" as Decoder
+participant "Runtime" as RT
+
+Host -> Host : captura options.temporal\nantes del trabajo asíncrono
+Host -> Adapter : activateTemporal(profile)
+Adapter -> Decoder : paquete GFTA (24+16N bytes)
+Decoder -> Decoder : verifica cada campo de forma independiente
+alt válido
+  Decoder -> RT : activate_with_temporal(&TemporalActivation)
+  RT -> RT : preasigna motores, búferes\ny J+1 puntos de control
+  RT --> Host : activo
+  loop en cada scan
+    Host -> RT : scan con el timeEpoch fijo
+  end
+else rechazado
+  Decoder --> Host : error; se conserva el estado de configuración
+end
+note over Host, RT : Una nueva época de tiempo requiere una nueva sesión.
+@enduml

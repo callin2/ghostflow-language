@@ -1,0 +1,38 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName Helvetica
+skinparam ArrowColor #555555
+hide empty description
+
+[*] --> Idle
+Idle --> Opening : 새 START,\n닫힘 확인됨
+Opening --> Settling : 열림 확인됨
+Settling --> Watering : 2초
+Watering --> PumpStopping : 5분
+PumpStopping --> Closing : 다음 스캔
+Closing --> Idle : 닫힘 확인됨
+
+Settling --> FaultPumpStopping : 수원 저수위,\n열림 확인됨,\n동작 허가됨
+Watering --> FaultPumpStopping
+PumpStopping --> FaultPumpStopping
+FaultPumpStopping --> FaultClosing : 다음 스캔
+FaultPumpStopping --> Faulted : 동작 금지
+FaultClosing --> Faulted : 닫힘 / 10초 /\n동작 금지
+Faulted --> Idle : 새 RESET,\n리셋 허용
+
+state Opening : 열기 ON (타임아웃 10초)
+state Watering : 펌프 ON
+state Closing : 닫기 ON (타임아웃 10초)
+state FaultPumpStopping : 모든 구동 OFF, 경보 ON
+state FaultClosing : 닫기 ON, 경보 ON
+state Faulted : 모든 구동 OFF, 경보 ON
+
+note as N
+매 스캔마다 먼저 검사:
+- 고장 원인 발생 (질서 있는 저수위
+  처리 경우 제외) -> Faulted, 원인 래치
+- 관측값 사용 불가 -> 원인이 래치되어 있으면
+  Faulted, 아니면 Idle
+- Idle..Closing에서 일반 STOP -> Idle (경보 없음)
+end note
+@enduml

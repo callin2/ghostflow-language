@@ -1,0 +1,42 @@
+@startuml
+skinparam defaultFontName Helvetica
+skinparam shadowing false
+skinparam ActivityBackgroundColor #F7F9FC
+skinparam ActivityBorderColor #4A6FA5
+title Orden de procesamiento de la entrada (una entrada)
+start
+:El driver entrega la muestra\n(ID de origen, época, ID de muestra, marca de tiempo, calidad);
+if (¿El driver informa Disconnected?) then (sí)
+  #FFE5E5:Result = fault(Disconnected)\n(se propaga de inmediato);
+  stop
+else (no)
+endif
+if (¿Muestra física nueva?) then (no: duplicada / solo reloj)
+  :Sin aporte al filtro ni a la recuperación;\nla vigencia no se renueva;
+else (sí)
+  if (¿Carga útil, unidad y rango `valid` correctos?) then (no)
+    #FFE5E5:Result = fault(Invalid);
+    stop
+  else (sí)
+    :Actualizar el estado del filtro;
+  endif
+endif
+if (¿Filtro listo y `recover_after` cumplido?) then (no)
+  #FFF4D6:Result = fault(NotReady);
+  stop
+else (sí)
+endif
+note right: Todo fallo vacía la ventana del filtro;\nla recuperación necesita muestras válidas nuevas.
+if (¿Antigüedad de la última muestra válida < `stale_after`?) then (no)
+  #FFE5E5:Result = fault(Stale);
+  stop
+else (sí)
+  :Predicado con estado\n(hysteresis, debounce, ...);
+  :Result = ok(value)\ncon la calidad conservada;
+endif
+stop
+legend bottom
+Todo Result, ok o fault, llega al autor,
+que elige un valor de control con `case` o `recover`.
+end legend
+@enduml

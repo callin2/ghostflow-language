@@ -1,0 +1,20 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontSize 13
+skinparam rectangleRoundCorner 8
+rectangle "GFB compilado\n+ mapa de fuentes verificado" as gfb
+rectangle "Escenario (TOON)\nacciones con atMs" as sc
+rectangle "ghostsim" as sim
+rectangle "Ejecutor nativo con tramas\n(programas de entradas simples)\nKeyboardMapper + ScanDriver" as nat
+rectangle "Host de control Rust/WASM\n(sensores, actuadores virtuales,\nintervalos certificados, Solar)" as wasm
+rectangle "Núcleo de evaluación\nportable de Rust" as core
+rectangle "GhostFlow/scenario-result-v1\n(TOON o JSON)" as res
+gfb --> sim
+sc --> sim
+sim --> nat
+sim --> wasm
+nat --> core
+wasm --> core
+sim --> res
+note bottom of core : No se abre ningún driver de dispositivo físico
+@enduml

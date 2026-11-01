@@ -1,0 +1,15 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontSize 12
+rectangle "引擎基础\ntemporal.rs Window、检查点" as A
+rectangle "GFB4 解码器/验证器\n（加载，而非执行）" as B
+rectangle "GFB4 + 原生执行\nbatch11，REF-04-027/028/029" as C
+rectangle "WASM、宿主、源追踪\nbatch12 完整门禁" as D
+rectangle "嵌套派生窗口\nbatch13（window-derived-design.md）" as E
+rectangle "未完成：持久恢复、\n热替换、估计证据" as F #FFE0B2
+A --> B
+B --> C
+C --> D
+D --> E
+E --> F
+@enduml

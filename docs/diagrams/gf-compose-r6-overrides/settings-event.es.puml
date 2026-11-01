@@ -1,0 +1,28 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName Helvetica
+skinparam defaultFontSize 13
+title Evento de propiedad del operador (diseño aprobado, no implementado)
+
+start
+:El operador envía una acción\n(uno o más valores de propiedad);
+:Validar el evento completo:
+unión de identidades (¿identidad de programa obsoleta?)
+y cada valor (tipo, finito, min/max/step);
+if (¿Obsoleto o algún valor inválido?) then (sí)
+  :Rechazar el evento completo;\nsin mutación; se conservan los valores previos;
+  stop
+else (todos válidos)
+  :Aplicar en su posición\nefectiva de evento;
+  :Nueva revisión de ajustes /\nposición efectiva;
+endif
+note right
+Sin cambios: programa/fuente/bytecode,
+identidad de ejecución, paquete de despliegue.
+Sin recompilar, reempaquetar ni
+parada de mantenimiento de todo el controlador.
+Abierto: durabilidad y orden ante fallos.
+end note
+:La lógica activa responde\nsegún las reglas existentes;
+stop
+@enduml

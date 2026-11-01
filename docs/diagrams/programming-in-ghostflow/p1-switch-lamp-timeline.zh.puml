@@ -1,0 +1,31 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName "PingFang SC"
+title E01 转换场景：松开、按下、松开、故障、按下（每一步 = 一个 tick）
+
+concise "switch_on" as S
+binary "lamp" as L
+scale 1 as 120 pixels
+
+@1
+S is "ok(false)"
+L is low
+
+@2
+S is "ok(true)"
+L is high
+
+@3
+S is "ok(false)"
+L is low
+
+@4
+S is "fault(Stale)"
+L is low
+
+@5
+S is "ok(true)"
+L is high
+
+@6
+@enduml

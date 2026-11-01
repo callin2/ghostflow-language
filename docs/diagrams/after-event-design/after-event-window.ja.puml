@@ -1,0 +1,22 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName "Hiragino Sans"
+skinparam defaultFontSize 13
+concise "述語のサンプル" as P
+concise "イベント A：ウィンドウ [0s, 10s)" as A
+concise "イベント B：ウィンドウ [4s, 14s)" as B
+
+@0
+P is false
+A is Pending
+B is {-}
+@2
+P is true
+A is Satisfied
+@3
+P is false
+@4
+B is Pending
+@14
+B is Expired
+@enduml

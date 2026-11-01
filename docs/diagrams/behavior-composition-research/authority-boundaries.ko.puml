@@ -1,0 +1,15 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontSize 13
+skinparam componentStyle rectangle
+component "정본 .ghost.md +\n고정된 import 소스" as SRC
+component "API 소유 기록\n(revision, 설치 문맥,\n배포)" as API
+component "Device 소유 프로필,\n드라이버, 관측" as DEV
+component "이식 가능한 Rust core" as CORE
+component "프런트엔드" as FE
+SRC --> CORE : 실행 가능한 동작
+API ..> SRC : revision 식별
+DEV --> CORE : 물리 정보
+CORE --> FE : 의미 descriptor,\n기록된 결과
+FE ..> SRC : 규칙을 바꾸는 편집 =\n소스 변경 후보
+@enduml

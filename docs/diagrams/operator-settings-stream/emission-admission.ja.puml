@@ -1,0 +1,29 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontSize 12
+title 設定エミッション: 受け入れと結果の Result
+start
+:設定パケットが到着
+（オペレーターの編集またはプロデューサの観測）;
+if (不正な形式、認識されない対象、\n古い Program/基準リビジョン、\nまたは権限拒否?) then (はい)
+  :受け入れ前に拒否;
+  note right: 観測は作成されない
+  stop
+else (いいえ)
+endif
+if (1 つの集約内で明示的な\nfault コードが矛盾?) then (はい)
+  :パケットを拒否;
+  stop
+else (いいえ)
+endif
+if (一様な明示的 fault?) then (はい)
+  :対象グループにその fault\n（例: SettingsUnavailable）;
+elseif (全ペイロードがまとめて検証に成功?) then (はい)
+  :対象の各 config に ok(value);
+else (いいえ)
+  :対象グループに\nfault(SettingsInvalid);
+endif
+:受け入れられたエミッションが\n設定観測のリビジョンを進める;
+:この評価位置のすべてのコンシューマが\n同じ現在の Result を読む;
+stop
+@enduml

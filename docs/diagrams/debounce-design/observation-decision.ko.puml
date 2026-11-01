@@ -1,0 +1,28 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontSize 12
+skinparam ActivityBackgroundColor #F7F9FC
+skinparam ActivityBorderColor #4A6FA5
+title Debounce: 선택된 root의 관측 하나 (단순화)
+start
+:도달 가능한 모든 root가 확정된 scan에서\n자체 상한 epoch/ID를 갱신;
+if (선택된 root가 바뀌었거나\n새 epoch 변경이 있는가?) then (예)
+  :stable과 candidate 연속성 초기화;
+endif
+if (Result가 fault인가?) then (예)
+  :정확한 사유와 출처 유지;\nstable과 candidate를 `initial`로 초기화;
+  stop
+endif
+if (새 관측인가?\n(tag 0: 확정된 scan마다 하나)) then (아니요: 중복,\n더 낮은 ID, 누락)
+  :연속성이 전진하지 않음;
+  stop
+else (예)
+endif
+if (Candidate가 `stable_for`\n이상 유지되었는가?) then (예)
+  :candidate를 stable로 승격;
+else (아니요)
+  :candidate 시간 계속 측정\n(샘플 시간 또는 scan 논리 시간);
+endif
+:상류 샘플 계보 전달;
+stop
+@enduml

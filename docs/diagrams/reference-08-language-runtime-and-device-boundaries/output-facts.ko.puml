@@ -1,0 +1,19 @@
+@startuml
+skinparam defaultFontName "Apple SD Gothic Neo"
+skinparam shadowing false
+skinparam defaultFontSize 13
+left to right direction
+rectangle "requested\n(제어식)" as req
+rectangle "safe\n(중재와 제약\n적용 후)" as safe
+rectangle "논리 결과의\n원자적 확정\n(런타임)" as commit
+rectangle "applied\n(renderer가\n버스 명령 전송)" as applied
+rectangle "confirmed\n(피드백 증거:\n접점·기계가 움직임)" as conf
+req --> safe
+safe --> commit
+commit --> applied
+applied --> conf
+note bottom of conf
+  서로 다른 세 가지 사실:
+  확정 != applied != confirmed
+end note
+@enduml

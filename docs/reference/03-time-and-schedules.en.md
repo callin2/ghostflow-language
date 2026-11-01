@@ -1,6 +1,3 @@
-<!-- translation-source: docs/reference/03-time-and-schedules.md -->
-[Korean original](03-time-and-schedules.md)
-
 # 3. Time and schedules
 
 [Full contents](../LANGUAGE-REFERENCE.en.md) · [Previous: 2. Types, expressions and state](02-types-expressions-state.en.md) ·

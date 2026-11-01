@@ -1,0 +1,21 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontSize 13
+skinparam rectangle {
+  BackgroundColor #F8F8F8
+  BorderColor #555555
+}
+
+rectangle "Host (navegador o Node)\nresponsable de durabilidad, parada física, fail-safe" as Host
+rectangle "station.mjs / policy.mjs\nlímite de la bomba compartida, plantillas de restricción" as Station
+rectangle "control-runtime.mjs\nsalidas virtuales, motor de sensores,\nvalidación de tipos de entrada, calidad en la traza" as Control
+rectangle "ghostflow-runtime.mjs\nenvoltorio sin dependencias de la ABI cruda" as Wrapper
+rectangle "cdylib ghostflow-wasm (C ABI)\nmismo ghostflow-core que ESP-IDF" as Wasm
+rectangle ".gfb + .manifest.json de confianza" as Artifact
+
+Host --> Station
+Host --> Control
+Control --> Wrapper
+Wrapper --> Wasm : gf_alloc, copiar .gfb,\nllamar exportaciones
+Artifact --> Control
+@enduml

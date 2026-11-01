@@ -1,0 +1,39 @@
+@startuml
+skinparam defaultFontName "Hiragino Sans"
+skinparam shadowing false
+skinparam defaultFontSize 13
+skinparam rectangle {
+  RoundCorner 8
+}
+left to right direction
+
+rectangle "何かが失敗した、\nまたは条件が満たされない" as start
+
+rectangle "無効なプログラム\n（名前/構文、型、\n分岐/定義、\n状態境界）" as invalid #FFE0E0
+rectangle "ソースを修正する" as fix
+
+rectangle "値の計算エラー\n（オーバーフロー、÷0、不正な変換）" as calc #FFF0D0
+rectangle "成功した tick はなし。\n部分的な確定もなし" as nocommit
+
+rectangle "外部データの問題\n（センサ故障、スケジュールの Unknown、\n観測の欠落/不一致）" as ext #E0F0FF
+rectangle "明示的なエラーフロー。\nFalse や許可にはしない" as flow
+
+rectangle "設定イベントの問題" as set #E8E0FF
+rectangle "受け入れ拒否：\n設定とリビジョンを維持" as adm
+rectangle "ペイロードエラー：\nfault(SettingsInvalid)、\nリビジョンは進む" as pay
+
+rectangle "既知の未充足条件" as known #E0FFE0
+rectangle "正常な判断。\n結果は False" as falsev
+
+start --> invalid
+invalid --> fix
+start --> calc
+calc --> nocommit
+start --> ext
+ext --> flow
+start --> set
+set --> adm
+set --> pay
+start --> known
+known --> falsev
+@enduml

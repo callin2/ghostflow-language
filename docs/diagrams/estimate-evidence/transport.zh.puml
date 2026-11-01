@@ -1,0 +1,23 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName Helvetica
+skinparam componentStyle rectangle
+title 估计证据准入路径
+
+[宿主\n（身份标识、历史、覆盖范围）] as Host
+[estimate-evidence.mjs\nEstimateEvidenceRuntime\n（仅编码/解码）] as JS
+[Rust 核心\nestimate_evidence::Session\n（1-64 条记录，不淘汰）] as Core
+[原生一致性示例\n（相同的 GFEE v1 适配器）] as Native
+
+Host --> JS : 创建 / 求值
+JS --> Core : GFEE v1 数据包\n（kind 0 创建，kind 1 求值）
+Native --> Core : GFEE v1 数据包
+Core --> JS : Verdict 或 Rejection
+JS --> Host : 快照（u64 为十进制字符串）
+note right of Core
+  仅准入声明的依据：
+  不产生数值估计、命令
+  或时间许可
+  (temporalAdmission: false)
+end note
+@enduml

@@ -1,0 +1,32 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName Helvetica
+skinparam defaultFontSize 13
+skinparam ArrowColor #526d76
+
+start
+:接收一个不可变的 ScheduleFacts
+（时钟快照 + 每个调度计划一组）;
+:暂存时钟闸门
+（间隙、信任、恢复检查）;
+:按依赖顺序处理每个前导条目：
+依据旧状态和已暂存的投影
+只求值一次;
+note right
+  某调度计划新交叉的触发实例
+  超过一个时：全部记为错过，
+  一个都不执行
+end note
+:运行 transitions 和 intents
+（读取已暂存的前导条目）;
+if (每个可能失败的表达式都成功？) then (是)
+  :一起提交：window、时钟状态、
+  触发实例消费、调度计划
+  观测、标量状态;
+  :TickRecord 保留事实和判定;
+else (否)
+  :丢弃所有候选;
+  :之后的重试看到同一次交叉;
+endif
+stop
+@enduml

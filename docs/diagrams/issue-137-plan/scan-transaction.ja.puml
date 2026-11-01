@@ -1,0 +1,19 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName "Hiragino Sans"
+skinparam defaultFontSize 12
+title VM スキャンとともにステージングされる after_event トラッカー
+participant "ランタイムホスト\n(ControlRuntime)" as Host
+participant "Rust AfterEventRuntime\n(WASM)" as AE
+participant "Rust VM" as VM
+Host -> AE : 明示的なイベント事実と\n測定された述語観測をステージング
+AE --> Host : Rust 所有の any/all 結果
+Host -> VM : 非公開の生成 Result 入力に\n結果を載せてスキャン
+alt VM スキャンが確定
+  VM --> Host : 確定
+  Host -> AE : トラッカー状態を確定
+else VM スキャンが拒否
+  VM --> Host : 拒否
+  Host -> AE : トラッカー状態をロールバック
+end
+@enduml

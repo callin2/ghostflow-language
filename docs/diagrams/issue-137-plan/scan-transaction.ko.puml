@@ -1,0 +1,18 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontSize 12
+title VM scan과 함께 준비되는 after_event tracker
+participant "런타임 호스트\n(ControlRuntime)" as Host
+participant "Rust AfterEventRuntime\n(WASM)" as AE
+participant "Rust VM" as VM
+Host -> AE : 명시적 event fact와\nmeasured 술어 관측 준비
+AE --> Host : Rust 소유 any/all 결과
+Host -> VM : 결과를 private 생성\nResult 입력에 담아 scan
+alt VM scan 확정
+  VM --> Host : committed
+  Host -> AE : tracker 상태 commit
+else VM scan 거부
+  VM --> Host : rejected
+  Host -> AE : tracker 상태 rollback
+end
+@enduml

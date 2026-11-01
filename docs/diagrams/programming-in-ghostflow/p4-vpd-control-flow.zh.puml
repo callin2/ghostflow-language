@@ -1,0 +1,26 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName "PingFang SC"
+skinparam defaultFontSize 13
+skinparam componentStyle rectangle
+title E19–E21：受光照门控的空气 VPD 需求
+
+rectangle "air: Temperature" as air
+rectangle "humidity: RelativeHumidity" as rh
+rectangle "light: PPFD" as light
+component "climate = air_vpd(t, rh)\n(任一输入 fault 则为 fault)" as climate
+component "state demand\nON / OFF / 死区内保持\n(fault -> false)" as demand
+component "daylight = ppfd >= 门限\n(fault -> false)" as day
+rectangle "air_vpd_value\n(fault 时为 0：显示占位值)" as vpd
+rectangle "vpd_valid" as valid
+rectangle "*_demand = daylight && demand'" as out
+
+air --> climate
+rh --> climate
+climate --> demand
+climate --> vpd
+climate --> valid
+light --> day
+demand --> out
+day --> out
+@enduml

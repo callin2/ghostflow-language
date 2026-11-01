@@ -1,0 +1,25 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName Helvetica
+skinparam defaultFontSize 13
+
+start
+if (命令？) then (capture)
+  :从程序初始化器运行场景\n（ghostsim.runScenario）;
+  :将 GFB、manifest、源映射、\n场景和已完成结果\n封存到新目录;
+  :captured（退出码 0）;
+  stop
+else (replay)
+  :校验 manifest 封印以及每个\n清单条目的哈希和大小;
+  :将已校验的字节暂存到\n私有临时目录;
+  :重新执行；与记录比较\n（若给出 --candidate，也与其比较）;
+  if (结果分类) then (全部检查通过)
+    :completed / compared（退出码 0）;
+  elseif () then (缺少初始状态\n或制品)
+    :partial（退出码 2）;
+  else (损坏、修订版不匹配、\n扫描间隙、时间或启动错误、\n判定被更改、候选失败)
+    :rejected（退出码 1）;
+  endif
+  stop
+endif
+@enduml

@@ -1,0 +1,16 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName Helvetica
+skinparam defaultFontSize 13
+
+rectangle "RTC / NTP / 平台\n时钟提供方" as Clock
+rectangle "GhostFlow 运行时" as Runtime {
+  rectangle "Daily 触发实例跨越、\n准入、错过的触发实例、\n重复抑制" as Calc
+  rectangle "调度计划账本" as Ledger
+}
+database "宿主存储" as Store
+
+Clock --> Calc : 每次求值：\n墙钟 + 单调时钟快照、\n墙钟可信状态
+Calc --> Ledger : 管理
+Ledger <--> Store : 跨运行时重启\n持久保存
+@enduml

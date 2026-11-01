@@ -1,0 +1,21 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName Helvetica
+title 1つのドライバセッション（エポック）、提案どおり
+
+participant "ホスト" as Host
+participant "ドライバ" as Driver
+Host -> Driver : gfdrv_negotiate(major 1, max_minor)
+Host -> Driver : describe -> 不変のメタデータ
+note over Host : バインディングの受け入れ\n（メタデータをプログラムの契約と照合）
+Host -> Driver : open(binding_and_budget)
+Driver --> Host : セッション（新しいエポック）またはエラー、出力なし
+loop 各スキャン
+  Host -> Driver : poll -> 順序付けられた入力レコード
+  note over Host : コアの評価と確定
+  Host -> Driver : apply(安全なコマンド) -> レシート
+end
+Host -> Driver : cancel(command_id) -> レシート（任意）
+Host -> Driver : close（ちょうど1回）
+note over Host, Driver : 再起動 = 新しいセッションエポック、\nメタデータとバインディングを再検証、\n暗黙の再開やリプレイはなし
+@enduml

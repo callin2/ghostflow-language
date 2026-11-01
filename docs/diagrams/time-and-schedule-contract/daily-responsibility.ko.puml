@@ -1,0 +1,16 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName Helvetica
+skinparam defaultFontSize 13
+
+rectangle "RTC / NTP / 플랫폼\n시계 provider" as Clock
+rectangle "GhostFlow 런타임" as Runtime {
+  rectangle "Daily 발생 crossing,\nadmission, 놓친 발생,\n중복 억제" as Calc
+  rectangle "예약 ledger(원장)" as Ledger
+}
+database "호스트 저장소" as Store
+
+Clock --> Calc : 평가마다:\n벽시계 + 단조 시간 snapshot,\n벽시계 신뢰 상태
+Calc --> Ledger : 관리
+Ledger <--> Store : 런타임 재시작 후에도\n영속화
+@enduml

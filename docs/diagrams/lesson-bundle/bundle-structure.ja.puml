@@ -1,0 +1,24 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName "Hiragino Sans"
+skinparam rectangleRoundCorner 8
+skinparam ArrowColor #555555
+left to right direction
+
+rectangle "ghostflow-lesson-v1 バンドル（JSON）" as B {
+  rectangle "source\nテキスト、sha256、\nmediaType" as SRC
+  rectangle "playback\ndurationMs、\nチェックポイント" as PB
+  rectangle "scenarios\nフレーム: atMs、\ninputs、samples?" as SC
+  rectangle "toolchain\n宣言された ID、\nABI 1" as TC
+  rectangle "bundleSha256" as DG
+}
+rectangle "validateLessonBundle\nフィールド、上限、順序、\nダイジェスト" as VAL
+rectangle "compileLessonBundle\nghost フェンスを抽出、\nコンパイル、フレームを\nマニフェストと照合" as CMP
+rectangle "コンシューマ / ランタイム\nフレームごとに\nruntime.step(...)" as RT
+
+B --> VAL
+VAL --> CMP : 妥当なバンドル
+CMP --> RT : コンパイル済みプログラム\n+ 検査済みフレーム
+PB ..> SRC : sourceSpan の行
+PB ..> SC : scenarioId
+@enduml

@@ -1,0 +1,19 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName Helvetica
+skinparam defaultFontSize 13
+skinparam componentStyle rectangle
+package "Línea de tiempo en vivo (origen)" {
+  component "Núcleo enmarcado en vivo" as L
+  component "Sumidero en vivo" as S
+  component "AccountingRuntime" as A
+  database "FileLedger" as F
+}
+package "Rama ghost" {
+  component "Núcleo enmarcado separado" as B
+}
+L --> S : intención Bool segura
+A --> F : persistir / confirmar recepción
+L ..> B : prefijo aceptado inmutable\n(reejecutado y verificado)
+note bottom of B : Sin sumidero en vivo, almacenamiento,\ncontabilización ni handle del runtime en vivo
+@enduml

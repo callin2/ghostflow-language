@@ -1,0 +1,20 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName "Hiragino Sans"
+skinparam defaultFontSize 13
+skinparam activity {
+  BackgroundColor #F8F8F8
+  BorderColor #555555
+}
+start
+:ウィンドウ終端 e + d に達した結果を期限切れにする;
+:終端結果を確認応答する;
+:新しいイベントをソース同一性の順に開始する;
+:述語の観測を適用する;
+if (容量エラーまたは観測エラー?) then (はい)
+  :ステージしたすべての変更を破棄\n（確認応答、期限切れ、\n同一性のハイウォーターマーク、クロック）;
+else (いいえ)
+  :tick 全体を確定する;
+endif
+stop
+@enduml

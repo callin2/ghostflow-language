@@ -1,0 +1,22 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName Helvetica
+skinparam defaultFontSize 13
+
+start
+if (기존 프로그램의 선언?) then (sensor)
+  :컴파일러가 마이그레이션\n진단과 함께 거부;
+  :`input`으로 이름 변경,\n기존 명시적 fault 정책 유지;
+else (plain scalar input)
+  if (독립·필수·conditioning 없는\nBool 입력만 있는가?) then (예, 명시적 요청)
+    :previewLegacyScalarMigration();
+    :legacy admission 지시문이\n있는 새 문서;
+  else (아니요)
+    :사용 위치 검토;
+    :먼저 fault 정책 결정;
+    :case 분석 또는\n명시적 recovery 추가;
+  endif
+endif
+:검토된 새 revision\n(이전 문서는 그대로 보존);
+stop
+@enduml

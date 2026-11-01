@@ -1,0 +1,15 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName Helvetica
+hide empty description
+
+[*] --> Idle
+Idle --> Waiting : start\n(age가 0부터 다시 시작)
+Waiting --> Idle : !start
+Waiting --> Running : start && age >= value\n(delay가 ok(value))
+Running --> Idle : !start
+Waiting --> Idle : delay가 fault(_)
+Running --> Idle : delay가 fault(_)
+
+note "한 tick에는 최대 한 번만 전이합니다.\nobserved_start가 fault이면 phase는 값을 유지합니다.\nmotor <- phase' == Running" as N
+@enduml

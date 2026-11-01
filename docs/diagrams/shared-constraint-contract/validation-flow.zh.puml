@@ -1,0 +1,21 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName Helvetica
+skinparam rectangle {
+  BackgroundColor White
+  BorderColor #555555
+}
+left to right direction
+title 检查逻辑映射（不执行）
+
+rectangle "本 .ghost.md\n(SharedPumpPolicy)" as src
+rectangle "compileSourceSync\n已检查的描述符\n+ 哈希" as comp
+rectangle "安装映射\n身份标识、类型化端口、\n模式、哈希" as map
+rectangle "validateResourceConstraintBinding" as val
+rectangle "executable: false" as out
+
+src --> comp
+comp --> val
+map --> val
+val --> out
+@enduml

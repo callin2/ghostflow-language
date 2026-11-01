@@ -1,0 +1,12 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName "Hiragino Sans"
+hide empty description
+state "wasTrue = false" as Off
+state "wasTrue = true" as On
+[*] --> Off : 初期状態 (since = 0)
+Off --> Off : false / 値 0, since' = now
+Off --> On : true / 値 0, since' = now
+On --> On : true / 値 now - since,\nsince' = since
+On --> Off : false / 値 0, since' = now
+@enduml

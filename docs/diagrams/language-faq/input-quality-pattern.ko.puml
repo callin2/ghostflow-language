@@ -1,0 +1,26 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontSize 13
+skinparam activityBorderColor #4A6FA5
+skinparam activityBackgroundColor #F7F9FC
+title Bool 입력 x 하나의 입력 품질 패턴 (tick마다)
+
+start
+:입력 observed_x 읽기\n(Result: ok 또는 fault);
+if (샘플이 ok(value)인가?) then (예)
+  :x_good = true\nx = value;
+else (fault)
+  :x_good = false\nx = remembered_x\n(마지막 값, 초기 false는 샘플이 아님);
+endif
+:remembered_x' = x;
+if (정상 STOP 또는 정상\n허가 해제인가?) then (예)
+  :운전 끄기;
+elseif (제한된 운전 시간이 끝났는가?) then (예)
+  :운전 종료;
+elseif (필요한 입력이 모두 _good인가?) then (예)
+  :새 전이 계산;
+else (아니요)
+  :이전 상태 유지\n(새 전이 없음);
+endif
+stop
+@enduml

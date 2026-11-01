@@ -1,0 +1,25 @@
+@startuml
+skinparam defaultFontName "Apple SD Gothic Neo"
+skinparam shadowing false
+skinparam defaultFontSize 13
+skinparam rectangleBorderColor #4A6FA5
+skinparam rectangleBackgroundColor #F7F9FC
+left to right direction
+title 기록된 occurrence에서 ghost timeline 분기 (§6.8)
+
+rectangle "원본 timeline (보존)" as O {
+  rectangle "tick 1" as O1
+  rectangle "tick 2" as O2
+  rectangle "tick 3" as O3
+}
+rectangle "Ghost branch (물리 effect sink 없음)" as G {
+  rectangle "tick 2'\n(바뀐 규칙 또는\n가상 what-if 입력)" as G2
+  rectangle "tick 3'" as G3
+}
+O1 --> O2
+O2 --> O3
+O1 --> G2 : 이 occurrence에서\nbranch
+G2 --> G3
+O2 .. G2 : 같은 논리 tick에서\n비교
+O3 .. G3 : 비교
+@enduml

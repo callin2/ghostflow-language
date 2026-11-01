@@ -1,0 +1,24 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName "Hiragino Sans"
+skinparam defaultFontSize 12
+skinparam componentStyle rectangle
+left to right direction
+
+rectangle "正本の .ghost.md（作成者が記述）" as doc {
+  card "ghostflow:anchor コメント\n+ 段落または引用ブロック1つ\n(id, kind, status, origin)" as A
+  card "ghost フェンス:\nghostflow:link コメント\n(id, relation)" as L
+  card "直後のトップレベルの\n宣言／文" as N
+}
+rectangle "コンパイラ\n（作成者が与えたものだけを\n検証）" as comp
+card "GFB バイト、マニフェスト、\nランタイムの動作\n（変更なし）" as out
+card "source-trace-v1 コンパニオン\nintentAnchors[]\nintentLinks[]" as trace
+
+L --> A : 同じ id
+L --> N : 直後に\n続く
+A --> comp
+L --> comp
+N --> comp
+comp --> out
+comp --> trace : 位置 + ノード ID、\n散文はコピーしない
+@enduml

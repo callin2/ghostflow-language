@@ -1,0 +1,23 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName Helvetica
+skinparam defaultFontSize 13
+skinparam componentStyle rectangle
+actor "调用方" as Caller
+rectangle "explainExecution(request)" as API {
+  component "重新编译规范的\n.ghost.md 源文件" as C
+  component "输出解释 +\n已完成扫描的快照\n+ 证明/快照关联" as J
+  component "检查设备\n身份标识与记录" as D
+}
+rectangle "execution-evidence-result-v1" as R {
+  card "requested、safe、\nauthored" as R1
+  card "设备状态" as R2
+}
+Caller --> C : source、runId、outputId
+Caller --> J : 已接受的扫描结果
+Caller --> D : expectedDevice、\ndeviceEvidence
+C --> J
+J --> R1
+D --> R2
+note right of API : 不新增求值器、不接触设备、\n不从磁盘读取导入
+@enduml

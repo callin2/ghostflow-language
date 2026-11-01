@@ -1,0 +1,22 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName "PingFang SC"
+skinparam rectangleRoundCorner 8
+skinparam ArrowColor #555555
+left to right direction
+
+rectangle "文学式源文件\n.ghost.md\n（第 1 章）" as SRC
+rectangle "编译器检查\n类型、单位、名称\n（第 2、7 章）" as COMP
+rectangle "tick 计算\n输入 + 前一状态\n-> 下一状态、意图\n（第 2、3 章）" as TICK
+rectangle "传感器与约束\n质量、互锁、模式\n（第 4 章）" as CONS
+rectangle "设置与观测\n实时变更、事件、报警\n（第 5 章）" as OBS
+rectangle "组合与重放\nimport、绑定、重放\n（第 6 章）" as COMPOSE
+rectangle "运行时、Driver、设备\n各层职责\n（第 8 章）" as DEV
+
+SRC --> COMP
+COMP --> TICK
+CONS --> TICK : 经滤波的读取值、\n允许的输出
+OBS --> TICK : 生效设置
+TICK --> DEV : 输出意图
+COMPOSE ..> TICK : 组合程序、\n重新运行已记录的 tick
+@enduml

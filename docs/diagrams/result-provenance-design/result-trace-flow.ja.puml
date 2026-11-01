@@ -1,0 +1,23 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName "Hiragino Sans"
+skinparam defaultFontSize 13
+skinparam componentStyle rectangle
+component "コンパイラ\n（一時的な Result 値）" as C
+component "ソースメタデータ\n（サイト表、許可された origin）" as M
+component "GFB3 オペコード 56\ntrace-result <u32 site>" as OP
+component "Rust VM の tick\n（候補）" as VM
+card "resultTrace バッファ\n{site, choice, origin}" as B
+component "確定済み tick 記録\n（状態 + 意図 + resultTrace）" as R
+component "ジャーナル / リプレイ" as J
+component "ホスト\n（イベントを検証済みメタデータ\nおよびセンサ品質と結合）" as H
+C --> OP : フォールバックサイトを下位変換
+C --> M : サイトを記録
+OP --> VM
+VM --> B : ペイロード成功後に追記
+B --> R : tick が成功
+B ..> VM : 後続の故障でイベントを破棄
+R --> J
+R --> H
+M --> H
+@enduml

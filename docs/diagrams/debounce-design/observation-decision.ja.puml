@@ -1,0 +1,29 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName "Hiragino Sans"
+skinparam defaultFontSize 12
+skinparam ActivityBackgroundColor #F7F9FC
+skinparam ActivityBorderColor #4A6FA5
+title debounce：選択中ルートの1回の観測（簡略版）
+start
+:到達可能な各ルートは、確定したスキャンで\n自身の最高水位 epoch/ID を更新;
+if (選択ルートが変わった、または\n新しい epoch 変化か？) then (はい)
+  :安定・候補の連続性をリセット;
+endif
+if (Result が故障か？) then (はい)
+  :正確な理由と発生元を保持し、\n安定・候補を `initial` にリセット;
+  stop
+endif
+if (新しい観測か？\n（tag 0：確定スキャンごとに1回）) then (いいえ：重複、\n小さい ID、欠落)
+  :連続性は進まない;
+  stop
+else (はい)
+endif
+if (候補が `stable_for` 以上\n維持されたか？) then (はい)
+  :候補を安定値に昇格;
+else (いいえ)
+  :候補の計時を継続\n（サンプル時刻またはスキャンの論理時間）;
+endif
+:上流のサンプル系譜を転送;
+stop
+@enduml

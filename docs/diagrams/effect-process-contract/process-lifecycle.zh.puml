@@ -1,0 +1,29 @@
+@startuml
+hide empty description
+skinparam shadowing false
+skinparam defaultFontName Helvetica
+skinparam state {
+  BackgroundColor White
+  BorderColor #555555
+}
+title 映射到 #74 时的 Process 生命周期观测
+
+state received
+state rejected : 原因代码 + 详情\n（含启动前被接受的取消）
+state started
+state completed
+state cancelled : 原因可选\n需要领域取消证据
+state failed : 原因代码 + 详情
+
+[*] --> received
+received --> rejected
+received --> started : 声明的启动证据
+started --> completed : 声明的完成证据
+started --> cancelled
+started --> failed
+rejected --> [*]
+completed --> [*]
+cancelled --> [*]
+failed --> [*]
+note "终止状态没有后继。\n按 #115 顺序，第一个有效的终止转换胜出。" as N1
+@enduml

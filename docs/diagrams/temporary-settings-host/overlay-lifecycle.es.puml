@@ -1,0 +1,21 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName Helvetica
+skinparam defaultFontSize 13
+hide empty description
+
+state "Solo valor ordinario" as Ordinary
+state "Superposición temporal activa\n(valor ordinario conservado debajo)" as Overlay
+state "Retorno aplicado" as Returned
+state "Reemplazado por evento ordinario" as Superseded
+state "Retorno completado como emisión de fallo" as Fault
+
+[*] --> Ordinary
+Ordinary --> Overlay : evento temporal\n(vigencia Run o Until)
+Overlay --> Returned : cancelación / vencimiento Until /\nendRun o nueva ejecución (Run)
+Overlay --> Superseded : evento ordinario para\nlos destinos afectados
+Overlay --> Fault : el retorno emite un fallo\n(nunca se etiqueta como éxito)
+Returned --> Ordinary
+Superseded --> Ordinary
+Fault --> Ordinary
+@enduml

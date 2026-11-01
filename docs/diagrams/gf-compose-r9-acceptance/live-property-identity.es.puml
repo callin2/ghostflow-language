@@ -1,0 +1,14 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName Helvetica
+skinparam defaultFontSize 13
+title Identidad a través de eventos de propiedades en vivo y reinicio (aceptación propuesta)
+
+[*] --> RunA : inicia la ejecución\n(runId A, rev. de ajustes N)
+RunA --> RunA : evento válido de propiedades en vivo\ntodos los valores aplicados como un solo evento;\nrev. de ajustes N -> N+1;\nhashes de fuente/programa y runId sin cambios
+RunA --> RunA : evento multipropiedad inválido\nse rechaza el evento completo;\nninguna propiedad cambia
+RunA --> RunB : reinicio real\n(evento de reinicio de GhostFlow)
+RunB : nuevo runId B
+RunB : los ajustes aceptados persisten
+RunB : respuesta = lógica GhostFlow escrita por el autor\n(sin política global de reanudación/manual)
+@enduml

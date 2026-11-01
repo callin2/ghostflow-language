@@ -1,0 +1,25 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName "PingFang SC"
+skinparam defaultFontSize 13
+title 已验证的 WASM 交接：生产方与使用方
+
+|CI 工作流|
+start
+:检出 PR head 或完整 source_sha;
+:验证 commit、tree、Cargo.lock 哈希;
+:准备（允许网络）：
+Node 22、Rust stable、npm ci、cargo fetch --locked;
+:CARGO_NET_OFFLINE=true npm test
+（唯一的一次 WASM 构建）;
+:tools/package-verified-wasm.mjs
+-> wasm + verification.json + manifest.json;
+:上传制品（保留 14 天）;
+|使用方|
+:下载三个文件;
+:检查格式、固定版本、tree、lockfile 哈希;
+:重新计算哈希和字节数;
+:检查预期的运行、commit 和工作流
+（zip 不能为自身授权）;
+stop
+@enduml

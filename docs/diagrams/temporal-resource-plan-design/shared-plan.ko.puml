@@ -1,0 +1,24 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName Helvetica
+skinparam defaultFontSize 13
+skinparam ArrowColor #526d76
+
+rectangle "설치된 module\n+ strategy + journal 용량" as M
+rectangle "GFTA activation profile\n(예산)" as P
+rectangle "검사를 거친 구조 계획 하나\n(구성, temporal arena 없음)" as SP
+rectangle "보고\n(fitsBudget, 필요 용량)" as R
+rectangle "Activation" as A
+rectangle "Replay" as RP
+
+M --> SP
+P --> SP
+SP --> R : plan_temporal /\nplan_current_temporal_replay
+SP --> A : 같은 계획
+SP --> RP : 같은 계획
+note right of A
+  할당 용량은 계획된
+  구성 안에 있어야 함;
+  불일치는 거부됨
+end note
+@enduml

@@ -1,0 +1,30 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName Helvetica
+skinparam ArrowColor #555555
+skinparam ActivityBorderColor #555555
+
+start
+:1. 전략, 프로파일 revision,
+입력과 이전 상태를 고정;
+:2. let/with와 모든 next 계산
+(이전 상태 + 같은 입력을 읽음);
+:3. 완전한 후보 상태 구성
+(전이 없음 = 이전 값 유지);
+:4. intent/emit 계산
+(state = 이전, next = 후보);
+:5. 안전 제약 적용
+(요청 의도 -> 안전 의도);
+if (tick 실패?) then (예)
+  :아무것도 확정하지 않음;
+  :호스트가 자신의
+  안전 출력 정책을 적용;
+  stop
+else (아니오)
+  :6. 상태, 출력, 기록을
+  함께 확정;
+  :7. 실제 호스트만: 안전 의도를
+  renderer에 적용;
+  stop
+endif
+@enduml

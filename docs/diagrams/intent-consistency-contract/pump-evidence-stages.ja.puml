@@ -1,0 +1,22 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName "Hiragino Sans"
+skinparam defaultFontSize 12
+left to right direction
+
+card "C1 チェック\n（有効なサンプル < 20%\n=> 安全意図 OFF）" as C1
+card "安全 OFF\n（論理の結果）" as SO
+card "OFF 要求を\n送信" as TX
+card "ACK／\nレジスタのリードバック" as ACK
+card "負荷のフィードバック\n（接点、動作、流量）" as LF
+
+C1 --> SO
+SO --> TX
+TX --> ACK
+ACK --> LF
+note bottom of ACK
+  証拠がある最後の段階までしか
+  主張しない。例:「OFF 要求の ACK
+  受信済み。実際の停止は未確認」。
+end note
+@enduml

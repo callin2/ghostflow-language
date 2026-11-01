@@ -1,0 +1,33 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName Helvetica
+skinparam ArrowColor #555555
+hide empty description
+
+[*] --> Idle
+Idle --> Opening : START nuevo,\ncierre confirmado
+Opening --> Settling : solo final de apertura
+Settling --> Watering : apertura mantenida 2 s
+Watering --> PumpStopping : transcurridos 5 min
+PumpStopping --> Closing : siguiente escaneo\n(finales disponibles)
+Closing --> Idle : solo final de cierre
+Settling --> FeedbackFault : retroalimentación de apertura perdida
+Watering --> FeedbackFault : retroalimentación de apertura perdida
+PumpStopping --> FeedbackFault : retroalimentación de apertura perdida
+FeedbackFault --> Idle : START soltado,\ncierre confirmado
+Interrupted --> Idle : START soltado,\ncierre confirmado
+
+state Opening : valve_open_contactor ON
+state Watering : pump_contactor ON
+state Closing : valve_close_contactor ON
+state FeedbackFault : todas las salidas OFF
+state Interrupted : todas las salidas OFF
+
+note as N
+De Idle a Closing, se comprueba primero:
+1. ambos finales en true -> FeedbackFault
+2. stop_ok u overload_ok perdido -> Interrupted
+Ambos estados de fallo esperan además a que
+vuelva el permiso y no haya conflicto.
+end note
+@enduml

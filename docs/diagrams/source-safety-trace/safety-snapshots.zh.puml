@@ -1,0 +1,16 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontSize 13
+start
+:第 0 轮：对请求的输出快照求值;
+repeat
+  :对每条约束求值\n（在本轮更新之前捕获值）;
+  if (该规则的首次违反？) then (是)
+    :保存 firstViolation\n{round, values, blocked};
+  endif
+repeat while (本轮是否有输出被阻止？) is (是：下一轮)
+->否;
+:从终止的无阻止轮次\n保存 final {round, values, satisfied};
+note right: 每条约束最多\n两个快照
+stop
+@enduml

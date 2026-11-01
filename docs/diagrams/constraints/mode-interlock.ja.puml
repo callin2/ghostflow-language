@@ -1,0 +1,26 @@
+@startuml
+hide empty description
+skinparam shadowing false
+skinparam defaultFontName "Hiragino Sans"
+skinparam state {
+  BackgroundColor White
+  BorderColor #555555
+}
+title Station のモードインターロック（Station アダプタの設備契約）
+
+state Stopped
+state Auto
+state Manual
+state Configure : 構造的な設定セッション\n（再始動は禁止）
+state Stopping : 進行中の作業を停止\n新規始動を抑止\n後処理、所有権を返却
+
+[*] --> Stopped
+Stopped --> Auto : enter(Auto)\nstopped(station) のときのみ
+Stopped --> Manual : enter(Manual)\nstopped(station) のときのみ
+Stopped --> Configure : enter(Configure)\nstopped(station) のときのみ
+Auto --> Stopping : 明示的な停止要求
+Manual --> Stopping : 明示的な停止要求
+Stopping --> Stopped : 停止完了\n（CommandedStop または VerifiedStop）
+Configure --> Stopped : 検証 + アトミックな適用、\nセッションを閉じる
+note "Auto <-> Manual の直接遷移や\n運転 -> Configure の直接遷移はない" as N1
+@enduml

@@ -1,0 +1,15 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontSize 12
+left to right direction
+rectangle "물리 root\n(sourceTag, sourceEpoch, sampleId)\n+ 원래 timestamp" as P
+rectangle "내부 window U\nover 2 ms" as U
+rectangle "외부 window W\nover 10 ms" as W
+P --> U : sample (0,0) (1,10) (2,20)
+U --> W : derived event (site, revision)\n값 0, 5, 15\nquality 3 + U의 site
+note bottom of W
+  derived event 3개의 평균 = 20/3
+  (평탄화한 물리 leaf의 10이 아님)
+  결과 품질: Derived (3)
+end note
+@enduml

@@ -1,0 +1,21 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontSize 13
+skinparam rectangle {
+  BackgroundColor #F8F8F8
+  BorderColor #555555
+}
+
+rectangle "宿主（浏览器或 Node）\n负责持久化、物理停止、故障安全" as Host
+rectangle "station.mjs / policy.mjs\n共享泵边界、约束模板" as Station
+rectangle "control-runtime.mjs\n虚拟输出、传感器引擎、\n输入类型检查、追踪中的质量" as Control
+rectangle "ghostflow-runtime.mjs\n原始 ABI 的无依赖封装" as Wrapper
+rectangle "ghostflow-wasm cdylib（C ABI）\n与 ESP-IDF 相同的 ghostflow-core" as Wasm
+rectangle ".gfb + 受信任的 .manifest.json" as Artifact
+
+Host --> Station
+Host --> Control
+Control --> Wrapper
+Wrapper --> Wasm : gf_alloc，复制 .gfb，\n调用导出函数
+Artifact --> Control
+@enduml

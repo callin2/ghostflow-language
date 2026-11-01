@@ -1,0 +1,23 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontSize 13
+skinparam rectangleBorderColor #4A6FA5
+skinparam rectangleBackgroundColor #F7F9FC
+title La unidad elige una grafía; el tipo lleva el significado
+
+rectangle "25°C   77°F   298.15K" as TL
+rectangle "Temperature\n(canónica K)" as T
+rectangle "5Δ°C   9Δ°F" as DL
+rectangle "TemperatureDelta\n(canónica ΔK)" as TD
+rectangle "Irradiance\n(W/m2, potencia radiante)" as IR
+rectangle "PPFD\n(umol/m2/s, fotones)" as PP
+rectangle "Lectura de sensor en lux\n(no existe tipo Lux)" as LX
+rectangle "Conversión validada\nen la vinculación/preprocesamiento" as CV
+
+TL --> T : mismo tipo,\nconvertido a la unidad canónica
+DL --> TD : mismo tipo
+T ..> TD : Temperature - Temperature
+IR -[#B03A2E]- PP : <color:#B03A2E>sin comparación directa</color>
+LX --> CV : espectro, calibración, óptica
+CV --> PP : solo si está verificada
+@enduml

@@ -1,0 +1,23 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName Helvetica
+skinparam defaultFontSize 13
+start
+:运行原始场景;
+if (守卫条件成立且目标\n违反了预期？) then (否)
+  :original-not-applicable、\noriginal-not-failing 或 incomplete;
+  stop
+else (是)
+endif
+repeat
+  :尝试删除下一个\n非目标动作（按顺序）;
+  if (有效、运行完成、守卫成立、\n违规相同？) then (是)
+    :接受；从第一个\n动作重新开始;
+  else (否)
+    :记录本次尝试;
+  endif
+repeat while (仍有未尝试的删除且\nmaxAttempts 未用完？) is (是)
+-> 否;
+:报告复现结果\n（single-deletion-minimal、budget-exhausted\n或 unresolved-candidates）;
+stop
+@enduml

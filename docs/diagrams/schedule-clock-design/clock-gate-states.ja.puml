@@ -1,0 +1,22 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName "Hiragino Sans"
+skinparam defaultFontSize 13
+hide empty description
+state "ベースラインなし" as None
+state "BootBaseline" as Boot
+state "ClockUnknown" as Unknown
+state "RecoveryBaseline" as Recovery
+state "信頼済み追跡\n（差分をギャップと比較）" as Tracking
+[*] --> None : 構築（gap、run epoch）
+None --> Boot : 最初の信頼済み壁時計時刻
+None --> Unknown : 壁時計時刻が欠落\nまたは信頼できない
+Boot --> Tracking
+Recovery --> Tracking
+Tracking --> Tracking : 差分 <= gap
+Tracking --> Tracking : 差分 > gap\n/ ObservationGap
+Tracking --> Unknown : 壁時計時刻が欠落\nまたは信頼できない
+Unknown --> Recovery : 再び信頼済み壁時計時刻
+note right of Boot : ベースラインは決して\n受け入れパルスではない
+note bottom of Tracking : 検証失敗（範囲、epoch、\n単調性の後退）では\n状態は変化しない
+@enduml

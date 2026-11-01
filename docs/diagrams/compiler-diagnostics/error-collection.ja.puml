@@ -1,0 +1,31 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName "Hiragino Sans"
+skinparam defaultFontSize 13
+skinparam ActivityBackgroundColor #F8F8F8
+start
+:ソースを構文解析;
+note right: 最初のエラーで停止
+:宣言をセットアップ;
+note right: 最初のエラーで停止
+partition "収集するフェーズ（最大 20 件の異なるエラー）" {
+  :let バインディングを検証;
+  if (エラーあり?) then (はい)
+    :収集したエラーを報告;
+    stop
+  endif
+  :次状態の代入を検証;
+  if (エラーあり?) then (はい)
+    :収集したエラーを報告;
+    stop
+  endif
+  :通常の出力接続を検証;
+  if (エラーあり?) then (はい)
+    :収集したエラーを報告;
+    stop
+  endif
+}
+:関数、適応戦略、\n制約、ローワリング;
+note right: 最初のエラーで停止
+stop
+@enduml

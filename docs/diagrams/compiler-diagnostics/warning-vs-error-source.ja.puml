@@ -1,0 +1,16 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName "Hiragino Sans"
+skinparam defaultFontSize 13
+rectangle "インポートした文書内の警告\n（コンパイル成功）" as W {
+  card "source = ルート文書" as WS
+  card "span.file = インポートした文書" as WF
+  card "sourceClosure が子文書の同一性を保持" as WC
+}
+rectangle "インポートした文書内のエラー\n（コンパイル失敗）" as E {
+  card "source = 子文書\n（ファイル名 + SHA-256）" as ES
+  card "requestSource = ルートリクエスト" as ER
+  card "span.file = 子文書" as EF
+}
+W -[hidden]right- E
+@enduml

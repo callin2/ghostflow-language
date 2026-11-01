@@ -1,0 +1,32 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName Helvetica
+skinparam defaultFontSize 13
+skinparam ArrowColor #526d76
+
+start
+:Recibir un ScheduleFacts inmutable
+(instantánea del reloj + un grupo por programación);
+:Preparar la compuerta de reloj
+(comprobaciones de brecha, confianza y recuperación);
+:Para cada entrada del preludio, en orden de dependencia:
+evaluar una vez contra el estado anterior
+y las proyecciones ya preparadas;
+note right
+  Más de una ocurrencia cruzada
+  por primera vez en una programación:
+  registrar todas como omitidas, no ejecutar ninguna
+end note
+:Ejecutar transiciones e intenciones
+(leen las entradas del preludio preparadas);
+if (¿Tuvo éxito toda expresión que puede fallar?) then (sí)
+  :Consolidar juntos: ventanas, estado del reloj,
+  consumo de ocurrencias, observaciones
+  de programaciones, estado escalar;
+  :TickRecord conserva hechos y decisiones;
+else (no)
+  :Descartar todos los candidatos;
+  :Un reintento posterior ve el mismo cruce;
+endif
+stop
+@enduml

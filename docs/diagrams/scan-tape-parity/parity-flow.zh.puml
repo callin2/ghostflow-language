@@ -1,0 +1,20 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontSize 13
+skinparam rectangleRoundCorner 8
+rectangle "场景源码" as src
+rectangle "编译后的模块\n（GFB1，只编译一次）" as mod
+rectangle "规范扫描带\n（有序的帧尝试）" as tape
+rectangle "原生：scan_tape CLI\n（TSV 扫描带 -> ScanDriver::scan）" as nat
+rectangle "WASM：FramedGhostFlowRuntime\n（公开 framed 适配器）" as wasm
+rectangle "逐次尝试的结果\n（accepted、outcome、error）" as res
+rectangle "断言\n1. 场景预期\n2. 跨目标严格相等" as cmp
+src --> mod
+mod --> nat
+mod --> wasm
+tape --> nat : 序列化为 TSV
+tape --> wasm : 原样数组
+nat --> res : JSON 行
+wasm --> res
+res --> cmp
+@enduml

@@ -1,0 +1,21 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontSize 13
+skinparam rectangleBorderColor #555555
+skinparam rectangleBackgroundColor #F7F7F7
+
+rectangle "GFB21 = 不可变民用时间 IANA Range\n（保留）" as R21
+rectangle "GFB22 = 生命周期信封\n（新的、独立的）" as L22 {
+  rectangle "经过检查的重启\n描述符" as DESC
+  rectangle "未改变的内部 GFB 字节\n格式 1–4、10、11\n或 Range 21" as INNER
+}
+rectangle "拒绝：生命周期 GFB19\n（历史预发布版 99ca1a3）" as L19 #FFEEEE
+rectangle "拒绝：生命周期 GFB21\n（临时的 PR536）" as L21 #FFEEEE
+
+INNER ..> R21 : 可以包装
+L19 -[hidden]- L21
+note bottom of L19
+  不做转换，也没有 fallback。
+  改为重新编译经过审查的源。
+end note
+@enduml

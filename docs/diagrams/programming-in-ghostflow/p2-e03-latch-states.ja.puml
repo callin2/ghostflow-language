@@ -1,0 +1,27 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontSize 13
+skinparam StateBackgroundColor #F7F9FC
+skinparam StateBorderColor #4A6FA5
+title E03：running と restart_blocked（tick ごとに 1 回の遷移）
+
+state "Stopped（停止）\nrunning=false\nrestart_blocked=false" as Stopped
+state "Running（運転）\nrunning=true" as Running
+state "RestartBlocked（再起動禁止）\nrunning=false\nrestart_blocked=true" as Blocked
+
+[*] --> Stopped
+Stopped --> Running : START 押下、STOP 解放\n（両入力とも正常）
+Running --> Stopped : STOP 押下（正常）、\n再起動禁止なし
+Stopped --> Blocked : START または STOP の fault
+Running --> Blocked : STOP の fault、または\n再起動禁止の設定中に停止
+Blocked --> Stopped : 両入力とも正常で\nSTART 解放
+Blocked --> Blocked : START を押し続けている、\nまたは何らかの fault
+
+note right of Running
+  運転中の START fault では
+  （STOP が正常かつ解放なら）運転を
+  継続しますが、restart_blocked を
+  設定します。両入力が正常な状態で
+  START の解放を観測すると解除されます。
+end note
+@enduml

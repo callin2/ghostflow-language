@@ -1,0 +1,25 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontSize 12
+start
+:node tools/ghostsim-console.mjs program.gfb --bind ...;
+if (stdin 是终端？) then (是：实时模式)
+  :同时要求 stderr 也是终端;
+  :在 0 ms 扫描并绘制面板;
+  repeat
+    :100 ms 定时器，或按键 1-8 / :toggle;
+    :在当前经过时间扫描一次;
+  repeat while (:exit 或 Ctrl-C？) is (否)
+  :恢复屏幕；打印简短摘要;
+  note right: --record 和 --format 被拒绝
+else (否：管道重放)
+  repeat
+    :每行读取一条命令;
+    :在虚拟时间执行 toggle / scan N;
+    :将面板打印到 stderr;
+  repeat while (exit 或输入结束？) is (否)
+  :向 stdout 写入一份 scenario-result-v1\n（默认 TOON，--format json）;
+  note right: --record 写入可重放的 TOON 场景
+endif
+stop
+@enduml

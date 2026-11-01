@@ -1,0 +1,22 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName "PingFang SC"
+
+start
+:宿主提供一个新样本\n（原始时间戳、身份标识）;
+if (健康、处于 valid = 0%..100% 内，\n且 age < stale_after = 3s？) then (是)
+  :对最近三个新的有效样本\n取 median(3);
+  if (窗口中已有三个值？) then (是)
+    :hysteresis\non_below 30%，off_above 35%;
+    :dry = ok(value);
+  else (否)
+    :dry = fault(NotReady);
+  endif
+else (否)
+  :清空滤波窗口；\n将 hysteresis 重置为 initial: false;
+  :dry = fault(...);
+endif
+:need_water = case dry\nok(value) => value\nfault(_) => false;
+:pump 请求 = enabled && need_water\n（enabled 故障时保持上一次请求）;
+stop
+@enduml

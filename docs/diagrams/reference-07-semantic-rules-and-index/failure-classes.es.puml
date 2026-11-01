@@ -1,0 +1,38 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontSize 13
+skinparam rectangle {
+  RoundCorner 8
+}
+left to right direction
+
+rectangle "Algo salió mal\no no se cumple una condición" as start
+
+rectangle "Programa inválido\n(nombre/sintaxis, tipo,\nramificación/definición,\nfrontera de estado)" as invalid #FFE0E0
+rectangle "Corregir la fuente" as fix
+
+rectangle "Error de cálculo de valores\n(desbordamiento, ÷0, conversión inválida)" as calc #FFF0D0
+rectangle "Ningún tick exitoso;\nsin consolidación parcial" as nocommit
+
+rectangle "Problema de datos externos\n(fallo de sensor, Unknown de programación,\nobservación ausente/no coincidente)" as ext #E0F0FF
+rectangle "Flujo de error explícito;\nnunca False ni permiso" as flow
+
+rectangle "Problema en un evento de ajustes" as set #E8E0FF
+rectangle "Admisión rechazada:\nse mantienen ajustes + revisión" as adm
+rectangle "Error de contenido:\nfault(SettingsInvalid),\nla revisión avanza" as pay
+
+rectangle "Condición conocida no cumplida" as known #E0FFE0
+rectangle "Decisión normal;\nel resultado es False" as falsev
+
+start --> invalid
+invalid --> fix
+start --> calc
+calc --> nocommit
+start --> ext
+ext --> flow
+start --> set
+set --> adm
+set --> pay
+start --> known
+known --> falsev
+@enduml

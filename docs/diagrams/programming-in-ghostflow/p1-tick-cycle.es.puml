@@ -1,0 +1,24 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName Helvetica
+skinparam defaultFontSize 13
+skinparam componentStyle rectangle
+left to right direction
+title Un tick: qué anotar antes de ejecutar
+
+rectangle "Entradas capturadas\n(un conjunto por tick)" as in
+rectangle "Estado anterior" as prev
+rectangle "Expresiones\n(let, case, if)" as expr
+rectangle "Estado siguiente" as next
+rectangle "Intención solicitada" as req
+rectangle "Intención segura\n(tras las reglas de seguridad)" as safe
+rectangle "Salidas hacia la vinculación\ny el renderizador" as out
+
+in --> expr
+prev --> expr
+expr --> next
+expr --> req
+req --> safe
+safe --> out
+next ..> prev : se convierte en el estado\nanterior del siguiente tick
+@enduml

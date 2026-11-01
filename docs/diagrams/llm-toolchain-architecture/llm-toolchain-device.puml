@@ -1,0 +1,59 @@
+@startuml
+title Physical scan: Device ownership and current firmware failure handling
+database "Approved profile + installation bindings" as Profile
+participant "Device scan host / clock" as Host
+participant "Sensor / input driver" as Input
+participant "ScanDriver + Rust Runtime" as Core
+participant "Physical output driver" as Output
+participant "Relay / load" as Load
+participant "Host observation stream" as Evidence
+participant "Independent observation" as Observer
+Profile -> Host: endpoint types, polarity, address, mapping and identities
+Host -> Core: install artifact; activate supported capabilities
+Host -> Input: sample mapped endpoints
+Input --> Host: normalized typed input snapshot
+Host -> Host: latch snapshot; assign scan ID and logical time
+Host -> Core: complete scan frame
+alt frame rejected or runtime evaluation error
+  Core --> Host: error (no successful scan result)
+  Host -> Host: halt adapter; running=false; fault recorded
+  Host -> Output: attempt OFF mask (firmware error path)
+  Output --> Host: application result; physical state requires evidence
+else successful scan (possibly with constraint faults)
+  Core -> Core: commit program state and requested/safe trace
+  Core --> Host: safe intent + scan identity + faults
+  Host -> Output: map safe logical intent through installation/polarity
+  Output -> Load: attempt electrical output write
+  alt write acknowledged
+    Output --> Host: applied mask = attempted mask
+  else write failed
+    Output --> Host: I/O error
+    Host -> Host: cached applied mask = unknown; cached latch = unknown
+  end
+  opt driver available and readback due
+    Output -> Load: read output latch/register
+    Load --> Output: observed register value
+    Output --> Host: readback evidence with observation scope
+  end
+  Host -> Host: record_relay(available, applied, latch)
+  opt write/readback failure, latch mismatch or unavailable driver
+    Host -> Evidence: publish attempted safe mask + separate applied/latch evidence
+    Host -> Host: halt: running=false; fault; clear adapter live outputs
+    Host -> Evidence: publish halted/fault observation
+    note over Host,Output
+      A following firmware loop requests OFF through the same driver.
+      OFF is not assumed applied until acknowledged.
+      Resume is rejected while faulted; redeployment is required.
+    end note
+  end
+  opt independent physical observation available
+    Observer -> Load: observe contact, terminal or delivered effect
+    Observer --> Host: confirmation evidence for stated scope
+  end
+  note over Host,Core
+    Core state already committed before output application.
+    Driver failure does not roll back that scan through ScanDriver.
+    Device halt policy is implemented; committed core state is retained.
+  end note
+end
+@enduml

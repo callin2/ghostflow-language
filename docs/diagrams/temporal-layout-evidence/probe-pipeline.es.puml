@@ -1,0 +1,18 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName Helvetica
+skinparam defaultFontSize 13
+skinparam ArrowColor #526d76
+
+start
+:Copiar crates/ghostflow-core/src/*.rs
+a build/temporal-layout-probe;
+:Agregar una exportación size_of por tipo
+(solo en la copia; árbol del producto intacto);
+:rustc → cdylib wasm32 probe.wasm;
+:Node instancia la sonda y llama a las exportaciones;
+:Escribir build/temporal-wasm32-layout.json;
+:El oráculo independiente de fixtures JS
+combina los anchos con la geometría declarada;
+stop
+@enduml

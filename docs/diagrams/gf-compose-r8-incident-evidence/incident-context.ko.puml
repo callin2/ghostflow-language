@@ -1,0 +1,19 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName Helvetica
+skinparam defaultFontSize 13
+skinparam rectangleRoundCorner 8
+title 하나의 incident 문맥, 세 가지 view (제안)
+
+rectangle "Incident 문맥 tuple\n\ndefinition / module\n인스턴스\nsettings revision + 유효 event 위치\n설치 / 바인딩\nrun / scan\n논리 시간\n(+ 소스 / 제약 연결)" as T
+
+rectangle "농부 view\n차단 원인 하나 + 다음 행동" as F
+rectangle "소프트웨어 view\n요청 / 안전 출력,\n소스와 제약" as S
+rectangle "하드웨어 view\n바인딩, 드라이버 event,\nboot / event 이력" as H
+rectangle "stale 또는 unavailable로 거부:\n이전 run, 잘못된 schema / module /\nsource, 잘못된 바인딩" as R
+
+T --> F
+T --> S
+T --> H
+T ..> R : identity 불일치
+@enduml

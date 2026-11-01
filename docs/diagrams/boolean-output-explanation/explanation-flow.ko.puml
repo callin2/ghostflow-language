@@ -1,0 +1,28 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName Helvetica
+skinparam ArrowColor #555555
+skinparam rectangle {
+  BackgroundColor White
+  BorderColor #555555
+}
+title 컴파일에서 join된 설명까지
+
+rectangle "컴파일러\n(typed IR + byte writer)" as C
+rectangle "GFB 바이트\n(변경 없음)" as B
+rectangle "explanationArtifact\n(sidecar)" as S
+rectangle "VM 스캔\n(instruction witness 활성화)" as V
+rectangle "TickRecord\n(완료된 스캔만)" as T
+rectangle "prepareOutputExplanation\nproducer.emit" as P
+rectangle "proof" as PR
+rectangle "joinOutputExplanation\n(출력 snapshot + 예상 run)" as J
+
+C --> B
+C --> S
+B --> V
+V --> T : 스캔 완료 후\n증거 첨부
+S --> P
+T --> P
+P --> PR
+PR --> J
+@enduml

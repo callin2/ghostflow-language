@@ -1,0 +1,16 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName "Hiragino Sans"
+skinparam defaultFontSize 13
+skinparam componentStyle rectangle
+component "正本の .ghost.md +\n固定されたインポート元ソース" as SRC
+component "API が所有する記録\n(リビジョン、設置\nコンテキスト、デプロイ)" as API
+component "Device が所有するプロファイル、\nドライバ、観測" as DEV
+component "ポータブルな Rust コア" as CORE
+component "フロントエンド" as FE
+SRC --> CORE : 実行可能な振る舞い
+API ..> SRC : リビジョンを識別
+DEV --> CORE : 物理情報
+CORE --> FE : 意味ディスクリプタ、\n記録された結果
+FE ..> SRC : ルールを変える編集 =\nソース変更の候補
+@enduml

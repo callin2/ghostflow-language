@@ -1,0 +1,29 @@
+@startuml
+hide empty description
+skinparam shadowing false
+skinparam defaultFontName Helvetica
+skinparam state {
+  BackgroundColor White
+  BorderColor #555555
+}
+title #74에 매핑했을 때의 Process 생명주기 관찰
+
+state received
+state rejected : 사유 코드 + 설명\n(시작 전 받아들여진 취소 포함)
+state started
+state completed
+state cancelled : 사유 선택\n도메인 취소 증거 필요
+state failed : 사유 코드 + 설명
+
+[*] --> received
+received --> rejected
+received --> started : 선언된 시작 증거
+started --> completed : 선언된 완료 증거
+started --> cancelled
+started --> failed
+rejected --> [*]
+completed --> [*]
+cancelled --> [*]
+failed --> [*]
+note "종결 상태에는 후속 상태가 없습니다.\n#115 순서에서 첫 유효 종결이 이깁니다." as N1
+@enduml

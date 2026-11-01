@@ -1,0 +1,37 @@
+@startuml
+skinparam shadowing false
+skinparam ArrowColor #555555
+hide empty description
+
+[*] --> Idle
+Idle --> Opening : 新たな START、\n閉位置を確認
+Opening --> Settling : 開位置を確認
+Settling --> Watering : 2 秒
+Watering --> PumpStopping : 5 分
+PumpStopping --> Closing : 次のスキャン
+Closing --> Idle : 閉位置を確認
+
+Settling --> FaultPumpStopping : 水源の低水位、\n開位置を確認済み、\n動作が許可
+Watering --> FaultPumpStopping
+PumpStopping --> FaultPumpStopping
+FaultPumpStopping --> FaultClosing : 次のスキャン
+FaultPumpStopping --> Faulted : 動作が禁止
+FaultClosing --> Faulted : 閉 / 10 秒 /\n動作が禁止
+Faulted --> Idle : 新たな RESET、\nリセット可能
+
+state Opening : 開 ON（タイムアウト 10 秒）
+state Watering : ポンプ ON
+state Closing : 閉 ON（タイムアウト 10 秒）
+state FaultPumpStopping : 動作出力すべて OFF、アラーム ON
+state FaultClosing : 閉 ON、アラーム ON
+state Faulted : 動作出力すべて OFF、アラーム ON
+
+note as N
+毎スキャン最初に確認:
+- 故障原因あり（低水位の順序立てた
+  閉止を除く）-> Faulted、原因をラッチ
+- 観測が取得不能 -> 原因がラッチ済みなら
+  Faulted、そうでなければ Idle
+- Idle..Closing での通常の STOP -> Idle（アラームなし）
+end note
+@enduml

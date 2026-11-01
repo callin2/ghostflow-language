@@ -1,0 +1,18 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontSize 13
+hide empty description
+state "Pending 아님" as Consumed
+
+[*] --> Pending : 호스트가 boot event\npending을 보고
+[*] --> Consumed : 호스트가 pending\nevent 없음을 보고
+Pending --> Pending : scan 거부\n(event 유지)
+Pending --> Consumed : 처음으로 성공적으로\ncommit된 scan\n(restart_event = true)
+Consumed --> Consumed : 이후 scan\n(restart_event = false)
+Consumed --> Consumed : 프로그램 교체\n(새 boot event 없음)
+
+note bottom of Pending
+  restart_reason은 run 동안 고정
+  (호스트에 근거가 없으면 Unknown).
+end note
+@enduml

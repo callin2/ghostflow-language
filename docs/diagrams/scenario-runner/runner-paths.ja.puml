@@ -1,0 +1,21 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName "Hiragino Sans"
+skinparam defaultFontSize 13
+skinparam rectangleRoundCorner 8
+rectangle "コンパイル済み GFB\n+ 検証済みソースマップ" as gfb
+rectangle "シナリオ (TOON)\natMs 付きのアクション" as sc
+rectangle "ghostsim" as sim
+rectangle "ネイティブのフレーム付きランナー\n(通常の入力プログラム)\nKeyboardMapper + ScanDriver" as nat
+rectangle "Rust/WASM 制御ホスト\n(センサ、仮想アクチュエータ、\n認証済み区間、Solar)" as wasm
+rectangle "ポータブルな Rust\n評価コア" as core
+rectangle "GhostFlow/scenario-result-v1\n(TOON または JSON)" as res
+gfb --> sim
+sc --> sim
+sim --> nat
+sim --> wasm
+nat --> core
+wasm --> core
+sim --> res
+note bottom of core : 物理デバイスのドライバは開かない
+@enduml

@@ -1,0 +1,17 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontSize 12
+skinparam StateBackgroundColor #F7F9FC
+skinparam StateBorderColor #4A6FA5
+title hold_last 缓存（measured 切片）
+[*] --> Unavailable : 冷重启
+state "Unavailable（不可用）\navailable=false\n结果：NotReady" as Unavailable
+state "Held（保持）\navailable=true, held=true\nage < forAtMost\n结果质量：Held" as Held
+state "Expired（已过期）\navailable=true, held=false\n结果：NotReady" as Expired
+Unavailable --> Held : 新的可接纳样本\n（连同其自身时间戳缓存）
+Held --> Held : 新的可接纳样本替换缓存；\n重复样本不刷新 age；\n故障 / 选择变化保留缓存
+Held --> Expired : age 达到 forAtMost
+Expired --> Held : 新的可接纳样本
+Held --> Unavailable : 缓存所属根的 epoch 被替换\n（即使该根未被选中）
+Expired --> Unavailable : 缓存所属根的\nepoch 被替换
+@enduml

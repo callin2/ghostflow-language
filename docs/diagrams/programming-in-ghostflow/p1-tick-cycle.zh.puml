@@ -1,0 +1,24 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName "PingFang SC"
+skinparam defaultFontSize 13
+skinparam componentStyle rectangle
+left to right direction
+title 一个 tick：运行前要记下什么
+
+rectangle "捕获的输入\n（每个 tick 一组）" as in
+rectangle "前一状态" as prev
+rectangle "表达式\n（let、case、if）" as expr
+rectangle "下一状态" as next
+rectangle "请求意图" as req
+rectangle "安全意图\n（应用安全规则后）" as safe
+rectangle "交给绑定\n和渲染器的输出" as out
+
+in --> expr
+prev --> expr
+expr --> next
+expr --> req
+req --> safe
+safe --> out
+next ..> prev : 成为下一个 tick\n的前一状态
+@enduml

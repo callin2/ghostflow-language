@@ -1,0 +1,24 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName Helvetica
+skinparam defaultFontSize 13
+
+start
+:원래 시나리오 실행;
+if (guard가 성립하고 대상이\n기대값을 위반하는가?) then (아니요)
+  :original-not-applicable,\noriginal-not-failing 또는 incomplete;
+  stop
+else (예)
+endif
+repeat
+  :대상이 아닌 다음 action\n삭제 시도 (순서대로);
+  if (유효, 완료, guard 성립,\n같은 위반?) then (예)
+    :받아들임; 첫 action부터\n다시 시작;
+  else (아니요)
+    :시도 기록;
+  endif
+repeat while (시도하지 않은 삭제와\nmaxAttempts가 남았는가?) is (예)
+-> 아니요;
+:재현된 결과 보고\n(single-deletion-minimal, budget-exhausted\n또는 unresolved-candidates);
+stop
+@enduml

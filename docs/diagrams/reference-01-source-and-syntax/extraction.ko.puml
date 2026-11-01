@@ -1,0 +1,19 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontSize 13
+start
+:정본 .ghost.md 문서 하나;
+:CommonMark로 해석;
+:info string이 정확히 ghost인\n최상위 fenced code block 선택\n(backtick 또는 tilde fence);
+note right
+  실행 코드가 아님: 본문, 표, front matter,
+  indented code, 다른 info string,
+  목록·인용문 안에 중첩되거나
+  더 긴 표시용 fence 안에 적힌 ghost fence,
+  ghost-python, 속성이 붙은 ghost
+end note
+:문서 순서 유지;\n각 본문은 개행으로 끝냄;\n블록 사이에 빈 줄 하나;
+:결과를 root control이 정확히 하나인\n프로그램 하나로 해석;
+:원본 파일·행·열 위치에\n진단 보고;
+stop
+@enduml

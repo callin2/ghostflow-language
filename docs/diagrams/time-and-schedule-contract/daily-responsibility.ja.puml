@@ -1,0 +1,16 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName "Hiragino Sans"
+skinparam defaultFontSize 13
+
+rectangle "RTC／NTP／プラットフォームの\nクロックプロバイダ" as Clock
+rectangle "GhostFlow ランタイム" as Runtime {
+  rectangle "Daily の発生時刻の通過判定、\n受け入れ、取りこぼした発生、\n重複抑止" as Calc
+  rectangle "スケジュール台帳" as Ledger
+}
+database "ホストストレージ" as Store
+
+Clock --> Calc : 評価ごと:\n壁時計＋単調時間のスナップショット、\n壁時計の信頼状態
+Calc --> Ledger : 管理する
+Ledger <--> Store : ランタイム再起動を\nまたいで永続化
+@enduml

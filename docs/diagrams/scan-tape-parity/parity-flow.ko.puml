@@ -1,0 +1,20 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontSize 13
+skinparam rectangleRoundCorner 8
+rectangle "시나리오 소스" as src
+rectangle "컴파일된 모듈\n(GFB1, 한 번만 컴파일)" as mod
+rectangle "정본 테이프\n(순서가 있는 프레임 시도)" as tape
+rectangle "Native: scan_tape CLI\n(TSV 테이프 -> ScanDriver::scan)" as nat
+rectangle "WASM: FramedGhostFlowRuntime\n(공개 framed 어댑터)" as wasm
+rectangle "시도별 결과\n(accepted, outcome, error)" as res
+rectangle "검증(assertion)\n1. 시나리오 기대값\n2. 대상 간 정확한 일치" as cmp
+src --> mod
+mod --> nat
+mod --> wasm
+tape --> nat : TSV로 직렬화
+tape --> wasm : 동일한 배열
+nat --> res : JSON lines
+wasm --> res
+res --> cmp
+@enduml

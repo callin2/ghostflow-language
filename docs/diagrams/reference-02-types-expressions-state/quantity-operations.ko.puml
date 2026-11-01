@@ -1,0 +1,25 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontSize 13
+skinparam rectangleBorderColor #4A6FA5
+skinparam rectangleBackgroundColor #F7F9FC
+title v1의 물리량 간 연산 결과 (목록에 없는 물리량 간 연산은 오류)
+
+rectangle "Temperature\n(절대 온도, K)" as T
+rectangle "TemperatureDelta\n(ΔK)" as TD
+rectangle "FlowRate" as FR
+rectangle "Volume" as V
+rectangle "Power" as P
+rectangle "Energy" as E
+rectangle "Voltage" as U
+rectangle "ElectricalCurrent" as I
+
+T --> TD : Temperature - Temperature
+TD --> T : Temperature ± TemperatureDelta
+FR --> V : FlowRate * Duration
+V --> FR : Volume / Duration
+P --> E : Power * Duration
+E --> P : Energy / Duration
+U --> P : Voltage * ElectricalCurrent
+I --> P
+@enduml

@@ -1,0 +1,16 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontSize 12
+start
+:输入快照 + 旧状态;
+if (有输入缺失？) then (是)
+  :拒绝输入\n（如果缺失有意义，宿主需发送\n显式的 fault/status 输入）;
+  stop
+endif
+:对所有 next 表达式求值\n（读取旧状态 + 输入）\n-> 一个候选状态;
+:对意图求值\n（不带撇号的状态 = 旧状态；\nnext.NAME = 候选状态）;
+:安全约束\n(requires, mutex)\n请求意图 -> 安全意图;
+:求值无错误：\n一起提交\n候选状态 + 请求/安全意图;
+:日志：输入、旧/新状态、\n两种意图、策略、故障;
+stop
+@enduml

@@ -1,0 +1,26 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontSize 13
+skinparam defaultFontName "Hiragino Sans"
+skinparam componentStyle rectangle
+title チュートリアルランナー：1 つの例、2 つの VM
+
+file "NN-name.ghost.md" as src
+component "compileSource\n（実際のコンパイラ）" as cc
+file "build/tutorial/NN-name.gfb\n+ .manifest.json, .map.json" as gfb
+component "WASM ランタイム\n（Node ホスト）" as wasm
+file ".inputs.csv\n（記録された VM 入力スナップショット）" as csv
+component "ネイティブランナー\n（target/debug/examples/run）" as nat
+file ".trace.json" as trace
+node "検証：VM トレースが一致" as cmp
+
+src --> cc
+cc --> gfb
+gfb --> wasm
+wasm --> csv : 正確な入力を記録
+gfb --> nat
+csv --> nat
+wasm --> trace
+wasm --> cmp : VM トレース
+nat --> cmp : VM トレース（JSON）
+@enduml

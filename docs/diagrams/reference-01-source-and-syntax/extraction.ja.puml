@@ -1,0 +1,20 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName "Hiragino Sans"
+skinparam defaultFontSize 13
+start
+:正準的な .ghost.md 文書 1 つ;
+:CommonMark として解析;
+:情報文字列がちょうど ghost である\nトップレベルのフェンス付きコードブロックを選択\n（バッククォートまたはチルダのフェンス）;
+note right
+  実行不可：本文、表、フロントマター、
+  インデントされたコード、他の情報文字列、
+  リスト／引用の中に入れ子になった、または
+  より長い表示用フェンスの中に書かれた ghost フェンス、
+  ghost-python、属性付きの ghost
+end note
+:文書の順序を保持;\n各本文を改行で終える;\nブロック間に空行を 1 行入れる;
+:結果を、ルート control がちょうど 1 つの\nプログラムとして解析;
+:元のファイル・行・列で\n診断を報告;
+stop
+@enduml

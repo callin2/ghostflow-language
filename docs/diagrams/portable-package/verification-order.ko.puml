@@ -1,0 +1,21 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName Helvetica
+skinparam defaultFontSize 13
+
+start
+:패키지 바이트 + trustedKeys + revokedKeyIds\n+ 호스트 입력 + verifyBytecode 콜백;
+:1. 정확한 package/payload schema, 지원 버전;
+:2. 정규 payload 다이제스트,\n활성 신뢰 서명 1개 이상;
+:3. 컴파일러 revision, 런타임 의미,\n런타임 ABI, 바인딩 revision;
+:4. manifest 형식, 필수 capability\n대 호스트 입력;
+:5. 소스 / GFB / manifest / source map\n다이제스트와 교차 링크;
+:6. source-trace 메타데이터 대\n소스 및 GFB identity;
+:7. 호스트 verifyBytecode(GFB, 동결된 manifest,\nsource map, identity);
+if (모든 검사를 통과하고\n콜백이 정확히 true를 반환했는가?) then (예)
+  :검증된 결과\n(접근할 때마다 bytecode.copy());
+else (아니요)
+  :안정된 code를 가진 PortablePackageError\n(bytecode 노출 없음, fallback 없음);
+endif
+stop
+@enduml

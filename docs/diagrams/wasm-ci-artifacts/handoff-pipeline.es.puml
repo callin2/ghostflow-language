@@ -1,0 +1,24 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontSize 13
+title Entrega de WASM verificado: productor y consumidor
+
+|Workflow de CI|
+start
+:Checkout del head del PR o del source_sha completo;
+:Verificar commit, árbol y hash de Cargo.lock;
+:Configuración (red permitida):
+Node 22, Rust stable, npm ci, cargo fetch --locked;
+:CARGO_NET_OFFLINE=true npm test
+(la única compilación de WASM);
+:tools/package-verified-wasm.mjs
+-> wasm + verification.json + manifest.json;
+:Cargar el artefacto (retención de 14 días);
+|Consumidor|
+:Descargar los tres archivos;
+:Comprobar formatos, pins, árbol y hash del lockfile;
+:Recalcular hashes y número de bytes;
+:Comprobar la ejecución, el commit y el workflow esperados
+(el zip no puede autorizarse a sí mismo);
+stop
+@enduml

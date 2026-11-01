@@ -1,0 +1,25 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName "Apple SD Gothic Neo"
+skinparam defaultFontSize 13
+title E37: 계획 시각 이후 경과 분 (계획 = 만조 - 30분, 4분 늦게 admission)
+
+concise "admission" as S
+concise "pump (출력 의도)" as P
+
+@0
+S is "열림: [계획, 계획+10분)"
+P is "false"
+
+@4
+P is "admission부터 5분 운전"
+
+@9
+P is "false"
+
+@10
+S is "닫힘 (끝 제외)"
+
+S@0 <-> @10 : within(10min)
+P@4 <-> @9 : run(5min)
+@enduml

@@ -1,0 +1,25 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName Helvetica
+title 一次灌溉判定（计算 watering'）
+
+start
+if (请求 STOP 或 STOP 故障？) then (是)
+  :watering' = false;
+elseif (低水位或 low_water 故障？) then (是)
+  :watering' = false;
+elseif (已在浇水？) then (是)
+  :watering' = true;
+elseif (START 正常且为开\n并且重启未被阻止？) then (是)
+  :watering' = true;
+else (否)
+  :watering' = false;
+endif
+:pump, valve <- watering';
+stop
+note right
+  任一输入故障时 restart_blocked' 变为 true。
+  只有当所有输入均正常且 START 为关时
+  才会清除。
+end note
+@enduml
