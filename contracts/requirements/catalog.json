@@ -10,10 +10,10 @@
         "path": "docs/LANGUAGE-SURFACE.md",
         "heading": "상태, 센서, 출력",
         "lines": [
-          40,
-          44
+          72,
+          72
         ],
-        "sha256": "17714fd8cb34cc18de7d2dd24e4f7635bc3f6569abc19d71d5a85afb6869ea63"
+        "sha256": "73b574582782aec74f68e8d78c54814b6bacfbe41de30c9fc326d82faeed0b2d"
       },
       "layer": "language",
       "targets": [
@@ -80,10 +80,10 @@
         "path": "docs/LANGUAGE.md",
         "heading": "7. Tick과 상태 읽기",
         "lines": [
-          295,
-          297
+          369,
+          370
         ],
-        "sha256": "e88ec213e359cf38d7a829195b390a65eb38953e65a7d8220c7fc3c4c95effea"
+        "sha256": "8fe85f6a83044021566b4c3b2e4e97525622be2ec4b5d92c1a4bcc72e87b6a14"
       },
       "layer": "runtime",
       "targets": [
@@ -104,10 +104,10 @@
         "path": "docs/LANGUAGE.md",
         "heading": "7. Tick과 상태 읽기",
         "lines": [
-          295,
-          301
+          370,
+          374
         ],
-        "sha256": "fdd4a472342511f6538653b6f46b4b9b3255e6e62b0ee58393f381775d00ccdd"
+        "sha256": "97f154f6f62422b5aac64da2adf09bf0540ce8d2b218bc19833fcc69e6f18141"
       },
       "layer": "runtime",
       "targets": [
@@ -126,10 +126,10 @@
         "path": "docs/LANGUAGE.md",
         "heading": "7. Tick과 상태 읽기",
         "lines": [
-          295,
-          302
+          371,
+          385
         ],
-        "sha256": "94ceafc89d0fb8085a55d6549b698704f76074a077f77bdc974c9bdb91721df6"
+        "sha256": "4b42dc1b67c41295af79471b2cf1bf9d011321b9955d1f1c6f8a4584d1ac5b2f"
       },
       "layer": "language",
       "targets": [
@@ -150,10 +150,10 @@
         "path": "docs/LANGUAGE.md",
         "heading": "8. 출력 제약",
         "lines": [
-          343,
-          353
+          440,
+          445
         ],
-        "sha256": "4b3f39ed24b758a15e1a5c9252908de38d364eb82c25819d8942899cb795d252"
+        "sha256": "e12fd86542d77aebafb8f8f576e9384bf5c485f64a66cee13468e0bb61c4706a"
       },
       "layer": "runtime",
       "targets": [
@@ -173,10 +173,10 @@
         "path": "docs/LANGUAGE.md",
         "heading": "7. Tick과 상태 읽기",
         "lines": [
-          295,
-          297
+          395,
+          396
         ],
-        "sha256": "e88ec213e359cf38d7a829195b390a65eb38953e65a7d8220c7fc3c4c95effea"
+        "sha256": "fc83efe90849f387f6b3834153b2a4099c4e58ba6cc57dd6178d0b792daea5c5"
       },
       "layer": "runtime",
       "targets": [
@@ -308,10 +308,10 @@
         "path": "docs/LANGUAGE-SURFACE.md",
         "heading": "장치 적응과 시간",
         "lines": [
-          80,
-          84
+          101,
+          108
         ],
-        "sha256": "c9cb564bf63f3171e1d76cd4d36b591560d461c7fb5dbd498e5c2e58d390707e"
+        "sha256": "2fc13fa10929dfd9088a8286f8e274c114e7e772ae970fcd3725ac52de54dc50"
       },
       "layer": "runtime",
       "targets": [
@@ -329,10 +329,10 @@
         "path": "docs/LANGUAGE-SURFACE.md",
         "heading": "장치 적응과 시간",
         "lines": [
-          80,
-          83
+          110,
+          114
         ],
-        "sha256": "c9cb564bf63f3171e1d76cd4d36b591560d461c7fb5dbd498e5c2e58d390707e"
+        "sha256": "14e93a3bc58237bf2631396ab270d2fe0d93c3e2ec7df37df0edfbb5a0905b3f"
       },
       "layer": "runtime",
       "targets": [
@@ -350,10 +350,10 @@
         "path": "docs/LANGUAGE-SURFACE.md",
         "heading": "Literate는 같은 언어의 문서형 입력",
         "lines": [
-          228,
-          234
+          231,
+          238
         ],
-        "sha256": "2605293614f98ec415c192944106ea2a31996f367d616690b2c746eb7c2626b9"
+        "sha256": "70d1536410fc90781aed8d6bead35a73c24f509c908e6559ec46a750b920063b"
       },
       "layer": "language",
       "targets": [
@@ -665,10 +665,10 @@
         "path": "docs/LANGUAGE-SURFACE.md",
         "heading": "상태, 센서, 출력",
         "lines": [
-          40,
-          44
+          70,
+          70
         ],
-        "sha256": "17714fd8cb34cc18de7d2dd24e4f7635bc3f6569abc19d71d5a85afb6869ea63"
+        "sha256": "abe191e4457eac9ed2c32e3512c7845d9554f8143fc04dd51398651741e0a2dd"
       },
       "layer": "runtime",
       "targets": [
@@ -685,10 +685,10 @@
         "path": "docs/LANGUAGE-SURFACE.md",
         "heading": "상태, 센서, 출력",
         "lines": [
-          40,
-          44
+          74,
+          79
         ],
-        "sha256": "17714fd8cb34cc18de7d2dd24e4f7635bc3f6569abc19d71d5a85afb6869ea63"
+        "sha256": "6fe34cb5ab26aaa19345958af9f5f58c9fdfe12058d0b4e0e40fd462e4b1b9aa"
       },
       "layer": "runtime",
       "targets": [
@@ -706,10 +706,10 @@
         "path": "docs/LANGUAGE-SURFACE.md",
         "heading": "상태, 센서, 출력",
         "lines": [
-          40,
-          41
+          89,
+          89
         ],
-        "sha256": "bba5cba2c885f230bae28cf1ee6b2027f5203ed9cd1fd5d3a2d22b839635cd70"
+        "sha256": "683b1397a2e8d2cff8df6ed1bda2a26354431acf82b99e438caf5afa8832facb"
       },
       "layer": "runtime",
       "targets": [
@@ -727,10 +727,10 @@
         "path": "docs/LANGUAGE-SURFACE.md",
         "heading": "장치 적응과 시간",
         "lines": [
-          80,
-          83
+          93,
+          97
         ],
-        "sha256": "c9cb564bf63f3171e1d76cd4d36b591560d461c7fb5dbd498e5c2e58d390707e"
+        "sha256": "30c04143aedf35d757f530ca3b829b99418877575d128a85433af43533e9be89"
       },
       "layer": "design-only",
       "targets": [
@@ -747,10 +747,10 @@
         "path": "docs/LANGUAGE-SURFACE.md",
         "heading": "장치 적응과 시간",
         "lines": [
-          80,
-          83
+          99,
+          99
         ],
-        "sha256": "c9cb564bf63f3171e1d76cd4d36b591560d461c7fb5dbd498e5c2e58d390707e"
+        "sha256": "4d37ca0211baf2edd9fb4fdbd305f49d75c54fb83d7ce715c441fa881775c90e"
       },
       "layer": "runtime",
       "targets": [

@@ -232,7 +232,7 @@ Host --> Author: 一个 TOON/JSON 结果 + 哈希 + 全部扫描行
 @enduml
 ```
 
-![离线定时器序列](assets/llm-toolchain-timer.svg)
+![离线定时器序列](diagrams/llm-toolchain-architecture/llm-toolchain-timer.svg)
 
 **此序列可能如何失败。**
 
@@ -297,7 +297,7 @@ Host --> Human: TOON 结果（无控制台展示信封）
 @enduml
 ```
 
-![管道控制台泵序列](assets/llm-toolchain-console.svg)
+![管道控制台泵序列](diagrams/llm-toolchain-architecture/llm-toolchain-console.svg)
 
 **录制保留什么。** 录制保留逻辑输入/按键动作和虚拟扫描时间。profile 摘要和 DI/RO
 绑定名册被添加到最终的控制台结果中，而不是场景文件中。因此：
@@ -388,7 +388,7 @@ end
 @enduml
 ```
 
-![物理扫描边界序列](assets/llm-toolchain-device.svg)
+![物理扫描边界序列](diagrams/llm-toolchain-architecture/llm-toolchain-device.svg)
 
 **如何阅读此图。** 它把所有权契约与当前 `farm-device` 固件的故障路径结合在一起。它不是 `ghostsim`
 建立的连接，也不是硬件验证。

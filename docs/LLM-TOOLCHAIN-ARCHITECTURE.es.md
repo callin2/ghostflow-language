@@ -289,7 +289,7 @@ Host --> Author: un resultado TOON/JSON + hashes + todas las filas de escaneo
 @enduml
 ```
 
-![Secuencia del temporizador fuera de línea](assets/llm-toolchain-timer.svg)
+![Secuencia del temporizador fuera de línea](diagrams/llm-toolchain-architecture/llm-toolchain-timer.svg)
 
 **Cómo puede fallar esta secuencia.**
 
@@ -359,7 +359,7 @@ Host --> Human: resultado TOON (sin envoltorio de presentación de consola)
 @enduml
 ```
 
-![Secuencia de la bomba en consola por tubería](assets/llm-toolchain-console.svg)
+![Secuencia de la bomba en consola por tubería](diagrams/llm-toolchain-architecture/llm-toolchain-console.svg)
 
 **Qué conserva una grabación.** Una grabación conserva las acciones lógicas de
 entrada/tecla y los tiempos virtuales de escaneo. El digest del perfil y la
@@ -460,7 +460,7 @@ end
 @enduml
 ```
 
-![Secuencia del límite del escaneo físico](assets/llm-toolchain-device.svg)
+![Secuencia del límite del escaneo físico](diagrams/llm-toolchain-architecture/llm-toolchain-device.svg)
 
 **Cómo leer este diagrama.** Combina el contrato de titularidad con la ruta de
 fallo actual del firmware `farm-device`. No es una conexión que haga

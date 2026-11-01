@@ -1870,10 +1870,16 @@ For first and last recorded Git commit dates, run `node <skill>/scripts/docs-ind
 | [docs/diagrams/llm-toolchain-architecture/evidence-stages.zh.svg](diagrams/llm-toolchain-architecture/evidence-stages.zh.svg) | evidence-stages.zh.svg | svg |
 | [docs/diagrams/llm-toolchain-architecture/llm-toolchain-console.ja.puml](diagrams/llm-toolchain-architecture/llm-toolchain-console.ja.puml) | llm-toolchain-console.ja.puml | puml |
 | [docs/diagrams/llm-toolchain-architecture/llm-toolchain-console.ja.svg](diagrams/llm-toolchain-architecture/llm-toolchain-console.ja.svg) | llm-toolchain-console.ja.svg | svg |
+| [docs/diagrams/llm-toolchain-architecture/llm-toolchain-console.puml](diagrams/llm-toolchain-architecture/llm-toolchain-console.puml) | llm-toolchain-console.puml | puml |
+| [docs/diagrams/llm-toolchain-architecture/llm-toolchain-console.svg](diagrams/llm-toolchain-architecture/llm-toolchain-console.svg) | llm-toolchain-console.svg | svg |
 | [docs/diagrams/llm-toolchain-architecture/llm-toolchain-device.ja.puml](diagrams/llm-toolchain-architecture/llm-toolchain-device.ja.puml) | llm-toolchain-device.ja.puml | puml |
 | [docs/diagrams/llm-toolchain-architecture/llm-toolchain-device.ja.svg](diagrams/llm-toolchain-architecture/llm-toolchain-device.ja.svg) | llm-toolchain-device.ja.svg | svg |
+| [docs/diagrams/llm-toolchain-architecture/llm-toolchain-device.puml](diagrams/llm-toolchain-architecture/llm-toolchain-device.puml) | llm-toolchain-device.puml | puml |
+| [docs/diagrams/llm-toolchain-architecture/llm-toolchain-device.svg](diagrams/llm-toolchain-architecture/llm-toolchain-device.svg) | llm-toolchain-device.svg | svg |
 | [docs/diagrams/llm-toolchain-architecture/llm-toolchain-timer.ja.puml](diagrams/llm-toolchain-architecture/llm-toolchain-timer.ja.puml) | llm-toolchain-timer.ja.puml | puml |
 | [docs/diagrams/llm-toolchain-architecture/llm-toolchain-timer.ja.svg](diagrams/llm-toolchain-architecture/llm-toolchain-timer.ja.svg) | llm-toolchain-timer.ja.svg | svg |
+| [docs/diagrams/llm-toolchain-architecture/llm-toolchain-timer.puml](diagrams/llm-toolchain-architecture/llm-toolchain-timer.puml) | llm-toolchain-timer.puml | puml |
+| [docs/diagrams/llm-toolchain-architecture/llm-toolchain-timer.svg](diagrams/llm-toolchain-architecture/llm-toolchain-timer.svg) | llm-toolchain-timer.svg | svg |
 
 ## docs/diagrams/observation-event-history/
 
@@ -3468,4 +3474,4 @@ For first and last recorded Git commit dates, run `node <skill>/scripts/docs-ind
 | [docs/research/GF-COMPOSE-R9-ACCEPTANCE.md](research/GF-COMPOSE-R9-ACCEPTANCE.md) | GF-COMPOSE R9: acceptance and implementation handoff | md |
 | [docs/research/GF-COMPOSE-R9-ACCEPTANCE.zh.md](research/GF-COMPOSE-R9-ACCEPTANCE.zh.md) | GF-COMPOSE R9：验收与实现交接 | md |
 
-2724 documents.
+2730 documents.

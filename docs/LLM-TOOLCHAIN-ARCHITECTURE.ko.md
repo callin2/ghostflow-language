@@ -260,7 +260,7 @@ Host --> Author: TOON/JSON 결과 하나 + 해시 + 모든 스캔 행
 @enduml
 ```
 
-![오프라인 타이머 순서](assets/llm-toolchain-timer.svg)
+![오프라인 타이머 순서](diagrams/llm-toolchain-architecture/llm-toolchain-timer.svg)
 
 **이 순서가 실패하는 방식.**
 
@@ -329,7 +329,7 @@ Host --> Human: TOON 결과 (콘솔 표시 봉투 없음)
 @enduml
 ```
 
-![파이프 콘솔 펌프 순서](assets/llm-toolchain-console.svg)
+![파이프 콘솔 펌프 순서](diagrams/llm-toolchain-architecture/llm-toolchain-console.svg)
 
 **기록에 남는 것.** 기록에는 논리 입력/키 동작과 가상 스캔 시간이 남습니다. 프로필
 다이제스트와 DI/RO 바인딩 목록은 시나리오 파일이 아니라 최종 콘솔 결과에
@@ -424,7 +424,7 @@ end
 @enduml
 ```
 
-![물리 스캔 경계 순서](assets/llm-toolchain-device.svg)
+![물리 스캔 경계 순서](diagrams/llm-toolchain-architecture/llm-toolchain-device.svg)
 
 **이 다이어그램을 읽는 법.** 이 다이어그램은 소유권 계약과 현재 `farm-device`
 펌웨어의 실패 경로를 함께 보여 줍니다. `ghostsim`이 만드는 연결이 아니며,

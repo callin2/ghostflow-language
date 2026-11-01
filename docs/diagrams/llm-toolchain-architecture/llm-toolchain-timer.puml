@@ -1,0 +1,41 @@
+@startuml
+title Offline timer: complete document to explicit virtual scans
+actor Author
+participant "ghostc (Node)" as Compiler
+database "GFB + manifest + source map" as Files
+participant "ghostsim (Node)" as Host
+participant "scenario_scan (Rust)" as Runner
+participant "ScanDriver" as Scan
+participant "Rust Runtime" as Core
+Author -> Compiler: check complete .ghost.md
+Compiler --> Author: diagnostics + source identity
+Author -> Compiler: compile same complete .ghost.md
+Compiler -> Files: GFB + manifest + map containing full document
+Author -> Host: artifact path + TOON scenario
+Host -> Files: read and verify artifact/source identities
+Host -> Host: strict decode; validate all actions and typed inputs
+Host -> Runner: spawn fresh process: GFB path + private JSON actions
+Runner -> Core: load, install, add virtual actuator capabilities, activate
+Runner -> Scan: transfer runtime ownership; next scan ID = 0
+Runner -> Runner: initial start=false, stop=false
+Runner -> Runner: input start=true (held input only)
+note over Runner,Core: Input mutation alone does not evaluate or advance time.
+loop atMs = 0, 1999, 2000; scan IDs = 0, 1, 2
+  Runner -> Scan: complete input snapshot + scan ID + atMs
+  Scan -> Scan: validate types, sequence, nondecreasing time
+  Scan -> Core: tick_at(atMs)
+  Core -> Core: previous state -> next state -> requested -> safe
+  Core -> Core: commit state and trace
+  Core --> Scan: inputs, stateBefore/After, requested/safe, faults
+  Scan -> Scan: advance scan sequence and logical clock
+  Scan --> Runner: ScanOutcome
+  Runner --> Host: one JSON trace row on stdout
+end
+note over Scan,Core
+  0 ms: Idle -> Running; pump ON/ON
+  1999 ms: Running -> Running; pump ON/ON
+  2000 ms: Running -> Done; pump OFF/OFF
+  requested/safe are virtual intents, not applied output.
+end note
+Host --> Author: one TOON/JSON result + hashes + all scan rows
+@enduml

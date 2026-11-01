@@ -2143,31 +2143,31 @@
       "files": {
         "en": {
           "path": "docs/LLM-TOOLCHAIN-ARCHITECTURE.md",
-          "sha256": "5f6e52f9038e12378e46eeb2c511e091912ccf74b49348fee7f8903cf173f3f4"
+          "sha256": "8f24a945e81272dd8f4fab2f06aa07e05b0cf7c0993c116ab993c21c419b911a"
         },
         "ko": {
           "path": "docs/LLM-TOOLCHAIN-ARCHITECTURE.ko.md",
-          "sha256": "8b73db055940fd167f5d5290bee4273648a266ec4faa7848aabc5bc729e52099",
+          "sha256": "e16a06d192e156a74630500483e1f34038fb41f0862bd58d4246088ba51ad168",
           "from": "en",
-          "sourceSha256": "5f6e52f9038e12378e46eeb2c511e091912ccf74b49348fee7f8903cf173f3f4"
+          "sourceSha256": "8f24a945e81272dd8f4fab2f06aa07e05b0cf7c0993c116ab993c21c419b911a"
         },
         "zh": {
           "path": "docs/LLM-TOOLCHAIN-ARCHITECTURE.zh.md",
-          "sha256": "27191761d635f8e0b12061efa544d5e1778750a9045213c0b97903bd1e33a649",
+          "sha256": "d46104885053fecb063dfa5f1c3c7710ef0266cbe2f11ecc8f51586dc31e2624",
           "from": "en",
-          "sourceSha256": "5f6e52f9038e12378e46eeb2c511e091912ccf74b49348fee7f8903cf173f3f4"
+          "sourceSha256": "8f24a945e81272dd8f4fab2f06aa07e05b0cf7c0993c116ab993c21c419b911a"
         },
         "es": {
           "path": "docs/LLM-TOOLCHAIN-ARCHITECTURE.es.md",
-          "sha256": "725541226b0c64c5c0aa288cc8e122d9b90ba8fabed9c688d2a996a72d8672bd",
+          "sha256": "c000a800213da3174d0ca083d5fe78afafb9cf39692a5ee08b6b3658014b3a87",
           "from": "en",
-          "sourceSha256": "5f6e52f9038e12378e46eeb2c511e091912ccf74b49348fee7f8903cf173f3f4"
+          "sourceSha256": "8f24a945e81272dd8f4fab2f06aa07e05b0cf7c0993c116ab993c21c419b911a"
         },
         "ja": {
           "path": "docs/LLM-TOOLCHAIN-ARCHITECTURE.ja.md",
           "sha256": "3e3cfc7ede0ef0849e3cadf3ffa4a48a3244fe7aacceb6d71e6a3e7d4b511738",
           "from": "en",
-          "sourceSha256": "5f6e52f9038e12378e46eeb2c511e091912ccf74b49348fee7f8903cf173f3f4"
+          "sourceSha256": "8f24a945e81272dd8f4fab2f06aa07e05b0cf7c0993c116ab993c21c419b911a"
         }
       }
     },
