@@ -1,0 +1,18 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName Helvetica
+participant Host
+participant "VM de Rust\n(ABI de contexto)" as VM
+Host -> VM : gf_activate_context(GFCA1)
+note right of VM : vinculaciones validadas;\ncapacidad terminal 1-4096
+opt solo antes del primer escaneo
+  Host -> VM : gf_restore_context_checkpoint(GFCX3)
+end
+loop en cada escaneo
+  Host -> VM : gf_tick_context(hechos GFSF4/5/6)
+  VM --> Host : resultado y traza (se consolidan solo si hay éxito)
+end
+Host -> VM : gf_context_checkpoint
+VM --> Host : bytes + JSON de ajustes efectivos\n(mediante accesores ptr/len)
+note left of Host : el host es responsable del\nalmacenamiento duradero y del acuse de recibo
+@enduml

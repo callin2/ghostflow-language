@@ -1,0 +1,17 @@
+@startuml
+skinparam defaultFontName "Hiragino Sans"
+skinparam shadowing false
+skinparam ActivityBackgroundColor #F7F9FC
+skinparam ActivityBorderColor #4A6FA5
+title 連続的なPercentリソースポリシー（例P）
+start
+:すべての要求と上限を、1つの\n入力スナップショット + 前状態で評価;
+if (要求または上限のいずれかが故障？) then (はい)
+  #FFF4D6:候補 = 作成者が書いた `safe`（0%）\n（`on_unknown = safe`、conditionsKnown = false）;
+else (いいえ)
+  :候補 = 要求の `select`（max）\n温度 70%、湿度 40% -> 70%;
+endif
+:既知の上限の最小値でクランプ\n（風 20%）;
+:vent_target の最終的な安全意図\n故障なし：70% -> 20%、故障あり：0%;
+stop
+@enduml

@@ -1,0 +1,17 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName Helvetica
+skinparam defaultFontSize 13
+hide empty description
+
+state "계획됨\n(안정적인 발생 ID)" as Planned
+state "admit됨\n(한 스캔 동안 .due true)" as Admitted
+state "놓침\n(이유는 trace에 보존)" as Missed
+
+[*] --> Planned
+Planned --> Planned : admission 전 provider\n보정이 계획 시각을 옮김
+Planned --> Admitted : Pulse crossing / Window /\nRun 늦은 시작 구간 안에서\n모든 조건이 true
+Planned --> Missed : ConditionsFalseAtPulse\nObservationGap\nLateStartExpired\nCorrectionPastHighWater\nEventWithdrawn
+Admitted --> [*] : 최대 한 번,\n재무장 없음, 중복 없음
+Missed --> [*] : queue되거나\nreplay되지 않음
+@enduml

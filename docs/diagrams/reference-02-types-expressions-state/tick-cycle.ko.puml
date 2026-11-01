@@ -1,0 +1,28 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontSize 13
+skinparam ActivityBackgroundColor #F7F9FC
+skinparam ActivityBorderColor #4A6FA5
+title tick 하나: snapshot을 읽고, 후보를 계산하고, 함께 확정
+
+start
+:입력 snapshot\n+ 이전 상태 읽기;
+:모든 다음 상태 계산\n(모두 이전 값을 읽음);
+:완전한 후보 상태 구성;
+:요청 출력 의도 계산\n(<- 식은 state'를 읽을 수 있음);
+:출력 제약 적용\n-> 안전 의도;
+if (runtime fault가 있는가?\n(overflow, percent-out-of-range 등)) then (예)
+  :tick 거부;
+  note right
+    아무것도 확정하지 않음:
+    후보 상태 없음,
+    의도 없음,
+    성공 journal 항목 없음
+  end note
+  stop
+else (아니요)
+  :상태와 논리 결과를\n함께 확정;
+  :확정된 상태가 다음 tick의\n"이전 상태"가 됨;
+  stop
+endif
+@enduml

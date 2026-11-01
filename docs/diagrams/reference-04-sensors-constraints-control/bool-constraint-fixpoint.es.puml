@@ -1,0 +1,17 @@
+@startuml
+skinparam defaultFontName Helvetica
+skinparam shadowing false
+skinparam ActivityBackgroundColor #F7F9FC
+skinparam ActivityBorderColor #4A6FA5
+title Evaluación de las restricciones de salida Bool
+start
+:Instantánea candidata = salidas solicitadas;
+repeat
+  :Evaluar cada `require` / `mutex`\nsobre la misma instantánea;
+  :Reunir los objetivos bloqueados;
+  :Poner a false los objetivos bloqueados\n(nunca false -> true);
+repeat while (¿Cambió la instantánea?) is (sí)
+->no;
+:Intención segura\n(independiente del orden de declaración);
+stop
+@enduml

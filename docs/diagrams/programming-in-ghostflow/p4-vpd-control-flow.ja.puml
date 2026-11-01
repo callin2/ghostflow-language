@@ -1,0 +1,26 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName "Hiragino Sans"
+skinparam defaultFontSize 13
+skinparam componentStyle rectangle
+title E19–E21：光で制限される空気 VPD 要求
+
+rectangle "air: Temperature" as air
+rectangle "humidity: RelativeHumidity" as rh
+rectangle "light: PPFD" as light
+component "climate = air_vpd(t, rh)\n（どちらかの入力が故障なら fault）" as climate
+component "state demand\nON / OFF / 不感帯では保持\n（fault -> false）" as demand
+component "daylight = ppfd >= gate\n（fault -> false）" as day
+rectangle "air_vpd_value\n（故障時は 0：表示用の仮値）" as vpd
+rectangle "vpd_valid" as valid
+rectangle "*_demand = daylight && demand'" as out
+
+air --> climate
+rh --> climate
+climate --> demand
+climate --> vpd
+climate --> valid
+light --> day
+demand --> out
+day --> out
+@enduml

@@ -1,0 +1,28 @@
+@startuml
+hide empty description
+skinparam shadowing false
+skinparam defaultFontSize 13
+skinparam state {
+  BackgroundColor #F8F8F8
+  BorderColor #555555
+}
+
+state "Idle\n모두 꺼짐" as Idle
+state "Open1\nvalve1" as Open1
+state "Water1\nvalve1 + pump" as Water1
+state "Stop1\nvalve1" as Stop1
+state "Switch\n모두 꺼짐" as Switch
+state "Open2\nvalve2" as Open2
+state "Water2\nvalve2 + pump" as Water2
+state "Stop2\nvalve2" as Stop2
+
+[*] --> Idle
+Idle --> Open1 : starts.due
+Open1 --> Water1 : age >= valve_delay (2s)
+Water1 --> Stop1 : age >= water1_time (5min)
+Stop1 --> Switch : age >= pump_stop_delay (2s)
+Switch --> Open2 : age >= switch_delay (2s)
+Open2 --> Water2 : age >= valve_delay (2s)
+Water2 --> Stop2 : age >= water2_time (5min)
+Stop2 --> Idle : age >= pump_stop_delay (2s)
+@enduml

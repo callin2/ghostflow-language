@@ -1,0 +1,18 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontSize 13
+left to right direction
+rectangle "requested\n(expresión de control)" as req
+rectangle "safe\n(tras el arbitraje\ny las restricciones)" as safe
+rectangle "resultado lógico\nconsolidado atómicamente\n(runtime)" as commit
+rectangle "applied\n(el renderizador envió\nel comando de bus)" as applied
+rectangle "confirmed\n(evidencia de retroalimentación:\nel contacto/mecanismo se movió)" as conf
+req --> safe
+safe --> commit
+commit --> applied
+applied --> conf
+note bottom of conf
+  Tres hechos distintos:
+  consolidado != applied != confirmed
+end note
+@enduml

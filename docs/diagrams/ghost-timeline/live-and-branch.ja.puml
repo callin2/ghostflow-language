@@ -1,0 +1,19 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName "Hiragino Sans"
+skinparam defaultFontSize 13
+skinparam componentStyle rectangle
+package "ライブタイムライン（元）" {
+  component "ライブのフレーム化コア" as L
+  component "ライブシンク" as S
+  component "AccountingRuntime" as A
+  database "FileLedger" as F
+}
+package "ゴーストブランチ" {
+  component "別のフレーム化コア" as B
+}
+L --> S : 安全なBoolの意図
+A --> F : 永続化／確認応答
+L ..> B : 不変の受理済みプレフィックス\n（再実行して検証）
+note bottom of B : ライブシンク、ストレージ、使用量計上、\nライブランタイムのハンドルなし
+@enduml

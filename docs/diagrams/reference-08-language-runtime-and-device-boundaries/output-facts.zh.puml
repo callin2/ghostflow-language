@@ -1,0 +1,19 @@
+@startuml
+skinparam defaultFontName "PingFang SC"
+skinparam shadowing false
+skinparam defaultFontSize 13
+left to right direction
+rectangle "requested\n（控制表达式）" as req
+rectangle "safe\n（经仲裁\n与约束之后）" as safe
+rectangle "原子提交的\n逻辑结果\n（运行时）" as commit
+rectangle "applied\n（渲染器已发送\n总线命令）" as applied
+rectangle "confirmed\n（反馈证据：\n触点/机构已动作）" as conf
+req --> safe
+safe --> commit
+commit --> applied
+applied --> conf
+note bottom of conf
+  三个不同的事实：
+  commit != applied != confirmed
+end note
+@enduml

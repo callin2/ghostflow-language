@@ -1,0 +1,26 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName Helvetica
+skinparam defaultFontSize 13
+skinparam ArrowColor #526d76
+skinparam rectangle {
+  BackgroundColor #f1f6f5
+  BorderColor #6d858b
+}
+hide stereotype
+
+rectangle "release\n(GhostFlow/integration-release-v1)\ntoolchain, runtimeSemanticsVersion,\nbytecodeFormat, protocolVersion,\nfirmwareSha256" as Release
+rectangle "boardProfile\nboardModel, endpoints" as Profile
+rectangle "installation\nreferencia a boardProfile, bindings\np. ej., pump -> relay.1" as Inst
+rectangle "run\nkind, startedAt, finishedAt,\nartifacts (source/module/manifest)" as Run
+rectangle "run.device\n(identidades observadas o null)" as Device
+rectangle "run.gates\nhost | hardware | physical" as Gates
+
+Release --> Profile : fija {id, revision, sha256}
+Release --> Inst : fija {id, revision, sha256}
+Inst --> Profile : referencia
+Run --> Release : releaseSha256
+Run *-- Device
+Run *-- Gates
+Device ..> Inst : installation debe ser igual a\nrelease.installation
+@enduml

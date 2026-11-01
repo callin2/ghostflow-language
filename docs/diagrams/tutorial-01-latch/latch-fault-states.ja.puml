@@ -1,0 +1,26 @@
+@startuml
+hide empty description
+skinparam shadowing false
+skinparam defaultFontName "Hiragino Sans"
+skinparam defaultFontSize 13
+skinparam state {
+  BackgroundColor #F8F8F8
+  BorderColor #555555
+}
+
+state "停止\nwatering = false\nrestart_blocked = false" as Stopped
+state "運転中\nwatering = true\nrestart_blocked = false" as Running
+state "運転中・再起動ブロック\nwatering = true\nrestart_blocked = true" as RunBlocked
+state "停止・再起動ブロック\nwatering = false\nrestart_blocked = true" as StopBlocked
+
+[*] --> Stopped
+Stopped --> Running : 正常な START が ON、\n正常な STOP が解放
+Stopped --> StopBlocked : いずれかの入力の故障
+Running --> Stopped : 正常な STOP が押下
+Running --> RunBlocked : START の故障、\n正常な STOP が解放
+Running --> StopBlocked : STOP の故障、または START\n故障中に STOP が押下
+RunBlocked --> Running : 両方正常、\nSTART が OFF、STOP が解放
+RunBlocked --> Stopped : 正常な STOP が押下、\n正常な START が OFF
+RunBlocked --> StopBlocked : STOP の故障、または START が\nON か故障中に STOP が押下
+StopBlocked --> Stopped : 両方正常、START が OFF
+@enduml

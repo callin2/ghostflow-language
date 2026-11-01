@@ -1,0 +1,22 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName Helvetica
+skinparam defaultFontSize 13
+title 第一条旅程（提议；农户无需导入或图）
+
+|农户|
+start
+:选择预先准备的行为;
+:查看通俗语言描述的要求;
+:确认农场 / 安装事实;
+:应用;
+if (结果？) then (已接受)
+  :具体的接受结果;
+else (被阻止)
+  :具体的阻止原因\n+ 下一步操作;
+endif
+|工程师 / 安装人员|
+:打开同一事故记录;
+:查看技术证据\n（源、修订版、实例、\n输入、约束、运行、绑定）;
+stop
+@enduml

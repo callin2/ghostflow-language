@@ -1,0 +1,30 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName "Hiragino Sans"
+skinparam ArrowColor #555555
+skinparam ActivityBorderColor #555555
+
+start
+:1. 戦略、プロファイルのリビジョン、
+入力、旧状態を固定;
+:2. let/with とすべての next を計算
+（旧状態 + 同じ入力を読む）;
+:3. 完全な候補状態を構築
+（遷移なし = 旧値を保持）;
+:4. intent/emit を計算
+（state = 旧値、next = 候補）;
+:5. 安全制約を適用
+（requested -> 安全意図）;
+if (tick が失敗?) then (はい)
+  :何も確定しない;
+  :ホストが自身の
+  安全出力ポリシーを適用;
+  stop
+else (いいえ)
+  :6. 状態、出力、記録を
+  まとめて確定;
+  :7. 実ホストのみ: 安全意図を
+  レンダラーに適用;
+  stop
+endif
+@enduml

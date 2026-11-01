@@ -1,0 +1,24 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName "Hiragino Sans"
+skinparam defaultFontSize 13
+skinparam rectangleRoundCorner 8
+rectangle "文芸的ソース\n(.ghost.md)" as src
+rectangle "compileSource" as cs
+rectangle "writeArtifact\n(検証してから書き込み)" as wa
+rectangle "GFB バイト列\n(変更なし)" as gfb
+rectangle "制御マニフェスト\n(変更なし)" as man
+rectangle ".gfb.map.json\nsource-map-v1:\nnodes, lines, bytecodeSha256,\nsourceDocument, traceMetadata" as map
+rectangle "verifyArtifactSourceMap\n-> sourceDocument" as ver
+rectangle "restoreArtifactSourceMap\n-> ソース + トレースのマップ" as res
+src --> cs
+cs --> wa
+wa --> gfb
+wa --> man
+wa --> map
+map --> ver
+gfb --> ver
+map --> res
+gfb --> res
+note bottom of res : 厳格：traceMetadata、モジュールの\nフィンガープリント、ソースバインディングも確認
+@enduml

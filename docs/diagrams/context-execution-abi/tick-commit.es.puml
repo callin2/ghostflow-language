@@ -1,0 +1,22 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName Helvetica
+start
+:El host envía el paquete de hechos\n(reloj, observaciones, calendarios,\nfilas, evento de ajustes);
+:Rust valida el paquete y las vinculaciones;
+if (¿paquete válido?) then (no)
+  :Rechazar el paquete;
+  :No se consume nada\n(eventos de ajustes, ID de ocurrencias);
+  stop
+endif
+:Clonar los motores de contexto;
+:Preparar validación del proveedor, ajustes,\nResults protegidos, predicados de\nprogramación y transiciones;
+:Ejecutar el tick de la VM sobre los valores preparados;
+if (¿tick de la VM exitoso?) then (sí)
+  :Consolidar el contexto preparado y la traza;
+else (no)
+  :Descartar la copia preparada;
+  :No se consume nada;
+endif
+stop
+@enduml

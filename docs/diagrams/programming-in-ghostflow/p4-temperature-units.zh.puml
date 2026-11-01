@@ -1,0 +1,22 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName "PingFang SC"
+skinparam defaultFontSize 13
+skinparam componentStyle rectangle
+title 一个物理阈值，三种源单位
+
+rectangle "E16: 18°C" as c
+rectangle "E17: 64.4°F" as f
+rectangle "E18: 291.15K" as k
+component "字面量精确换算，\n再进行 binary64 舍入" as conv
+rectangle "规范 Temperature\n291.15 K" as canon
+component "hysteresis(air, on_below, ...)" as h
+rectangle "相同的加热器判定" as out
+
+c --> conv
+f --> conv
+k --> conv
+conv --> canon
+canon --> h
+h --> out
+@enduml

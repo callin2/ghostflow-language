@@ -1,0 +1,19 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontSize 13
+skinparam defaultFontName "Apple SD Gothic Neo"
+title Verified WASM 워크플로 경로 선택 (이슈 #357)
+
+start
+:변경 분류;
+if (수동 실행?) then (예)
+  :전체 검증;
+elseif (허용 목록에 있는 일반 문서만 변경\n(정확한 diff 규칙)?) then (예)
+  :문서 검사\n(WASM 빌드 없음);
+else (아니요)
+  :전체 검증:\nVerify WASM (current) /\nVerify WASM (frontend-pin);
+endif
+:Verification result
+(항상 실행; 병합하려면 성공해야 함);
+stop
+@enduml

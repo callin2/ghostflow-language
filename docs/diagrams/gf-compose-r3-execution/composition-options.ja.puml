@@ -1,0 +1,21 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName "Hiragino Sans"
+skinparam defaultFontSize 13
+skinparam rectangleRoundCorner 8
+title 比較する 2 つの選択肢（いずれも提案）
+
+package "選択肢 A：1 つのモジュールへのコンパイラ合成" {
+  rectangle "east + west\n（修飾名）" as A1
+  rectangle "1 つの GFB1 モジュール\ntick ごとに 1 つのクロック\n安全処理は 1 回" as A2
+  A1 --> A2 : インポート／修飾の\nローワリング
+}
+
+package "選択肢 B：複数の VM インスタンス + コーディネータ" {
+  rectangle "コーディネータ\n（クロック、取り込み、\n故障の波及ポリシーを提供）" as C
+  rectangle "VM: east\n固有のモジュール、状態" as VE
+  rectangle "VM: west\n固有のモジュール、状態" as VW
+  C --> VE
+  C --> VW
+}
+@enduml

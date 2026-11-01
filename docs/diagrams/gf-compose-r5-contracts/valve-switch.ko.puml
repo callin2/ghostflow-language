@@ -1,0 +1,23 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName Helvetica
+skinparam defaultFontSize 13
+title 밸브 전환 반례 (수작업 예이며 실행 증거 아님)
+
+participant "동작 A\n(펌프 세션 소유자)" as A
+participant "Station 정책\n(prepare_start_batch,\nauthorize_output)" as S
+participant "동작 B" as B
+
+A -> S : 펌프 세션 활성 (ValveA)
+A -> S : 펌프를 잠시 OFF,\nValveA -> ValveB 전환
+note over S : 밸브 정리 동안에도\n세션 유지
+B -> B : pump=false를 봄
+B -> S : 같은 물리 펌프 요청
+S --> B : 거부 (AlreadyOwned):\nA가 여전히 세션 소유;\n비활성 제어는 소유자를 정지시킬 수 없음
+note over A, B
+"펌프가 꺼져 있으므로 B가 시작해도 된다"는 지역 규칙은
+세션 소유권 불변조건을 깨뜨립니다.
+이것은 제한된 station 주장일 뿐이며, 임의로 조합된
+동작들이 자원을 올바르게 공유한다는 증명이 아닙니다.
+end note
+@enduml

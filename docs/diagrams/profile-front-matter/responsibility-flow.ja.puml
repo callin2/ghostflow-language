@@ -1,0 +1,27 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName "Hiragino Sans"
+skinparam defaultFontSize 13
+skinparam ArrowColor #526d76
+
+rectangle "顧客 / AI 作成ツール\n（正本 .ghost.md：\n意図、本体、フロントマター）" as C
+rectangle "ボード / 設備プロファイル\n（Device）" as B
+rectangle "ドライバパッケージ\n（Drivers）" as D
+rectangle "コンパイラホスト / Worker\n（Language）\nネットワーク・ファイル・GPIO なし" as L
+rectangle "パッケージングホスト\n（Device）" as K
+node "MCU" as M {
+  rectangle "共有通信\nサービス" as S
+  rectangle "ドライバインスタンス" as I
+  rectangle "GhostFlow ランタイム" as R
+}
+
+C --> L : ソース
+B --> L : 固定されたプロファイル\n（呼び出し側が与えるクロージャ）
+D --> L : デバイスプロファイル\n（チャネル、要件）
+L --> K : バインディング計画\n（ソース/プロファイルのハッシュに紐付け）
+D --> K : モジュール（ELF）
+K --> M : デプロイバンドル\n+ 来歴
+I --> S : バス要求\n（直列化、時間制限付き）
+I --> R : 値 + 品質/エラー
+R --> I : 出力要求
+@enduml

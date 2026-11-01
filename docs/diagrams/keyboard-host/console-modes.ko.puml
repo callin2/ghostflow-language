@@ -1,0 +1,25 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontSize 12
+start
+:node tools/ghostsim-console.mjs program.gfb --bind ...;
+if (stdin이 터미널인가?) then (예: live 모드)
+  :stderr도 터미널이어야 함;
+  :0 ms에 스캔, 패널 그리기;
+  repeat
+    :100 ms 타이머 또는 키 1-8 / :toggle;
+    :현재 경과 시간에 한 번 스캔;
+  repeat while (:exit 또는 Ctrl-C?) is (아니오)
+  :화면 복원, 짧은 요약 출력;
+  note right: --record와 --format은 거부됨
+else (아니오: 파이프 재생)
+  repeat
+    :한 줄에 명령 하나 읽기;
+    :가상 시간에 toggle / scan N;
+    :패널을 stderr에 출력;
+  repeat while (exit 또는 입력 끝?) is (아니오)
+  :stdout에 scenario-result-v1 하나 쓰기\n(기본 TOON, --format json);
+  note right: --record는 재생 가능한 TOON 시나리오를 씀
+endif
+stop
+@enduml

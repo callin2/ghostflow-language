@@ -1,0 +1,19 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontSize 12
+hide empty description
+[*] --> received
+received --> rejected : nunca se inició\n(reason obligatorio)
+received --> started : evidencia de inicio del dominio
+started --> completed : evidencia de finalización
+started --> cancelled : reason opcional
+started --> failed : reason obligatorio
+rejected --> [*]
+completed --> [*]
+cancelled --> [*]
+failed --> [*]
+note right of rejected
+  Los estados terminales
+  no tienen sucesor
+end note
+@enduml

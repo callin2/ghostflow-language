@@ -1,0 +1,29 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontSize 12
+skinparam rectangle {
+  RoundCorner 8
+}
+left to right direction
+legend top left
+  绿色 = 已实现的切片
+  橙色 = 仍未完成（公开路径保持 RED）
+endlegend
+
+rectangle "公开 .ghost.md 编译器\n（unsupported 诊断仍生效）" as PC #FFE0B2
+rectangle "类型检查器 + true-for\n描述符（直接 Bool）" as TC #C8E6C9
+rectangle "GFB 格式 6\nprelude 标签 2，操作码 59" as GFB #C8E6C9
+rectangle "ControlRuntime：manifest、\n区间采集、帧" as CR #FFE0B2
+rectangle "WASM activateTemporal\n（GFTA v2）" as W #C8E6C9
+rectangle "原生 TrueForActivation\n+ Rust tick" as N #C8E6C9
+rectangle "TrueFor 引擎\nstage / commit / rollback" as E #C8E6C9
+rectangle "已认证检查点、\n倒带、重放" as CK #FFE0B2
+
+PC --> TC
+TC --> GFB
+GFB --> N
+CR --> W
+W --> N
+N --> E
+E --> CK
+@enduml

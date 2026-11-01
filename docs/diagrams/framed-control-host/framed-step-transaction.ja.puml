@@ -1,0 +1,27 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName "Hiragino Sans"
+skinparam defaultFontSize 13
+start
+:入力、サンプル、スケジュール\nフラグを検証して取り込む;
+:すべてのコンディショナに対し、Rustが\n所有するトランザクションを1つ開始;
+:入力をコンディショニングし、完全な\n生成入力リストを作る;
+:runtime.scan(明示的な論理時間);
+if (コンディショニングの失敗、または\n既知のネイティブ拒否か？) then (はい)
+  :コンディショナをロールバック。\n論理時間とフレームIDは保持;
+  :呼び出し側は同じフレームを再試行できる;
+  stop
+elseif (確定状態が不明（トラップ）か？) then (はい)
+  :ホストを終了\n（ロールバックを捏造しない）;
+  stop
+else (肯定的なスキャン)
+  :コンディショナ、論理時間、\nフレームIDを確定;
+  if (確定後の失敗か？) then (はい)
+    :ホストを終了。\n確定済みの結果は保持;
+    stop
+  else (いいえ)
+    :{vm, sensors, signals, frame} を返す;
+    stop
+  endif
+endif
+@enduml

@@ -1,0 +1,14 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontSize 13
+skinparam stateBorderColor #4A6FA5
+skinparam stateBackgroundColor #F7F9FC
+title OnDelay（问题 5）：enabled 仅在 Active 中为 true
+
+[*] --> Idle
+Idle --> Waiting : request && !stop
+Waiting --> Idle : stop || !request
+Waiting --> Active : age >= delay
+Active --> Idle : !request || stop
+note "健康的停止或无效的延时：任意阶段 -> Idle。\nrequest/stop 未知：保持当前阶段。\nage = elapsed(phase) 在每次阶段变化时重新计时。" as N
+@enduml

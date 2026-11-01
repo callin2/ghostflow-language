@@ -1,0 +1,24 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName "PingFang SC"
+skinparam rectangleRoundCorner 8
+skinparam ArrowColor #555555
+left to right direction
+
+rectangle "宿主提供\ninput、sensor 读取值\n（值或故障）" as IN
+rectangle "前一状态\nwatering" as PREV
+rectangle "纯计算\nlet、fn、if、case" as CALC
+rectangle "下一状态\nwatering'" as NEXT
+rectangle "输出连接\npump <- ...;" as OUT
+rectangle "require 约束\n阻止 bool 输出" as REQ
+rectangle "宿主 / 渲染器\n应用输出，\n负责故障安全" as HOST
+
+IN --> CALC
+PREV --> CALC
+CALC --> NEXT
+CALC --> OUT
+NEXT --> OUT : 输出表达式\n可读取下一状态
+OUT --> REQ : 候选意图
+REQ --> HOST : 请求意图 / 安全意图
+NEXT ..> PREV : 在 tick 结束时\n一并提交
+@enduml

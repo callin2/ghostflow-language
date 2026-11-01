@@ -1,0 +1,23 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontSize 12
+hide empty description
+[*] --> NoRun
+NoRun : 인증된 coverage 없음
+Accumulating : measured-true [start,end)의 합집합
+Satisfied : covered duration >= duration
+
+NoRun --> Accumulating : Measured true certificate
+Accumulating --> Accumulating : 맞닿거나 겹치는\nMeasured true certificate
+Accumulating --> Satisfied : coverage가 duration에 도달
+Satisfied --> Satisfied : Measured true가 계속됨
+Accumulating --> NoRun : false 또는 Measured가 아닌 증거,\n품질 fault (reset 하한)
+Satisfied --> NoRun : false 또는 Measured가 아닌 증거,\n품질 fault (reset 하한)
+Accumulating --> NoRun : source 또는 clock epoch 변경\n(새 chain)
+Satisfied --> NoRun : source 또는 clock epoch 변경\n(새 chain)
+note bottom of Accumulating
+  NoObservation: NotReady, coverage를 더하지 않음.
+  중복은 coverage를 전진시키지 않음.
+  잘못된 입력: 거부, commit된 상태는 그대로.
+end note
+@enduml

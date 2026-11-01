@@ -1,0 +1,25 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName "Hiragino Sans"
+skinparam defaultFontSize 13
+skinparam ArrowColor #526d76
+
+start
+:厳密な TOON リクエストをデコード;
+if (フィールド・operation・\nbudgetBytes 256–1,000,000 は有効?) then (いいえ)
+  :エラー（CLI 終了コード 2）;
+  stop
+endif
+:リファレンス索引とリンク先の章を読む;
+:カタログを再構築\n（ref-CC-SS ID、ダイジェスト）;
+if (セレクタに一致する節がある?) then (いいえ)
+  :status: no_match\n（CLI 終了コード 1）;
+  stop
+endif
+if (応答が budgetBytes に収まる?) then (いいえ)
+  :status: budget_exceeded\n+ requiredBytes（CLI 終了コード 2）;
+  stop
+endif
+:status: ok\nメタデータ + 厳密な Markdown 抜粋;
+stop
+@enduml

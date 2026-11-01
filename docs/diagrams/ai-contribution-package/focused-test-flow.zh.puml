@@ -1,0 +1,20 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontSize 13
+start
+:将未修改的测试夹具编译一次\n(numeric-threshold.ghost.md);
+fork
+  :运行原生 Rust\n（相同字节、相同输入带）;
+fork again
+  :运行 WASM\n（相同字节、相同输入带）;
+end fork
+:将请求/安全结果\n与独立的 oracle.json 比较;
+:对每个内存中的变异体\n("<" -> "<=", 条件 -> true);
+:变异体必须在两个目标上\n正常编译和运行;
+:未修改的预言断言\n必须变为 RED;
+note right
+  崩溃、超时或缺少运行器
+  不算作杀死了变异
+end note
+stop
+@enduml

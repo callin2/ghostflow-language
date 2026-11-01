@@ -1,0 +1,19 @@
+@startuml
+skinparam defaultFontName "Hiragino Sans"
+skinparam shadowing false
+skinparam defaultFontSize 13
+left to right direction
+rectangle "requested\n（制御式）" as req
+rectangle "safe\n（調停と制約の\n適用後）" as safe
+rectangle "論理結果を\nアトミックに確定\n（ランタイム）" as commit
+rectangle "applied\n（レンダラーが\nバスコマンドを送信）" as applied
+rectangle "confirmed\n（フィードバックの証拠：\n接点/機構が動いた）" as conf
+req --> safe
+safe --> commit
+commit --> applied
+applied --> conf
+note bottom of conf
+  三つの異なる事実：
+  確定 != applied != confirmed
+end note
+@enduml

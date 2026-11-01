@@ -1,0 +1,16 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName "Hiragino Sans"
+skinparam defaultFontSize 13
+hide empty description
+[*] --> pending : event.atMs で開始\n同一性 (sourceTag, sourceEpoch, id)
+pending --> satisfied : event.atMs + windowMs より前に\n測定された true の観測\n(satisfiedAtMs を設定)
+pending --> expired : ウィンドウ終端に到達\n(終端は含まない)
+satisfied --> [*] : 明示的な確認応答
+expired --> [*] : 明示的な確認応答
+note right of pending
+  終端境界より前には
+  確認応答できない。
+  確認応答まで保持（最大 32）。
+end note
+@enduml

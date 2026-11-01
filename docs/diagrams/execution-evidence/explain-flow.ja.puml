@@ -1,0 +1,23 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName "Hiragino Sans"
+skinparam defaultFontSize 13
+skinparam componentStyle rectangle
+actor "呼び出し側" as Caller
+rectangle "explainExecution(request)" as API {
+  component "正準.ghost.md\nソースを再コンパイル" as C
+  component "出力の説明 +\n完了スキャンのスナップショット\n+ 証明/スナップショットの結合" as J
+  component "デバイスの同一性と\nレコードを検査" as D
+}
+rectangle "execution-evidence-result-v1" as R {
+  card "requested、safe、\nauthored" as R1
+  card "device ステータス" as R2
+}
+Caller --> C : source、runId、outputId
+Caller --> J : 受理済みスキャン結果
+Caller --> D : expectedDevice、\ndeviceEvidence
+C --> J
+J --> R1
+D --> R2
+note right of API : 新しい評価器なし、デバイスとの通信なし、\nディスクからのインポート読み込みなし
+@enduml

@@ -1,0 +1,27 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName Helvetica
+skinparam defaultFontSize 13
+skinparam ArrowColor #526d76
+
+rectangle "고객 / AI 작성 도구\n(정본 .ghost.md:\n의도, 본문, front matter)" as C
+rectangle "보드 / 설치 프로필\n(Device)" as B
+rectangle "드라이버 패키지\n(Drivers)" as D
+rectangle "컴파일러 호스트 / Worker\n(Language)\n네트워크·파일·GPIO 접근 없음" as L
+rectangle "패키징 호스트\n(Device)" as K
+node "MCU" as M {
+  rectangle "공유 통신\n서비스" as S
+  rectangle "드라이버 인스턴스" as I
+  rectangle "GhostFlow 런타임" as R
+}
+
+C --> L : 소스
+B --> L : 고정된 프로필\n(호출자가 제공한 closure)
+D --> L : 장치 프로필\n(채널, 요구사항)
+L --> K : 바인딩 계획\n(소스/프로필 해시에 묶임)
+D --> K : 모듈 (ELF)
+K --> M : 배포 bundle\n+ provenance
+I --> S : 버스 요청\n(직렬화, 시간 제한)
+I --> R : 값 + 품질/오류
+R --> I : 출력 요청
+@enduml

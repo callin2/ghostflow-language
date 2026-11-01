@@ -1,0 +1,23 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontSize 12
+hide empty description
+[*] --> NoRun
+NoRun : 无已认证覆盖
+Accumulating : measured-true [start,end) 的并集
+Satisfied : 覆盖持续时间 >= duration
+
+NoRun --> Accumulating : Measured true 证书
+Accumulating --> Accumulating : 相接 / 重叠的\nMeasured true 证书
+Accumulating --> Satisfied : 覆盖达到 duration
+Satisfied --> Satisfied : 持续的 Measured true
+Accumulating --> NoRun : false 或非 Measured 证据，\n质量故障（重置下界）
+Satisfied --> NoRun : false 或非 Measured 证据，\n质量故障（重置下界）
+Accumulating --> NoRun : 来源或时钟 epoch 变化\n（新链）
+Satisfied --> NoRun : 来源或时钟 epoch 变化\n（新链）
+note bottom of Accumulating
+  NoObservation：NotReady，不增加覆盖。
+  重复项永远不会推进覆盖。
+  格式错误的输入：被拒绝，已提交状态不变。
+end note
+@enduml

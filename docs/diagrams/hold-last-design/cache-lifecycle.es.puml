@@ -1,0 +1,17 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontSize 12
+skinparam StateBackgroundColor #F7F9FC
+skinparam StateBorderColor #4A6FA5
+title Caché de hold_last (porción medida)
+[*] --> Unavailable : reinicio en frío
+state "Unavailable (no disponible)\navailable=false\nresultado: NotReady" as Unavailable
+state "Held (retenido)\navailable=true, held=true\nage < forAtMost\ncalidad del resultado: Held" as Held
+state "Expired (vencido)\navailable=true, held=false\nresultado: NotReady" as Expired
+Unavailable --> Held : muestra admisible fresca\n(almacenada con su propia marca de tiempo)
+Held --> Held : una muestra admisible fresca reemplaza la caché;\nun duplicado no renueva la edad;\nfallo / cambio de selección conserva la caché
+Held --> Expired : la edad alcanza forAtMost
+Expired --> Held : muestra admisible fresca
+Held --> Unavailable : epoch reemplazado en la raíz\nalmacenada (aunque no esté seleccionada)
+Expired --> Unavailable : epoch reemplazado en la\nraíz almacenada
+@enduml

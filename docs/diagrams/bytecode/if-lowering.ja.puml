@@ -1,0 +1,24 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName "Hiragino Sans"
+skinparam ArrowColor #555555
+skinparam rectangle {
+  BackgroundColor White
+  BorderColor #555555
+}
+title if condition then yes else no の低水準化（フォーマット3以降）
+
+rectangle "condition" as C
+rectangle "JUMP_IF_FALSE(length(yes) + 3)" as JF
+rectangle "yes" as Y
+rectangle "JUMP(length(no))" as J
+rectangle "no" as N
+rectangle "式の終端\n（結果型の値が1つ）" as E
+
+C --> JF
+JF --> Y : true\n（フォールスルー）
+JF --> N : false\n（前方ジャンプ）
+Y --> J
+J --> E : 前方ジャンプ
+N --> E
+@enduml

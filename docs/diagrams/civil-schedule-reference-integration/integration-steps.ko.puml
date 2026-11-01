@@ -1,0 +1,16 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontSize 13
+skinparam activity {
+  BackgroundColor #F8F8F8
+  BorderColor #555555
+}
+start
+:완료: 구조적 pulse 슬라이스\n(파싱, 타입 검사, checker descriptor);
+:1. 민간 시각 발생 사실\n(provider는 사실만 제공, .due는 계산하지 않음);
+:2. Solar 이외로 확장한\n이식 가능한 admission descriptor;
+:3. 검증된 바이트코드, WASM/native\n활성화, prelude 실행;
+:4. 소스 -> 아티팩트 -> 실행 증명;\n방출 거부와 호스트 .due 제거;
+:5. 정책을 Window/Run,\n취소, 보류된 시계로 확장;
+stop
+@enduml

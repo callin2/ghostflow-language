@@ -1,0 +1,21 @@
+@startuml
+hide empty description
+skinparam shadowing false
+skinparam defaultFontSize 13
+skinparam state {
+  BackgroundColor #F8F8F8
+  BorderColor #555555
+}
+
+state "Inactivo\nrunning = false\narmed = false" as Idle
+state "Armado\nrunning = false\narmed = true" as Armed
+state "En marcha\nrunning = true\nvalve, pump ON" as Running
+
+[*] --> Idle
+Idle --> Armed : START sano liberado\ny STOP sano permite
+Idle --> Idle : START mantenido, STOP no\npermite o cualquier fallo de entrada
+Armed --> Running : START sano pulsado\ny STOP permite
+Armed --> Idle : STOP no permite\no cualquier fallo de entrada
+Running --> Running : STOP permite\n(un fallo de START mantiene la marcha)
+Running --> Idle : STOP no permite\no fallo de STOP
+@enduml

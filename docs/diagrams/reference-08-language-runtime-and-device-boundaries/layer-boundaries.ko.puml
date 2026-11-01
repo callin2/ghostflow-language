@@ -1,0 +1,33 @@
+@startuml
+skinparam defaultFontName "Apple SD Gothic Neo"
+skinparam shadowing false
+skinparam defaultFontSize 13
+skinparam componentStyle rectangle
+
+package "의미" {
+  [정본 소스\n(.ghost.md)] as src
+  [컴파일러 / 도구] as tools
+}
+package "판단" {
+  [제어 런타임\n(Program / run)] as rt
+}
+package "실행 환경(host)" {
+  [시계, 달력,\n예측, ledger,\ncheckpoint, 설정 저장소] as env
+}
+package "Device" {
+  [입력 driver] as drv
+  [출력 renderer] as rnd
+  [설치 profile /\nbinding] as bind
+}
+[Cabinet view / UI] as ui
+
+src --> tools : 해석, 검사
+tools --> rt : 실행 가능한 Program
+env --> rt : 시간, 자료 snapshot
+drv --> rt : 샘플\n(값, 시각, 품질)
+rt --> rnd : safe 출력 의도
+bind ..> drv : 논리 역할 -> endpoint
+bind ..> rnd : 논리 역할 -> endpoint
+rt --> ui : descriptor,\n관찰
+ui --> rt : typed 설정 요청
+@enduml

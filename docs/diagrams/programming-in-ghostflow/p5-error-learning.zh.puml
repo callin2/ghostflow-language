@@ -1,0 +1,20 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName "PingFang SC"
+skinparam defaultFontSize 13
+skinparam activityBorderColor #4A6FA5
+skinparam activityBackgroundColor #F7F9FC
+title 通过错误学习（附录 B）
+
+start
+:挑选一个错误示例（E90–E102）;
+:预测诊断：\n它指向哪里，违反了哪条规则;
+:把该围栏作为单独的 ghost 程序编译;
+if (诊断与预测一致？) then (是)
+  :说出被打破的约定\n及对应的 Reference 规则;
+else (否)
+  :重读该规则\n并修正你的理解;
+endif
+:一次只保留一个错误;
+stop
+@enduml

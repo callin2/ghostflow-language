@@ -1,0 +1,17 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName "Hiragino Sans"
+skinparam defaultFontSize 13
+hide empty description
+state "Config Result OK" as ok
+ok : Solar の受け入れを通常どおり評価
+state "依存する config の故障" as fault
+fault : 受け入れ = Unknown(SettingsFault)
+fault : (fault 分岐が true でも同じ。\n古い値や既定値は使わない)
+state "復旧ベースライン" as base
+base : 取りこぼした開始は追いつかない
+[*] --> ok
+ok --> fault : 現在の観測が故障
+fault --> base : 後続の成功した観測
+base --> ok : 次の適格な交差で\n1 回だけ発火できる
+@enduml

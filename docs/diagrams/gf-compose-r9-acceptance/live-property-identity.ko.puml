@@ -1,0 +1,14 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName Helvetica
+skinparam defaultFontSize 13
+title live property event와 재시작에 걸친 identity (제안된 acceptance)
+
+[*] --> RunA : run 시작\n(runId A, settings rev N)
+RunA --> RunA : 유효한 live property event\n모든 값을 하나의 event로 적용;\nsettings rev N -> N+1;\nsource/프로그램 hash와 runId는 그대로
+RunA --> RunA : 잘못된 다중 property event\nevent 전체 거부;\n어떤 property도 바뀌지 않음
+RunA --> RunB : 실제 재시작\n(GhostFlow 재시작 event)
+RunB : 새 runId B
+RunB : 수락된 설정 유지
+RunB : 반응 = 작성된 GhostFlow 논리\n(전역 resume/manual 정책 없음)
+@enduml

@@ -1,0 +1,19 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontSize 13
+start
+:immutable snapshot 하나 생성\n(입력 + commit된 이전 상태);
+:모든 transition을 동시에 평가\n→ 후보 상태;
+:requested intent 평가\n(prime 없는 x = 이전 상태, x' = 후보);
+:Boolean constraint 적용\n→ safe intent;
+note right
+  output을 safe로 강제하는
+  constraint는 실패한 scan이 아님.
+end note
+if (평가와 검증이 성공했는가?) then (예)
+  :후보 상태와 requested/safe\nscan record를 atomic하게 commit;
+else (아니요)
+  :Rollback: 이전에 commit된 상태 유지;\n부분 후보를 노출하지 않음;
+endif
+stop
+@enduml

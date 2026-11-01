@@ -1,0 +1,29 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontSize 12
+skinparam componentStyle rectangle
+left to right direction
+
+rectangle "呼び出し元（外部）" as caller {
+  card "解釈\n(text, anchorIds, decision)" as I
+  card "条件\n(statement, scope, nodeIds)" as C
+  card "外部チェック\n（報告された結果）" as X
+}
+rectangle "compileSource(source,\n{ filename, intentEvidence })" as comp
+card "コンパイル結果\n（GFB・マニフェストは不変）" as out
+card "compilation.intentEvidence\nintent-evidence-report-v1" as rep
+
+C --> I : interpretation {id, revision}
+X --> C : 条件参照 (sha256)
+I --> comp
+C --> comp
+X --> comp
+comp --> out
+comp --> rep : 構造・ソース・リンク・\nリビジョン整合性を検査
+note bottom of rep
+  自然言語の解釈なし、
+  権限の認証なし、
+  条件の実行なし、
+  デバイスの観測なし
+end note
+@enduml

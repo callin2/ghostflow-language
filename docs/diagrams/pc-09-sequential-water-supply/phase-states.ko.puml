@@ -1,0 +1,33 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName Helvetica
+skinparam ArrowColor #555555
+hide empty description
+
+[*] --> Idle
+Idle --> Opening : 새 START,\n닫힘 확인됨
+Opening --> Settling : 열림 리밋만 켜짐
+Settling --> Watering : 열림 2초 유지
+Watering --> PumpStopping : 5분 경과
+PumpStopping --> Closing : 다음 스캔\n(리밋 사용 가능)
+Closing --> Idle : 닫힘 리밋만 켜짐
+Settling --> FeedbackFault : 열림 피드백 상실
+Watering --> FeedbackFault : 열림 피드백 상실
+PumpStopping --> FeedbackFault : 열림 피드백 상실
+FeedbackFault --> Idle : START 해제,\n닫힘 확인됨
+Interrupted --> Idle : START 해제,\n닫힘 확인됨
+
+state Opening : valve_open_contactor ON
+state Watering : pump_contactor ON
+state Closing : valve_close_contactor ON
+state FeedbackFault : 모든 출력 OFF
+state Interrupted : 모든 출력 OFF
+
+note as N
+Idle부터 Closing까지 먼저 검사:
+1. 두 리밋 모두 true -> FeedbackFault
+2. stop_ok 또는 overload_ok 상실 -> Interrupted
+두 고장 상태 모두 허가가 돌아오고
+충돌이 없을 때까지 기다립니다.
+end note
+@enduml

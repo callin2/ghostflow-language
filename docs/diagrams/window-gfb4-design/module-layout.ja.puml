@@ -1,0 +1,22 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontSize 13
+skinparam rectangle {
+  BackgroundColor #F8F8F8
+}
+rectangle "GFB1 マジック、フォーマットバージョン 4" as H
+rectangle "スカラー状態テーブルまでの\n既存セクション" as S
+rectangle "時間コンテキスト\nu16 nowInput, u16 timeEpochInput" as C
+rectangle "ルートテーブル\nu16 rootCount。ルートごとに u32 tag、名前、\n4 x u16 入力（present, epoch, id, timestamp）" as R
+rectangle "戦略ごと" as ST {
+  rectangle "名前、優先度、クエリ（変更なし）" as N
+  rectangle "u16 windowCount + ウィンドウディスクリプタ\n（site, name, operation, payloadType,\noverMs, maxAgeMs, ルート参照, 6 つの blob）" as W
+  rectangle "遷移と意図\n（オペコード 57 でスロットを読める）" as T
+}
+H -down-> S
+S -down-> C
+C -down-> R
+R -down-> ST
+N -down-> W
+W -down-> T
+@enduml

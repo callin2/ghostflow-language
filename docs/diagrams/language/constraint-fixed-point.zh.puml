@@ -1,0 +1,25 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName Helvetica
+skinparam ArrowColor #555555
+skinparam ActivityBorderColor #555555
+
+start
+:候选 bool 输出
+（请求意图）;
+repeat
+  :针对同一快照检查
+  每个 requires / mutex;
+  :把要关断的输出的并集
+  同时设为 false;
+repeat while (有输出发生变化？) is (是)
+-> 否;
+:安全意图
+（满足每个约束）;
+note right
+  输出只会 true -> false，
+  因此对于 N 个 bool 输出
+  最多有 N 轮发生变化。
+end note
+stop
+@enduml

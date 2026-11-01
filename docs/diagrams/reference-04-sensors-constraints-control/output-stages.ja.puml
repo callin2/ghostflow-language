@@ -1,0 +1,24 @@
+@startuml
+skinparam defaultFontName "Hiragino Sans"
+skinparam shadowing false
+skinparam rectangleBorderColor #4A6FA5
+skinparam rectangleBackgroundColor #F7F9FC
+left to right direction
+title 入力から確認済みの状態まで
+rectangle "入力 +\n前状態" as IN
+rectangle "要求意図\n(requested)" as REQ
+rectangle "調停\n+ 制約" as ARB
+rectangle "安全意図 / 有効意図\n(safe)" as SAFE
+rectangle "適用済み (applied)\n（出力レンダラー）" as APP
+rectangle "確認済み (confirmed)\n（フィードバック）" as CONF
+IN --> REQ : output <- expr
+REQ --> ARB
+ARB --> SAFE : Bool制約は\ntrue -> false にするだけ
+SAFE --> APP : デバイスへの\n適用
+APP --> CONF : エンコーダ、リミットスイッチ、\n画像など
+note bottom of SAFE
+各段階はそれぞれ独自の来歴と
+品質を持つ。ある段階の証拠は
+次の段階を証明しない。
+end note
+@enduml

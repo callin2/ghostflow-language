@@ -1,0 +1,32 @@
+@startuml
+skinparam defaultFontSize 12
+skinparam shadowing false
+start
+:受理された tick
+（不変の ClockSnapshot 1 つ）;
+if (信頼できる壁時計の時刻か？
+（または有界の hold_trusted）) then (いいえ)
+  :Unknown(ClockUnknown)
+fallback が決定し、新規受け入れなし;
+  stop
+else (はい)
+endif
+:トリガーが発生を計画
+（At, Daily, DailySlots, Periodic,
+Cron, Solar, Tide）;
+:日付ルール / カレンダー（on）
+Unknown は Unknown のまま;
+if (台帳上で発生が受け入れ済み
+または終端済みか？) then (はい)
+  :新規受け入れなし
+（キャッチアップなし、リプレイなし）;
+  stop
+else (いいえ)
+endif
+:basis が受け入れを決定
+（pulse, window, run, range）
+when と gap を使用;
+:射影 .due / .open / .active / .missed
+＋スケジュール観測レコード;
+stop
+@enduml

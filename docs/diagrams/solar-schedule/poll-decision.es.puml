@@ -1,0 +1,28 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontSize 13
+start
+:poll({nowMs, wallMs, trusted});
+if (¿confiable?) then (no)
+  :due = false\nUntrustedClock;
+  stop
+endif
+if (¿primera muestra confiable\n(arranque o recuperación)?) then (sí)
+  :due = false\nBootBaseline / ClockRecoveryBaseline\n(sin recuperación de lo omitido);
+  stop
+endif
+if (¿wallMs <= marca de nivel máximo?) then (sí)
+  :due = false\nAlreadyObserved\n(retroceso / duplicado);
+  stop
+endif
+if (¿brecha de pared o monotónica > 60 s?) then (sí)
+  :due = false\nClockGapSkipped;
+  stop
+endif
+if (¿evento + desfase en\n(previousWall, currentWall]?) then (sí)
+  :due = true\ncon identidad de ocurrencia;
+else (no)
+  :due = false\n(evento no disponible o no cruzado);
+endif
+stop
+@enduml

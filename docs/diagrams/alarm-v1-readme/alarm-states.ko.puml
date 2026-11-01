@@ -1,0 +1,20 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName Helvetica
+skinparam defaultFontSize 13
+skinparam ArrowColor #526d76
+skinparam state {
+  BackgroundColor #f1f6f5
+  BorderColor #6d858b
+  FontColor #102b35
+}
+
+[*] --> unobserved : 관측자 활성화
+unobserved : 첫 성공 스캔\n이전
+unobserved --> inactive : 첫 확정 false\n(이벤트 없음)
+unobserved --> active : 첫 확정 true\n/ "raised" (새 episode)
+inactive --> active : true\n/ "raised" (새 episode)
+active --> inactive : false\n/ "cleared" (같은 episode)
+active --> active : 반복 true\n(이벤트 없음)
+inactive --> inactive : 반복 false\n(이벤트 없음)
+@enduml

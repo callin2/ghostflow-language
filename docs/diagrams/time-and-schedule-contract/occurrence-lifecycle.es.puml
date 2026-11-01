@@ -1,0 +1,17 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName Helvetica
+skinparam defaultFontSize 13
+hide empty description
+
+state "Planificada\n(ID de ocurrencia estable)" as Planned
+state "Admitida\n(.due verdadero durante un escaneo)" as Admitted
+state "Omitida\n(motivo conservado en la traza)" as Missed
+
+[*] --> Planned
+Planned --> Planned : corrección del proveedor previa\na la admisión mueve la hora planificada
+Planned --> Admitted : todas las condiciones verdaderas dentro\ndel cruce de Pulse / Window /\nintervalo de inicio tardío de Run
+Planned --> Missed : ConditionsFalseAtPulse\nObservationGap\nLateStartExpired\nCorrectionPastHighWater\nEventWithdrawn
+Admitted --> [*] : como máximo una vez;\nsin rearme ni duplicado
+Missed --> [*] : nunca se encola\nni se reproduce
+@enduml

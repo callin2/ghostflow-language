@@ -1,0 +1,17 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName "Hiragino Sans"
+start
+:正確な差分を算出\n（PR: merge-base..head、\npush: 直前..現在のコミット）;
+if (手動ディスパッチ？) then (はい)
+  :完全検証;
+elseif (差分が空または未解決？) then (はい)
+  :完全検証;
+elseif (すべてのパスがドキュメント\n許可リストに含まれる？) then (はい)
+  :ドキュメントレーン\n（docs:check、doc-index、\nルーティングテスト。WASM 成果物なし）;
+else (いいえ: 不明、混在、.ghost.md、\n仕様、契約、ポリシー、安全でないモード)
+  :完全検証;
+endif
+:Verification result チェック\n（分類 + 選択されたレーン）;
+stop
+@enduml

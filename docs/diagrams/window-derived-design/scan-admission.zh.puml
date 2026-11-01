@@ -1,0 +1,18 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontSize 12
+start
+:按依赖顺序对 prelude 求值一次，\n基于旧的已编写状态;
+:消费者 W 暂存每个已声明\n上游窗口的 highwater revision\n（无论是否被选中、是否成功）;
+if (被选中的上游结果成功\n且其 revision > 已保存的 highwater？) then (是)
+  :准入一个派生事件\n身份标识 (site, admissionRevision)\n+ 自有证明树;
+else (否)
+  :没有新的下游点\n（过期、重新选择、重新求值）;
+endif
+if (整个扫描成功？) then (是)
+  :提交窗口、证明、highwater;
+else (否：来源、密度、\n算术或意图错误)
+  :全部回滚；\n重试看到相同的新鲜度;
+endif
+stop
+@enduml

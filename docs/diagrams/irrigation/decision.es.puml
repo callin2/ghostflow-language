@@ -1,0 +1,25 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName Helvetica
+title Una decisión de riego (calcula watering')
+
+start
+if (¿STOP solicitado o STOP con fallo?) then (sí)
+  :watering' = false;
+elseif (¿nivel de agua bajo o low_water con fallo?) then (sí)
+  :watering' = false;
+elseif (¿ya está regando?) then (sí)
+  :watering' = true;
+elseif (¿START sano activado\ny rearranque no bloqueado?) then (sí)
+  :watering' = true;
+else (no)
+  :watering' = false;
+endif
+:pump, valve <- watering';
+stop
+note right
+  restart_blocked' pasa a true ante cualquier fallo de entrada.
+  Solo se borra cuando todas las entradas están sanas
+  y START está desactivado.
+end note
+@enduml

@@ -1,0 +1,23 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontSize 13
+skinparam rectangleRoundCorner 8
+rectangle "文学式源文件\n(.ghost.md)" as src
+rectangle "compileSource" as cs
+rectangle "writeArtifact\n（先校验，再写入）" as wa
+rectangle "GFB 字节\n（不变）" as gfb
+rectangle "控制清单\n（不变）" as man
+rectangle ".gfb.map.json\nsource-map-v1:\nnodes, lines, bytecodeSha256,\nsourceDocument, traceMetadata" as map
+rectangle "verifyArtifactSourceMap\n-> sourceDocument" as ver
+rectangle "restoreArtifactSourceMap\n-> 源码 + 追踪映射" as res
+src --> cs
+cs --> wa
+wa --> gfb
+wa --> man
+wa --> map
+map --> ver
+gfb --> ver
+map --> res
+gfb --> res
+note bottom of res : 严格：还会检查 traceMetadata、\n模块指纹和源码绑定
+@enduml

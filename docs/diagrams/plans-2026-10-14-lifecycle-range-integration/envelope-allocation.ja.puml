@@ -1,0 +1,22 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName "Hiragino Sans"
+skinparam defaultFontSize 13
+skinparam rectangleBorderColor #555555
+skinparam rectangleBackgroundColor #F7F7F7
+
+rectangle "GFB21 = 不変な暦時間 IANA Range\n（維持）" as R21
+rectangle "GFB22 = lifecycle エンベロープ\n（新規、別番号）" as L22 {
+  rectangle "検査済みの再起動\nディスクリプタ" as DESC
+  rectangle "変更されない内側の GFB バイト\nフォーマット 1–4、10、11\nまたは Range 21" as INNER
+}
+rectangle "拒否：lifecycle GFB19\n（過去のプレリリース 99ca1a3）" as L19 #FFEEEE
+rectangle "拒否：lifecycle GFB21\n（暫定の PR536）" as L21 #FFEEEE
+
+INNER ..> R21 : ラップ可能
+L19 -[hidden]- L21
+note bottom of L19
+  変換もフォールバックもなし。
+  レビュー済みソースを再コンパイルする。
+end note
+@enduml

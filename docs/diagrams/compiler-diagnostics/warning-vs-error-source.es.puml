@@ -1,0 +1,15 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontSize 13
+rectangle "Advertencia en documento importado\n(compilación exitosa)" as W {
+  card "source = documento raíz" as WS
+  card "span.file = documento importado" as WF
+  card "sourceClosure conserva la identidad del hijo" as WC
+}
+rectangle "Error en documento importado\n(compilación fallida)" as E {
+  card "source = documento hijo\n(nombre de archivo + SHA-256)" as ES
+  card "requestSource = solicitud raíz" as ER
+  card "span.file = documento hijo" as EF
+}
+W -[hidden]right- E
+@enduml

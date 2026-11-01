@@ -1,0 +1,21 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName "Hiragino Sans"
+skinparam defaultFontSize 13
+skinparam componentStyle rectangle
+component "検証済みプロバイダ\n（Solar 発生のファクト、\n.due は決して供給しない）" as P
+component "ネイティブ / WASM ホスト\n（エンベロープと\nバインディングを検証）" as H
+rectangle "Rust コア（単一のポータブルエンジン）" {
+  component "受け入れエンジン\n（クロック、ギャップ、重複抑止、\nパルス結果）" as E
+  component "コンパイル済みプレリュード\n（when 述語、\n依存関係順序）" as W
+  component "VM トランザクション\n（ステージ、確定またはロールバック）" as T
+}
+card "スケジュール観測\n+ Bool .due" as O
+component "ジャーナル / リプレイ\n（ライブプロバイダなし）" as J
+P --> H : カバレッジのファクト
+H --> E : クロックスナップショット +\n有界のカバレッジ
+W --> E : 交差 tick での\n述語
+E --> T : ステージされた射影
+T --> O : tick 全体の成功時
+O --> J
+@enduml

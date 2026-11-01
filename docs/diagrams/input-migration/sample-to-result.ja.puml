@@ -1,0 +1,17 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName "Hiragino Sans"
+skinparam defaultFontSize 13
+left to right direction
+
+rectangle "プロデューサ\n（Driver、USB、ソフトウェア）" as P
+rectangle "samples[name] =\n{epoch, id, timestampMs,\nquality, value}" as S
+rectangle "コンディショニング\n（フィルタ、古さ（stale）、\n復旧カウント）" as C
+rectangle "input name: T\nの読み取り結果は\nResult<T, SensorFault>" as R
+rectangle "記述された故障ポリシー\n（case 分析または recover）" as F
+
+P --> S
+S --> C
+C --> R
+R --> F
+@enduml

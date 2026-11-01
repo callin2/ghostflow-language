@@ -1,0 +1,21 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontSize 13
+skinparam rectangleBorderColor #555555
+skinparam rectangleBackgroundColor #F7F7F7
+
+rectangle "GFB21 = Range IANA civil inmutable\n(se conserva)" as R21
+rectangle "GFB22 = envoltorio de ciclo de vida\n(nuevo, distinto)" as L22 {
+  rectangle "descriptor de reinicio\nverificado" as DESC
+  rectangle "bytes GFB internos sin cambios\nformatos 1–4, 10, 11\no Range 21" as INNER
+}
+rectangle "Rechazado: ciclo de vida GFB19\n(prerelease histórico 99ca1a3)" as L19 #FFEEEE
+rectangle "Rechazado: ciclo de vida GFB21\n(PR536 provisional)" as L21 #FFEEEE
+
+INNER ..> R21 : puede envolver
+L19 -[hidden]- L21
+note bottom of L19
+  Sin traducción ni respaldo.
+  En su lugar, recompile la fuente revisada.
+end note
+@enduml

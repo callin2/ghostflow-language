@@ -1,0 +1,21 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontSize 13
+skinparam rectangleBorderColor #555555
+skinparam rectangleBackgroundColor #F7F7F7
+
+rectangle "기존 source AST\n+ compiler 진입점\n(공개 API 변경 없음)" as AST
+rectangle "Typed expression IR (#171)\n해소된 identity/type\nopcode·byte 없음" as EIR
+rectangle "Typed module IR (#172)\ninput, state, transition,\nintent, constraint" as MIR
+rectangle "Typed extension descriptor\nwindow, schedule, true_for,\nconfig stream, accounting, PID" as EXT
+rectangle "단일 GFB emitter\n(format을 고르고 byte를\n쓰는 유일한 곳)" as EMIT
+rectangle "기존 GFB byte\n(envelope, instruction,\nextension record)" as GFB
+
+AST --> EIR
+AST --> MIR
+EIR --> MIR
+AST --> EXT
+EXT --> MIR : 별개의 extension\nrecord로 유지
+MIR --> EMIT
+EMIT --> GFB
+@enduml

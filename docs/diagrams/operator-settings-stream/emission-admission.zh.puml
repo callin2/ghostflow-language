@@ -1,0 +1,29 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontSize 12
+title 设置发射：准入与所得 Result
+start
+:设置数据包到达
+（操作员编辑或生产者观测）;
+if (格式错误、目标无法识别、\nProgram/基准修订版陈旧\n或权限被拒绝？) then (是)
+  :准入前拒绝;
+  note right: 不创建观测
+  stop
+else (否)
+endif
+if (同一聚合中存在\n相互冲突的显式故障代码？) then (是)
+  :拒绝数据包;
+  stop
+else (否)
+endif
+if (统一的显式故障？) then (是)
+  :对所寻址的组给出该故障\n（例如 SettingsUnavailable）;
+elseif (所有载荷一起验证通过？) then (是)
+  :每个被寻址的 config 均为 ok(value);
+else (否)
+  :对所寻址的组给出\nfault(SettingsInvalid);
+endif
+:被接受的发射推进\n设置观测修订版;
+:该求值位置上的所有消费者\n读取同一个当前 Result;
+stop
+@enduml

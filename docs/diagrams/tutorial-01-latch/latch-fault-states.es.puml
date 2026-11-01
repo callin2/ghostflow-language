@@ -1,0 +1,25 @@
+@startuml
+hide empty description
+skinparam shadowing false
+skinparam defaultFontSize 13
+skinparam state {
+  BackgroundColor #F8F8F8
+  BorderColor #555555
+}
+
+state "Detenido\nwatering = false\nrestart_blocked = false" as Stopped
+state "En marcha\nwatering = true\nrestart_blocked = false" as Running
+state "En marcha, rearranque bloqueado\nwatering = true\nrestart_blocked = true" as RunBlocked
+state "Detenido, rearranque bloqueado\nwatering = false\nrestart_blocked = true" as StopBlocked
+
+[*] --> Stopped
+Stopped --> Running : START sano activado,\nSTOP sano liberado
+Stopped --> StopBlocked : cualquier fallo de entrada
+Running --> Stopped : STOP sano pulsado
+Running --> RunBlocked : fallo de START,\nSTOP sano liberado
+Running --> StopBlocked : fallo de STOP, o STOP\npulsado durante fallo de START
+RunBlocked --> Running : ambos sanos,\nSTART desactivado, STOP liberado
+RunBlocked --> Stopped : STOP sano pulsado,\nSTART sano desactivado
+RunBlocked --> StopBlocked : fallo de STOP, o STOP pulsado\ncon START activado o en fallo
+StopBlocked --> Stopped : ambos sanos, START desactivado
+@enduml

@@ -1,0 +1,23 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontSize 12
+title Registro (journal) de eventos acotado: publicar, retener, leer
+participant "Productor de confianza" as P
+participant "Registro de eventos\n(host de referencia)" as J
+participant "Consumidor" as C
+P -> J: publish({completion, trace, settingsState?, events})
+alt alguna comprobación falla
+  J --> P: rechazo; registro sin cambios (se permite reintentar)
+else todo el lote es válido
+  J -> J: asignar secuencias N+1..N+k\n(ninguna si events = [])
+  J -> J: conservar los `capacity` eventos más recientes
+  J -> J: reemplazar la última instantánea
+  J --> P: registros publicados + instantánea + nextCursor
+end
+C -> J: read({cursor: afterSequence = 10})
+J --> C: gaps [11..13, "retention"]\neventos desde 14\núltima instantánea (aparte)\nnextCursor
+note right of C
+  Sin eventos sintéticos para 11-13.
+  Guarde nextCursor solo después de procesar.
+end note
+@enduml

@@ -1,0 +1,18 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontSize 13
+skinparam componentStyle rectangle
+component "Definición fijada\n(ajustes + temporizadores)" as D
+package "Program combinado (núcleo Rust compartido)" {
+  component "instancia east\nResult de ajuste propio,\nemissionRevision, estado de temporizador" as East
+  component "instancia west\nResult de ajuste propio,\nemissionRevision, estado de temporizador" as West
+}
+component "Transacción de ajustes\n(un único settingsRevision global)" as S
+component "Reloj lógico\n(mismo tiempo proporcionado)" as C
+D --> East : instanciar
+D --> West : instanciar
+S --> East : evento para el ID de ajuste de east
+S ..> West : sin cambios
+C --> East
+C --> West
+@enduml

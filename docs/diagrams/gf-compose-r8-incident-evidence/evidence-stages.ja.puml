@@ -1,0 +1,23 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName "Hiragino Sans"
+skinparam defaultFontSize 13
+skinparam rectangleRoundCorner 8
+left to right direction
+title 提案中の因果の証拠の連鎖（各段階は分離されたまま）
+
+rectangle "入力イベント\nまたは観測" as I
+rectangle "評価されたルール\n（有効な設定リビジョン\nに結合）" as E
+rectangle "意図" as N
+rectangle "要求された出力\n（Rust コアのトレース）" as Q
+rectangle "安全な出力\n（Rust の安全性解決）" as S
+rectangle "ホスト / レンダラー\nの適用結果\n（#74/#88、v0 では未定義）" as A
+rectangle "物理的な観測\n（Device / 設備、\n#28 の提案）" as P
+
+I --> E
+E --> N
+N --> Q
+Q --> S : 制約の\n参照
+S --> A : コマンドの応答は\n物理的な証明ではない
+A --> P : 記録された applied イベントは\n物理的な証明ではない
+@enduml

@@ -1,0 +1,16 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontSize 13
+start
+:라운드 0: 요청 출력 snapshot 평가;
+repeat
+  :각 제약 평가\n(이 라운드의 갱신 전에 values 포착);
+  if (이 규칙의 첫 위반?) then (예)
+    :firstViolation 저장\n{round, values, blocked};
+  endif
+repeat while (이번 라운드에 차단된 출력이 있음?) is (예: 다음 라운드)
+->아니오;
+:종료하는 무차단 라운드에서\nfinal {round, values, satisfied} 저장;
+note right: 제약마다 snapshot은\n최대 두 개
+stop
+@enduml

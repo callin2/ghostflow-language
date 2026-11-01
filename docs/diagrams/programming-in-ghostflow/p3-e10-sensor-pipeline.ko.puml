@@ -1,0 +1,22 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName Helvetica
+
+start
+:호스트가 새 샘플을 공급\n(원래 시각, 식별자);
+if (정상이고 valid = 0%..100% 범위 안이며\nage < stale_after = 3s?) then (예)
+  :최근 세 개의 새 유효 샘플에\nmedian(3) 적용;
+  if (창에 값이 세 개 있는가?) then (예)
+    :hysteresis\non_below 30%, off_above 35%;
+    :dry = ok(value);
+  else (아니요)
+    :dry = fault(NotReady);
+  endif
+else (아니요)
+  :필터 창을 비움;\nhysteresis를 initial: false로 초기화;
+  :dry = fault(...);
+endif
+:need_water = case dry\nok(value) => value\nfault(_) => false;
+:pump 요청 = enabled && need_water\n(enabled가 fault인 동안 마지막 요청 유지);
+stop
+@enduml

@@ -1,0 +1,19 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontSize 13
+skinparam stateBorderColor #4A6FA5
+skinparam stateBackgroundColor #F7F9FC
+title CancelAndReturn（问题 19）
+
+[*] --> Idle
+Idle --> Working : start_event && !cancel
+Working --> Stopping : cancel
+Stopping --> Idle : stopped && home
+Stopping --> Returning : stopped && !home
+Returning --> Idle : home
+
+Working : work = true
+Stopping : 无命令\n（等待停止反馈）
+Returning : return_device = true
+note "任一输入未知时，保持当前阶段。\n无超时：缺少反馈时保持当前阶段。" as N
+@enduml

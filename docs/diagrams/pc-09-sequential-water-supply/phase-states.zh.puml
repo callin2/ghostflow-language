@@ -1,0 +1,33 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName "PingFang SC"
+skinparam ArrowColor #555555
+hide empty description
+
+[*] --> Idle
+Idle --> Opening : 新的 START，\n已确认关闭
+Opening --> Settling : 仅开启限位
+Settling --> Watering : 开启保持 2 s
+Watering --> PumpStopping : 已过 5 min
+PumpStopping --> Closing : 下一次扫描\n（限位可用）
+Closing --> Idle : 仅关闭限位
+Settling --> FeedbackFault : 失去开启反馈
+Watering --> FeedbackFault : 失去开启反馈
+PumpStopping --> FeedbackFault : 失去开启反馈
+FeedbackFault --> Idle : START 已松开，\n已确认关闭
+Interrupted --> Idle : START 已松开，\n已确认关闭
+
+state Opening : valve_open_contactor ON
+state Watering : pump_contactor ON
+state Closing : valve_close_contactor ON
+state FeedbackFault : 所有输出 OFF
+state Interrupted : 所有输出 OFF
+
+note as N
+从 Idle 到 Closing，最先检查：
+1. 两个限位都为 true -> FeedbackFault
+2. 失去 stop_ok 或 overload_ok -> Interrupted
+两个故障状态还会等待
+许可恢复且没有冲突。
+end note
+@enduml

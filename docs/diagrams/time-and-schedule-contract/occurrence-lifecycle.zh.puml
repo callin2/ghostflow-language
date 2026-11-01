@@ -1,0 +1,17 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName Helvetica
+skinparam defaultFontSize 13
+hide empty description
+
+state "已计划\n（稳定的触发实例 ID）" as Planned
+state "已准入\n（.due 在一次扫描中为 true）" as Admitted
+state "已错过\n（原因保留在追踪中）" as Missed
+
+[*] --> Planned
+Planned --> Planned : 准入前 provider 修正\n移动计划时间
+Planned --> Admitted : 在 Pulse 跨越 / Window /\nRun 延迟启动区间内\n所有条件为 true
+Planned --> Missed : ConditionsFalseAtPulse\nObservationGap\nLateStartExpired\nCorrectionPastHighWater\nEventWithdrawn
+Admitted --> [*] : 至多一次；\n不重新武装、不重复
+Missed --> [*] : 绝不排队\n或重放
+@enduml

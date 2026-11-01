@@ -1,0 +1,42 @@
+@startuml
+skinparam defaultFontName "Apple SD Gothic Neo"
+skinparam shadowing false
+skinparam ActivityBackgroundColor #F7F9FC
+skinparam ActivityBorderColor #4A6FA5
+title 입력 처리 순서 (입력 하나)
+start
+:Driver가 샘플 전달\n(source ID, epoch, sample ID, timestamp, 품질);
+if (Driver가 Disconnected를 보고?) then (예)
+  #FFE5E5:Result = fault(Disconnected)\n(즉시 전달);
+  stop
+else (아니요)
+endif
+if (새 물리 샘플?) then (아니요: 중복 / clock-only)
+  :filter·복구에 기여하지 않음;\nfreshness 갱신 안 함;
+else (예)
+  if (payload, 단위, `valid` 범위 정상?) then (아니요)
+    #FFE5E5:Result = fault(Invalid);
+    stop
+  else (예)
+    :filter 상태 갱신;
+  endif
+endif
+if (filter 준비 완료 및 `recover_after` 충족?) then (아니요)
+  #FFF4D6:Result = fault(NotReady);
+  stop
+else (예)
+endif
+note right: 모든 fault는 filter window를 비운다.\n복구에는 새 유효 샘플이 필요하다.
+if (마지막 유효 샘플의 age < `stale_after`?) then (아니요)
+  #FFE5E5:Result = fault(Stale);
+  stop
+else (예)
+  :상태 있는 predicate\n(hysteresis, debounce 등);
+  :Result = ok(value)\n품질 보존;
+endif
+stop
+legend bottom
+모든 Result(ok든 fault든)는 작성자에게 전달되며,
+작성자가 `case` 또는 `recover`로 제어값을 고른다.
+end legend
+@enduml

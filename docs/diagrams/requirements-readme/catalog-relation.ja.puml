@@ -1,0 +1,25 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName "Hiragino Sans"
+skinparam defaultFontSize 13
+skinparam ArrowColor #526d76
+hide circle
+hide methods
+
+entity "requirements" as R {
+  id : "GF-REQ-" + SHA-256(statement) の先頭 16 桁の16進
+  statement
+  source : path, heading, lines, sha256
+  testIds
+  status / pendingReason
+}
+entity "tests" as T {
+  id
+  locator : path, anchor, lines, sha256
+}
+R }o--o{ T : testIds
+note bottom of R
+  testIds がない場合は
+  空でない pendingReason が必須
+end note
+@enduml

@@ -1,0 +1,19 @@
+@startuml
+!include ../_style.puml
+skinparam defaultFontName "PingFang SC"
+left to right direction
+rectangle "英文\nNAME.md 或 NAME.en.md\n（规范）" as en
+rectangle "韩文\nNAME.ko.md 或 NAME.md" as ko
+rectangle "中文\nNAME.zh.md" as zh
+rectangle "西班牙文\nNAME.es.md" as es
+rectangle "日文\nNAME.ja.md" as ja
+rectangle "docs/translations.json\n每个文件的 sha256" as manifest
+en --> ko : 翻译
+en --> zh : 翻译
+en --> es : 翻译
+en --> ja : 翻译
+ko ..> manifest : npm run docs:stamp
+zh ..> manifest
+es ..> manifest
+ja ..> manifest
+@enduml

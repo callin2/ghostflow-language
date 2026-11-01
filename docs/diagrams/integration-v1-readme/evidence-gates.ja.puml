@@ -1,0 +1,31 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName "Hiragino Sans"
+skinparam defaultFontSize 13
+skinparam ArrowColor #526d76
+skinparam rectangle {
+  BackgroundColor #f1f6f5
+  BorderColor #6d858b
+}
+hide stereotype
+
+rectangle "host-tests\ninjected-fixture" as HS
+rectangle "device-status\ngpio-readback\nregister-readback" as HWS
+rectangle "physical-observation" as PS
+rectangle "host ゲート" as H
+rectangle "hardware ゲート" as HW
+rectangle "physical ゲート" as P
+
+HS --> H
+HWS --> HW
+PS --> P
+H -[hidden]right- HW
+HW -[hidden]right- P
+H ..> HW : 決して補完しない
+HW ..> P : リードバックは決して\nphysical pass にならない
+note bottom of P
+  集約された pass はない。
+  各ゲート: not_run | pass | fail | unknown。
+  ソース "none" は not_run / unknown のみ許可。
+end note
+@enduml

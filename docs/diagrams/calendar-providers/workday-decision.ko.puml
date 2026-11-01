@@ -1,0 +1,25 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName Helvetica
+skinparam ArrowColor #555555
+title WorkCalendar workday/offday 판정 순서
+
+start
+if (snapshot이 있고 coverage 안이며\n만료 전인가?) then (아니요)
+  :Unknown\n(CalendarMissing 또는\nCalendarOutOfRange);
+  stop
+else (예)
+endif
+if (날짜별 근무 예외가 있는가?) then (예)
+  :예외를 사용\n(work 또는 off);
+  stop
+else (아니요)
+endif
+if (공휴일인가?) then (예)
+  :공휴일 근무 정책 적용;
+  stop
+else (아니요)
+endif
+:주간 패턴 적용\n(weeklyWorkMask);
+stop
+@enduml

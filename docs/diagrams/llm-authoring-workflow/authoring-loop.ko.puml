@@ -1,0 +1,27 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName Helvetica
+skinparam ArrowColor #555555
+skinparam ActivityBorderColor #555555
+
+start
+:Reference §1.2, §1.5, §4.7 조회
+(citation + digest);
+:build/authoring/pump.ghost.md의
+rev-1-input-v1 검사;
+:검사 실패: 진단 span이 원본 문서의
+pump <- start && ; 를 가리킴;
+:같은 문서를 편집
+(rev-2-input-v1: pump <- requested';);
+:rev-2 검사 후 컴파일
+(GFB + 소스 맵);
+:0, 1, 2 ms 스캔 시뮬레이션
+(가상 요청 / 안전 의도);
+:사용자에게 미결 질문
+(최대 실행 시간?);
+note right
+  사용자가 답할 때까지
+  타이머를 추가하지 않습니다.
+end note
+stop
+@enduml

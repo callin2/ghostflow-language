@@ -1,0 +1,19 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontSize 13
+skinparam ActivityBackgroundColor #F8F8F8
+start
+:step(packet, proposal);
+:Copiar argumentos de forma privada;
+:Comprobar identidades, tiempo,\nprocedencia, autoridad, capacidad;
+:Comprobar cada cambio: tipo, cuadrícula/rango,\nrango allowed, maxStep, maxChange móvil;
+if (¿Se superan todas las comprobaciones?) then (sí)
+  :Enviar UN evento atómico\nde ajustes al núcleo;
+  :Registrar historial tras\nla aceptación del núcleo;
+  :Devolver resultado del núcleo\n+ nueva revisión;
+else (cualquier fallo)
+  :Devolver outcome: null\n+ traza de adaptación;
+  note right: No se consolida ningún tick,\nreloj, historial ni revisión
+endif
+stop
+@enduml

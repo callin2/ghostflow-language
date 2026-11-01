@@ -1,0 +1,31 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName "Apple SD Gothic Neo"
+skinparam defaultFontSize 13
+skinparam ActivityBackgroundColor #F8F8F8
+start
+:소스 파싱;
+note right: 첫 오류에서 중단
+:선언 설정;
+note right: 첫 오류에서 중단
+partition "수집 단계 (서로 다른 오류 최대 20개)" {
+  :let 바인딩 검증;
+  if (오류 있음?) then (예)
+    :수집한 오류 보고;
+    stop
+  endif
+  :다음 상태 할당 검증;
+  if (오류 있음?) then (예)
+    :수집한 오류 보고;
+    stop
+  endif
+  :일반 출력 연결 검증;
+  if (오류 있음?) then (예)
+    :수집한 오류 보고;
+    stop
+  endif
+}
+:함수, 적응 전략,\n제약, 하향 변환(lowering);
+note right: 첫 오류에서 중단
+stop
+@enduml

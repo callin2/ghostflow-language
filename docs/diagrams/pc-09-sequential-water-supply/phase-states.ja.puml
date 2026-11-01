@@ -1,0 +1,32 @@
+@startuml
+skinparam shadowing false
+skinparam ArrowColor #555555
+hide empty description
+
+[*] --> Idle
+Idle --> Opening : 新たな START、\n閉位置を確認
+Opening --> Settling : 開リミットのみ
+Settling --> Watering : 開を 2 秒保持
+Watering --> PumpStopping : 5 分経過
+PumpStopping --> Closing : 次のスキャン\n（リミット取得可能）
+Closing --> Idle : 閉リミットのみ
+Settling --> FeedbackFault : 開フィードバック喪失
+Watering --> FeedbackFault : 開フィードバック喪失
+PumpStopping --> FeedbackFault : 開フィードバック喪失
+FeedbackFault --> Idle : START 解放、\n閉位置を確認
+Interrupted --> Idle : START 解放、\n閉位置を確認
+
+state Opening : valve_open_contactor ON
+state Watering : pump_contactor ON
+state Closing : valve_close_contactor ON
+state FeedbackFault : 全出力 OFF
+state Interrupted : 全出力 OFF
+
+note as N
+Idle から Closing まででは最初に確認:
+1. 両方のリミットが true -> FeedbackFault
+2. stop_ok または overload_ok を喪失 -> Interrupted
+どちらの故障状態も、許可が戻り
+競合がなくなるまで待ちます。
+end note
+@enduml

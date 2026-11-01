@@ -1,0 +1,32 @@
+@startuml
+skinparam defaultFontSize 12
+skinparam shadowing false
+start
+:Tick aceptado
+(una ClockSnapshot inmutable);
+if (¿Hora de pared de confianza?
+(o hold_trusted acotado)) then (no)
+  :Unknown(ClockUnknown)
+decide el fallback, sin nueva admisión;
+  stop
+else (sí)
+endif
+:El disparador planifica la ocurrencia
+(At, Daily, DailySlots, Periodic,
+Cron, Solar, Tide);
+:Regla de día / calendario (on)
+Unknown sigue siendo Unknown;
+if (¿Ocurrencia ya admitida
+o terminal en el libro mayor?) then (sí)
+  :Sin nueva admisión
+(sin catch-up, sin reproducción);
+  stop
+else (no)
+endif
+:La base decide la admisión
+(pulse, window, run, range)
+usando when y gap;
+:Proyecciones .due / .open / .active / .missed
++ registro de observación de programación;
+stop
+@enduml

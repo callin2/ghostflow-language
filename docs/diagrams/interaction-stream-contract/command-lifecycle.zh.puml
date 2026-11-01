@@ -1,0 +1,19 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontSize 12
+hide empty description
+[*] --> received
+received --> rejected : 从未开始\n（reason 必需）
+received --> started : 领域开始证据
+started --> completed : 完成证据
+started --> cancelled : reason 可选
+started --> failed : reason 必需
+rejected --> [*]
+completed --> [*]
+cancelled --> [*]
+failed --> [*]
+note right of rejected
+  终止状态
+  没有后继状态
+end note
+@enduml

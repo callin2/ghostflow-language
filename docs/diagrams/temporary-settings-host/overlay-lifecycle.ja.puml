@@ -1,0 +1,21 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName "Hiragino Sans"
+skinparam defaultFontSize 13
+hide empty description
+
+state "通常値のみ" as Ordinary
+state "一時オーバーレイが有効\n（通常値は下に保持）" as Overlay
+state "復帰が適用された" as Returned
+state "通常イベントで置き換えられた" as Superseded
+state "復帰が故障の出力として完了" as Fault
+
+[*] --> Ordinary
+Ordinary --> Overlay : 一時イベント\n（存続期間 Run または Until）
+Overlay --> Returned : キャンセル／Until の期限切れ／\nendRun または新しい実行（Run）
+Overlay --> Superseded : 影響を受ける対象への\n通常イベント
+Overlay --> Fault : 復帰が故障を出力\n（成功とは決して表示しない）
+Returned --> Ordinary
+Superseded --> Ordinary
+Fault --> Ordinary
+@enduml

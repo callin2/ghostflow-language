@@ -1,0 +1,28 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontSize 13
+skinparam defaultFontName "Hiragino Sans"
+title what-if ブランチ：記録済みプレフィックスから候補へ
+
+start
+:prepareWhatIfReplay
+（ソースマップを検証、再コンパイル、
+バイトコード + マニフェストを確認）;
+:チェックポイントを構築
+GhostFlow/replay-prefix-checkpoint-v1;
+:branch({ branchId, runId, synthetic });
+:新しいランタイムがプレフィックスをリプレイし
+結果ダイジェストを検証;
+:明示的な synthetic 値を適用;
+if (将来の全フレームに必要な\ninput/サンプルがすべてあるか？) then (はい)
+  :将来のフレームを実行
+（実際のポータブルコア）;
+  :候補 + レシートを返す
+（recorded / synthetic ラベル）;
+else (いいえ)
+  :status 'missing-input' を返す
+（欠けている名前と論理時刻、
+ブランチフレームは実行しない）;
+endif
+stop
+@enduml

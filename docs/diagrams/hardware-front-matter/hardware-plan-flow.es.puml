@@ -1,0 +1,16 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName Helvetica
+skinparam defaultFontSize 13
+skinparam componentStyle rectangle
+artifact ".ghost.md\n(front matter + código ghost)" as Src
+component "Compilador" as C
+artifact "GFB + manifiesto\n(sin cambios por el hardware)" as G
+artifact "hardwarePlan\n(derivado)" as P
+component "Responsable del despliegue" as D
+Src --> C
+C --> G
+C --> P
+P --> D
+note right of D : Resuelve perfil/módulos fijados,\nvalida la configuración con el esquema del proveedor,\ncomprueba la admisión antes de la activación
+@enduml

@@ -1,0 +1,19 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontSize 13
+skinparam ActivityBackgroundColor #F8F8F8
+start
+:step(packet, proposal);
+:私下复制参数;
+:检查身份标识、时间、\n来源、权限、容量;
+:逐项检查变更：类型、网格/范围、\nallowed 范围、maxStep、滚动 maxChange;
+if (所有检查都通过？) then (是)
+  :提交一个原子的\n核心设置事件;
+  :核心接受后\n记录历史;
+  :返回核心结果\n+ 新修订版;
+else (任一失败)
+  :返回 outcome: null\n+ 自适应追踪;
+  note right: 不提交任何 tick、时钟、\n历史或修订版
+endif
+stop
+@enduml

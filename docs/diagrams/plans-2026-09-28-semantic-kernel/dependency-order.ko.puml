@@ -1,0 +1,35 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontSize 13
+skinparam rectangleBorderColor #555555
+skinparam rectangleBackgroundColor #F7F7F7
+left to right direction
+
+rectangle "Issue 167\n정확한 dev push\n검증" as I167
+rectangle "Issue 168\ntick 계약\n정정" as I168
+rectangle "Issue 169\n증거에 근거한\n기능 상태" as I169
+rectangle "Issue 170\n유한 core +\n증거 matrix" as I170
+rectangle "Issue 171\nexpression\nCore IR" as I171
+rectangle "Issue 172\nmodule\nCore IR" as I172
+rectangle "Issue 173\ncanonical\n관수 증명" as I173
+rectangle "Issue 178\nretained-core\nreplay" as I178
+rectangle "Issue 179\nstale coverage\ngate" as I179
+rectangle "PR 175\ndev → main" as PR175
+
+I168 --> I169 : 분쟁 중인 행
+I168 --> I170
+I169 --> I170
+I168 --> I171
+I170 --> I171 : 동결 범위
+I171 --> I172
+I170 --> I172 : 동결 범위
+I170 --> I173 : 범위 +\n증거 schema
+I172 ..> I170 : 증명을\nmatrix에 투입
+I173 ..> I170 : 증명을\nmatrix에 투입
+note right of PR175
+  통합: dev 검토와 정확한 HEAD
+  검증 후 PR #175를 재사용.
+  #167, #178, #179에는
+  나열된 선행 조건이 없음.
+end note
+@enduml

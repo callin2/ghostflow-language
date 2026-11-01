@@ -1,0 +1,24 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontSize 13
+participant "ホスト\n(ControlRuntime)" as Host
+participant "WASM アダプタ" as Adapter
+participant "Rust デコーダ" as Decoder
+participant "Runtime" as RT
+
+Host -> Host : 非同期処理の前に\noptions.temporal を取り込む
+Host -> Adapter : activateTemporal(profile)
+Adapter -> Decoder : GFTA パケット（24+16N バイト）
+Decoder -> Decoder : すべてのフィールドを個別に検査
+alt 有効
+  Decoder -> RT : activate_with_temporal(&TemporalActivation)
+  RT -> RT : エンジン、バッファ、\nJ+1 個のチェックポイントを事前割り当て
+  RT --> Host : アクティブ
+  loop スキャンごと
+    Host -> RT : 固定の timeEpoch でスキャン
+  end
+else 拒否
+  Decoder --> Host : エラー。設定中の状態は保持
+end
+note over Host, RT : 新しい時間エポックには新しいセッションが必要です。
+@enduml

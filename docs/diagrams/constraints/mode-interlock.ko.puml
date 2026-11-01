@@ -1,0 +1,26 @@
+@startuml
+hide empty description
+skinparam shadowing false
+skinparam defaultFontName Helvetica
+skinparam state {
+  BackgroundColor White
+  BorderColor #555555
+}
+title Station 모드 인터록 (Station adapter 설비 계약)
+
+state Stopped
+state Auto
+state Manual
+state Configure : 구조적 구성 세션\n(재기동 금지)
+state Stopping : 진행 작업 정지\n새 시작 억제\n정리, 사용권 반환
+
+[*] --> Stopped
+Stopped --> Auto : enter(Auto)\nstopped(station)일 때만
+Stopped --> Manual : enter(Manual)\nstopped(station)일 때만
+Stopped --> Configure : enter(Configure)\nstopped(station)일 때만
+Auto --> Stopping : 명시적 정지 요청
+Manual --> Stopping : 명시적 정지 요청
+Stopping --> Stopped : 정지 완료\n(CommandedStop 또는 VerifiedStop)
+Configure --> Stopped : 검증 + 원자적 적용,\n세션 닫기
+note "Auto <-> Manual, 운전 -> Configure\n직접 전환 없음" as N1
+@enduml

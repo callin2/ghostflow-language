@@ -1,0 +1,19 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontSize 13
+skinparam activityBorderColor #4A6FA5
+skinparam activityBackgroundColor #F7F9FC
+title Aprender a través de los errores (Apéndice B)
+
+start
+:Elija un ejemplo de error (E90–E102);
+:Prediga el diagnóstico:\ndónde señala y qué regla incumple;
+:Compile el bloque como un programa ghost aislado;
+if (¿El diagnóstico coincide con la predicción?) then (sí)
+  :Nombre la promesa incumplida\ny la regla de la Referencia;
+else (no)
+  :Relea la regla\ny corrija su modelo;
+endif
+:Mantenga un solo error a la vez;
+stop
+@enduml

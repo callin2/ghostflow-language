@@ -1,0 +1,21 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName "Hiragino Sans"
+skinparam defaultFontSize 13
+skinparam ParticipantPadding 12
+
+participant "プロデューサ" as P
+participant "ホストのイングレス\n（シリアライズ地点）" as H
+participant "コア\n（評価）" as C
+participant "レンダラー /\nDevice" as D
+
+P -> H : 1. レシート\n（receiptSequence を割り当て）
+H -> H : 2. ラッチ + 不変の\nバッチをクローズ
+H -> C : 3. 単一のスナップショットを\n検証して評価
+C --> H : 4. 論理的な結果\n（確定または失敗した試行）
+H -> H : 5. 確定した証拠を\n取り込む（フックの前）
+H -> D : 6. 確定した安全意図を\nディスパッチ
+D --> H : 7. 効果結果 =\n相関付けされた新しいレシート
+H -> H : 8. 後のバッチ：明示的な\n型付きバインディングのみ
+note over P, H : ステップ 1 と 7 は境界の間で\n非同期に起こりうる
+@enduml

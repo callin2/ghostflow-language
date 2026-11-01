@@ -1,0 +1,32 @@
+@startuml
+skinparam shadowing false
+
+concise "mode （スキャン後）" as M
+concise "auto_demand" as D
+binary "request_armed （スキャン後）" as A
+concise "run_phase （スキャン後）" as P
+
+@0
+M is Off
+D is true
+A is low
+P is Stopped
+
+@1
+M is Auto
+
+@3
+D is false
+A is high
+
+@4
+D is true
+A is low
+P is Running
+
+@6
+D is false
+A is high
+P is Stopped
+
+@enduml

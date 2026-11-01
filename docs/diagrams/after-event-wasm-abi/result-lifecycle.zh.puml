@@ -1,0 +1,15 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontSize 13
+hide empty description
+[*] --> pending : 在 event.atMs 开始\n身份标识 (sourceTag, sourceEpoch, id)
+pending --> satisfied : 在 event.atMs + windowMs 之前\n出现测量得到的 true 观测\n（设置 satisfiedAtMs）
+pending --> expired : 到达窗口终点\n（不含终点）
+satisfied --> [*] : 显式确认
+expired --> [*] : 显式确认
+note right of pending
+  到达终态边界之前
+  不能被确认。
+  在确认之前一直保留（最多 32 个）。
+end note
+@enduml

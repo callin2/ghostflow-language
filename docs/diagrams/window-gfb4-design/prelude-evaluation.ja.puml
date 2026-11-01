@@ -1,0 +1,21 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontSize 13
+start
+:作成者が定義した古い状態を読む;
+:ソースの **ok** を評価;
+if (ok は成功?) then (はい)
+  :**payload** を即時に評価
+  （重複した観測でも評価する。
+  選択された式の故障は保持される）;
+else (いいえ)
+  :**fault** / **origin** の分岐を評価
+  （payload は評価しない）;
+  note right
+    物理ルートの密度と
+    連続性の観測は
+    引き続き処理される。
+  end note
+endif
+stop
+@enduml

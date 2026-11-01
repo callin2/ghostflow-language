@@ -1,0 +1,15 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontSize 13
+hide empty description
+[*] --> pending : event.atMs에 시작\nidentity (sourceTag, sourceEpoch, id)
+pending --> satisfied : event.atMs + windowMs 전의\n측정된 참 관측\n(satisfiedAtMs 설정)
+pending --> expired : 창 끝 도달\n(끝 시각은 제외)
+satisfied --> [*] : 명시적 확인
+expired --> [*] : 명시적 확인
+note right of pending
+  종료 경계 전에는
+  확인할 수 없음.
+  확인될 때까지 보존(최대 32).
+end note
+@enduml

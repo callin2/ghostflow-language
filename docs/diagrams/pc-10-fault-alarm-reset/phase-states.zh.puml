@@ -1,0 +1,38 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName "PingFang SC"
+skinparam ArrowColor #555555
+hide empty description
+
+[*] --> Idle
+Idle --> Opening : 新的 START，\n已确认关闭
+Opening --> Settling : 已确认开启
+Settling --> Watering : 2 s
+Watering --> PumpStopping : 5 min
+PumpStopping --> Closing : 下一次扫描
+Closing --> Idle : 已确认关闭
+
+Settling --> FaultPumpStopping : 水源水位低，\n已确认开启，\n允许动作
+Watering --> FaultPumpStopping
+PumpStopping --> FaultPumpStopping
+FaultPumpStopping --> FaultClosing : 下一次扫描
+FaultPumpStopping --> Faulted : 动作被禁止
+FaultClosing --> Faulted : 已关闭 / 10 s /\n动作被禁止
+Faulted --> Idle : 新的 RESET，\n允许复位
+
+state Opening : 开启 ON（超时 10 s）
+state Watering : 泵 ON
+state Closing : 关闭 ON（超时 10 s）
+state FaultPumpStopping : 所有动作输出 OFF，报警 ON
+state FaultClosing : 关闭 ON，报警 ON
+state Faulted : 所有动作输出 OFF，报警 ON
+
+note as N
+每次扫描最先检查：
+- 任何故障原因（有序的低水位
+  情况除外）-> Faulted，锁存原因
+- 观测不可用 -> 若已锁存原因则 Faulted，
+  否则 Idle
+- Idle..Closing 中的正常 STOP -> Idle（无报警）
+end note
+@enduml

@@ -1,0 +1,26 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName Helvetica
+skinparam defaultFontSize 13
+skinparam ArrowColor #526d76
+
+participant "宿主" as H
+participant "Provider" as P
+participant "原生 VM\n(Runtime)" as R
+database "持久存储" as D
+participant "输出" as O
+
+H -> P : 为已安装的 Solar 描述符\n请求事实
+P --> H : 触发实例事实\n（无 due 位）
+H -> R : tick_with_solar(clock, facts)
+R -> R : 暂存准入，求值 when，\n一起提交时钟、账本、状态、\n输出和日志
+R --> H : outcome + schedule_trace
+H -> R : solar_checkpoint()
+R --> H : GFSO v1 字节
+H -> D : 持久化检查点
+alt 保存成功
+  H -> O : 发布 / 应用 ON
+else 保存失败
+  H -> O : 停机并清除输出
+end
+@enduml

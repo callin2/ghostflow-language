@@ -32,7 +32,7 @@
     {
       "root": {
         "filename": "E31.ghost.md",
-        "sha256": "62f357b7cf4c74ebfb5fe527df7e11f68d719df316e7c289740194ee48756771",
+        "sha256": "a526002ca775ee331e3eaa5b3898bcca90eed76b063108f69290fa94c46a588d",
         "canonicalSource": {
           "path": "docs/ProgrammingInGhostflow.md",
           "example": "E31"

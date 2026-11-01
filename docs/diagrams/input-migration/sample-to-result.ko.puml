@@ -1,0 +1,17 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName Helvetica
+skinparam defaultFontSize 13
+left to right direction
+
+rectangle "Producer\n(드라이버, USB, 소프트웨어)" as P
+rectangle "samples[name] =\n{epoch, id, timestampMs,\nquality, value}" as S
+rectangle "Conditioning\n(필터, stale 판정,\nrecovery 횟수)" as C
+rectangle "input name: T\n읽기 결과\nResult<T, SensorFault>" as R
+rectangle "작성자의 fault 정책\n(case 분석 또는 recover)" as F
+
+P --> S
+S --> C
+C --> R
+R --> F
+@enduml

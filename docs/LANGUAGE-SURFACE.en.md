@@ -1,6 +1,3 @@
-<!-- translation-source: docs/LANGUAGE-SURFACE.md -->
-[Korean original](LANGUAGE-SURFACE.md)
-
 # GhostFlow selected syntax · control
 
 This page is a compact tour of the **selected GhostFlow surface syntax**: the `control` form built around braces, expressions, and output connections. It shows the core notation, how state, sensors, and outputs behave on each tick, how time and device adaptation are expressed, and three annotated examples. The [Language Reference](LANGUAGE-REFERENCE.en.md) remains the normative source for exact rules.

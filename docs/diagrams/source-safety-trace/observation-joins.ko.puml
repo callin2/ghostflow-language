@@ -1,0 +1,16 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontSize 13
+skinparam rectangleRoundCorner 8
+rectangle "컴파일러 companion\ntraceMetadata (source-trace-v1):\nfingerprint, bindings, constraints,\ndependencies, windowSites" as meta
+rectangle "런타임 trace\nTickRecord.to_json():\nsafetyTrace, windowTrace" as trace
+rectangle "observeSourceTrace\n(소스 + 안전 + window 증거)" as ost
+rectangle "observeRuntimeValues\n(runtime-values-v1)" as orv
+rectangle "interaction-runtime-snapshot\n(runtime-snapshot-v0)" as snap
+meta --> ost
+trace --> ost
+meta --> orv
+trace --> orv
+orv --> snap : 생성된 타이머 저장소를\n내부에서 해석
+note bottom of ost : 실제 필드만 결합;\n식을 다시 평가하지 않음
+@enduml

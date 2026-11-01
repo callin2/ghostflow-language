@@ -1,0 +1,17 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName Helvetica
+skinparam ArrowColor #555555
+skinparam rectangle {
+  BackgroundColor White
+  BorderColor #555555
+}
+title 요청 OFF: 왼쪽 피연산자가 false인 AND
+
+rectangle "output = left && right\nvalue = false" as AND
+rectangle "left\n평가됨, value = false\nsupportsResult = true" as L #E8F5E9
+rectangle "right (0으로 나누게 됨)\n생략됨: unavailable\n값 없음, 결코 지지하지 않음" as R #EEEEEE
+
+AND --> L : 지지 edge
+AND ..> R : 평가되지 않음
+@enduml

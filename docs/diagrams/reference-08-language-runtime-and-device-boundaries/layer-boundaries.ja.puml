@@ -1,0 +1,33 @@
+@startuml
+skinparam defaultFontName "Hiragino Sans"
+skinparam shadowing false
+skinparam defaultFontSize 13
+skinparam componentStyle rectangle
+
+package "意味" {
+  [正本ソース\n(.ghost.md)] as src
+  [コンパイラ / ツール] as tools
+}
+package "判断" {
+  [制御ランタイム\n(Program / run)] as rt
+}
+package "実行環境（ホスト）" {
+  [クロック、カレンダー、\n予測、台帳、\nチェックポイント、設定ストア] as env
+}
+package "Device" {
+  [入力ドライバ] as drv
+  [出力レンダラー] as rnd
+  [設置プロファイル /\nバインディング] as bind
+}
+[Cabinet view / UI] as ui
+
+src --> tools : 解釈、検査
+tools --> rt : 実行可能な Program
+env --> rt : 時刻、データのスナップショット
+drv --> rt : サンプル\n（値、時刻、品質）
+rt --> rnd : 安全な出力意図
+bind ..> drv : 論理ロール -> エンドポイント
+bind ..> rnd : 論理ロール -> エンドポイント
+rt --> ui : ディスクリプタ、\n観測
+ui --> rt : 型付きの設定要求
+@enduml

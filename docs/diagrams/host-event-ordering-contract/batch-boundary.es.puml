@@ -1,0 +1,44 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName Helvetica
+skinparam defaultFontSize 13
+scale 1 as 70 pixels
+hide time-axis
+
+concise "Recepciones" as R
+concise "Lote" as B
+concise "Instancia" as I
+
+@0
+R is "r1"
+B is "abierto (lote N)"
+I is "inactiva"
+
+@1
+R is "r2"
+
+@2
+R is "cierre"
+B is "N cerrado"
+I is "evaluar N"
+
+@3
+R is "r3"
+
+@4
+I is "consolidar + despachar N"
+
+@5
+R is "r4"
+
+@6
+R is "cierre"
+B is "N+1 cerrado: r3, r4"
+I is "evaluar N+1"
+
+@7
+R is "-"
+I is "inactiva"
+
+B@2 <-> @6 : r3 y r4 llegan tras el cierre -> esperan a N+1
+@enduml

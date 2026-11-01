@@ -1,0 +1,21 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName Helvetica
+skinparam defaultFontSize 13
+left to right direction
+title Identidades separadas unidas para una ejecución (registro propuesto)
+
+rectangle "Revisión de\nfuente / composición" as S
+rectangle "Identidad del programa\ncompilado (bytes/hash)" as P
+rectangle "Revisión de ajustes /\nposición efectiva" as G
+rectangle "Revisión de\ninstalación / vinculación" as I
+rectangle "Identidad del paquete\nde despliegue" as K
+rectangle "Identidad de ejecución\n(runId; scanId ordenado\nsolo dentro de una ejecución)" as R
+
+S --> P : compilar
+P --> K
+I --> K : bindingRevision
+K --> R : el despliegue inicia una ejecución
+G --> R : evento en vivo en\nla misma ejecución
+I --> R : unida
+@enduml

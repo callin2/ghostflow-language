@@ -30,6 +30,7 @@ export const LANGUAGE_TESTS = Object.freeze([
   'tests/curriculum-pc05-quality.test.mjs',
   'tests/curriculum-pc06-10-quality.test.mjs',
   'tests/doc-translations.test.mjs',
+  'tests/doc-diagrams.test.mjs',
   'tests/io-role-documentation.test.mjs',
   'tests/doc-index.test.mjs',
   'tests/verified-wasm-artifact.test.mjs',

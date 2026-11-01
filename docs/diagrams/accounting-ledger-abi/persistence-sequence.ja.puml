@@ -1,0 +1,26 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName "Hiragino Sans"
+skinparam defaultFontSize 13
+skinparam ArrowColor #526d76
+
+participant "ホスト" as H
+participant "台帳プリミティブ" as L
+database "永続ストレージ\n（ホスト所有）" as D
+
+H -> L : 作成
+note right of L : 読み取りは Unknown
+H -> L : 空で初期化（初回インストール時のみ）
+H -> L : スナップショット
+L --> H : バイト列 + リビジョン N
+H -> D : バイト列をそのまま書き込み
+D --> H : ok
+H -> L : リビジョン N を確認応答
+note right of L : 読み取りは Known
+H -> L : レコード挿入
+note right of L : リビジョン N+1、読み取りは Unknown
+H -> L : 古いリビジョン N を確認応答
+L --> H : 拒否
+H -> L : スナップショット、書き込み、N+1 を確認応答
+note right of L : 再び読み取りは Known
+@enduml

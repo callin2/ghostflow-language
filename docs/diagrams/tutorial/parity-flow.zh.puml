@@ -1,0 +1,26 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName "PingFang SC"
+skinparam defaultFontSize 13
+skinparam componentStyle rectangle
+title 教程运行器：一个示例，两个 VM
+
+file "NN-name.ghost.md" as src
+component "compileSource\n（真实编译器）" as cc
+file "build/tutorial/NN-name.gfb\n+ .manifest.json, .map.json" as gfb
+component "WASM 运行时\n（Node 宿主）" as wasm
+file ".inputs.csv\n（记录的 VM 输入快照）" as csv
+component "原生运行器\n(target/debug/examples/run)" as nat
+file ".trace.json" as trace
+node "断言：VM 追踪相同" as cmp
+
+src --> cc
+cc --> gfb
+gfb --> wasm
+wasm --> csv : 记录精确输入
+gfb --> nat
+csv --> nat
+wasm --> trace
+wasm --> cmp : VM 追踪
+nat --> cmp : VM 追踪（JSON）
+@enduml

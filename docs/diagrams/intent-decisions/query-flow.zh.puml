@@ -1,0 +1,28 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontSize 12
+skinparam componentStyle rectangle
+left to right direction
+
+rectangle "intent-decisions-request-v1" as req {
+  card "current\n（source + intentEvidence\n+ 可选 sourceClosure）" as cur
+  card "previous（可选）" as prev
+  card "transitions（可选，\n需要 previous）" as tr
+  card "requirementContract\n（可选，外部）" as rc
+}
+rectangle "inspectIntentDecisions\n（纯查询）" as q
+card "现有编译器：\n重新编译 + 校验\n锚点和证据" as comp
+card "intent-decisions-result-v1\ndecisions, judgments,\nrequirements, comparison, trust" as res
+
+cur --> q
+prev --> q
+tr --> q
+rc --> q
+q --> comp
+comp --> q
+q --> res
+note bottom of res
+  只做报告。不批准、不认证、
+  不暂停/阻止、不改变运行时。
+end note
+@enduml

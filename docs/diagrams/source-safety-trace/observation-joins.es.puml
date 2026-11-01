@@ -1,0 +1,16 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontSize 13
+skinparam rectangleRoundCorner 8
+rectangle "Acompañante del compilador\ntraceMetadata (source-trace-v1):\nfingerprint, bindings, constraints,\ndependencies, windowSites" as meta
+rectangle "Traza del runtime\nTickRecord.to_json():\nsafetyTrace, windowTrace" as trace
+rectangle "observeSourceTrace\n(evidencia de fuente + seguridad + ventanas)" as ost
+rectangle "observeRuntimeValues\n(runtime-values-v1)" as orv
+rectangle "interaction-runtime-snapshot\n(runtime-snapshot-v0)" as snap
+meta --> ost
+trace --> ost
+meta --> orv
+trace --> orv
+orv --> snap : almacenamiento de temporizadores\ngenerado resuelto internamente
+note bottom of ost : solo une campos reales;\nnunca reevalúa expresiones
+@enduml

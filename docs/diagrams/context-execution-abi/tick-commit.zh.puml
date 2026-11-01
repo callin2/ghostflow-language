@@ -1,0 +1,22 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName "PingFang SC"
+start
+:宿主发送事实包\n（时钟、观测、日历、\n行、设置事件）;
+:Rust 校验数据包与绑定;
+if (数据包有效？) then (否)
+  :拒绝数据包;
+  :不消耗任何内容\n（设置事件、触发实例 ID）;
+  stop
+endif
+:克隆上下文引擎;
+:暂存提供方校验、设置、\n受保护的 Result、调度计划\n谓词与状态转换;
+:基于暂存值运行 VM tick;
+if (VM tick 成功？) then (是)
+  :提交暂存的上下文与追踪;
+else (否)
+  :丢弃暂存副本;
+  :不消耗任何内容;
+endif
+stop
+@enduml

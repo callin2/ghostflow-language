@@ -1,0 +1,41 @@
+@startuml
+title オフラインタイマー: 完全なドキュメントから明示的な仮想スキャンまで
+actor "作成者" as Author
+participant "ghostc (Node)" as Compiler
+database "GFB + マニフェスト + ソースマップ" as Files
+participant "ghostsim (Node)" as Host
+participant "scenario_scan (Rust)" as Runner
+participant "ScanDriver" as Scan
+participant "Rust ランタイム" as Core
+Author -> Compiler: 完全な .ghost.md を check
+Compiler --> Author: 診断 + ソースの同一性
+Author -> Compiler: 同じ完全な .ghost.md を compile
+Compiler -> Files: GFB + マニフェスト + ドキュメント全体を含むマップ
+Author -> Host: 成果物のパス + TOON シナリオ
+Host -> Files: 成果物/ソースの同一性を読み込んで検証
+Host -> Host: 厳格にデコード。全アクションと型付き入力を検証
+Host -> Runner: 新しいプロセスを起動: GFB パス + 非公開 JSON アクション
+Runner -> Core: 読み込み、インストール、仮想アクチュエータのケイパビリティ追加、有効化
+Runner -> Scan: ランタイムの所有権を移譲。次のスキャン ID = 0
+Runner -> Runner: 初期値 start=false, stop=false
+Runner -> Runner: 入力 start=true（保持入力のみ）
+note over Runner,Core: 入力の変更だけでは評価も時間の前進も起きない。
+loop atMs = 0, 1999, 2000; スキャン ID = 0, 1, 2
+  Runner -> Scan: 完全な入力スナップショット + スキャン ID + atMs
+  Scan -> Scan: 型、シーケンス、減少しない時間を検証
+  Scan -> Core: tick_at(atMs)
+  Core -> Core: 前状態 -> 次状態 -> requested -> safe
+  Core -> Core: 状態とトレースを確定
+  Core --> Scan: 入力、stateBefore/After、requested/safe、故障
+  Scan -> Scan: スキャンのシーケンスと論理クロックを進める
+  Scan --> Runner: ScanOutcome
+  Runner --> Host: stdout に JSON トレース行を 1 行
+end
+note over Scan,Core
+  0 ms: Idle -> Running; pump ON/ON
+  1999 ms: Running -> Running; pump ON/ON
+  2000 ms: Running -> Done; pump OFF/OFF
+  requested/safe は仮想意図であり、適用済み出力ではない。
+end note
+Host --> Author: TOON/JSON の結果 1 つ + ハッシュ + 全スキャン行
+@enduml

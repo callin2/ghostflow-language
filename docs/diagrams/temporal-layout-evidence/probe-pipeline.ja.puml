@@ -1,0 +1,18 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName "Hiragino Sans"
+skinparam defaultFontSize 13
+skinparam ArrowColor #526d76
+
+start
+:crates/ghostflow-core/src/*.rs を
+build/temporal-layout-probe にコピー;
+:型ごとに size_of エクスポートを 1 つ追加
+（コピーのみ。製品ツリーは変更しない）;
+:rustc → wasm32 cdylib probe.wasm;
+:Node がプローブをインスタンス化し、エクスポートを呼ぶ;
+:build/temporal-wasm32-layout.json を書き出す;
+:独立した JS フィクスチャオラクルが
+幅と宣言されたジオメトリを組み合わせる;
+stop
+@enduml

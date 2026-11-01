@@ -1,0 +1,20 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName "Hiragino Sans"
+skinparam defaultFontSize 13
+participant "プラントモデル\n(greenhouse-temperature-v1)" as P
+participant "シナリオホスト" as H
+participant "Rust 制御" as C
+participant "仮想アクチュエータ\n(roof-vent)" as A
+H -> P : atMs まで積分\n(直前の適用位置を一定に保持)
+P --> H : 正準 K での温度
+H -> C : 生成された Good の Temperature サンプル
+C --> H : 安全な換気窓の目標値
+H -> A : 範囲チェック (min..max)
+alt 評価と範囲チェックが成功
+  H -> H : スキャン行を確定
+  A --> H : 安全な目標値が次の区間の\n適用位置になる
+else 評価またはレンダラーの受け入れが失敗
+  H -> H : 実行を終了、この境界の行はなし\n(プラントの計算は破棄)
+end
+@enduml

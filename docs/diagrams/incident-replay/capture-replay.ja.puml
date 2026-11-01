@@ -1,0 +1,25 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName "Hiragino Sans"
+skinparam defaultFontSize 13
+
+start
+if (コマンド?) then (capture)
+  :プログラムの初期化子から\nシナリオを実行\n(ghostsim.runScenario);
+  :GFB、マニフェスト、ソースマップ、\nシナリオ、完了した結果を\n新しいディレクトリに封印;
+  :captured（終了コード 0）;
+  stop
+else (replay)
+  :マニフェストの封印と、すべての\nインベントリのハッシュとサイズを検証;
+  :検証済みのバイト列を\n非公開の一時ディレクトリに配置;
+  :再実行し、記録と比較\n（--candidate があればそれとも比較）;
+  if (結果を分類) then (すべてのチェックに合格)
+    :completed / compared（終了コード 0）;
+  elseif () then (初期状態または\n成果物が欠落)
+    :partial（終了コード 2）;
+  else (破損、リビジョン不一致、\nスキャンのギャップ、時刻または起動の誤り、\n判断の変化、候補の失敗)
+    :rejected（終了コード 1）;
+  endif
+  stop
+endif
+@enduml

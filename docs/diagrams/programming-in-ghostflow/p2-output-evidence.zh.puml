@@ -1,0 +1,27 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontSize 13
+skinparam ActivityBackgroundColor #F7F9FC
+skinparam ActivityBorderColor #4A6FA5
+title 从请求意图到物理证据（E05 最后一行）
+
+start
+:请求意图\n（<- 连接）\npump=true, valve=false;
+:输出约束\nrequire pump => valve;
+:安全意图\n（本章所说的“最终输出”）\npump=false, valve=false;
+note right
+  约束只会把 true
+  降为 false。运行时
+  绝不会为满足规则
+  而打开阀门。
+end note
+:已应用（applied）\n（渲染器证据：\n命令已写出）;
+:已确认（confirmed）\n（反馈证据：\n限位、编码器……）;
+note right
+  applied 与 confirmed 位于
+  语言的输出意图之外。
+  safe=true 并不能证明
+  泵已运行。
+end note
+stop
+@enduml

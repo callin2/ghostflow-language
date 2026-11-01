@@ -1,0 +1,19 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName Helvetica
+skinparam defaultFontSize 13
+left to right direction
+
+artifact "Artefacto compilado\n(fuente, cierre, bytecode,\nmanifiesto, mapa de fuente)" as A
+artifact "Presentación\n(etiquetas,\npresentationRevision)" as L
+rectangle "Activación\n(verificar identidad,\nrecompilar, comprobar etiquetas)" as ACT
+artifact "Traza del runtime\n(observeSourceTrace)" as T
+rectangle "projectTrace(trace)\n(comprobar huella del módulo)" as PT
+artifact "Entradas congeladas\n(ID de instancia, etiqueta, nodo,\nsímbolo, campos de traza)" as OUT
+
+A --> ACT
+L --> ACT
+ACT --> PT
+T --> PT
+PT --> OUT
+@enduml

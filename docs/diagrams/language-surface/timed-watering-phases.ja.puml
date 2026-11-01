@@ -1,0 +1,16 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName "Hiragino Sans"
+hide empty description
+
+[*] --> Idle
+Idle --> Open1 : starts.due
+Open1 --> Water1 : age >= 2s
+Water1 --> Stop1 : age >= 5min
+Stop1 --> Idle : age >= 2s
+
+Idle : valve オフ、pump オフ
+Open1 : valve オン、pump オフ
+Water1 : valve オン、pump オン
+Stop1 : valve オン、pump オフ
+@enduml

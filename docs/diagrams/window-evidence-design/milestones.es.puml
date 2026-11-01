@@ -1,0 +1,15 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontSize 12
+rectangle "Fundamentos del motor\nWindow de temporal.rs, checkpoints" as A
+rectangle "Decodificador/verificador GFB4\n(carga, no ejecución)" as B
+rectangle "GFB4 + ejecución nativa\nbatch11, REF-04-027/028/029" as C
+rectangle "WASM, host, traza de fuente\nbarrera completa batch12" as D
+rectangle "Ventanas derivadas anidadas\nbatch13 (window-derived-design.md)" as E
+rectangle "Abierto: restauración duradera,\nhot-swap, evidencia estimada" as F #FFE0B2
+A --> B
+B --> C
+C --> D
+D --> E
+E --> F
+@enduml

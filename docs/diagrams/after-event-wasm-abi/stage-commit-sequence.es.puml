@@ -1,0 +1,29 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontSize 13
+participant "Host (JS)" as H
+participant "Adaptador WASM" as W
+participant "Rust AfterEvent<32>" as R
+H -> W : stage(batch)
+W -> W : codificar paquete GFAE v1
+W -> R : stage(packet)
+R -> R : vencer, acusar recibo,\nañadir inicios, aplicar predicado
+alt la preparación tiene éxito
+  R --> W : preparado (no consolidado)
+  H -> W : stagedAny() / stagedAll()
+  note over H : results sigue mostrando\nsolo el estado consolidado
+  alt commit
+    H -> W : commit()
+    W -> R : commit
+    note over R : el estado preparado\npasa a consolidado
+  else rollback
+    H -> W : rollback()
+    W -> R : rollback
+    note over R : se conservan los\nresultados anteriores
+  end
+else falla la decodificación o la preparación
+  R --> W : error
+  W --> H : lanza excepción
+  note over R : no se consume nada;\nel lote preparado anterior\nadmite aún commit/rollback
+end
+@enduml

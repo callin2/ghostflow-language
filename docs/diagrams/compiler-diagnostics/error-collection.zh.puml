@@ -1,0 +1,30 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontSize 13
+skinparam ActivityBackgroundColor #F8F8F8
+start
+:解析源代码;
+note right: 遇到第一个错误即停止
+:建立声明;
+note right: 遇到第一个错误即停止
+partition "收集阶段（最多 20 个不同错误）" {
+  :验证 let 绑定;
+  if (有错误？) then (是)
+    :报告收集到的错误;
+    stop
+  endif
+  :验证下一状态赋值;
+  if (有错误？) then (是)
+    :报告收集到的错误;
+    stop
+  endif
+  :验证普通输出连接;
+  if (有错误？) then (是)
+    :报告收集到的错误;
+    stop
+  endif
+}
+:函数、自适应策略、\n约束、降级（lowering）;
+note right: 遇到第一个错误即停止
+stop
+@enduml

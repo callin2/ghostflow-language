@@ -1,0 +1,30 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontSize 13
+skinparam rectangleBorderColor #555555
+rectangle "R1 사용자 결과 (P0)" as R1
+rectangle "R2 권한/identity (P0)" as R2
+rectangle "R3 실행 (P0)" as R3
+rectangle "R4 포트/바인딩 (P1)" as R4
+rectangle "R5 계약 (P1)" as R5
+rectangle "R6 override (P1)" as R6
+rectangle "R7 패키지 (P1)" as R7
+rectangle "R8 incident 증거 (P0)" as R8
+rectangle "R9 인수 (P1)" as R9
+R2 --> R3
+R2 --> R4
+R2 --> R6
+R3 --> R5
+R4 --> R5
+R2 --> R7
+R3 --> R7
+R6 --> R7
+R1 --> R8
+R2 --> R8
+R3 --> R8
+R1 --> R9
+R5 --> R9
+R7 --> R9
+R8 --> R9
+note bottom of R9 : R1-R8 이후에만 확정
+@enduml

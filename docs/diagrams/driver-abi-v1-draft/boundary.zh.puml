@@ -1,0 +1,25 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName Helvetica
+skinparam componentStyle rectangle
+title 提议的原生边界（草案，未实现）
+
+package "执行宿主" {
+  [Rust 核心\n（求值、提交）] as Core
+  [宿主\n（绑定、调度、策略）] as Host
+}
+package "Driver（设备专用）" {
+  [端点 I/O 与\n解释] as Drv
+}
+node "Device / 板卡\n（物理 I/O、故障策略）" as Dev
+
+Host --> Core : 有序输入记录
+Core --> Host : 安全/有效意图
+Host --> Drv : gfdrv_api_v1\n(describe, open, poll,\napply, cancel, close)
+Drv ..> Host : gfdrv_host_v1\n(clock, report)
+Drv --> Dev : 端点通信
+note bottom of Core
+  不属于此 ABI：Rust ScanDriver（核心扫描适配器）
+  以及 gf_* / gf_frame_* WASM 宿主-核心 ABI
+end note
+@enduml

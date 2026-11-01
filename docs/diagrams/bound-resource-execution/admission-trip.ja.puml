@@ -1,0 +1,20 @@
+@startuml
+hide empty description
+skinparam shadowing false
+skinparam defaultFontSize 13
+skinparam state {
+  BackgroundColor #F8F8F8
+  BorderColor #555555
+}
+
+state "受け入れなし\nsafe: pump OFF" as Idle
+state "受け入れ済み\nsafe = requested" as Admitted
+state "トリップ\n安全ベクトル:\npump OFF, valve ON" as Tripped
+
+[*] --> Idle
+Idle --> Admitted : 新たなモードの占有宣言が\n包絡を通過\n(スキャン 0: automatic, スキャン 4: manual)
+Admitted --> Tripped : valve OFF のまま\npump ON を要求\n(スキャン 1)
+Tripped --> Tripped : valve 要求が戻る\n自動再起動なし\n(スキャン 2)
+Tripped --> Idle : 中立フレーム:\nすべてのモードの占有宣言が false\n(スキャン 3)
+Admitted --> Idle : すべてのモードの占有宣言が false
+@enduml

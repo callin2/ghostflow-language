@@ -1,0 +1,24 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName "PingFang SC"
+skinparam defaultFontSize 13
+title npm test (tools/verify-language.mjs)：在第一个失败处停止
+
+start
+:预检：Node 22+、POSIX 宿主、
+源哈希、目录、文档检查;
+:1. 工具链版本 + cargo fmt --check;
+:2. 编译旧版 fixture (include_bytes!);
+:3. cargo test --locked --offline --workspace;
+:4. 从同一核心构建原生运行器、
+release scan_tape 运行器和 release WASM;
+:5. Node 语言/集成测试套件
+（含原生/WASM tape 一致性）;
+:6. 用新构建的运行器执行教程
+（比较原生/WASM 追踪）;
+:7. 记录资源、运行器/WASM
+摘要和源哈希;
+:写入 build/verification.json
+（+ build/verification-runs/ 中的唯一副本）;
+stop
+@enduml

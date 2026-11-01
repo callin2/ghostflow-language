@@ -1,0 +1,16 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontSize 13
+hide empty description
+state "Config Result 正常" as ok
+ok : Solar 准入正常求值
+state "依赖的 config 故障" as fault
+fault : 准入 = Unknown(SettingsFault)
+fault : （即使 fault 分支为真；\n不使用旧值或默认值）
+state "恢复基线" as base
+base : 错过的启动不会被补发
+[*] --> ok
+ok --> fault : 当前观测为故障
+fault --> base : 之后的成功观测
+base --> ok : 下一次符合条件的穿越\n可以触发一次
+@enduml

@@ -1,0 +1,19 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontSize 13
+skinparam rectangleBorderColor #4A6FA5
+skinparam rectangleBackgroundColor #F7F9FC
+left to right direction
+title 每类变更在哪里处理（问题 33-40）
+
+rectangle "GhostFlow 源代码（.ghost.md）\n逻辑输入/输出、\n输入契约、控制规则" as SRC
+rectangle "运行设置\n（config 值）" as CFG
+rectangle "设施绑定\n逻辑端口 -> 引脚 / 通道 / 地址" as BIND
+rectangle "输入 Driver /\n输出渲染器\n协议、原始值、极性" as DRV
+rectangle "物理设备\n传感器、按钮、继电器、\n扩展板" as DEV
+
+CFG --> SRC : 实时事件，\n同一 Program
+SRC --> BIND : 逻辑端口
+BIND --> DRV
+DRV --> DEV
+@enduml

@@ -1,0 +1,17 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName "Hiragino Sans"
+skinparam ArrowColor #555555
+skinparam rectangle {
+  BackgroundColor White
+  BorderColor #555555
+}
+title 要求 OFF：左オペランドが false の AND
+
+rectangle "output = left && right\nvalue = false" as AND
+rectangle "left\n評価済み、value = false\nsupportsResult = true" as L #E8F5E9
+rectangle "right（ゼロ除算になるはずの式）\nスキップ：利用不可\n値なし、結果を支持しない" as R #EEEEEE
+
+AND --> L : 支持エッジ
+AND ..> R : 評価されない
+@enduml

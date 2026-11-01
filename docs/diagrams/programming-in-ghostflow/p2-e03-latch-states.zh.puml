@@ -1,0 +1,24 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontSize 13
+skinparam StateBackgroundColor #F7F9FC
+skinparam StateBorderColor #4A6FA5
+title E03：running 与 restart_blocked（每个 tick 一次转移）
+state "Stopped（停止）\nrunning=false\nrestart_blocked=false" as Stopped
+state "Running（运行）\nrunning=true" as Running
+state "RestartBlocked（禁止重启）\nrunning=false\nrestart_blocked=true" as Blocked
+[*] --> Stopped
+Stopped --> Running : START 按下，STOP 松开\n（两个输入均正常）
+Running --> Stopped : STOP 按下（正常），\n无重启禁止
+Stopped --> Blocked : START 或 STOP fault
+Running --> Blocked : STOP fault，或在\n重启禁止已设置时停止
+Blocked --> Stopped : 两个输入均正常\n且 START 松开
+Blocked --> Blocked : START 仍被按住，\n或出现任何 fault
+note right of Running
+  运行中发生 START fault 时，
+  （只要 STOP 正常且松开）
+  继续运行，但设置 restart_blocked。
+  在两个输入均正常时观测到
+  START 松开后解除。
+end note
+@enduml

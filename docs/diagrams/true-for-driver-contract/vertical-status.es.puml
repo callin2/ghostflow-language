@@ -1,0 +1,29 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontSize 12
+skinparam rectangle {
+  RoundCorner 8
+}
+left to right direction
+legend top left
+  Verde = corte implementado
+  Naranja = aún abierto (el camino público sigue en RED)
+endlegend
+
+rectangle "Compilador público de .ghost.md\n(diagnóstico unsupported activo)" as PC #FFE0B2
+rectangle "Verificador de tipos + descriptor\ntrue-for (Bool directo)" as TC #C8E6C9
+rectangle "Formato GFB 6\netiqueta de preludio 2, opcode 59" as GFB #C8E6C9
+rectangle "ControlRuntime: manifiesto,\ncaptura de intervalos, tramas" as CR #FFE0B2
+rectangle "WASM activateTemporal\n(GFTA v2)" as W #C8E6C9
+rectangle "TrueForActivation nativo\n+ tick en Rust" as N #C8E6C9
+rectangle "Motor TrueFor\nstage / commit / rollback" as E #C8E6C9
+rectangle "Checkpoint certificado,\nrewind, replay" as CK #FFE0B2
+
+PC --> TC
+TC --> GFB
+GFB --> N
+CR --> W
+W --> N
+N --> E
+E --> CK
+@enduml

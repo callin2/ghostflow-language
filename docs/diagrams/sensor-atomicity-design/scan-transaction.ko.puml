@@ -1,0 +1,44 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName Helvetica
+skinparam defaultFontSize 13
+skinparam ArrowColor #526d76
+
+start
+:전체 scan을 capture하고 검증;
+if (모든 conditioner를 begin?) then (모두 begin됨)
+else (begin 실패)
+  :이미 begin한 handle만 rollback;
+  stop
+endif
+:입력 conditioning, VM 입력 준비
+committed = false;
+if (준비 성공?) then (예)
+else (아니오)
+  :begin한 모든 conditioner를 rollback;
+  :VM 상태, 시각, frame ID 그대로;
+  :유효한 재시도 허용;
+  stop
+endif
+:committed = null
+native VM 호출;
+if (Native 호출이 반환?) then (예)
+  :committed = native 반환값;
+  if (반환값?) then (1)
+    :conditioner, 수용된 host 시각과
+    frame ID를 commit;
+    :trace/outcome JSON decoding;
+    note right
+      이후 오류는 host를 종료시키지만
+      scan을 되돌릴 수는 없음
+    end note
+  else (0: 알려진 거부)
+    :begin한 모든 conditioner를 rollback;
+    :유효한 재시도 허용;
+  endif
+else (trap / adapter 예외)
+  :상태 알 수 없음: rollback 주장 안 함;
+  :이후 step 종료;
+endif
+stop
+@enduml

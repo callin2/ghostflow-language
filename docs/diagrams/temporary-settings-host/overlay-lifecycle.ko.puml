@@ -1,0 +1,21 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName Helvetica
+skinparam defaultFontSize 13
+hide empty description
+
+state "ordinary 값만 있음" as Ordinary
+state "임시 overlay 활성\n(ordinary 값은 아래에 유지)" as Overlay
+state "복귀 적용됨" as Returned
+state "ordinary event로 대체됨" as Superseded
+state "복귀가 fault emission으로 완료됨" as Fault
+
+[*] --> Ordinary
+Ordinary --> Overlay : temporary event\n(lifetime Run 또는 Until)
+Overlay --> Returned : cancel / Until 만료 /\nendRun 또는 새 run (Run)
+Overlay --> Superseded : 영향받는 target에 대한\nordinary event
+Overlay --> Fault : 복귀가 fault를 내보냄\n(성공으로 표시하지 않음)
+Returned --> Ordinary
+Superseded --> Ordinary
+Fault --> Ordinary
+@enduml

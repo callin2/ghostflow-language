@@ -1,0 +1,25 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName Helvetica
+skinparam defaultFontSize 13
+skinparam componentStyle rectangle
+left to right direction
+title E01: de dónde viene cada valor
+
+rectangle "Contacto del interruptor\n(NA o NC)" as contact
+rectangle "Cableado / módulo de entrada DI\nnormaliza la polaridad" as di
+rectangle "Driver de entrada\n+ vinculación (DI1)" as drv
+package "Programa GhostFlow" {
+  rectangle "input switch_on\nResult<Bool, SensorFault>" as sw
+  rectangle "output lamp: Bool" as lamp
+}
+rectangle "Vinculación (RO1)\n+ renderizador de salida" as rend
+rectangle "Relé / LED" as relay
+
+contact --> di
+di --> drv
+drv --> sw : observación\ncon calidad
+sw --> lamp : recover(false)
+lamp --> rend : valor solicitado
+rend --> relay
+@enduml

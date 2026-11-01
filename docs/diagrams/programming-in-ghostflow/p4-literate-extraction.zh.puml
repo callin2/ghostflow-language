@@ -1,0 +1,20 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName "PingFang SC"
+skinparam defaultFontSize 13
+skinparam componentStyle rectangle
+title 文学式文档：只有顶层 ghost 块会执行
+
+file "follow-switch.ghost.md\n(可编辑原文)" as doc
+rectangle "说明段落、\n其他 info string、\n嵌套围栏" as prose
+rectangle "顶层 ```ghost 块\n(按文档顺序)" as blocks
+component "编译器把各块拼接成\n一个 root control" as cc
+file "GFB + manifest + source map\n(派生产物)" as out
+
+doc --> prose
+doc --> blocks
+prose ..> cc : 不执行\n(只改变修订版)
+blocks --> cc
+cc --> out
+out ..> doc : 错误位置\n指回此原文
+@enduml

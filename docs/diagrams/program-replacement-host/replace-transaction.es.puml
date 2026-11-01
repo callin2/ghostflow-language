@@ -1,0 +1,25 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName Helvetica
+skinparam defaultFontSize 13
+
+start
+:host.replace({ artifact, runId });
+:Comprobar que el ID de ejecución es nuevo\ny que queda capacidad en el historial;
+:Copiar el candidato, recompilar la fuente canónica + cierre,\ncomprobar la identidad de fuente/manifiesto/bytecode\ny el perfil admitido;
+if (¿Se superan todas las comprobaciones?) then (no)
+  :Rechazar;
+  :Conservar el Program, el estado,\nla ejecución, la valoración y la última traza anteriores;
+  stop
+endif
+:hotSwap del núcleo Rust\n(el núcleo transfiere el estado con igual nombre e igual tipo);
+if (¿Se supera la comprobación de compatibilidad del núcleo?) then (no)
+  :Rechazar;
+  :Conservar el Program, el estado,\nla ejecución, la valoración y la última traza anteriores;
+  stop
+endif
+:Publicar la nueva identidad de fuente / artefacto / ejecución\ncon la valoración recalculada;
+:Borrar la última traza; el núcleo ha descartado su caché de entradas;
+:El siguiente step() necesita un mapa\nde observaciones nuevo y completo;
+stop
+@enduml

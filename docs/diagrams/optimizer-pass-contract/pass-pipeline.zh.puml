@@ -1,0 +1,20 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName Helvetica
+skinparam defaultFontSize 13
+
+title 拟议的优化器边界（仅为设计，尚未实现）
+start
+:解析、类型检查、解析名称 /\n枚举 / 下一状态（现有强制检查）;
+:1. 不可变的带类型语义 IR + 源映射\n+ 约束效果 + 验证结果\n（保留原始可执行产物作为回退）;
+:2. 可选的带类型 SMT 属性检查\n（显式的域和假设）;
+:3. 仅为符合条件的纯、全\nBoolean 区域生成 BDD 候选;
+:4. 独立的等价性与\n证书检查;
+if (义务已确立？) then (是)
+  :使用经过检查的候选\n+ 变换/证明关系;
+else (SAT 不匹配、Unknown、超时、\n无效证书……)
+  :保留未改变的原始产物\n+ 有界的跳过原因 / 诊断;
+endif
+:5. 发射最终字节码，检查资源上限，\n验证来源关系;
+stop
+@enduml

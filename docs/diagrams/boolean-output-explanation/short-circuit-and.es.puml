@@ -1,0 +1,17 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName Helvetica
+skinparam ArrowColor #555555
+skinparam rectangle {
+  BackgroundColor White
+  BorderColor #555555
+}
+title OFF solicitado: AND con un operando izquierdo false
+
+rectangle "output = left && right\nvalue = false" as AND
+rectangle "left\nevaluado, value = false\nsupportsResult = true" as L #E8F5E9
+rectangle "right (dividiría entre cero)\nomitido: no disponible\nsin valor, nunca sustenta" as R #EEEEEE
+
+AND --> L : arista de soporte
+AND ..> R : no evaluado
+@enduml

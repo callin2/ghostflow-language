@@ -1,0 +1,22 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontSize 12
+left to right direction
+rectangle "デバイスプロファイル" as prof
+rectangle "basic\npriority 0\n(pump, valve, low_water)" as basic
+rectangle "moisture_aware\npriority 10\n(+ moisture)" as aware
+rectangle "blocked =\nstop or low_water\n(Err -> true)" as blocked
+rectangle "dry = moisture < 35\n(Err -> false)" as dry
+rectangle "next.watering =\nlatch(start, blocked,\nstate.watering)" as latch
+rectangle "意図\nvalve, pump" as intent
+rectangle "安全\npump は valve を要求" as safety
+prof --> basic : moisture なし
+prof --> aware : moisture あり\n（高い priority が優先）
+basic --> blocked
+aware --> blocked
+aware --> dry
+blocked --> latch
+dry --> latch : and（moisture_aware のみ）
+latch --> intent
+intent --> safety
+@enduml

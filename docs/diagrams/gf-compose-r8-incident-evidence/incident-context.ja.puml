@@ -1,0 +1,19 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName "Hiragino Sans"
+skinparam defaultFontSize 13
+skinparam rectangleRoundCorner 8
+title 1つのインシデントコンテキストと3つのビュー（提案）
+
+rectangle "インシデントコンテキストのタプル\n\n定義 / モジュール\nインスタンス\n設定リビジョン + 有効なイベント位置\n設備 / バインディング\n実行 / スキャン\n論理時間\n（+ ソース / 制約へのリンク）" as T
+
+rectangle "農家ビュー\n1つのブロック要因 + 次の行動" as F
+rectangle "ソフトウェアビュー\n要求 / 安全な出力、\nソースと制約" as S
+rectangle "ハードウェアビュー\nバインディング、ドライバのイベント、\nブート / イベント履歴" as H
+rectangle "stale または unavailable として拒否：\n古い実行、誤ったスキーマ / モジュール /\nソース、誤ったバインディング" as R
+
+T --> F
+T --> S
+T --> H
+T ..> R : 同一性の不一致
+@enduml

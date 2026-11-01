@@ -1,0 +1,19 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName Helvetica
+skinparam defaultFontSize 13
+skinparam rectangleRoundCorner 8
+title 一个事故上下文，三个视图（提案）
+
+rectangle "事故上下文元组\n\n定义 / 模块\n实例\n设置修订版 + 生效事件位置\n设施 / 绑定\n运行 / 扫描\n逻辑时间\n（+ 源码 / 约束链接）" as T
+
+rectangle "农户视图\n一个阻断原因 + 下一步行动" as F
+rectangle "软件视图\n请求 / 安全输出，\n源码与约束" as S
+rectangle "硬件视图\n绑定、驱动程序事件、\n启动 / 事件历史" as H
+rectangle "作为陈旧或不可用而拒绝：\n旧运行、错误的 schema / 模块 /\n源码、错误的绑定" as R
+
+T --> F
+T --> S
+T --> H
+T ..> R : 身份标识不匹配
+@enduml

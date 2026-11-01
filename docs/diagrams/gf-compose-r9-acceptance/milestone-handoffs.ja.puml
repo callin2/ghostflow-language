@@ -1,0 +1,20 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName "Hiragino Sans"
+skinparam defaultFontSize 13
+skinparam rectangleRoundCorner 8
+title 提案中のマイルストーン引き継ぎ（アーキテクチャオーナーのレビュー対象）
+
+rectangle "アーキテクチャオーナーのレビュー\n（調査の完了は実装の\n権限を与えない）" as R
+rectangle "M1：準備済みの振る舞いを適用\n契約ディスクリプタ、入力の種類、\n排他的所有権、論理ポート、\n受け入れ/拒否の結果" as M1
+rectangle "M2：別の振る舞いを追加\nインスタンス修飾付きの合成、\n分離された状態/タイマー、\n保持されたバインディング" as M2
+rectangle "M3：予期しない結果を調査\n実行/スキャンに結合された\nインスタンス修飾付きのソース/制約トレース" as M3
+rectangle "オーナーの判断ゲート\nコンパイラ/ランタイム、パッケージ/インポート、\n設備制約、インスタンス/デプロイ、\nバインディングの証拠、インシデントの証拠" as G
+
+R --> M1
+M1 --> M2
+M2 --> M3
+G ..> M1 : それを使う\nスライスのみゲート
+G ..> M2
+G ..> M3
+@enduml

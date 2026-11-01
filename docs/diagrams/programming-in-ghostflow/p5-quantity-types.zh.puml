@@ -1,0 +1,24 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName "PingFang SC"
+skinparam defaultFontSize 13
+skinparam rectangleBorderColor #4A6FA5
+skinparam rectangleBackgroundColor #F7F9FC
+title 单位只决定写法，含义由类型承载
+
+rectangle "25°C   77°F   298.15K" as TL
+rectangle "Temperature\n（规范单位 K）" as T
+rectangle "5Δ°C   9Δ°F" as DL
+rectangle "TemperatureDelta\n（规范单位 ΔK）" as TD
+rectangle "Irradiance\n（W/m2，辐射功率）" as IR
+rectangle "PPFD\n（umol/m2/s，光子）" as PP
+rectangle "Lux 传感器读数\n（没有 Lux 类型）" as LX
+rectangle "经过验证的换算\n（绑定/预处理边界）" as CV
+
+TL --> T : 同一类型，\n换算为规范单位
+DL --> TD : 同一类型
+T ..> TD : Temperature - Temperature
+IR -[#B03A2E]- PP : <color:#B03A2E>不能直接比较</color>
+LX --> CV : 光谱、校准、光学条件
+CV --> PP : 仅在验证后
+@enduml

@@ -1,0 +1,26 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName Helvetica
+skinparam rectangle {
+  BackgroundColor White
+  BorderColor #555555
+}
+title GFB 모듈 봉투: 기본 필드 순서
+
+rectangle "magic GFB1" as M
+rectangle "형식 버전 u16" as F
+rectangle "모듈 이름, 버전 u32" as N
+rectangle "입력: u16 count + (name, type)" as I
+rectangle "상태: u16 count + (name, type, default)" as S
+rectangle "형식 4 전용: nowInput, timeEpochInput, root 테이블" as H
+rectangle "strategy: u16 count + strategy 레코드\n(이름, 우선순위, query blob,\n[형식 4: window], transition, intent)" as ST
+rectangle "안전 제약: u16 count + 레코드" as K
+
+M -down-> F
+F -down-> N
+N -down-> I
+I -down-> S
+S -down-> H
+H -down-> ST
+ST -down-> K
+@enduml

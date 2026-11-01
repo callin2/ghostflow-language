@@ -1,0 +1,19 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName Helvetica
+skinparam defaultFontSize 13
+skinparam componentStyle rectangle
+package "实时时间线（起点）" {
+  component "实时 framed 核心" as L
+  component "实时 sink" as S
+  component "AccountingRuntime" as A
+  database "FileLedger" as F
+}
+package "Ghost 分支" {
+  component "独立的 framed 核心" as B
+}
+L --> S : 安全 Bool 意图
+A --> F : 持久化 / 应答（acknowledge）
+L ..> B : 不可变的已接受前缀\n（重新执行并验证）
+note bottom of B : 无实时 sink、存储、\n用量核算或实时运行时句柄
+@enduml

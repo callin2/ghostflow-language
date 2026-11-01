@@ -1,0 +1,25 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName Helvetica
+title 관수 판단 한 번 (watering' 계산)
+
+start
+if (STOP 요청 또는 STOP fault?) then (예)
+  :watering' = false;
+elseif (저수위 또는 low_water fault?) then (예)
+  :watering' = false;
+elseif (이미 관수 중?) then (예)
+  :watering' = true;
+elseif (정상 START on\n그리고 재시작 차단 아님?) then (예)
+  :watering' = true;
+else (아니요)
+  :watering' = false;
+endif
+:pump, valve <- watering';
+stop
+note right
+  입력 fault가 하나라도 있으면 restart_blocked'는 true가 됩니다.
+  모든 입력이 정상이고 START가 off일 때만
+  해제됩니다.
+end note
+@enduml

@@ -1,0 +1,23 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName Helvetica
+skinparam defaultFontSize 13
+
+participant "Firmante del paquete" as P
+participant "Verificador del host\n(instantánea de confianza)" as H
+
+== 1. Confiar en la clave siguiente ==
+H -> H : añadir la clave pública siguiente a trustedKeys
+note right of H : de confianza: actual, siguiente
+
+== 2. Publicar un paquete cofirmado ==
+P -> H : paquete firmado con la actual + la siguiente
+note right of H : aceptado
+
+== 3. Revocar la clave antigua ==
+H -> H : añadir el ID de la clave actual a revokedKeyIds
+P -> H : el mismo paquete cofirmado
+note right of H : firma revocada ignorada;\nla firma de la clave siguiente verifica: aceptado
+P -> H : paquete firmado solo con la clave antigua
+note right of H : rechazado: no queda ninguna\nfirma activa de confianza
+@enduml

@@ -1,0 +1,21 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName Helvetica
+skinparam defaultFontSize 13
+title 개념적 import lock (예시이며 승인된 schema 아님)
+
+rectangle "루트 조합\nfarm-irrigation@composition-rev-17\nsha256:ROOT...17" as ROOT
+rectangle "인스턴스 east-zone-01\n(자체 상태, 타이머, 포트,\n설정, binding, provenance)" as E
+rectangle "인스턴스 west-zone-02\n(자체 상태, 타이머, 포트,\n설정, binding, provenance)" as W
+rectangle "definition\nirrigation-controller@rev-42\nsha256:DEF...42" as DEF
+rectangle "rain-policy@rev-8\nsha256:RAIN...08" as RAIN
+
+ROOT --> E
+ROOT --> W
+E --> DEF : 고정
+W --> DEF : 고정 (같은 digest)
+DEF --> RAIN : import (전이적)
+note bottom of RAIN
+전이적 closure: ROOT...17, DEF...42, RAIN...08
+end note
+@enduml

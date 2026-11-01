@@ -98,23 +98,36 @@ test('PR compares merge-base; push compares exact before; manual and unresolved 
   assert.equal(r.classify(unrelated, head, 'pull_request'), 'full');
 });
 
-const pair = (source = 'README.md', translation = 'README.ko.md') => ({ source, translation, sourceLanguage: 'en', sourceSha256: 'a'.repeat(64), translationSha256: 'b'.repeat(64) });
-test('translation metadata allows only ordinary pair hashes/addition/removal', t => {
+const entry = (document = 'README.md', languages = ['en', 'ko']) => ({ document, baseLanguage: 'en', canonical: 'en', files: Object.fromEntries(languages.map(language => [language, language === 'en'
+  ? { path: document, sha256: 'a'.repeat(64) }
+  : { path: document.replace(/\.md$/, `.${language}.md`), sha256: 'b'.repeat(64), from: 'en', sourceSha256: 'a'.repeat(64) }])) });
+test('translation metadata allows only ordinary document hashes/languages/addition/removal', t => {
   const r = repository(t);
-  const manifest = { format: 'GhostFlow/document-translations-v1', documents: [pair(), pair('docs/SPEC.md', 'docs/SPEC.ko.md')], exclusions: [] };
+  const manifest = { format: 'GhostFlow/document-translations-v2', documents: [entry(), entry('docs/SPEC.md')], exclusions: [] };
   r.write('docs/translations.json', JSON.stringify(manifest)); const before = r.commit();
   const check = (next, expected) => { r.write('docs/translations.json', typeof next === 'string' ? next : JSON.stringify(next)); const head = r.commit(); assert.equal(r.classify(before, head), expected); };
-  const changed = structuredClone(manifest); changed.documents[0].sourceSha256 = 'c'.repeat(64); check(changed, 'docs');
+  const changed = structuredClone(manifest); changed.documents[0].files.en.sha256 = 'c'.repeat(64); check(changed, 'docs');
   check({ ...manifest, documents: [manifest.documents[1]] }, 'docs');
-  check({ ...manifest, documents: [...manifest.documents, pair('CONTRIBUTING.md', 'CONTRIBUTING.ko.md')] }, 'docs');
-  const spec = structuredClone(manifest); spec.documents[1].sourceSha256 = 'c'.repeat(64); check(spec, 'full');
+  check({ ...manifest, documents: [...manifest.documents, entry('CONTRIBUTING.md')] }, 'docs');
+  check({ ...manifest, documents: [entry('README.md', ['en', 'ko', 'zh', 'es', 'ja']), manifest.documents[1]] }, 'docs');
+  const spec = structuredClone(manifest); spec.documents[1].files.en.sha256 = 'c'.repeat(64); check(spec, 'full');
+  const flipped = structuredClone(manifest); flipped.documents[0].canonical = 'ko'; check(flipped, 'full');
+  const wrongPath = structuredClone(manifest); wrongPath.documents[0].files.ko.path = 'README.zh.md'; check(wrongPath, 'full');
+  const fromKorean = entry('README.md', ['en', 'ko', 'zh']); fromKorean.files.zh.from = 'ko'; check({ ...manifest, documents: [fromKorean, manifest.documents[1]] }, 'full');
   check({ ...manifest, exclusions: ['new policy'] }, 'full');
   check({ ...manifest, exclusions: [{ path: 'report.md', reason: 'Historical report' }] }, 'full');
   check({ ...manifest, format: 'changed' }, 'full');
+  check({ ...manifest, format: 'GhostFlow/document-translations-v1' }, 'full');
   const extra = structuredClone(manifest); extra.documents[0].policy = true; check(extra, 'full');
   check('{broken', 'full');
   const malformedBase = r.git('rev-parse', 'HEAD'); r.write('docs/translations.json', JSON.stringify(manifest)); assert.equal(r.classify(malformedBase, r.commit()), 'full');
   assert.equal(r.classify(r.base, r.git('rev-parse', 'HEAD')), 'full');
+});
+
+test('translated ordinary documents in new languages route to docs', t => {
+  const r = repository(t);
+  r.write('README.zh.md'); r.write('docs/DOCUMENTATION.ja.md');
+  assert.equal(r.classify(r.base, r.commit()), 'docs');
 });
 
 test('final gate requires successful classifier and selected lane; skipped other lane is expected', () => {

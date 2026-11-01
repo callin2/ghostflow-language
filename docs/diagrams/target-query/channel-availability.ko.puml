@@ -1,0 +1,35 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName Helvetica
+skinparam defaultFontSize 13
+title 선택된 채널 하나의 가용성
+
+start
+:최신이고 연결된 관측만 남김
+(유효하지 않은 보고는 제외되고
+diagnostics에 기록됨);
+:채널과 선언된 각 resource의
+state를 수집;
+if (채널 또는 resource 하나에 대해
+보고가 서로 다른가?) then (예)
+  :conflict;
+  stop
+endif
+if (채널에 `resources`가 선언되었는가?) then (아니요)
+  :unknown;
+  stop
+endif
+if (채널과 선언된 모든 resource에
+state가 하나 이상 있는가?) then (아니요)
+  :unknown;
+  stop
+endif
+if (reserved인 state가 있는가?) then (예)
+  :reserved;
+elseif (busy인 state가 있는가?) then (예)
+  :busy;
+else (모두 available)
+  :available;
+endif
+stop
+@enduml

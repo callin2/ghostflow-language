@@ -1,0 +1,35 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontSize 13
+skinparam rectangleBorderColor #555555
+skinparam rectangleBackgroundColor #F7F7F7
+left to right direction
+
+rectangle "Issue 167\n精确 dev 推送\n验证" as I167
+rectangle "Issue 168\ntick 契约\n修正" as I168
+rectangle "Issue 169\n有证据支撑的\n特性状态" as I169
+rectangle "Issue 170\n有限核心 +\n证据矩阵" as I170
+rectangle "Issue 171\n表达式\nCore IR" as I171
+rectangle "Issue 172\n模块\nCore IR" as I172
+rectangle "Issue 173\n规范灌溉\n证明" as I173
+rectangle "Issue 178\n保留核心\n重放" as I178
+rectangle "Issue 179\n陈旧覆盖率\n门禁" as I179
+rectangle "PR 175\ndev → main" as PR175
+
+I168 --> I169 : 有争议的行
+I168 --> I170
+I169 --> I170
+I168 --> I171
+I170 --> I171 : 冻结范围
+I171 --> I172
+I170 --> I172 : 冻结范围
+I170 --> I173 : 范围 +\n证据模式
+I172 ..> I170 : 证明输入\n矩阵
+I173 ..> I170 : 证明输入\n矩阵
+note right of PR175
+  集成：在 dev 审查和精确 HEAD
+  验证之后复用 PR #175。
+  #167、#178 和 #179
+  没有列出的前提条件。
+end note
+@enduml

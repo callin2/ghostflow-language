@@ -1,0 +1,15 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontSize 12
+skinparam rectangleBorderColor #4A6FA5
+skinparam rectangleBackgroundColor #F7F9FC
+left to right direction
+title Oleadas de investigación de GF-COMPOSE (issue padre #99)
+rectangle "Oleada 1\n#100 resultados para el usuario\n#101 autoridad/identidad" as W1
+rectangle "Oleada 2\n#102 ejecución\n#103 vinculaciones\n#105 anulaciones" as W2
+rectangle "Oleada 3\n#104 contratos\n#106 paquetes\n#107 evidencia de incidentes" as W3
+rectangle "Oleada 4\n#108 aceptación/traspaso" as W4
+W1 --> W2 : traspaso de la investigación de #101
+W2 --> W3 : dependencias explícitas disponibles
+W3 --> W4 : resultados de #100–#107 revisados
+@enduml

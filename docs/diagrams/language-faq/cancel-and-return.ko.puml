@@ -1,0 +1,19 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontSize 13
+skinparam stateBorderColor #4A6FA5
+skinparam stateBackgroundColor #F7F9FC
+title CancelAndReturn (질문 19)
+
+[*] --> Idle
+Idle --> Working : start_event && !cancel
+Working --> Stopping : cancel
+Stopping --> Idle : stopped && home
+Stopping --> Returning : stopped && !home
+Returning --> Idle : home
+
+Working : work = true
+Stopping : 명령 없음\n(정지 피드백 대기)
+Returning : return_device = true
+note "입력을 하나라도 알 수 없으면 단계를 유지합니다.\n시간 초과 없음: 피드백이 없으면 단계를 유지합니다." as N
+@enduml

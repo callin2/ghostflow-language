@@ -1,0 +1,21 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontSize 13
+skinparam rectangleBorderColor #555555
+skinparam rectangleBackgroundColor #F7F7F7
+
+rectangle "AST de fuente existente\n+ puntos de entrada del compilador\n(API pública sin cambios)" as AST
+rectangle "IR tipada de expresiones (#171)\nidentidades/tipos resueltos\nsin opcodes ni bytes" as EIR
+rectangle "IR tipada de módulos (#172)\nentradas, estado, transiciones,\nintenciones, restricciones" as MIR
+rectangle "Descriptores de extensión tipados\nventanas, programaciones, true_for,\nflujos de config, contabilización, PID" as EXT
+rectangle "Un único emisor GFB\n(único lugar que elige\nel formato y escribe bytes)" as EMIT
+rectangle "Bytes GFB existentes\n(envoltorio, instrucciones,\nregistros de extensión)" as GFB
+
+AST --> EIR
+AST --> MIR
+EIR --> MIR
+AST --> EXT
+EXT --> MIR : se conservan como registros\nde extensión distintos
+MIR --> EMIT
+EMIT --> GFB
+@enduml

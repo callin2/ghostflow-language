@@ -1,0 +1,31 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName Helvetica
+skinparam defaultFontSize 13
+skinparam rectangleRoundCorner 8
+rectangle "Fase 0\nIntegrar y rehacer la línea base" as P0
+rectangle "Fase 1\nSemántica escalar y\nbases de ejecución GFB" as P1
+rectangle "Fase 2\nSegmentos verticales\nde señales acotadas" as P2
+rectangle "Fase 3\nSchedules y contabilización" as P3
+rectangle "Fase 4\nRestricciones, recursos y\ncontrol continuo" as P4
+rectangle "Fase 5\nImports, composición\ny macros" as P5
+rectangle "Fase 6\nAjustes, observación,\nreproducción, reemplazo en caliente" as P6
+rectangle "Fase 7\nAuditoría de límites externos\n(23 casos)" as P7
+rectangle "Fase 8\nAceptación final" as P8
+P0 --> P1
+P1 --> P2 : tipos Duration/Result
+P1 ..> P3
+P1 ..> P4
+P1 ..> P5
+P3 ..> P4 : contabilización
+P1 --> P6
+P2 --> P6
+P3 --> P6
+P4 --> P6
+P5 --> P6 : descriptores estables
+P6 --> P7 : manifiestos y esquemas\nde observación estables
+P7 --> P8
+note right of P3 : También necesita Date/Time,\neventos de ajustes, ledger
+note right of P4 : También necesita ajustes
+note right of P5 : Necesita identidad estable de\ntipo/manifiesto/fuente
+@enduml

@@ -1,0 +1,21 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontSize 12
+left to right direction
+
+card "C1 检查\n（有效样本 < 20%\n=> 安全意图 OFF）" as C1
+card "安全 OFF\n（逻辑结果）" as SO
+card "OFF 请求\n已发送" as TX
+card "ACK /\n寄存器回读" as ACK
+card "负载反馈\n（触点、动作、流量）" as LF
+
+C1 --> SO
+SO --> TX
+TX --> ACK
+ACK --> LF
+note bottom of ACK
+  只声明到有证据的最后一个阶段，
+  例如“已收到 OFF 请求 ACK；
+  实际停止未确认”。
+end note
+@enduml

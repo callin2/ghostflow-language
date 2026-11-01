@@ -1,0 +1,22 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName "Hiragino Sans"
+skinparam defaultFontSize 13
+skinparam componentStyle rectangle
+title 1つの物理しきい値、3つのソース単位
+
+rectangle "E16: 18°C" as c
+rectangle "E17: 64.4°F" as f
+rectangle "E18: 291.15K" as k
+component "リテラルの厳密な変換の後、\nbinary64 丸め" as conv
+rectangle "正準 Temperature\n291.15 K" as canon
+component "hysteresis(air, on_below, ...)" as h
+rectangle "同じヒーター判断" as out
+
+c --> conv
+f --> conv
+k --> conv
+conv --> canon
+canon --> h
+h --> out
+@enduml

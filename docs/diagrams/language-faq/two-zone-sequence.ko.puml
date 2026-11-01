@@ -1,0 +1,24 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontSize 13
+skinparam stateBorderColor #4A6FA5
+skinparam stateBackgroundColor #F7F9FC
+title TwoZones (질문 8): 정상 관수 순서
+
+[*] --> Idle
+Idle --> Open1 : start_event
+Open1 --> Water1 : age >= settle_time
+Water1 --> Stop1 : age >= watering_time
+Stop1 --> Open2 : age >= settle_time
+Open2 --> Water2 : age >= settle_time
+Water2 --> Stop2 : age >= watering_time
+Stop2 --> Idle : age >= settle_time
+
+Open1 : valve1
+Water1 : valve1 + pump
+Stop1 : valve1
+Open2 : valve2
+Water2 : valve2 + pump
+Stop2 : valve2
+note "watering_time 또는 settle_time이 fault: 모든 단계 -> Idle." as N
+@enduml

@@ -1,0 +1,15 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontSize 12
+left to right direction
+rectangle "物理根\n(sourceTag, sourceEpoch, sampleId)\n+ 原始时间戳" as P
+rectangle "内层窗口 U\nover 2 ms" as U
+rectangle "外层窗口 W\nover 10 ms" as W
+P --> U : 样本 (0,0) (1,10) (2,20)
+U --> W : 派生事件 (site, revision)\n值 0、5、15\nquality 3 + U 的 site
+note bottom of W
+  3 个派生事件的平均值 = 20/3
+  （而不是展平物理叶子得到的 10）
+  结果质量：Derived (3)
+end note
+@enduml

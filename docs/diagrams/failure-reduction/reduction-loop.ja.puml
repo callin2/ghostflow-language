@@ -1,0 +1,23 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName "Hiragino Sans"
+skinparam defaultFontSize 13
+start
+:元のシナリオを実行;
+if (ガードが成立し、対象が\n期待値に違反しているか？) then (いいえ)
+  :original-not-applicable、\noriginal-not-failing、または incomplete;
+  stop
+else (はい)
+endif
+repeat
+  :対象以外の次のアクションの\n削除を試す（元の順序で）;
+  if (有効・完了・ガード成立・\n同じ違反か？) then (はい)
+    :受理し、最初の\nアクションから再開;
+  else (いいえ)
+    :試行を記録;
+  endif
+repeat while (未試行の削除が残り、\nmaxAttemptsも残っているか？) is (はい)
+-> いいえ;
+:再現結果を報告\n（single-deletion-minimal、budget-exhausted、\nまたは unresolved-candidates）;
+stop
+@enduml

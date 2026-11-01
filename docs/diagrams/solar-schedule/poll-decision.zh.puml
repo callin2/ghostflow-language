@@ -1,0 +1,28 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontSize 13
+start
+:poll({nowMs, wallMs, trusted});
+if (trusted?) then (否)
+  :due = false\nUntrustedClock;
+  stop
+endif
+if (第一个可信样本\n（启动或恢复）？) then (是)
+  :due = false\nBootBaseline / ClockRecoveryBaseline\n（不补发）;
+  stop
+endif
+if (wallMs <= 高水位标记？) then (是)
+  :due = false\nAlreadyObserved\n（回拨 / 重复）;
+  stop
+endif
+if (墙钟或单调时间间隙 > 60 s？) then (是)
+  :due = false\nClockGapSkipped;
+  stop
+endif
+if (事件 + 偏移量位于\n(previousWall, currentWall] 内？) then (是)
+  :due = true\n附带触发实例身份标识;
+else (否)
+  :due = false\n（事件不可用或未穿越）;
+endif
+stop
+@enduml

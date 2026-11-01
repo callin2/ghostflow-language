@@ -1,0 +1,25 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName Helvetica
+skinparam defaultFontSize 13
+skinparam ArrowColor #526d76
+hide circle
+hide methods
+
+entity "requirements" as R {
+  id : "GF-REQ-" + SHA-256(statement) 的前 16 个十六进制字符
+  statement
+  source : 路径, 标题, 行范围, sha256
+  testIds
+  status / pendingReason
+}
+entity "tests" as T {
+  id
+  locator : 路径, 锚点, 行范围, sha256
+}
+R }o--o{ T : testIds
+note bottom of R
+  没有 testIds 时，必须提供
+  非空的 pendingReason
+end note
+@enduml

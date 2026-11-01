@@ -1,0 +1,27 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName Helvetica
+skinparam defaultFontSize 13
+left to right direction
+title 提议的第一个契约配置：各属性在何处检查
+
+rectangle "类型" as T
+rectangle "依赖" as D
+rectangle "参数界限" as B
+rectangle "排他所有者" as X
+rectangle "安装约束\n兼容性" as I
+
+rectangle "编译 / 静态\n（编译、降级、\n绑定验证）" as C #EEF5FF
+rectangle "激活前\n验证 / 关卡" as P #FFF8E6
+rectangle "运行时\n（请求/启动或\n工作站授权）" as R #EEFBEF
+
+T --> C : 静态绑定验证
+D --> C : 编译/降级
+D --> P : 激活前验证
+B --> C : 编译验证
+B --> R : 请求/启动授权
+X --> C : 逻辑权威 +\n独立的绑定验证
+X --> R : 适用时的\n工作站授权
+I --> P : 兼容性关卡
+I --> R : 仅限实际被降级/\n强制执行的约束
+@enduml

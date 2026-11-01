@@ -1,0 +1,29 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName "Hiragino Sans"
+skinparam defaultFontSize 13
+skinparam rectangleRoundCorner 8
+title #62 設置制約：未決の 2 つの選択肢（いずれも未選択）
+
+package "選択肢 1：正準な制約の個別コンパイル" {
+  rectangle "振る舞いパッケージ\n（正本の .ghost.md）" as B1
+  rectangle "制約アーティファクト\n（名前付き制約パス）" as C1
+  rectangle "API による結合\n両方のダイジェストを固定" as J1
+  rectangle "設置者が制約\nアーティファクトを強制" as E1
+  B1 --> J1
+  C1 --> J1
+  J1 --> E1
+}
+
+package "選択肢 2：明示的なプロジェクト横断の境界リビジョン" {
+  rectangle "設置境界リビジョン\n（API／システム所有者が公開）" as R2
+  rectangle "振る舞いリビジョン" as B2
+  rectangle "制約リビジョン" as C2
+  rectangle "バインディング" as BD2
+  rectangle "強制の所有者" as EO2
+  R2 --> B2 : 参照
+  R2 --> C2 : 参照
+  R2 --> BD2 : 参照
+  R2 --> EO2 : 指名
+}
+@enduml

@@ -1,0 +1,20 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontSize 13
+hide empty description
+title Un ajuste con una superposición temporal (§5.2)
+
+state "Ordinario" as Ordinary
+state "Superpuesto" as Overlaid
+state "No disponible" as Unavailable
+[*] --> Ordinary
+Ordinary : efectivo = último valor ordinario
+Ordinary --> Overlaid : evento temporal\n(vigencia Run o Until(DateTime))
+Overlaid : efectivo = valor temporal
+Overlaid : destino de retorno = valor ordinario\nvalidado anterior
+Overlaid --> Ordinary : vencimiento, fin de Run o cancelación\n(restaurar el destino de retorno)
+Overlaid --> Ordinary : nuevo valor ordinario\n(superposición eliminada en el mismo evento)
+Overlaid --> Overlaid : segunda solicitud temporal:\nrechazada
+Overlaid --> Unavailable : el retorno falla
+Unavailable : no se registra como retorno exitoso;\nse informa como no disponible
+@enduml

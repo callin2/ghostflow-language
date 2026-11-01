@@ -1,97 +1,141 @@
 <!-- translation-source: docs/SOLAR-SCHEDULE.md -->
-[영어 원문](SOLAR-SCHEDULE.md)
+[영문 원문](SOLAR-SCHEDULE.md)
 
-# Solar schedule: compiler와 simulation host
+# Solar 예약: 컴파일러와 시뮬레이션 호스트
 
-이 안내는 이전 standalone Solar profile을 설명한다. live typed config Result를
-공유하고 Rust가 context admission을 소유하는 Solar는
-[Solar/config 실행](SOLAR-CONFIG-EXECUTION.ko.md)을 참조한다. 현재 Reference의
-명시 공통 정책과 제한된 hold/fixed-time fallback 규칙은 아래 원래 v3 범위를
-대체한다. [Reference §3.5](reference/03-time-and-schedules.md#35-schedule의-공통-의미)를 참조한다.
-standalone profile은 구체적인 기존 consumer를 위해 유지하며 공유 context
-profile의 fallback이 아니다.
+이 가이드는 **이전의 단독 Solar 프로필**을 설명합니다.
 
-`Solar`는 host가 공급하는 occurrence descriptor다. compiler는 typed `.due` Boolean input만
-내보낸다. 천문 event를 계산하거나 output을 운전하지 않는다.
+- live 형식 지정 config Result를 공유하고 Rust가 소유하는 context admission(수용)을
+  사용하는 Solar는 [Solar/config 실행](SOLAR-CONFIG-EXECUTION.ko.md)을 사용하세요.
+- 현재 레퍼런스의 명시적 공통 정책과 제한된 hold/fixed-time fallback 규칙이 아래에
+  설명한 원래 v3 범위를 대체합니다.
+  [레퍼런스 §3.5](reference/03-time-and-schedules.md)를 참조하세요.
+- 단독 프로필은 구체적인 기존 소비자를 위해 남아 있습니다. 공유 context 프로필의
+  fallback이 아닙니다.
 
-완전한 canonical source는 [solar-watering.ghost.md](../examples/solar-watering.ghost.md)다.
-intent, 명시 test 위치, rise+30min/set−30min, 5분 valve group 두 개를 하나의 문서에 담는다.
-예를 들어 `at` field는 `` at = sun`rise + 30min`; ``이다.
+`Solar`는 호스트가 공급하는 발생 descriptor입니다. 컴파일러는 형식이 지정된
+`.due` Boolean 입력만 내보냅니다. 컴파일러는 천문 이벤트를 계산하지 않으며, 출력을
+조작하지도 않습니다.
 
-모든 Solar schedule에는 정확히 하나의 `timezone`, `latitude`, `longitude`, `at`,
-`fallback` field가 필요하다. `timezone`은 지원 IANA timezone 문자열이다. 좌표는
-latitude `-90..90`, longitude `-180..180` 안의 finite signed numeric literal이다.
-식/config 참조는 허용하지 않는다.
+완전한 정본 소스는 [solar-watering.ghost.md](../examples/solar-watering.ghost.md)
+입니다. 한 문서에 의도, 명시적인 테스트 위치, rise+30min/set−30min, 그리고
+5분짜리 밸브 그룹 두 개가 들어 있습니다. 그 `at` 필드는 예를 들어
+`` at = sun`rise + 30min`; ``처럼 읽힙니다.
 
-`at`은 Solar 선언에만 있으며 형식은 다음뿐이다.
+**필수 필드.** 모든 Solar 예약에는 `timezone`, `latitude`, `longitude`, `at`,
+`fallback`이 각각 정확히 하나씩 필요합니다.
 
-- `` sun`rise` `` 또는 `` sun`set` ``.
-- 두 event 중 하나와 `+`/`-`. 예: `` sun`rise + 30min` `` 또는 `` sun`set - 30min` ``.
+| 필드 | 규칙 |
+| --- | --- |
+| `timezone` | 지원되는 IANA 시간대 문자열. |
+| `latitude` | `-90..90` 범위의 유한한 부호 있는 숫자 리터럴. |
+| `longitude` | `-180..180` 범위의 유한한 부호 있는 숫자 리터럴. |
+| `at` | 아래 형식 중 하나. |
+| `fallback` | `skip`(필수). |
 
-`Nunit`은 정수 `ms`, `s`, `min`, `h` literal이다. signed offset은 정확하며 0일 수 있고
-크기는 최대 24시간이다. tagged literal, interpolation, 임의 식은 일반 GhostFlow 식 문법의
-일부가 아니다.
+좌표는 리터럴이어야 하며, 식이나 설정 참조는 허용되지 않습니다.
 
-`fallback = skip`은 필수이며 현재 유일한 fallback 정책이다. host가 요청 solar event를
-신뢰하지 않거나 가지고 있지 않으면 새 `.due` occurrence를 공급하지 않는다. 기존 relative
-timer는 독립적으로 계속된다.
+`at`은 Solar 선언에서만 허용되며 다음 형식만 가집니다.
 
-Solar를 포함한 control의 manifest format은 `GhostFlow/control-v3`다. descriptor는
-`{ kind: "solar", name, timezone, latitude, longitude, event, offsetMs, fallback: "skip",
-dueInput }`이다. mixed v3 manifest에서도 기존 `DailySlots` descriptor는 불변이다.
-원래 compiler 범위는 Solar/operating-setting metadata를 함께 거부했다. 새 GFB16
-공유 context profile은 설정을 상수로 접지 않고 이 합성을 지원한다.
-Solar가 없는 control은 v1/v2 manifest 동작을 유지한다.
+- `` sun`rise` `` 또는 `` sun`set` ``
+- 두 이벤트 중 하나에 `+` 또는 `-`를 붙인 형식. 예: `` sun`rise + 30min` `` 또는 `` sun`set - 30min` ``.
 
-## Simulation host
+`Nunit`은 정수 `ms`, `s`, `min`, `h` 리터럴입니다. 부호 있는 offset은 정확한
+값이며, 0일 수 있고, 크기는 최대 24시간입니다. 태그 리터럴, 보간, 임의의 식은
+일반 GhostFlow 식 문법에 포함되지 **않습니다**.
 
-`runtimes/wasm/schedule.mjs`의 `SolarSchedule`은 DailySlots와 같은
-`poll({nowMs, wallMs, trusted}) → {due, reason?, occurrence?}` host 경계를 구현한다.
-`preview(wallMs)`는 event local date, `eventWallMs`, `scheduledWallMs`, 계산 identity를
-보고한다. preview는 event를 소비하지 않는다.
+**Fallback.** `fallback = skip`은 필수이며, 현재 유일한 fallback 정책입니다.
+호스트가 요청된 태양 이벤트를 신뢰하지 못하거나 가지고 있지 않으면 새 `.due`
+발생을 공급하지 않습니다. 기존 상대 타이머는 독립적으로 계속 동작합니다.
 
-`ghostflow_core::solar`는 device worker에 대응하는 bounded portable native provider인
-`ClockSnapshot`, `SolarDescriptor`, `SolarSchedule`을 제공한다. 현재 `Asia/Seoul`, `UTC`,
-`Etc/UTC`만 받는다. 다른 IANA zone은 DST 규칙을 만들어 주지 않고 명시 거부한다.
-`wall_ms` 부재는 항상 untrusted이며 합성 현재 시각 sample을 만들 수 없다. polling reason은
-아래 baseline/recovery/rollback/gap 동작을 유지한다. admit된 occurrence는
-`SolarPoll.occurrence`에 반환한다. 계산 port와 보존된 upstream license는
-[SUNCALC-ATTRIBUTION.md](SUNCALC-ATTRIBUTION.md)에 문서화돼 있다.
+**Manifest.** Solar를 포함한 control의 manifest 형식은
+`GhostFlow/control-v3`입니다. 그 descriptor는 `{ kind: "solar", name, timezone, latitude, longitude, event,
+offsetMs, fallback: "skip", dueInput }`입니다.
 
-고정된 [SunCalc 2.0.2](https://github.com/mourner/suncalc/tree/v2.0.2) provider는 해수면
-sunrise/sunset(upper limb, 표준 굴절)을 계산한다. 지원 event 날짜는 2000–2100이다.
-정확한 offset 적용 전에 인접 UTC solar day를 명시 IANA local date로 해소한다.
-특이 civil date에 일치 event가 여럿이면 첫 번째를 고른다. 이 version에는 지형,
-관측자 고도, 관측 날씨 입력이 없다.
+- 기존 `DailySlots` descriptor는 혼합 v3 manifest 안에서도 바뀌지 않습니다.
+- 이 원래 컴파일러 범위는 Solar와 운영 설정 메타데이터를 함께 쓰는 것을
+  거부했습니다. 더 새로운 GFB16 공유 context 프로필은 설정을 상수로 접지 않고도
+  그 조합을 지원합니다.
+- Solar가 없는 control은 v1/v2 manifest 동작을 유지합니다.
 
-occurrence는 `(previousWall, currentWall]`을 crossing하고 crossing 후 첫 logical scan에
-emit된다. queue되지 않는다. high-water mark는 wall-clock rollback 후 중복을 억제한다.
-boot/recovery의 첫 trusted sample은 catch-up 없이 baseline을 세운다. 60초를 넘는 wall/
-monotonic gap은 놓친 시작을 skip한다. 가속은 logical scan을 보존해야 하며 건너뛰지 않는다.
-event 직전 playback 시작도 같은 경로를 검사한다. host 재생성은 새 baseline을 세우며
-영속 pending event queue를 만들지 않는다.
+## 시뮬레이션 호스트
 
-`fallback = skip`은 untrusted time, 미지원 날짜, 요청 event가 없는 극낮/극밤에서 새
-admission이 없다는 뜻이다. 이미 admit된 run은 멈추지 않는다. 예의 5분 elapsed timer는
-monotonic clock을 사용한다. host는 network/machine clock을 읽지 않는다. 실제 clock
-trust/time 동기화는 device driver 책임이다.
+`runtimes/wasm/schedule.mjs`의 `SolarSchedule`은 DailySlots와 같은 호스트 경계를
+구현합니다:
+`poll({nowMs, wallMs, trusted}) → {due, reason?, occurrence?}`.
 
-consumer는 `ControlRuntime.instantiateFramed(wasm, artifact, {acceptSolar: true})`로
-v3를 opt-in한다. 기존 strict default는 v3를 거부한다. Rust VM, GFB ABI, DI/RO
-input/output, elapsed timer, final constraint는 불변이다. Solar due input은 literate 선언에
-source-observation binding을 가진다. canonical document revision은 좌표/offset도 식별한다.
-이는 manifest data이며 GFB bytecode 변경 없이 바뀔 수 있다.
+`preview(wallMs)`는 이벤트의 현지 날짜, `eventWallMs`, `scheduledWallMs`, 계산
+identity를 보고합니다. preview는 이벤트를 절대 소비하지 않습니다.
+
+**native 공급자.** `ghostflow_core::solar`는 장치 worker를 위한, 이에 대응하는
+제한된 이식 가능 native 공급자를 제공합니다: `ClockSnapshot`, `SolarDescriptor`,
+`SolarSchedule`.
+
+- 현재는 `Asia/Seoul`, `UTC`, `Etc/UTC`만 받습니다. 다른 IANA 시간대는 지어낸
+  DST 규칙을 적용하는 대신 명시적으로 거부됩니다.
+- `wall_ms`가 없으면 항상 신뢰되지 않으며, 합성된 현재 시간 샘플을 만들 수 없습니다.
+- polling 이유(reason)는 아래에 설명한 기준선, 복구, 롤백, 공백 동작을 유지합니다.
+  수용된 발생은 `SolarPoll.occurrence`로 반환됩니다.
+- 계산 이식본과 그에 유지된 상위(upstream) 라이선스는
+  [SUNCALC-ATTRIBUTION.md](SUNCALC-ATTRIBUTION.ko.md)에 문서화되어 있습니다.
+
+**천문 계산.** 고정된
+[SunCalc 2.0.2](https://github.com/mourner/suncalc/tree/v2.0.2) 공급자가 해수면
+기준 일출/일몰(태양 윗가장자리, 표준 대기굴절)을 계산합니다.
+
+- 지원하는 이벤트 날짜는 2000–2100년입니다.
+- 인접한 UTC 태양일은 정확한 offset을 적용하기 전에 명시적 IANA 현지 날짜로
+  해석됩니다.
+- 드물게 한 민간 날짜에 일치하는 이벤트가 둘 이상 있으면 첫 번째를 선택합니다.
+- 지형, 관측자 고도, 관측된 날씨는 이 버전의 입력이 아닙니다.
+
+**발생이 일어나는 시점.** 아래 다이어그램은 시뮬레이션 호스트의 `poll`이 스캔이
+due인지 판단하는 과정을 보여 줍니다.
+
+![SolarSchedule.poll의 판단 흐름: 신뢰 여부, 기준선, 롤백, 공백, 그다음 교차 검사](diagrams/solar-schedule/poll-decision.ko.svg)
+
+- 발생 시각이 `(previousWall, currentWall]`에 들어가면 발생이 일어납니다. 교차 후
+  첫 논리 스캔에서 내보내지며, 큐에 쌓이지 않습니다.
+- high-water mark가 벽시계 롤백 후의 중복을 억제합니다.
+- 부팅이나 복구 시 첫 신뢰 샘플은 따라잡기 없이 기준선을 세웁니다.
+- 60초를 넘는 벽시계 또는 단조 공백은 놓친 시작을 건너뜁니다.
+- 가속은 논리 스캔을 보존해야 하며, 스캔을 건너뛰어서는 안 됩니다. 이벤트 직전에서
+  재생을 시작해도 같은 경로를 거칩니다.
+- 호스트를 다시 만들면 새 기준선이 세워집니다. 영속적인 대기 이벤트 큐는 없습니다.
+
+**`fallback = skip`의 의미.** 신뢰되지 않는 시간, 지원되지 않는 날짜, 요청된
+이벤트가 없는 극지방의 백야/극야에는 새 admission이 없습니다. 이미 수용된 실행을
+멈추지는 않습니다. 예제의 5분짜리 경과 타이머는 단조 시계를 사용합니다. 호스트는
+네트워크나 기계 시계를 읽지 않습니다. 실시간 시계 신뢰와 시간 동기화는 장치
+드라이버의 책임입니다.
+
+**사용 선택(opt-in).** 소비자는
+`ControlRuntime.instantiateFramed(wasm, artifact,
+{acceptSolar: true})`로 v3를 선택합니다. 기존의 엄격한 기본값은 v3를 거부합니다.
+
+- Rust VM, GFB ABI, DI/RO 입출력, 경과 타이머, 최종 제약은 바뀌지 않습니다.
+- Solar due 입력에는 문서형 선언으로 이어지는 소스 관측 바인딩이 있습니다.
+- 정본 문서 revision은 좌표와 offset도 식별합니다. 이들은 manifest 데이터이므로
+  GFB 바이트코드를 바꾸지 않고도 바뀔 수 있습니다.
 
 ## 검증
 
-`npm test`는 compiler/source-location 사례, host fallback/DST/date-line 테스트,
-실제 framed WASM 5분 output trace를 포함한다. 서울 test 좌표의 2026-09-14 독립
-[USNO 참조](https://aa.usno.navy.mil/api/rstt/oneday?date=2026-09-14&coords=37.5665%2C126.978&tz=9)는
-rise 06:13, set 18:42(UTC+9, 분 해상도)를 보고한다. 테스트는 provider/rounding 차이로
-90초를 허용한다. 이는 browser/host driver를 구현한다. ESP32 solar-time driver는 별도
-작업이며 이 테스트는 device 작업을 수행하지 않는다.
+`npm test`에는 다음이 포함됩니다.
 
-더 넓은 [시간/Schedule 계약 제안](TIME-AND-SCHEDULE-CONTRACT.md)은 다음 version의
-DateTime/work-calendar/tidal/fallback 경계를 기록한다. 제안된 일반 timezone/DST profile을
-이 bounded native provider가 구현하지 않는다. 위 60초 gap은 missed-occurrence 억제이며
-동기화 상실 후 stale civil time으로 운전할 수 있다는 허가가 아니다.
+- 컴파일러와 소스 위치 사례;
+- 호스트 fallback, DST, 날짜변경선 테스트;
+- 실제 framed WASM의 5분 출력 trace.
+
+독립적인
+[USNO 참조](https://aa.usno.navy.mil/api/rstt/oneday?date=2026-09-14&coords=37.5665%2C126.978&tz=9)
+는 2026-09-14 서울 테스트 좌표에 대해 일출 06:13, 일몰 18:42(UTC+9, 분 단위)를
+보고합니다. 테스트는 공급자 차이와 반올림 차이를 위해 90초를 허용합니다.
+
+이것은 브라우저/호스트 드라이버를 구현합니다. ESP32 태양 시간 드라이버는 별도
+작업이며, 이 테스트들은 장치 조작을 하지 않습니다.
+
+더 넓은 [시간과 Schedule 계약 제안](TIME-AND-SCHEDULE-CONTRACT.ko.md)은 다음 버전의
+DateTime, 업무 달력, 조석, fallback 경계를 기록합니다. 거기서 제안한 일반
+timezone/DST 프로필은 이 제한된 native 공급자가 구현하지 **않습니다**. 위의 60초
+공백 규칙은 놓친 발생을 억제할 뿐이며, 동기화가 끊긴 뒤 오래된 민간 시간으로
+동작하는 것을 허용하지 않습니다.

@@ -1,6 +1,3 @@
-<!-- translation-source: docs/reference/04-sensors-constraints-control.md -->
-[Korean original](04-sensors-constraints-control.md)
-
 # 4. Sensors, constraints and control
 
 [Full contents](../LANGUAGE-REFERENCE.en.md) · [Previous: 3. Time and schedules](03-time-and-schedules.en.md) ·

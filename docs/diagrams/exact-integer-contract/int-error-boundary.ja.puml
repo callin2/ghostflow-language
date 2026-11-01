@@ -1,0 +1,22 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName "Hiragino Sans"
+skinparam defaultFontSize 13
+skinparam activityBackgroundColor #F7F9FC
+start
+:Int値を含むソース;
+if (定数のオーバーフロー、不正なリテラル、\nInt/Numberの混在、または\n静的に無効な変換か？) then (はい)
+  :コンパイル診断;
+  stop
+else (いいえ)
+endif
+:GFBにエンコードしてスキャンを実行;
+if (入力依存のオーバーフロー、\nゼロ除数、または無効な変換か？) then (はい)
+  :スキャンを拒否\n（安定した理由。例：integer-overflow）;
+  :新しい状態も意図も確定しない。\n最後に受理された結果が証拠として残る;
+  stop
+else (いいえ)
+  :厳密なInt結果を確定;
+  stop
+endif
+@enduml

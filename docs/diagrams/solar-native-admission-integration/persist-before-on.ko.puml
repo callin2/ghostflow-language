@@ -1,0 +1,26 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName Helvetica
+skinparam defaultFontSize 13
+skinparam ArrowColor #526d76
+
+participant "Host" as H
+participant "Provider" as P
+participant "Native VM\n(Runtime)" as R
+database "영속 저장소" as D
+participant "출력" as O
+
+H -> P : 설치된 Solar descriptor의\nfact 요청
+P --> H : occurrence fact\n(due bit 없음)
+H -> R : tick_with_solar(clock, facts)
+R -> R : admission 준비, when 평가,\nclock, ledger, 상태, 출력,\njournal을 함께 commit
+R --> H : outcome + schedule_trace
+H -> R : solar_checkpoint()
+R --> H : GFSO v1 바이트
+H -> D : checkpoint 저장
+alt 저장 성공
+  H -> O : ON 게시 / 적용
+else 저장 실패
+  H -> O : 실행 중단, 출력 clear
+end
+@enduml

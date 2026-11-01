@@ -1,0 +1,29 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName Helvetica
+skinparam defaultFontSize 13
+skinparam rectangleRoundCorner 8
+title #62 安装约束：两个未决选项（均未选定）
+
+package "选项 1：单独编译规范约束" {
+  rectangle "行为包\n（规范 .ghost.md）" as B1
+  rectangle "约束产物\n（命名约束路径）" as C1
+  rectangle "API 关联\n固定两个摘要" as J1
+  rectangle "安装方强制执行\n约束产物" as E1
+  B1 --> J1
+  C1 --> J1
+  J1 --> E1
+}
+
+package "选项 2：显式的跨项目边界修订版" {
+  rectangle "安装边界修订版\n（由 API/系统负责人发布）" as R2
+  rectangle "行为修订版" as B2
+  rectangle "约束修订版" as C2
+  rectangle "绑定" as BD2
+  rectangle "执行负责人" as EO2
+  R2 --> B2 : 引用
+  R2 --> C2 : 引用
+  R2 --> BD2 : 引用
+  R2 --> EO2 : 指定
+}
+@enduml

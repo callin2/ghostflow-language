@@ -1,0 +1,38 @@
+@startuml
+' Daily 08:00 range(10min); observado por primera vez a las 08:04; Duration en vivo cambiado a 12min a las 08:07
+skinparam defaultFontSize 12
+scale 1 as 70 pixels
+concise "Hora de pared" as W
+concise "Fin planificado" as P
+concise "Range .active" as A
+concise ".due" as D
+hide time-axis
+
+@0
+W is "07:58"
+P is "-"
+A is "false"
+D is "false"
+
+@2
+W is "08:00"
+P is "08:10"
+
+@6
+W is "08:04"
+A is "true"
+D is "true"
+
+@7
+W is "08:05"
+D is "false"
+
+@9
+W is "08:07"
+P is "08:12"
+
+@14
+W is "08:12"
+P is "terminado"
+A is "false"
+@enduml

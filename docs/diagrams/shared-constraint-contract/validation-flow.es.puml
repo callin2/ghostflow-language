@@ -1,0 +1,21 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName Helvetica
+skinparam rectangle {
+  BackgroundColor White
+  BorderColor #555555
+}
+left to right direction
+title Verificación del mapeo lógico (sin ejecución)
+
+rectangle "Este .ghost.md\n(SharedPumpPolicy)" as src
+rectangle "compileSourceSync\ndescriptor verificado\n+ hashes" as comp
+rectangle "Mapeo de la instalación\nidentidades, puertos tipados,\nmodos, hashes" as map
+rectangle "validateResourceConstraintBinding" as val
+rectangle "executable: false" as out
+
+src --> comp
+comp --> val
+map --> val
+val --> out
+@enduml

@@ -1,6 +1,3 @@
-<!-- translation-source: docs/LANGUAGE-REFERENCE.md -->
-[Korean original](LANGUAGE-REFERENCE.md)
-
 # GhostFlow Language Reference
 
 GhostFlow is a reactive control language. From sensor readings and user inputs, a GhostFlow program describes **how state changes and which outputs it intends for devices**.

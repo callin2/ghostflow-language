@@ -1,0 +1,34 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName Helvetica
+skinparam defaultFontSize 13
+skinparam ArrowColor #526d76
+skinparam rectangle {
+  BackgroundColor #f1f6f5
+  BorderColor #6d858b
+}
+hide stereotype
+
+rectangle "规范 .ghost.md\n（唯一的控制源）" as Src
+rectangle "编译器\n(#71)" as Comp
+rectangle "Interaction Schema\n（静态描述符）" as Schema
+rectangle "已完成的原生/WASM\n追踪（一次扫描）" as Trace
+rectangle "快照生产者\n（#72，校验 schema）" as Prod
+rectangle "Runtime Snapshot\nschema.sha256, module,\nsource, runId, scanId" as Snap
+rectangle "消费者连接\n（校验器 + 预期身份标识）" as Join
+rectangle "valid" as Ok
+rectangle "join.status: stale\n（身份标识与\n预期不同）" as Stale
+rectangle "校验错误\n（两份文档不一致）" as Err
+
+Src --> Comp
+Comp --> Schema
+Comp --> Trace : 模块在\n宿主上运行
+Schema --> Prod
+Trace --> Prod : 只读投影
+Prod --> Snap : 每个描述符\n一条观测
+Schema --> Join
+Snap --> Join
+Join --> Ok
+Join --> Stale
+Join --> Err
+@enduml

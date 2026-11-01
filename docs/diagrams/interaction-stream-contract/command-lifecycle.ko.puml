@@ -1,0 +1,19 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontSize 12
+hide empty description
+[*] --> received
+received --> rejected : 시작되지 않음\n(reason 필수)
+received --> started : 도메인 시작 증거
+started --> completed : 완료 증거
+started --> cancelled : reason 선택
+started --> failed : reason 필수
+rejected --> [*]
+completed --> [*]
+cancelled --> [*]
+failed --> [*]
+note right of rejected
+  종료 상태에는
+  후속 상태가 없음
+end note
+@enduml

@@ -1,0 +1,28 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName Helvetica
+skinparam defaultFontSize 13
+
+concise "已应用 A" as A
+concise "已应用 B" as B
+concise "40s 时的 60s 窗口\n（从 -20s 起）" as W1
+concise "65s 时的 60s 窗口\n（从 5s 起）" as W2
+
+@0
+A is "ON [0,20s]"
+B is {-}
+W1 is "已使用 30s，+5s 被阻止"
+W2 is {-}
+@5
+W2 is "已使用 25s，+5s 可准入"
+@10
+B is "ON [10,30s]"
+@20
+A is {-}
+@30
+B is {-}
+@40
+W1 is {-}
+@65
+W2 is {-}
+@enduml

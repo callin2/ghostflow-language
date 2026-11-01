@@ -1,0 +1,23 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName Helvetica
+skinparam defaultFontSize 13
+skinparam componentStyle rectangle
+component "编译器\n（瞬态 Result 值）" as C
+component "源元数据\n（site 表、允许的来源）" as M
+component "GFB3 操作码 56\ntrace-result <u32 site>" as OP
+component "Rust VM tick\n（候选）" as VM
+card "resultTrace 缓冲区\n{site, choice, origin}" as B
+component "已提交的 tick 记录\n（状态 + 意图 + resultTrace）" as R
+component "日志 / 重放" as J
+component "宿主\n（将事件与经验证的\n元数据和传感器质量关联）" as H
+C --> OP : 降级 fallback site
+C --> M : 记录 site
+OP --> VM
+VM --> B : 载荷成功后追加
+B --> R : tick 成功
+B ..> VM : 后续故障丢弃事件
+R --> J
+R --> H
+M --> H
+@enduml

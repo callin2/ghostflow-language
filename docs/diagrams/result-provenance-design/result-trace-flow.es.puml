@@ -1,0 +1,23 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName Helvetica
+skinparam defaultFontSize 13
+skinparam componentStyle rectangle
+component "Compilador\n(valor Result transitorio)" as C
+component "Metadatos de la fuente\n(tabla de sitios, orígenes permitidos)" as M
+component "Opcode 56 de GFB3\ntrace-result <u32 site>" as OP
+component "Tick de la VM de Rust\n(candidato)" as VM
+card "Búfer resultTrace\n{site, choice, origin}" as B
+component "Registro del tick consolidado\n(estado + intenciones + resultTrace)" as R
+component "Journal / reproducción" as J
+component "Host\n(une los eventos con metadatos\nverificados y calidad del sensor)" as H
+C --> OP : reduce los sitios de respaldo
+C --> M : registra los sitios
+OP --> VM
+VM --> B : se añade tras el éxito del payload
+B --> R : el tick tiene éxito
+B ..> VM : un fallo posterior descarta los eventos
+R --> J
+R --> H
+M --> H
+@enduml

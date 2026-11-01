@@ -1,0 +1,26 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName "Hiragino Sans"
+skinparam defaultFontSize 12
+left to right direction
+
+card "元の\n要求" as O
+card "解釈" as I
+card "判断\n（§3 の区分）" as D
+card "検証\n条件" as C
+card "コード\n(.ghost.md, GFB)" as P
+card "実行\n(run / scan)" as E
+card "実デバイス\n（観測）" as R
+
+O --> I : 外部オーサリングシステム
+I --> D : 確認フロー／\nポリシー適用者
+D --> C : 作成者／\n検証設計者
+C --> P : オーサリングツール\n+ コンパイラ
+P --> E : 実行／\n検証ツール
+E --> R : デバイス／ホスト／\n観測者
+note bottom of D
+  各リンクはそれぞれのリビジョンを持ちます。
+  リンクが欠けると、それに依存する主張
+  だけが不明になります。
+end note
+@enduml

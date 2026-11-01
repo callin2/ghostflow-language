@@ -1,0 +1,34 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName "Hiragino Sans"
+skinparam defaultFontSize 13
+skinparam ArrowColor #526d76
+skinparam rectangle {
+  BackgroundColor #f1f6f5
+  BorderColor #6d858b
+}
+hide stereotype
+
+rectangle "正準 .ghost.md\n(唯一の制御ソース)" as Src
+rectangle "コンパイラ\n(#71)" as Comp
+rectangle "Interaction Schema\n(静的ディスクリプタ)" as Schema
+rectangle "完了したネイティブ/WASM\nトレース (1 スキャン)" as Trace
+rectangle "スナップショット生成器\n(#72、スキーマを検証)" as Prod
+rectangle "Runtime Snapshot\nschema.sha256, module,\nsource, runId, scanId" as Snap
+rectangle "コンシューマの結合\n(バリデータ + 期待される同一性)" as Join
+rectangle "有効" as Ok
+rectangle "join.status: stale\n(同一性が期待値と\n異なる)" as Stale
+rectangle "検証エラー\n(文書同士が不一致)" as Err
+
+Src --> Comp
+Comp --> Schema
+Comp --> Trace : モジュールを\nホストで実行
+Schema --> Prod
+Trace --> Prod : 読み取り専用の射影
+Prod --> Snap : ディスクリプタごとに\n1 つの観測
+Schema --> Join
+Snap --> Join
+Join --> Ok
+Join --> Stale
+Join --> Err
+@enduml

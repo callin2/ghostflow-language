@@ -1,0 +1,29 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName "Hiragino Sans"
+skinparam defaultFontSize 13
+start
+:poll({nowMs, wallMs, trusted});
+if (trusted?) then (いいえ)
+  :due = false\nUntrustedClock;
+  stop
+endif
+if (最初の信頼できるサンプル\n(起動または復旧)?) then (はい)
+  :due = false\nBootBaseline / ClockRecoveryBaseline\n(追いつきなし);
+  stop
+endif
+if (wallMs <= 最高水位?) then (はい)
+  :due = false\nAlreadyObserved\n(巻き戻り / 重複);
+  stop
+endif
+if (壁時計または単調時間の\nギャップ > 60 秒?) then (はい)
+  :due = false\nClockGapSkipped;
+  stop
+endif
+if (イベント + オフセットが\n(previousWall, currentWall] 内?) then (はい)
+  :due = true\n発生の同一性付き;
+else (いいえ)
+  :due = false\n(イベントなし、または未交差);
+endif
+stop
+@enduml

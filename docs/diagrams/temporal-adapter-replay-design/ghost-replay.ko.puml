@@ -1,0 +1,27 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName Helvetica
+skinparam defaultFontSize 13
+skinparam ArrowColor #526d76
+
+rectangle "Live runtime" as L {
+  rectangle "Journal\n(보존된 기록)" as J
+  rectangle "상태, 대기 입력,\nintent, clock, frame ID" as S
+  rectangle "Live trace /\nframed outcome" as T
+}
+rectangle "Ghost instance" as G {
+  rectangle "설치된 module +\ncapability의 fork" as F
+}
+rectangle "Replay 결과 buffer\n(gf_replay_ptr/len,\ngf_frame_replay_ptr/len)" as B
+actor "Effect sink /\nactuator" as A
+
+J --> F : prefix 직전 checkpoint\n+ 가장 오래된 `count`개 기록
+F --> B : 성공 시에만 교체
+F ..> A : effect dispatch 없음
+F ..> S : live 변경 없음
+F ..> T : 절대 덮어쓰지 않음
+note bottom of G
+  effect를 절대 dispatch하지 않으며
+  live 상태, journal, 출력을 절대 바꾸지 않음
+end note
+@enduml

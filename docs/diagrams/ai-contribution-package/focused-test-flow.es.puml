@@ -1,0 +1,20 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontSize 13
+start
+:Compilar una vez el fixture sin modificar\n(numeric-threshold.ghost.md);
+fork
+  :Ejecutar Rust nativo\n(mismos bytes, misma cinta de entrada);
+fork again
+  :Ejecutar WASM\n(mismos bytes, misma cinta de entrada);
+end fork
+:Comparar resultados solicitado/seguro\ncon oracle.json independiente;
+:Para cada mutante en memoria\n("<" -> "<=", condición -> true);
+:El mutante debe compilar y ejecutarse\ncon normalidad en ambos destinos;
+:La aserción del oráculo sin modificar\ndebe pasar a ROJO;
+note right
+  Un fallo, un tiempo agotado o un ejecutor
+  ausente NO cuentan como mutación eliminada
+end note
+stop
+@enduml

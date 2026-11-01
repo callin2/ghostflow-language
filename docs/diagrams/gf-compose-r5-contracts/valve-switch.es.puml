@@ -1,0 +1,23 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName Helvetica
+skinparam defaultFontSize 13
+title Contraejemplo de cambio de válvula (elaborado a mano, no evidencia de ejecución)
+
+participant "Comportamiento A\n(titular de la sesión de bomba)" as A
+participant "Política de estación\n(prepare_start_batch,\nauthorize_output)" as S
+participant "Comportamiento B" as B
+
+A -> S : sesión de bomba activa (ValveA)
+A -> S : bomba en OFF brevemente,\ncambio ValveA -> ValveB
+note over S : La sesión se conserva\ndurante la limpieza de válvulas
+B -> B : ve pump=false
+B -> S : solicita la misma bomba física
+S --> B : rechazado (AlreadyOwned):\nA sigue siendo titular de la sesión;\nun control inactivo no puede detener al titular
+note over A, B
+Una regla local «la bomba está apagada, por tanto B puede arrancar»
+rompería el invariante de titularidad de la sesión.
+Es solo una afirmación acotada sobre la estación, no una prueba
+de que comportamientos compuestos arbitrarios compartan recursos correctamente.
+end note
+@enduml

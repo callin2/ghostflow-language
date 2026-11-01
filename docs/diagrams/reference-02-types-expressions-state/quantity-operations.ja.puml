@@ -1,0 +1,25 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontSize 13
+skinparam rectangleBorderColor #4A6FA5
+skinparam rectangleBackgroundColor #F7F9FC
+title v1 で許可される異なる量の間の結果（列挙されていない量の間の演算はエラー）
+
+rectangle "Temperature\n（絶対温度、K）" as T
+rectangle "TemperatureDelta\n（ΔK）" as TD
+rectangle "FlowRate" as FR
+rectangle "Volume" as V
+rectangle "Power" as P
+rectangle "Energy" as E
+rectangle "Voltage" as U
+rectangle "ElectricalCurrent" as I
+
+T --> TD : Temperature - Temperature
+TD --> T : Temperature ± TemperatureDelta
+FR --> V : FlowRate * Duration
+V --> FR : Volume / Duration
+P --> E : Power * Duration
+E --> P : Energy / Duration
+U --> P : Voltage * ElectricalCurrent
+I --> P
+@enduml

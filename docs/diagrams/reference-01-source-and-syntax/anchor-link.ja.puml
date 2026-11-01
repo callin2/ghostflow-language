@@ -1,0 +1,20 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName "Hiragino Sans"
+skinparam defaultFontSize 13
+skinparam rectangleBorderColor #555555
+skinparam rectangleBackgroundColor #F7F7F7
+
+rectangle "Markdown の本文" as PROSE {
+  rectangle "HTML コメント\nghostflow:anchor id=… kind=… status=… origin=…" as ANCHOR
+  rectangle "直後のトップレベルの段落\nまたは引用ブロック" as TEXT
+}
+rectangle "ghost フェンス" as FENCE {
+  rectangle "// ghostflow:link id=… relation=…" as LINK
+  rectangle "直後の追跡可能な文" as STMT
+}
+
+ANCHOR --> TEXT : 原文を識別
+LINK --> STMT : ちょうど 1 つを識別
+LINK ..> ANCHOR : id を参照\n(implements | constrains |\nfallback | assumes)
+@enduml

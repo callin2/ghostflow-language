@@ -1,0 +1,16 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontSize 13
+skinparam activity {
+  BackgroundColor #F8F8F8
+  BorderColor #555555
+}
+start
+:Hecho: corte estructural de pulse\n(análisis, verificación de tipos, descriptor del verificador);
+:1. Hechos de ocurrencias civiles\n(el proveedor aporta hechos, nunca .due);
+:2. Descriptor de admisión portable\nmás allá de Solar;
+:3. Bytecode verificado, activación\nWASM/nativa, ejecución del preludio;
+:4. Demostrar fuente -> artefacto -> ejecución;\neliminar el rechazo de emisión y el .due del host;
+:5. Extender la política a Window/Run,\ncancelación, relojes retenidos;
+stop
+@enduml

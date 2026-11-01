@@ -1,0 +1,27 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName Helvetica
+skinparam defaultFontSize 13
+left to right direction
+title Primer perfil de contrato propuesto: dónde se comprueba cada propiedad
+
+rectangle "Tipo" as T
+rectangle "Dependencia" as D
+rectangle "Límites de parámetros" as B
+rectangle "Titular exclusivo" as X
+rectangle "Compatibilidad con\nrestricciones de instalación" as I
+
+rectangle "Compilación / estático\n(compilación, lowering,\nvalidación de vinculación)" as C #EEF5FF
+rectangle "Validación / compuerta\nprevia a la activación" as P #FFF8E6
+rectangle "Runtime\n(autorización de solicitud/inicio\no de estación)" as R #EEFBEF
+
+T --> C : validación estática de vinculación
+D --> C : compilación/lowering
+D --> P : validación previa a la activación
+B --> C : validación en compilación
+B --> R : autorización de solicitud/inicio
+X --> C : autoridad lógica +\nvalidación de vinculación aparte
+X --> R : autorización de estación\ncuando corresponda
+I --> P : compuerta de compatibilidad
+I --> R : solo restricciones realmente\nreducidas (lowered)/aplicadas
+@enduml

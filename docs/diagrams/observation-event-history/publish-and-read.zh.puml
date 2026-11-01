@@ -1,0 +1,23 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontSize 12
+title 有界事件日志：发布、保留、读取
+participant "可信生产者" as P
+participant "事件日志\n（参考宿主）" as J
+participant "消费者" as C
+P -> J: publish({completion, trace, settingsState?, events})
+alt 任一检查失败
+  J --> P: 拒绝；日志不变（允许重试）
+else 整批有效
+  J -> J: 分配序号 N+1..N+k\n（events = [] 时不分配）
+  J -> J: 保留最新的 `capacity` 个事件
+  J -> J: 替换最新快照
+  J --> P: 已发布记录 + 快照 + nextCursor
+end
+C -> J: read({cursor: afterSequence = 10})
+J --> C: gaps [11..13, "retention"]\n从 14 开始的事件\n最新快照（单独）\nnextCursor
+note right of C
+  不为 11-13 生成合成事件。
+  仅在处理完成后保存 nextCursor。
+end note
+@enduml

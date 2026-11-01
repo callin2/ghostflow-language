@@ -1,0 +1,22 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName Helvetica
+skinparam defaultFontSize 13
+hide empty description
+state "无基线" as None
+state "BootBaseline" as Boot
+state "ClockUnknown" as Unknown
+state "RecoveryBaseline" as Recovery
+state "可信跟踪\n（将增量与 gap 比较）" as Tracking
+[*] --> None : 构造(gap, 运行纪元)
+None --> Boot : 首个可信墙钟时间
+None --> Unknown : 墙钟时间缺失\n或不可信
+Boot --> Tracking
+Recovery --> Tracking
+Tracking --> Tracking : 增量 <= gap
+Tracking --> Tracking : 增量 > gap\n/ ObservationGap
+Tracking --> Unknown : 墙钟时间缺失\n或不可信
+Unknown --> Recovery : 再次获得可信墙钟时间
+note right of Boot : 基线绝不是\n准入脉冲
+note bottom of Tracking : 验证失败（范围、纪元、\n单调回退）时\n状态保持不变
+@enduml

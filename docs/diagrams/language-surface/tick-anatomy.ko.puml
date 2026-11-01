@@ -1,0 +1,24 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName "Apple SD Gothic Neo"
+skinparam rectangleRoundCorner 8
+skinparam ArrowColor #555555
+left to right direction
+
+rectangle "호스트가 공급\ninput, sensor 읽기 값\n(값 또는 fault)" as IN
+rectangle "이전 상태\nwatering" as PREV
+rectangle "순수 계산\nlet, fn, if, case" as CALC
+rectangle "다음 상태\nwatering'" as NEXT
+rectangle "출력 연결\npump <- ...;" as OUT
+rectangle "require 제약\nbool 출력 차단" as REQ
+rectangle "호스트 / 렌더러\n출력 적용,\n페일세이프 담당" as HOST
+
+IN --> CALC
+PREV --> CALC
+CALC --> NEXT
+CALC --> OUT
+NEXT --> OUT : 출력 식은\n다음 상태를 읽을 수 있음
+OUT --> REQ : 후보 의도
+REQ --> HOST : 요청 의도 / 안전 의도
+NEXT ..> PREV : tick 끝에\n함께 확정
+@enduml

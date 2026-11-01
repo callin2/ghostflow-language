@@ -1,0 +1,32 @@
+@startuml
+skinparam defaultFontSize 12
+skinparam shadowing false
+start
+:被接受的 tick
+（一个不可变的 ClockSnapshot）;
+if (墙钟时间可信？
+（或有界的 hold_trusted）) then (否)
+  :Unknown(ClockUnknown)
+由 fallback 决定；不产生新的准入;
+  stop
+else (是)
+endif
+:触发器规划触发实例
+（At、Daily、DailySlots、Periodic、
+Cron、Solar、Tide）;
+:日规则 / 日历（on）
+Unknown 保持为 Unknown;
+if (触发实例已在账本中
+被准入或已终结？) then (是)
+  :不产生新的准入
+（不追补、不重放）;
+  stop
+else (否)
+endif
+:基准决定准入
+（pulse、window、run、range）
+使用 when 和 gap;
+:投影 .due / .open / .active / .missed
++ 调度计划观测记录;
+stop
+@enduml

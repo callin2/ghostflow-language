@@ -10,7 +10,12 @@
   "scripts": {
     "test": "node tools/verify-language.mjs",
     "test:node": "node tools/verify-language.mjs --node-only",
-    "docs:check": "node tools/check-doc-translations.mjs && node --test tests/io-role-documentation.test.mjs && npm run docs:index:check",
+    "docs:check": "node tools/check-doc-translations.mjs && node tools/render-diagrams.mjs --check && node --test tests/io-role-documentation.test.mjs && npm run docs:index:check",
+    "docs:stamp": "node tools/stamp-doc-translations.mjs",
+    "docs:translations:coverage": "node tools/check-doc-translations.mjs --coverage",
+    "docs:diagrams": "node tools/render-diagrams.mjs",
+    "docs:diagrams:fetch": "node tools/render-diagrams.mjs --fetch",
+    "docs:diagrams:check": "node tools/render-diagrams.mjs --check",
     "test:compiler": "node --test tests/compiler.test.mjs tests/docs-runnable-examples.test.mjs tests/int-compiler.test.mjs tests/constraints.test.mjs tests/literate.test.mjs tests/toolchain.test.mjs tests/interaction-emission.test.mjs tests/browser-toolchain.test.mjs",
     "test:contract": "node --test tests/integration-contract.test.mjs",
     "test:reference": "node --test tests/reference-cli.test.mjs",

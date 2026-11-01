@@ -1,0 +1,19 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName Helvetica
+skinparam defaultFontSize 13
+skinparam ArrowColor #526d76
+skinparam state {
+  BackgroundColor #f1f6f5
+  BorderColor #6d858b
+  FontColor #102b35
+}
+
+[*] --> Off : 逻辑时间 0
+Off : watering = false\nRO1 = RO2 = false
+On : watering = true\nRO1 = RO2 = true
+Off --> On : DI1 新的 false→true 沿\n且 DI2、DI3 已释放
+On --> Off : DI2 停止或 DI3 低水位\n（或 DI2/DI3 故障）
+On --> Off : age 达到 5min
+Off --> Off : 持续按住 DI1、DI2/DI3 解除\n或故障恢复（不重新启动）
+@enduml

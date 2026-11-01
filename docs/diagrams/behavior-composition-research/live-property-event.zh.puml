@@ -1,0 +1,20 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontSize 13
+title 已商定的修订 - 提议中，尚未实现
+start
+:一次操作修改\n多个属性;
+:校验完整的事件\n（作为一个原子事件）;
+if (所有值都有效？) then (是)
+  :处理事件时应用所有值\n（即使在运行过程中）;
+  :保留程序和运行身份标识；\n推进设置修订版 /\n生效事件位置;
+  note right
+    不改写源代码、不重新编译、
+    不更新固件/字节码、
+    不停止/重启控制器
+  end note
+else (任一无效)
+  :整体拒绝该事件；\n不做任何修改;
+endif
+stop
+@enduml

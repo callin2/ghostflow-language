@@ -1,0 +1,20 @@
+@startuml
+hide empty description
+skinparam shadowing false
+skinparam defaultFontSize 13
+skinparam state {
+  BackgroundColor #F8F8F8
+  BorderColor #555555
+}
+
+state "Sin admisión\nsegura: bomba OFF" as Idle
+state "Admitido\nsegura = solicitada" as Admitted
+state "Disparado\nvector seguro:\nbomba OFF, válvula ON" as Tripped
+
+[*] --> Idle
+Idle --> Admitted : reclamo de modo nuevo\npasa la envolvente\n(escaneo 0: automático, escaneo 4: manual)
+Admitted --> Tripped : bomba solicitada ON\ncon válvula OFF\n(escaneo 1)
+Tripped --> Tripped : vuelve la solicitud de válvula\nsin rearranque automático\n(escaneo 2)
+Tripped --> Idle : trama neutra:\ntodos los reclamos de modo en false\n(escaneo 3)
+Admitted --> Idle : todos los reclamos de modo en false
+@enduml

@@ -1,0 +1,30 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName "Hiragino Sans"
+skinparam defaultFontSize 12
+skinparam rectangle {
+  RoundCorner 8
+}
+left to right direction
+legend top left
+  緑 = 実装済みのスライス
+  橙 = 未完了（公開経路は RED のまま）
+endlegend
+
+rectangle "公開 .ghost.md コンパイラ\n（unsupported 診断が有効）" as PC #FFE0B2
+rectangle "型チェッカ + true-for\nディスクリプタ（直接の Bool）" as TC #C8E6C9
+rectangle "GFB format 6\nprelude タグ 2、opcode 59" as GFB #C8E6C9
+rectangle "ControlRuntime：マニフェスト、\n区間の取り込み、フレーム" as CR #FFE0B2
+rectangle "WASM activateTemporal\n（GFTA v2）" as W #C8E6C9
+rectangle "ネイティブ TrueForActivation\n+ Rust tick" as N #C8E6C9
+rectangle "TrueFor エンジン\nstage / commit / rollback" as E #C8E6C9
+rectangle "認証済みチェックポイント、\n巻き戻し、リプレイ" as CK #FFE0B2
+
+PC --> TC
+TC --> GFB
+GFB --> N
+CR --> W
+W --> N
+N --> E
+E --> CK
+@enduml

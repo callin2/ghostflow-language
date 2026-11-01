@@ -1,0 +1,20 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName "Hiragino Sans"
+skinparam defaultFontSize 13
+skinparam componentStyle rectangle
+title E22：1つのサンプルパケット、固定された2つのインスタンス
+
+rectangle "root の入力\nair, humidity, light" as in
+component "instance high: HighVpd\n（E19.ghost.md、固定済み）" as high
+component "instance low: LowVpd\n（E20.ghost.md、固定済み）" as low
+rectangle "air_vpd_value\nvpd_valid" as common
+rectangle "humidify_demand" as hd
+rectangle "ventilate_demand" as vd
+
+in --> high : connect
+in --> low : connect
+high --> common
+high --> hd
+low --> vd
+@enduml

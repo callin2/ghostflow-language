@@ -1,0 +1,44 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName Helvetica
+skinparam defaultFontSize 13
+skinparam ArrowColor #526d76
+
+start
+:捕获并校验完整的扫描;
+if (所有调理器都 begin 成功？) then (全部已 begin)
+else (某个 begin 失败)
+  :只回滚已 begin 的句柄;
+  stop
+endif
+:调理输入，准备 VM 输入
+committed = false;
+if (准备成功？) then (是)
+else (否)
+  :回滚每个已 begin 的调理器;
+  :VM 状态、时间、帧 ID 不变;
+  :允许有效重试;
+  stop
+endif
+:committed = null
+调用原生 VM;
+if (原生调用已返回？) then (是)
+  :committed = 原生返回值;
+  if (返回值？) then (1)
+    :提交调理器、
+    已接受的宿主时间和帧 ID;
+    :解码 trace/outcome JSON;
+    note right
+      之后的错误会终止宿主，
+      但不能撤销该扫描
+    end note
+  else (0：已知拒绝)
+    :回滚每个已 begin 的调理器;
+    :允许有效重试;
+  endif
+else (trap / 适配器异常)
+  :状态未知：不声称已回滚;
+  :终止后续步骤;
+endif
+stop
+@enduml

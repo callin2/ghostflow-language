@@ -1,0 +1,26 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName Helvetica
+skinparam defaultFontSize 13
+skinparam ArrowColor #526d76
+
+participant "호스트" as H
+participant "Ledger 기본 요소" as L
+database "영속 저장소\n(호스트 소유)" as D
+
+H -> L : 생성
+note right of L : 읽기 Unknown
+H -> L : 빈 ledger 초기화 (최초 설치 시에만)
+H -> L : 스냅샷
+L --> H : 바이트 + revision N
+H -> D : 바이트를 정확히 기록
+D --> H : ok
+H -> L : revision N 확인 응답
+note right of L : 읽기 Known
+H -> L : 레코드 추가
+note right of L : revision N+1, 읽기 Unknown
+H -> L : 오래된 revision N 확인 응답
+L --> H : 거부됨
+H -> L : 스냅샷, 기록, N+1 확인 응답
+note right of L : 다시 읽기 Known
+@enduml

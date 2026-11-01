@@ -1,0 +1,18 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontSize 13
+skinparam componentStyle rectangle
+component "固定定义\n（config + 定时器）" as D
+package "组合后的 Program（共享 Rust 核心）" {
+  component "east 实例\n自有 config Result、\nemissionRevision、定时器状态" as East
+  component "west 实例\n自有 config Result、\nemissionRevision、定时器状态" as West
+}
+component "设置事务\n（一个全局 settingsRevision）" as S
+component "逻辑时钟\n（同一提供时间）" as C
+D --> East : 实例化
+D --> West : 实例化
+S --> East : 针对 east config ID 的事件
+S ..> West : 不变
+C --> East
+C --> West
+@enduml

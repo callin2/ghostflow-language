@@ -1,0 +1,28 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontSize 13
+skinparam ActivityBackgroundColor #F7F9FC
+skinparam ActivityBorderColor #4A6FA5
+title Un tick: leer una instantánea, calcular candidatos, consolidar juntos
+
+start
+:Leer la instantánea de entradas\n+ estado anterior;
+:Calcular cada estado siguiente\n(todos leen valores anteriores);
+:Construir el estado candidato completo;
+:Calcular la intención de salida solicitada\n(las expresiones <- pueden leer state');
+:Aplicar las restricciones de salida\n-> intención segura;
+if (¿Algún fallo en tiempo de ejecución?\n(overflow, percent-out-of-range, ...)) then (sí)
+  :Rechazar el tick;
+  note right
+    No se consolida nada:
+    ni estado candidato,
+    ni intención,
+    ni entrada exitosa en el journal
+  end note
+  stop
+else (no)
+  :Consolidar juntos el estado\ny los resultados lógicos;
+  :El estado consolidado pasa a ser\nel "estado anterior" del siguiente tick;
+  stop
+endif
+@enduml

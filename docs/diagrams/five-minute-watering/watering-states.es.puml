@@ -1,0 +1,21 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName Helvetica
+skinparam defaultFontSize 13
+skinparam ArrowColor #526d76
+skinparam state {
+  BackgroundColor #f1f6f5
+  BorderColor #6d858b
+  FontColor #102b35
+}
+
+state "Apagado" as Off
+state "Encendido" as On
+[*] --> Off : tiempo lógico 0
+Off : watering = false\nRO1 = RO2 = false
+On : watering = true\nRO1 = RO2 = true
+Off --> On : nuevo flanco de false a true en DI1\ny DI2, DI3 liberadas
+On --> Off : paro DI2 o nivel bajo DI3\n(o fallo de DI2/DI3)
+On --> Off : age alcanza 5min
+Off --> Off : DI1 mantenida, DI2/DI3 despejadas\no fallo recuperado (sin reinicio)
+@enduml

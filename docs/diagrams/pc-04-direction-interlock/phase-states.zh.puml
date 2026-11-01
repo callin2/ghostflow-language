@@ -1,0 +1,27 @@
+@startuml
+hide empty description
+skinparam shadowing false
+skinparam defaultFontSize 13
+skinparam state {
+  BackgroundColor #F8F8F8
+  BorderColor #555555
+}
+
+state "Stopped\n两者均 OFF" as Stopped
+state "Forward\n正转 ON" as Forward
+state "Reverse\n反转 ON" as Reverse
+state "WaitReverse\n两者均 OFF" as WaitReverse
+state "WaitForward\n两者均 OFF" as WaitForward
+
+note "从任意阶段：\n!permit 或同时按下两个按钮\n→ Stopped" as N1
+
+[*] --> Stopped
+Stopped --> Forward : forward_event
+Stopped --> Reverse : reverse_event
+Forward --> WaitReverse : reverse_event
+Reverse --> WaitForward : forward_event
+WaitReverse --> Reverse : age >= 2s
+WaitForward --> Forward : age >= 2s
+WaitReverse --> WaitForward : forward_event\n（定时器重新开始）
+WaitForward --> WaitReverse : reverse_event\n（定时器重新开始）
+@enduml

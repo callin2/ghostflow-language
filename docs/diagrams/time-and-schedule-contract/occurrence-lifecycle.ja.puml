@@ -1,0 +1,17 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName "Hiragino Sans"
+skinparam defaultFontSize 13
+hide empty description
+
+state "計画済み\n（安定した発生ID）" as Planned
+state "受け入れ済み\n（1スキャンだけ .due が true）" as Admitted
+state "取りこぼし\n（理由はトレースに保持）" as Missed
+
+[*] --> Planned
+Planned --> Planned : 受け入れ前のプロバイダ補正が\n計画時刻を動かす
+Planned --> Admitted : Pulse の通過／Window／\nRun の遅延開始区間の中で\nすべての条件が true
+Planned --> Missed : ConditionsFalseAtPulse\nObservationGap\nLateStartExpired\nCorrectionPastHighWater\nEventWithdrawn
+Admitted --> [*] : 最大1回。\n再アームなし、重複なし
+Missed --> [*] : キューに入れたり\nリプレイしたりしない
+@enduml

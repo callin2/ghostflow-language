@@ -1,0 +1,21 @@
+@startuml
+hide empty description
+skinparam shadowing false
+skinparam defaultFontName Helvetica
+skinparam state {
+  BackgroundColor White
+  BorderColor #555555
+}
+title Guarda Bool compartida: admisión, disparo y recuperación (un grupo exclusivo)
+
+[*] --> Idle
+Idle : sin actividad admitida
+Idle --> Admitted : nuevo reclamo en true\n+ todas las condiciones de admisión\n+ el candidato cumple safe_output
+Idle --> Idle : el candidato viola una relación\n(denegado: sin admisión,\nsin nueva salida protegida)
+Admitted : salidas = candidato solicitado
+Admitted --> Admitted : reclamo de recién llegado en conflicto\n(denegado; se mantienen la admisión\nvigente y las salidas seguras previas)
+Admitted --> Tripped : el candidato solicitado\nviola una relación obligatoria
+Tripped : salidas = vector seguro del autor\n(p. ej., pump=false, valve=true)
+Tripped --> Tripped : las entradas vuelven a la normalidad\n(sin reinicio automático)
+Tripped --> Idle : observación con\ntodos los reclamos en false
+@enduml

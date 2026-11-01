@@ -1,0 +1,28 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontSize 13
+start
+:poll({nowMs, wallMs, trusted});
+if (trusted?) then (아니오)
+  :due = false\nUntrustedClock;
+  stop
+endif
+if (첫 신뢰 샘플\n(부팅 또는 복구)?) then (예)
+  :due = false\nBootBaseline / ClockRecoveryBaseline\n(따라잡기 없음);
+  stop
+endif
+if (wallMs <= high-water mark?) then (예)
+  :due = false\nAlreadyObserved\n(롤백 / 중복);
+  stop
+endif
+if (벽시계 또는 단조 공백 > 60 s?) then (예)
+  :due = false\nClockGapSkipped;
+  stop
+endif
+if (event + offset이\n(previousWall, currentWall]에 있음?) then (예)
+  :due = true\n발생 identity 포함;
+else (아니오)
+  :due = false\n(이벤트 없음 또는 교차하지 않음);
+endif
+stop
+@enduml

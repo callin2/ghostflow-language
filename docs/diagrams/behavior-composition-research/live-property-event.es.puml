@@ -1,0 +1,20 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontSize 13
+title Enmienda acordada - propuesta, NO implementada
+start
+:Una acción cambia\nvarias propiedades;
+:Validar el evento completo\n(como UN evento atómico);
+if (¿Todos los valores son válidos?) then (sí)
+  :Aplicar todos los valores al procesar\nel evento (incluso en operación);
+  :Mantener identidad de programa y ejecución;\navanzar revisión de ajustes /\nposición del evento efectivo;
+  note right
+    Sin reescribir la fuente, recompilar,
+    actualizar firmware/bytecode
+    ni detener/reiniciar el controlador
+  end note
+else (alguno no válido)
+  :Rechazar el evento completo;\nsin mutación;
+endif
+stop
+@enduml

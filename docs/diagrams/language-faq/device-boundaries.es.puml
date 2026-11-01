@@ -1,0 +1,19 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontSize 13
+skinparam rectangleBorderColor #4A6FA5
+skinparam rectangleBackgroundColor #F7F9FC
+left to right direction
+title Dónde se gestiona cada tipo de cambio (preguntas 33-40)
+
+rectangle "Fuente GhostFlow (.ghost.md)\nentradas/salidas lógicas,\ncontratos de entrada, reglas de control" as SRC
+rectangle "Ajustes operativos\n(valores config)" as CFG
+rectangle "Vinculación de la instalación\npuerto lógico -> pin / canal / dirección" as BIND
+rectangle "Driver de entrada /\nrenderizador de salida\nprotocolo, valores brutos, polaridad" as DRV
+rectangle "Dispositivo físico\nsensor, botón, relé,\nplaca de expansión" as DEV
+
+CFG --> SRC : evento en vivo,\nmismo programa
+SRC --> BIND : puertos lógicos
+BIND --> DRV
+DRV --> DEV
+@enduml

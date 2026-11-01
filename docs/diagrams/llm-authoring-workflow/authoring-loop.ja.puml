@@ -1,0 +1,27 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName "Hiragino Sans"
+skinparam ArrowColor #555555
+skinparam ActivityBorderColor #555555
+
+start
+:Reference §1.2、§1.5、§4.7 を取得
+（citation + digest）;
+:build/authoring/pump.ghost.md の
+rev-1-input-v1 を検査;
+:検査が失敗: 診断の span が元の文書内の
+pump <- start && ;  を指す;
+:同じ文書を編集
+（rev-2-input-v1: pump <- requested';）;
+:rev-2 を検査し、コンパイル
+（GFB + ソースマップ）;
+:0、1、2 ms のスキャンをシミュレート
+（仮想の requested / safe 意図）;
+:未解決の質問をユーザーに尋ねる
+（最大運転時間は?）;
+note right
+  ユーザーが答えるまで
+  タイマーは追加しない。
+end note
+stop
+@enduml

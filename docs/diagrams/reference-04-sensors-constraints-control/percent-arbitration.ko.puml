@@ -1,0 +1,17 @@
+@startuml
+skinparam defaultFontName "Apple SD Gothic Neo"
+skinparam shadowing false
+skinparam ActivityBackgroundColor #F7F9FC
+skinparam ActivityBorderColor #4A6FA5
+title 연속 Percent 자원 policy (예: P)
+start
+:모든 요청과 상한을 하나의\n입력 snapshot + 이전 state에서 평가;
+if (요청이나 상한 중 fault가 있나?) then (예)
+  #FFF4D6:후보 = 작성한 `safe` (0%)\n(`on_unknown = safe`; conditionsKnown = false);
+else (아니요)
+  :후보 = 요청의 `select` (max)\n온도 70%, 습도 40% -> 70%;
+endif
+:알려진 상한의 최소값으로 clamp\n(바람 20%);
+:vent_target의 최종 safe intent\nfault 없음: 70% -> 20%; fault: 0%;
+stop
+@enduml

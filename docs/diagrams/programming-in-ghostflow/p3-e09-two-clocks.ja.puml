@@ -1,0 +1,17 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName "Hiragino Sans"
+
+rectangle "暦時計\n（タイムゾーン、DST、信頼できるクロック）" as civil
+rectangle "schedule starts:\nDailySlots<15min>\n06:00, 18:45" as sched
+rectangle "starts.due\n（発生が到来した tick で true）" as due
+rectangle "phase: Idle -> Watering" as start
+rectangle "単調クロック\nage = elapsed(phase)" as mono
+rectangle "age >= 5min:\nWatering -> Idle" as stop
+
+civil --> sched : 壁時計の時刻
+sched --> due : 受け入れられた発生
+due --> start
+start --> mono : age は 0 から再開
+mono --> stop : 5min 以上経過した最初の tick
+@enduml

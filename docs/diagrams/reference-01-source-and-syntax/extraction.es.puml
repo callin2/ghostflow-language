@@ -1,0 +1,19 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontSize 13
+start
+:Un documento .ghost.md canónico;
+:Analizar como CommonMark;
+:Seleccionar los bloques de código delimitados\nde nivel superior cuya cadena de información\nes exactamente ghost\n(delimitadores de acento grave o tilde);
+note right
+  No ejecutable: prosa, tablas, front matter,
+  código indentado, otras cadenas de información,
+  bloques ghost anidados en listas/citas o
+  escritos dentro de un bloque de visualización más largo,
+  ghost-python, ghost con atributos
+end note
+:Mantener el orden del documento;\nterminar cada cuerpo con un salto de línea;\nponer una línea en blanco entre bloques;
+:Analizar el resultado como un programa\ncon exactamente un control raíz;
+:Informar diagnósticos en el archivo,\nla línea y la columna originales;
+stop
+@enduml

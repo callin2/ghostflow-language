@@ -1,0 +1,28 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontSize 12
+skinparam ActivityBackgroundColor #F7F9FC
+skinparam ActivityBorderColor #4A6FA5
+title Debounce: una observación de la raíz seleccionada (simplificado)
+start
+:Cada raíz alcanzable actualiza su propia\nmarca máxima de epoch/ID en el escaneo consolidado;
+if (¿Cambió la raíz seleccionada,\no hay un cambio de epoch fresco?) then (sí)
+  :Reiniciar la continuidad de stable y candidate;
+endif
+if (¿El Result es un fallo?) then (sí)
+  :Conservar el motivo y el origen exactos;\nreiniciar stable y candidate a `initial`;
+  stop
+endif
+if (¿Observación fresca?\n(tag 0: una por escaneo consolidado)) then (no: duplicada,\nID menor, ausente)
+  :La continuidad no avanza;
+  stop
+else (sí)
+endif
+if (¿Candidate mantenido durante\n`stable_for` o más?) then (sí)
+  :Promover candidate a stable;
+else (no)
+  :Seguir cronometrando candidate\n(hora de la muestra o tiempo lógico del escaneo);
+endif
+:Reenviar el linaje de muestra de origen;
+stop
+@enduml

@@ -1,0 +1,26 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName Helvetica
+skinparam defaultFontSize 13
+skinparam rectangleRoundCorner 8
+title 保持区分的身份标识（当前事实与提议）
+
+rectangle "规范源\ndocumentId + revisionId + sha256" as SRC
+rectangle "已编译模块\n指纹 + 字节码摘要" as MOD
+rectangle "行为实例\n不透明的 instanceId（提议）" as INST
+rectangle "逻辑端口\n作者指定的 id（按实例限定，提议）" as PORT
+rectangle "物理绑定\nbindingRevision / 摘要" as BIND
+rectangle "设置修订版\n+ 生效事件位置（提议）" as SET
+rectangle "运行\nrunId" as RUN
+rectangle "发生实例\nrun + instance + scanId（提议）" as OCC
+rectangle "显示标签 / 文件名\n（仅用于展示和追踪）" as LBL #EEEEEE
+
+SRC --> MOD : 编译为
+SRC --> INST : 固定的定义修订版
+INST --> PORT : 限定
+PORT --> BIND : 由安装绑定
+INST --> SET : 关联
+RUN --> OCC : 在其内排序 scanId
+INST --> OCC : 限定
+LBL ..> INST : 绝不是身份标识
+@enduml

@@ -1,0 +1,23 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName Helvetica
+skinparam defaultFontSize 13
+skinparam componentStyle rectangle
+actor "Llamador" as Caller
+rectangle "explainExecution(request)" as API {
+  component "Recompilar la fuente\ncanónica .ghost.md" as C
+  component "Explicación de salida +\ninstantánea del escaneo completado\n+ unión prueba/instantánea" as J
+  component "Verificar identidad\ny registros del dispositivo" as D
+}
+rectangle "execution-evidence-result-v1" as R {
+  card "requested, safe,\nauthored" as R1
+  card "estado del dispositivo" as R2
+}
+Caller --> C : source, runId, outputId
+Caller --> J : resultado del escaneo aceptado
+Caller --> D : expectedDevice,\ndeviceEvidence
+C --> J
+J --> R1
+D --> R2
+note right of API : Sin evaluador nuevo, sin contacto con el dispositivo,\nsin leer imports del disco
+@enduml

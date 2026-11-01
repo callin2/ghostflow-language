@@ -1,0 +1,20 @@
+@startuml
+skinparam defaultFontName "Hiragino Sans"
+skinparam shadowing false
+skinparam defaultFontSize 13
+skinparam activityBorderColor #4A6FA5
+skinparam activityBackgroundColor #F7F9FC
+title Programのホット置換（§6.9）
+
+start
+:新しいソースrevisionまたは\nimportクロージャを持つ候補;
+if (ポート、所有権、プロファイル、リソース、\n状態の互換性は有効？) then (はい)
+  :tick境界でアトミックに確定;
+  :同名・同型の状態のみ引き継ぐ\n新しい状態 = 宣言された既定値\n削除された状態は消える;
+  :古い入力キャッシュを破棄し、\n新しいスキーマの完全な\n入力スナップショットを受け取る;
+  :新しいアーティファクト／ソースの同一性\nと新しい実行（run）の境界;
+else (いいえ)
+  :以前のProgramを維持;
+endif
+stop
+@enduml

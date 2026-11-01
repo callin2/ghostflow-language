@@ -1,0 +1,29 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontSize 13
+participant "호스트 (JS)" as H
+participant "WASM 어댑터" as W
+participant "Rust AfterEvent<32>" as R
+H -> W : stage(batch)
+W -> W : GFAE v1 패킷 인코딩
+W -> R : stage(packet)
+R -> R : 만료, 확인,\n시작 추가, 조건자 적용
+alt stage 성공
+  R --> W : stage됨 (확정 전)
+  H -> W : stagedAny() / stagedAll()
+  note over H : results는 여전히\n확정된 상태만 표시
+  alt commit
+    H -> W : commit()
+    W -> R : commit
+    note over R : stage된 상태가\n확정됨
+  else rollback
+    H -> W : rollback()
+    W -> R : rollback
+    note over R : 이전 결과\n보존
+  end
+else 디코딩 또는 stage 실패
+  R --> W : 오류
+  W --> H : 예외 발생
+  note over R : 아무것도 소비하지 않음;\n앞서 stage된 묶음은\n여전히 commit/rollback 가능
+end
+@enduml

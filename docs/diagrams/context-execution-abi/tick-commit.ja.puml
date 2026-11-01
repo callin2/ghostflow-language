@@ -1,0 +1,22 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName "Hiragino Sans"
+start
+:ホストがファクトパケットを送信\n（クロック、観測、カレンダー、\n行、設定イベント）;
+:Rust がパケットとバインディングを検証;
+if (パケットは有効？) then (いいえ)
+  :パケットを拒否;
+  :何も消費しない\n（設定イベント、オカレンス ID）;
+  stop
+endif
+:コンテキストエンジンを複製;
+:プロバイダ検証、設定、\n保護された Result、スケジュール\n述語と遷移をステージング;
+:ステージングした値で VM tick を実行;
+if (VM tick は成功？) then (はい)
+  :ステージングしたコンテキストと\nトレースを確定;
+else (いいえ)
+  :ステージングしたコピーを破棄;
+  :何も消費しない;
+endif
+stop
+@enduml

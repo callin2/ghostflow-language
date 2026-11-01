@@ -1,6 +1,3 @@
-<!-- translation-source: docs/reference/05-settings-and-observation.md -->
-[Korean original](05-settings-and-observation.md)
-
 # 5. Settings and observation
 
 [Complete contents](../LANGUAGE-REFERENCE.en.md) · [Previous: Sensors, constraints, and control](04-sensors-constraints-control.en.md) · [Next: Composition and replay](06-composition-and-replay.en.md)

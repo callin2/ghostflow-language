@@ -1,0 +1,21 @@
+@startuml
+skinparam defaultFontName "Hiragino Sans"
+skinparam shadowing false
+skinparam defaultFontSize 13
+hide empty description
+title 一時オーバーレイを持つ1つの設定（§5.2）
+
+state "通常" as Ordinary
+state "オーバーレイ中" as Overlaid
+state "利用不可" as Unavailable
+[*] --> Ordinary
+Ordinary : 有効値 = 最新の通常値
+Ordinary --> Overlaid : 一時イベント\n（有効期間 Run または Until(DateTime)）
+Overlaid : 有効値 = 一時値
+Overlaid : 復帰先 = 直前の\n検証済み通常値
+Overlaid --> Ordinary : 期限切れ、Runの終了、または取り消し\n（復帰先を復元）
+Overlaid --> Ordinary : 新しい通常値\n（同じイベントでオーバーレイを削除）
+Overlaid --> Overlaid : 2つ目の一時要求：\n拒否
+Overlaid --> Unavailable : 復帰に失敗
+Unavailable : 成功した復帰としては記録しない;\n利用不可として報告
+@enduml

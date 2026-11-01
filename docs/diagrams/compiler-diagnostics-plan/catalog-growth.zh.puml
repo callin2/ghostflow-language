@@ -1,0 +1,24 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontSize 13
+skinparam rectangle {
+  BackgroundColor #F8F8F8
+  BorderColor #555555
+}
+left to right direction
+rectangle "459\n2026-09-22" as C459
+rectangle "481\n+4 控制\n+18 消抖" as C481
+rectangle "491\n+10 hold_last" as C491
+rectangle "646\n+19 边界\n+136 CLI" as C646
+rectangle "663\n+17 语法审计" as C663
+rectangle "673\n+10 窗口/速率" as C673
+rectangle "679\n+4 解析器\n+2 字节上限" as C679
+rectangle "683\n+4 调度计划\n重复字段" as C683
+C459 --> C481
+C481 --> C491
+C491 --> C646
+C646 --> C663
+C663 --> C673
+C673 --> C679
+C679 --> C683
+@enduml

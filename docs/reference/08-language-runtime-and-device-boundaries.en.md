@@ -1,6 +1,3 @@
-<!-- translation-source: docs/reference/08-language-runtime-and-device-boundaries.md -->
-[Korean original](08-language-runtime-and-device-boundaries.md)
-
 # 8. FAQ requirements and language, execution, and device responsibilities
 
 [Complete contents](../LANGUAGE-REFERENCE.en.md) · [Previous: Semantic preservation rules and index](07-semantic-rules-and-index.en.md)

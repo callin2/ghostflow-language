@@ -1,0 +1,23 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName Helvetica
+skinparam defaultFontSize 13
+left to right direction
+
+file "program.ghost.md" as SRC
+rectangle "tools/browser-toolchain.mjs\ncompileSource()" as BT
+rectangle "tools/toolchain.mjs\n(Node + 파일 I/O)" as NT
+rectangle "tools/literate.mjs\n(CommonMark 추출)" as LIT
+rectangle "tools/gfb1.mjs\n(하향 변환)" as GFB
+artifact ".gfb + 매니페스트\n+ .gfb.map.json" as ART
+rectangle "runtimes/wasm\n(참조 호스트 어댑터)" as WASM
+rectangle "crates/ghostflow-core\n(VM, 상태, 안전)" as CORE
+
+SRC --> BT
+NT --> BT : 감쌈
+BT --> LIT
+LIT --> GFB
+GFB --> ART
+ART --> WASM
+WASM --> CORE : 노출
+@enduml

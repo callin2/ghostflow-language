@@ -1,0 +1,24 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName Helvetica
+skinparam defaultFontSize 13
+title Dos opciones de empaquetado (ambas propuestas; ninguna aprobada)
+
+package "Opción 1: paquete de fuentes ampliado (recomendada para revisión)" {
+  rectangle "Cierre de fuentes bloqueado\n(raíz + todos los imports,\nrevisiones, digests)" as C1
+  rectangle "Una reproducción del compilador" as R1
+  rectangle "Un artefacto compuesto\n(GFB, manifiesto, mapa de fuentes)" as A1
+  rectangle "Carga útil firmada" as S1
+  C1 --> R1
+  R1 --> A1
+  A1 --> S1
+}
+
+package "Opción 2: sobre de composición" {
+  rectangle "Sobre\n(referencias fijadas + aristas;\nsi la firma es obligatoria: sin resolver)" as E2
+  rectangle "Paquete existente A\n(mapa de fuentes y firma propios)" as PA
+  rectangle "Paquete existente B\n(mapa de fuentes y firma propios)" as PB
+  E2 --> PA : fija el digest
+  E2 --> PB : fija el digest
+}
+@enduml

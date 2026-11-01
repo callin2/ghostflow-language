@@ -1,0 +1,21 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontSize 13
+skinparam rectangleBorderColor #555555
+skinparam rectangleBackgroundColor #F7F7F7
+
+rectangle "GFB21 = immutable civil IANA Range\n(유지)" as R21
+rectangle "GFB22 = lifecycle envelope\n(신규, 별도)" as L22 {
+  rectangle "검증된 restart\ndescriptor" as DESC
+  rectangle "변경 없는 내부 GFB byte\nformat 1–4, 10, 11\n또는 Range 21" as INNER
+}
+rectangle "거부: lifecycle GFB19\n(역사적 prerelease 99ca1a3)" as L19 #FFEEEE
+rectangle "거부: lifecycle GFB21\n(임시 PR536)" as L21 #FFEEEE
+
+INNER ..> R21 : 감쌀 수 있음
+L19 -[hidden]- L21
+note bottom of L19
+  변환이나 fallback 없음.
+  대신 검토한 source를 재컴파일.
+end note
+@enduml

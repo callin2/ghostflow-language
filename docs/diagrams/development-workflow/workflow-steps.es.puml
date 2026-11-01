@@ -1,0 +1,11 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName Helvetica
+start
+:1. Establecer el contexto de trabajo\n(partir de dev, registrar el SHA base,\nleer AGENTS.md, docs:find);
+:2. Fijar un único contrato de tarea\n(resultado, alcance, criterios de aceptación,\nrequisitos previos, comprobación focalizada);
+:3. Asignar una entrega completa y acotada\n(un trabajador por unidad);
+:4. Verificar una vez, con la profundidad adecuada\n(estática -> focalizada -> CI completa);
+:5. Cerrar la tarea\n(informar de la evidencia, mejorar la repetibilidad);
+stop
+@enduml

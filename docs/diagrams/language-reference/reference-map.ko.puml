@@ -1,0 +1,22 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName "Apple SD Gothic Neo"
+skinparam rectangleRoundCorner 8
+skinparam ArrowColor #555555
+left to right direction
+
+rectangle "문서형 소스\n.ghost.md\n(1장)" as SRC
+rectangle "컴파일러 검사\n타입, 단위, 이름\n(2장, 7장)" as COMP
+rectangle "tick 계산\n입력 + 이전 상태\n-> 다음 상태, 의도\n(2장, 3장)" as TICK
+rectangle "센서와 제약\n품질, 인터록, 모드\n(4장)" as CONS
+rectangle "설정과 관찰\nlive 변경, event, 알람\n(5장)" as OBS
+rectangle "합성과 재현\nimport, 바인딩, replay\n(6장)" as COMPOSE
+rectangle "런타임, Driver, 장치\n계층별 책임\n(8장)" as DEV
+
+SRC --> COMP
+COMP --> TICK
+CONS --> TICK : 필터된 읽기 값,\n허용된 출력
+OBS --> TICK : 유효 설정
+TICK --> DEV : 출력 의도
+COMPOSE ..> TICK : 프로그램 결합,\n기록된 tick 재실행
+@enduml

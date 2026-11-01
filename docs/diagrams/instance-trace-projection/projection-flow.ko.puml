@@ -1,0 +1,19 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName Helvetica
+skinparam defaultFontSize 13
+left to right direction
+
+artifact "컴파일된 아티팩트\n(소스, closure, 바이트코드,\n매니페스트, 소스 맵)" as A
+artifact "Presentation\n(라벨,\npresentationRevision)" as L
+rectangle "Activation\n(identity 검증,\n재컴파일, 라벨 검사)" as ACT
+artifact "런타임 trace\n(observeSourceTrace)" as T
+rectangle "projectTrace(trace)\n(module fingerprint 검사)" as PT
+artifact "동결된 항목\n(instance ID, 라벨, 노드,\nsymbol, trace 필드)" as OUT
+
+A --> ACT
+L --> ACT
+ACT --> PT
+T --> PT
+PT --> OUT
+@enduml

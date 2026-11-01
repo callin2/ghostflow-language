@@ -1,0 +1,21 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontSize 13
+skinparam rectangleBorderColor #555555
+skinparam rectangleBackgroundColor #F7F7F7
+
+rectangle "现有源 AST\n+ 编译器入口点\n（公共 API 不变）" as AST
+rectangle "类型化表达式 IR（#171）\n已解析的身份标识/类型\n无操作码或字节" as EIR
+rectangle "类型化模块 IR（#172）\n输入、状态、转移、\n意图、约束" as MIR
+rectangle "类型化扩展描述符\n窗口、调度计划、true_for、\n配置流、用量核算、PID" as EXT
+rectangle "唯一的 GFB 发射器\n（唯一选择格式\n并写入字节的位置）" as EMIT
+rectangle "现有 GFB 字节\n（信封、指令、\n扩展记录）" as GFB
+
+AST --> EIR
+AST --> MIR
+EIR --> MIR
+AST --> EXT
+EXT --> MIR : 保留为独立的\n扩展记录
+MIR --> EMIT
+EMIT --> GFB
+@enduml

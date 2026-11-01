@@ -1,0 +1,25 @@
+@startuml
+skinparam defaultFontName "Hiragino Sans"
+skinparam shadowing false
+skinparam defaultFontSize 13
+skinparam rectangleBorderColor #4A6FA5
+skinparam rectangleBackgroundColor #F7F9FC
+left to right direction
+title 記録された発生からゴーストタイムラインを分岐する（§6.8）
+
+rectangle "元のタイムライン（保存される）" as O {
+  rectangle "tick 1" as O1
+  rectangle "tick 2" as O2
+  rectangle "tick 3" as O3
+}
+rectangle "ゴーストブランチ（物理効果シンクなし）" as G {
+  rectangle "tick 2'\n（変更した規則または\n仮想のwhat-if入力）" as G2
+  rectangle "tick 3'" as G3
+}
+O1 --> O2
+O2 --> O3
+O1 --> G2 : この発生で\n分岐
+G2 --> G3
+O2 .. G2 : 同じ論理tickで\n比較
+O3 .. G3 : 比較
+@enduml

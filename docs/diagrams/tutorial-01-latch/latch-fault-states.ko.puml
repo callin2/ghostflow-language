@@ -1,0 +1,25 @@
+@startuml
+hide empty description
+skinparam shadowing false
+skinparam defaultFontSize 13
+skinparam state {
+  BackgroundColor #F8F8F8
+  BorderColor #555555
+}
+
+state "정지\nwatering = false\nrestart_blocked = false" as Stopped
+state "운전 중\nwatering = true\nrestart_blocked = false" as Running
+state "운전 중, 재시작 차단\nwatering = true\nrestart_blocked = true" as RunBlocked
+state "정지, 재시작 차단\nwatering = false\nrestart_blocked = true" as StopBlocked
+
+[*] --> Stopped
+Stopped --> Running : 정상 START 켜짐,\n정상 STOP 해제
+Stopped --> StopBlocked : 입력 고장 발생
+Running --> Stopped : 정상 STOP 누름
+Running --> RunBlocked : START 고장,\n정상 STOP 해제
+Running --> StopBlocked : STOP 고장, 또는 START\n고장 중 STOP 누름
+RunBlocked --> Running : 둘 다 정상,\nSTART 꺼짐, STOP 해제
+RunBlocked --> Stopped : 정상 STOP 누름,\n정상 START 꺼짐
+RunBlocked --> StopBlocked : STOP 고장, 또는 START가\n켜짐/고장일 때 STOP 누름
+StopBlocked --> Stopped : 둘 다 정상, START 꺼짐
+@enduml

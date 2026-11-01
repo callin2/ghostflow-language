@@ -1,0 +1,18 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName "Hiragino Sans"
+skinparam defaultFontSize 13
+
+rectangle "ライブランタイム" as Live {
+  rectangle "記録済みの tick／スキャン" as Rec
+  rectangle "ライブの状態、ジャーナル、意図、\ntrace/outcome、フレームシーケンス、\nクロック、最後の outcome" as State
+}
+rectangle "別個のゴーストインスタンス" as Ghost
+rectangle "リプレイ結果\n(runtime.replay)" as Result
+actor "呼び出し側" as Caller
+
+Caller --> Ghost : replayTemporal({count, profile,\nmaxPeakTemporalBytes, maxJsonBytes})
+Rec --> Ghost : 最古の対象プレフィックス直前の\nチェックポイント＋レコード
+Ghost --> Result : 成功時はこれだけを置き換える
+Ghost ..> State : 効果なし、\n変更なし
+@enduml

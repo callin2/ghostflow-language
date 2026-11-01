@@ -1,0 +1,25 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName "Hiragino Sans"
+skinparam defaultFontSize 13
+
+start
+:host.replace({ artifact, runId });
+:run ID が新しく、履歴容量が残っているか確認;
+:候補をコピーし、正本ソース + クロージャを再コンパイル、\nソース/マニフェスト/バイトコードの同一性\nとサポート対象プロファイルを確認;
+if (すべての確認に合格?) then (いいえ)
+  :拒否;
+  :以前の Program、状態、\n実行、アセスメント、最後のトレースを維持;
+  stop
+endif
+:Rust コアの hotSwap\n（コアが同名・同型の状態を引き継ぐ）;
+if (コアの互換性確認に合格?) then (いいえ)
+  :拒否;
+  :以前の Program、状態、\n実行、アセスメント、最後のトレースを維持;
+  stop
+endif
+:新しいソース / アーティファクト / 実行の同一性を\n再計算したアセスメントとともに公開;
+:最後のトレースをクリア。コアは入力キャッシュを破棄済み;
+:次の step() には完全な\n新しい観測マップが必要;
+stop
+@enduml

@@ -1,0 +1,30 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontSize 13
+skinparam ActivityBackgroundColor #F8F8F8
+start
+:Analizar la fuente;
+note right: se detiene en el primer error
+:Preparar declaraciones;
+note right: se detiene en el primer error
+partition "Fases recopiladas (hasta 20 errores distintos)" {
+  :Validar vinculaciones let;
+  if (¿errores?) then (sí)
+    :Informar errores recopilados;
+    stop
+  endif
+  :Validar asignaciones de estado siguiente;
+  if (¿errores?) then (sí)
+    :Informar errores recopilados;
+    stop
+  endif
+  :Validar conexiones de salida ordinarias;
+  if (¿errores?) then (sí)
+    :Informar errores recopilados;
+    stop
+  endif
+}
+:Funciones, estrategias adaptativas,\nrestricciones, reducción (lowering);
+note right: se detienen en el primer error
+stop
+@enduml

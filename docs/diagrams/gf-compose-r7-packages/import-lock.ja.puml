@@ -1,0 +1,21 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName "Hiragino Sans"
+skinparam defaultFontSize 13
+title 概念的なインポートロック（説明用であり、承認済みのスキーマではない）
+
+rectangle "ルート合成\nfarm-irrigation@composition-rev-17\nsha256:ROOT...17" as ROOT
+rectangle "instance east-zone-01\n（固有の状態、タイマー、ポート、\n設定、バインディング、来歴）" as E
+rectangle "instance west-zone-02\n（固有の状態、タイマー、ポート、\n設定、バインディング、来歴）" as W
+rectangle "定義\nirrigation-controller@rev-42\nsha256:DEF...42" as DEF
+rectangle "rain-policy@rev-8\nsha256:RAIN...08" as RAIN
+
+ROOT --> E
+ROOT --> W
+E --> DEF : 固定
+W --> DEF : 固定（同じダイジェスト）
+DEF --> RAIN : インポート（推移的）
+note bottom of RAIN
+推移閉包: ROOT...17, DEF...42, RAIN...08
+end note
+@enduml

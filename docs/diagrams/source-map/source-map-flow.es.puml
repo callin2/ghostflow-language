@@ -1,0 +1,23 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontSize 13
+skinparam rectangleRoundCorner 8
+rectangle "Fuente literaria\n(.ghost.md)" as src
+rectangle "compileSource" as cs
+rectangle "writeArtifact\n(validar y luego escribir)" as wa
+rectangle "Bytes GFB\n(sin cambios)" as gfb
+rectangle "Manifiesto de control\n(sin cambios)" as man
+rectangle ".gfb.map.json\nsource-map-v1:\nnodes, lines, bytecodeSha256,\nsourceDocument, traceMetadata" as map
+rectangle "verifyArtifactSourceMap\n-> sourceDocument" as ver
+rectangle "restoreArtifactSourceMap\n-> fuente + mapas de traza" as res
+src --> cs
+cs --> wa
+wa --> gfb
+wa --> man
+wa --> map
+map --> ver
+gfb --> ver
+map --> res
+gfb --> res
+note bottom of res : estricto: también comprueba traceMetadata,\nla huella digital del módulo y las vinculaciones de fuente
+@enduml

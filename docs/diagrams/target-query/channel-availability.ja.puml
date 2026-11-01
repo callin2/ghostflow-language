@@ -1,0 +1,35 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName "Hiragino Sans"
+skinparam defaultFontSize 13
+title 選択された1つのチャネルの可用性
+
+start
+:新鮮でリンクされた観測だけを残す
+（無効な報告は除外され、
+診断に記録される）;
+:チャネルと、宣言された各リソースの
+状態を収集する;
+if (チャネルまたはいずれかのリソースについて
+報告が食い違っているか？) then (はい)
+  :conflict;
+  stop
+endif
+if (チャネルに `resources` が宣言されているか？) then (いいえ)
+  :unknown;
+  stop
+endif
+if (チャネルと宣言されたすべてのリソースに
+少なくとも1つの状態があるか？) then (いいえ)
+  :unknown;
+  stop
+endif
+if (いずれかの状態が reserved か？) then (はい)
+  :reserved;
+elseif (いずれかの状態が busy か？) then (はい)
+  :busy;
+else (すべて available)
+  :available;
+endif
+stop
+@enduml

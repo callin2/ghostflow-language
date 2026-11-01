@@ -1,0 +1,28 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName "Hiragino Sans"
+skinparam ArrowColor #555555
+skinparam rectangle {
+  BackgroundColor White
+  BorderColor #555555
+}
+title コンパイルから結合済みの説明まで
+
+rectangle "コンパイラ\n（型付き IR + バイトライタ）" as C
+rectangle "GFB バイト列\n（変更なし）" as B
+rectangle "explanationArtifact\n（サイドカー）" as S
+rectangle "VM スキャン\n（命令ウィットネス有効）" as V
+rectangle "TickRecord\n（完了したスキャンのみ）" as T
+rectangle "prepareOutputExplanation\nproducer.emit" as P
+rectangle "証明（proof）" as PR
+rectangle "joinOutputExplanation\n（出力スナップショット + 期待する実行）" as J
+
+C --> B
+C --> S
+B --> V
+V --> T : スキャン完了後に\n証拠を付加
+S --> P
+T --> P
+P --> PR
+PR --> J
+@enduml

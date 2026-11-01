@@ -1,0 +1,22 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName Helvetica
+skinparam defaultFontSize 13
+skinparam activityBackgroundColor #F7F9FC
+start
+:Fuente con valores Int;
+if (¿Desbordamiento de constante, literal inválido,\nmezcla Int/Number o\nconversión estáticamente inválida?) then (sí)
+  :Diagnóstico de compilación;
+  stop
+else (no)
+endif
+:Codificar GFB y ejecutar un escaneo;
+if (¿Desbordamiento dependiente de la entrada,\ndivisor cero o conversión inválida?) then (sí)
+  :Rechazar el escaneo\n(motivo estable, p. ej. integer-overflow);
+  :No se consolida ningún estado ni intención nuevos;\nel último resultado aceptado queda como evidencia;
+  stop
+else (no)
+  :Consolidar resultados Int exactos;
+  stop
+endif
+@enduml

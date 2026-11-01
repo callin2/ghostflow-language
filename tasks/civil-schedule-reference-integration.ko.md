@@ -1,77 +1,91 @@
 <!-- translation-source: tasks/civil-schedule-reference-integration.md -->
+[영문 원문](civil-schedule-reference-integration.md)
 
-[영문 원본](civil-schedule-reference-integration.md)
-
-# Civil schedule Reference 통합
+# 민간 시각 예약의 Reference 통합
 
 기준: [Reference §3.5–3.8](../docs/reference/03-time-and-schedules.md).
-이 문서는 구현 기록이며 언어 계약을 대체하지 않는다.
+이 문서는 구현 기록입니다. 언어 계약을 대체하지 않습니다.
 
-## 구현된 구조 slice
+## 구현된 구조적 슬라이스
 
-`REF-03-024` (`Daily`)와 `REF-03-032` (`DailySlots<15min>`)는 이제 명시적
-pulse 정책을 파싱하고 타입 검사한다. Checker는 안정된 선언 site,
-timezone, 정확한 trigger, DST 선택, Bool 술어, 공통 정책을 보존한다.
-Daily는 00:00과 23:59:59.999를 포함한 정확한 TimeOfDay 밀리초를 보존한다.
-DailySlots는 정렬된 중복 없는 분 단위 slot과 15분 grid를 보존한다.
+`REF-03-024`(`Daily`)와 `REF-03-032`(`DailySlots<15min>`)는 이제 명시적인 pulse
+정책을 파싱하고 타입 검사합니다. checker는 다음을 보존합니다.
 
-이 slice가 구조적으로 지원하는 정책은 `pulse`, `trusted_only`,
-`skip_after(positive constant Duration)`, `baseline`, `skip`이다.
-누락/중복 필드, 잘못된 타입/영역, Bool이 아닌 술어, 잘못된 zone/slot에는
-진단을 낸다. Provider가 fold나 gap을 이미 해결했다고 가장하지 않고
-DST enum 값을 보존한다.
+- 안정적인 선언 위치
+- 시간대
+- 정확한 트리거
+- DST 선택
+- Bool predicate
+- 공통 정책
 
-Descriptor는 checker 출력일 뿐이다. 수용된 bytecode, package,
-activation ABI를 정의하지 않는다. 명시적 정책 schedule에는 옛 host
-`dueInput`을 주지 않는다. 공개 컴파일은 의도적으로 다음에서 멈춘다.
+`Daily`는 00:00과 23:59:59.999를 포함한 정확한 TimeOfDay 밀리초 값을 보존합니다.
+`DailySlots`는 정렬되고 중복 없는 분 단위 슬롯과 15분 격자를 보존합니다.
+
+이 슬라이스에서 지원하는 구조적 정책은 `pulse`, `trusted_only`,
+`skip_after(positive constant Duration)`, `baseline`, `skip`입니다. 다음 경우에는
+진단이 발생합니다. 필드 누락 또는 중복, 잘못된 타입 또는 도메인, Bool이 아닌
+predicate, 잘못된 시간대, 잘못된 슬롯. DST enum 값은 provider가 이미 fold나 gap을
+해석한 것처럼 가장하지 않고 그대로 보존합니다.
+
+descriptor는 checker 출력일 뿐입니다. 수용된 바이트코드, 패키지, 활성화 ABI를
+정의하지 않습니다. 명시적 정책이 있는 예약은 기존 호스트 `dueInput`을 받지
+않습니다. 공개 컴파일은 의도적으로 다음 메시지와 함께 중단됩니다.
 
 ```text
-Daily 정책 실행에는 검증된 occurrence provider와 native admission binding이 필요하다
-DailySlots 정책 실행에는 검증된 occurrence provider와 native admission binding이 필요하다
+Daily policy execution requires verified occurrence provider and native admission bindings
+DailySlots policy execution requires verified occurrence provider and native admission bindings
 ```
 
-따라서 **REF-03-024와 REF-03-032는 executable 수용 실패로 남는다**.
-원래의 수용 기대값은 변경하지 않는다. 정책 없는 옛 DailySlots 경로는
-아직 수용된 구현으로 대체되지 않았다. 이 slice는 그 경로의 Reference 준수를
-인증하지 않는다. 정본 대체 경로가 실행되고 검증되면 옛 경로를 제거하고
-활성 호출자를 이관한다.
+따라서 **REF-03-024와 REF-03-032는 여전히 실행 수용 실패입니다**.
+원래의 수용 기대값은 바뀌지 않았습니다. 정책이 없는 기존 `DailySlots` 경로는 아직
+수용된 구현으로 대체되지 않았으며, 이 슬라이스는 그 경로를 Reference에 비추어
+인증하지 않습니다. 정본 대체 구현이 실행되고 검증되면 기존 경로를 제거하고, 그
+경로를 쓰는 활성 호출자를 이전해야 합니다.
 
-근거: `tests/daily-slots-policy.test.mjs`는 두 Reference fixture를 직접 사용한다.
-최초 테스트는 옛 미지원 문법에서 실패했다. 구현 뒤 새 구조/진단 테스트와
-기존 중복/control 검사가 통과한다(52건; `build/daily-policy-green.log`).
-공개 Reference 컴파일은 여전히 명시적 runtime binding 누락 진단에서 실패한다.
+증거: `tests/daily-slots-policy.test.mjs`는 두 Reference fixture를 직접 사용합니다.
+초기 테스트는 지원되지 않던 기존 구문에서 실패했습니다. 구현 후에는 새
+구조/진단 테스트와 기존 중복 검사 및 제어 검사가 통과합니다(52개 테스트;
+`build/daily-policy-green.log`). 공개 Reference 컴파일은 여전히 명시적인
+런타임 바인딩 누락 진단에서 실패합니다.
 
-## 남은 통합 순서
+## 남은 통합 작업(순서대로)
 
-1. 범위가 제한된 완전한 civil occurrence fact, 안정된 local-date/time/fold
-   식별자, IANA/context revision, clock coverage를 정의한다.
-   Provider는 fact를 공급하고 `.due`를 계산해서는 안 된다.
-2. Portable admission descriptor를 Solar 밖으로 확장한다. 임의 술어 평가,
-   수용된 scan의 clock 상한 기록, recovery baseline, gap 종결 처리,
-   occurrence별 결과, multiple-crossing skip을 보존한다.
-   기존 GFB5 schedule descriptor는 구체적으로 `SolarPulseDescriptor`다.
-   그 tag를 다른 trigger에 재사용하면 잘못된 wire 계약이 된다.
-3. 검증된 bytecode, WASM/native activation binding, 의존 순서의 prelude
-   실행을 추가한다. Let/signal/schedule에 대한 술어 의존성,
-   transaction rollback, 제한된 자원 집계, replay/restore를 포함한다.
-4. 공개 literate 소스 -> 산출물 -> native/WASM 실행을 한 번의 daily crossing,
-   거짓 술어, 정확한 gap 경계, 복구, rollback, 여러 crossing, DST gap/fold,
-   하류 실패 rollback에 대해 증명한다. 그 뒤 명시적 생성 거부와
-   대체된 host `.due` 경로를 제거한다.
-5. 공통 정책을 Window/Run, 취소, held clock으로 확장하고 각 전체 실행 의미를
-   구현한다. 이 유효한 Reference 형태는 pulse 구조 slice로 완료되지 않는다.
+아래 다이어그램은 구조적 슬라이스의 현재 위치와, 반드시 이 순서대로 수행해야 하는
+남은 다섯 단계를 요약합니다.
 
-## 그 밖의 요청된 Reference 사례: 관측된 최초 실패
+![통합 단계: 완료된 구조적 pulse 슬라이스, 이어서 발생 사실, admission descriptor, 검증된 바이트코드와 활성화, 종단 간 증명, Window/Run 확장](../docs/diagrams/civil-schedule-reference-integration/integration-steps.ko.svg)
 
-다음 진단은 이 slice 이전에 실제 catalog fixture에 `compileSource`를 적용하여
-관측했다. 최초 차단 요인을 설명하며 전체 범위를 뜻하지 않는다.
+1. 제한되고 완전한 민간 시각 발생(occurrence) 사실, 안정적인
+   local-date/time/fold identity, IANA/컨텍스트 revision, 시계 커버리지를
+   정의합니다. provider는 사실을 제공하며, `.due`를 계산해서는 안 됩니다.
+2. 이식 가능한 admission descriptor를 Solar 이외로 확장합니다. 임의의 predicate
+   평가, 수용된 스캔의 시계 high-water mark, 복구 baseline, gap 종결 처리,
+   발생별 결과, 여러 번의 경계 통과에 대한 skip을 보존해야 합니다. 기존 GFB5 예약
+   descriptor는 특히 `SolarPulseDescriptor`이므로, 그 태그를 다른 트리거에
+   재사용하면 잘못된 wire 계약이 됩니다.
+3. 검증된 바이트코드, WASM/native 활성화 바인딩, 의존성 순서에 따른 prelude 실행을
+   추가합니다. let/signal/예약에 대한 predicate 의존성, 트랜잭션 rollback, 제한된
+   자원 집계, replay/restore를 포함해야 합니다.
+4. 공개 문서형 소스 -> 아티팩트 -> native/WASM 실행을 다음 경우에 대해 증명합니다.
+   하루 한 번의 경계 통과, false predicate, 정확한 gap 경계, 복구, rollback, 여러 번의
+   경계 통과, DST gap/fold, 하위 단계 실패 rollback. 그런 다음 명시적인 방출 거부와
+   대체된 호스트 `.due` 경로를 제거합니다.
+5. 공통 정책을 Window/Run, 취소, 보류된 시계까지 그 완전한 실행 의미와 함께
+   확장합니다. pulse 구조적 슬라이스는 이러한 유효한 Reference 형태를 완성하지
+   않습니다.
+
+## 요청된 그 밖의 Reference 사례: 관측된 첫 실패
+
+이 진단은 이 슬라이스 이전에 실제 카탈로그 fixture에 대해 `compileSource`로
+관측한 것입니다. 각 항목은 첫 번째 차단 요인만 설명하며, 전체 작업 범위를 나타내지
+않습니다.
 
 | 사례 | 관측된 실패 | 추가로 필요한 계약 |
 |---|---|---|
-| REF-03-036 | Periodic schedule kind 거부 | 명시적 anchor, live interval phase/revision, occurrence provider와 admission |
-| REF-03-038 | Cron schedule kind 거부 | cron5 parser/영역 검사, civil occurrence provider와 admission |
-| REF-03-042/045 | Solar `basis` option 거부 | 기존 GFB5 구조/native admission 선행 구현으로 공개 공통 정책 lowering; provider/runtime binding은 여전히 필요 |
-| REF-03-057 | `TimeSlots<15min,8>` config 거부 | 유한 집합 타입, live setting 검증/원자성, schedule grid binding과 편집 시 baseline/식별자 |
-| REF-03-059 | `calendar` 선언 거부 | 타입이 지정된 WorkCalendar provider, day 규칙, revision/품질 관측 |
-| REF-03-060 | `provider` 선언 거부 | 안정된 사건 식별자를 갖춘 Tide fact, 취소, Run/within admission |
-| REF-03-062 | `provider` 선언 거부 | 자연 provider 선언과 품질을 인식하는 `tide_is`/`moon_is` Result 의미 |
+| REF-03-036 | Periodic 예약 종류 거부 | 명시적 anchor, live 주기 위상/revision, 발생 provider와 admission |
+| REF-03-038 | Cron 예약 종류 거부 | cron5 파서/도메인 검사, 민간 시각 발생 provider와 admission |
+| REF-03-042/045 | Solar `basis` 옵션 거부 | 기존 GFB5 구조/native admission 선행 요건으로의 공개 공통 정책 lowering; provider/런타임 바인딩은 여전히 필요 |
+| REF-03-057 | `TimeSlots<15min,8>` config 거부 | 유한 집합 타입, live 설정 검증/원자성, 예약 격자 바인딩, 편집 시 baseline/identity |
+| REF-03-059 | `calendar` 선언 거부 | 타입이 있는 WorkCalendar provider, 날짜 규칙, revision/품질 관측 |
+| REF-03-060 | `provider` 선언 거부 | 안정적인 이벤트 identity가 있는 Tide 사실, 취소, Run/within admission |
+| REF-03-062 | `provider` 선언 거부 | 자연 현상 provider 선언과 품질을 고려한 `tide_is`/`moon_is` Result 의미 |

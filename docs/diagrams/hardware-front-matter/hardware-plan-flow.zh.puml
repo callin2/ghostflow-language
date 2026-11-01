@@ -1,0 +1,16 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName Helvetica
+skinparam defaultFontSize 13
+skinparam componentStyle rectangle
+artifact ".ghost.md\n（front matter + ghost 代码）" as Src
+component "编译器" as C
+artifact "GFB + 清单\n（不受硬件影响）" as G
+artifact "hardwarePlan\n（派生）" as P
+component "部署负责人" as D
+Src --> C
+C --> G
+C --> P
+P --> D
+note right of D : 解析固定版本的 profile/模块，\n用 provider schema 校验配置，\n激活前检查准入
+@enduml

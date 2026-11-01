@@ -1,0 +1,24 @@
+@startuml
+skinparam defaultFontName "Apple SD Gothic Neo"
+skinparam shadowing false
+skinparam rectangleBorderColor #4A6FA5
+skinparam rectangleBackgroundColor #F7F9FC
+title 연속 control objective 루프
+rectangle "target\n(setpoint)" as T
+rectangle "measure\n(공정값)" as M
+rectangle "PID controller\nP + I + D + bias" as PID
+rectangle "requested\n(출력 범위로 clamp)" as R
+rectangle "중재 +\n안전 제약" as C
+rectangle "safe target" as S
+rectangle "출력 renderer\n(applied)" as A
+rectangle "공정 +\n피드백" as P
+T --> PID
+M --> PID
+PID --> R
+R --> C
+C --> S
+S --> A
+A --> P
+P --> M : 다음 샘플
+S ..> PID : anti-windup과\nbumpless tracking은\nsafe target을 사용
+@enduml

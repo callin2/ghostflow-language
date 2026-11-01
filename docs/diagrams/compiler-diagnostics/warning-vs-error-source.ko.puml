@@ -1,0 +1,16 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName "Apple SD Gothic Neo"
+skinparam defaultFontSize 13
+rectangle "가져온 문서의 경고\n(컴파일 성공)" as W {
+  card "source = 루트 문서" as WS
+  card "span.file = 가져온 문서" as WF
+  card "sourceClosure가 하위 문서 identity 보존" as WC
+}
+rectangle "가져온 문서의 오류\n(컴파일 실패)" as E {
+  card "source = 하위 문서\n(파일명 + SHA-256)" as ES
+  card "requestSource = 루트 요청" as ER
+  card "span.file = 하위 문서" as EF
+}
+W -[hidden]right- E
+@enduml

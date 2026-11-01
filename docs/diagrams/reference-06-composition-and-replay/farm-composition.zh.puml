@@ -1,0 +1,24 @@
+@startuml
+skinparam defaultFontName "PingFang SC"
+skinparam shadowing false
+skinparam defaultFontSize 13
+skinparam rectangleBorderColor #4A6FA5
+skinparam rectangleBackgroundColor #F7F9FC
+left to right direction
+title control Farm 的组合与绑定层次（§6.2–§6.4）
+
+rectangle "irrigation.ghost.md\nrevision rev-42 + sha256" as DEF
+rectangle "control Farm" as FARM {
+  rectangle "根 input\neast_start" as ES
+  rectangle "instance east:\nIrrigation" as E
+  rectangle "根 output\neast_pump" as EP
+}
+rectangle "安装绑定\n（不属于 control 源）" as BIND
+rectangle "物理端点\n例如 board.RO3" as PHY
+
+DEF ..> E : import 固定\n确切修订版
+ES --> E : connect east.start
+E --> EP : connect east_pump
+EP --> BIND : 逻辑端口
+BIND --> PHY : 绑定修订版
+@enduml

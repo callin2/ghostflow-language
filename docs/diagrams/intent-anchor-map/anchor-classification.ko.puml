@@ -1,0 +1,18 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontSize 12
+hide empty description
+
+state "assumption\nstatus=unconfirmed\n(예: origin=ai)" as AU
+state "intent / premise\nstatus=confirmed" as C
+state "superseded anchor\n(모든 kind)" as S
+
+[*] --> AU : AI 또는 작성자의 추측
+AU --> C : 사람이 확인함;\n소스에서 재분류
+AU --> S : 이전 가정을\n본문으로 유지
+C --> S : 더 새로운 진술로\n대체됨
+
+AU : relation=assumes로만\nlink 가능
+C : implements, constrains,\nfallback으로 link 가능
+S : 현재 node에\nlink할 수 없음
+@enduml

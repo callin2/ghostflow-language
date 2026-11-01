@@ -1,0 +1,19 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontSize 13
+hide empty description
+state "配置中" as Configuring
+state "已激活" as Active
+[*] --> Configuring : gf_frame_create
+Configuring : 拥有 Runtime
+Configuring : load / add_capability
+Configuring : validate / initialize_restart
+Configuring --> Configuring : 激活失败\n（状态保留）
+Configuring --> Active : gf_frame_activate\n（Runtime 仅移交一次）
+Active : 拥有 ScanDriver
+Active : gf_frame_scan
+Active : load / add / activate 被拒绝
+Active --> Active : 扫描失败\n（保留上次结果和 VM 状态）
+Configuring --> [*] : gf_frame_destroy
+Active --> [*] : gf_frame_destroy
+@enduml

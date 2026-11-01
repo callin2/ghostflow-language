@@ -1,0 +1,21 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontSize 13
+start
+:读取旧的作者状态;
+:对源 **ok** 求值;
+if (ok 成功？) then (是)
+  :立即对 **payload** 求值，
+  即使是重复观测也如此
+  （保留所选表达式的故障）;
+else (否)
+  :对 **fault** / **origin** 分支求值
+  （不对 payload 求值）;
+  note right
+    物理根的密度与
+    连续性观测
+    仍会被处理。
+  end note
+endif
+stop
+@enduml

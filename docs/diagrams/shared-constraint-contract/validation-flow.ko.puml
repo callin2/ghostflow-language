@@ -1,0 +1,21 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName Helvetica
+skinparam rectangle {
+  BackgroundColor White
+  BorderColor #555555
+}
+left to right direction
+title 논리 매핑 검사 (실행 없음)
+
+rectangle "이 .ghost.md\n(SharedPumpPolicy)" as src
+rectangle "compileSourceSync\n검사된 descriptor\n+ 해시" as comp
+rectangle "설치 매핑\nidentity, 타입 있는 포트,\n모드, 해시" as map
+rectangle "validateResourceConstraintBinding" as val
+rectangle "executable: false" as out
+
+src --> comp
+comp --> val
+map --> val
+val --> out
+@enduml

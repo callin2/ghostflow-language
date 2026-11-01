@@ -1,7 +1,3 @@
-<!-- translation-source: docs/language_faq.md -->
-
-[Korean original](language_faq.md)
-
 # GhostFlow Coding FAQ
 
 This FAQ answers one kind of question: “How do I code this behavior?”

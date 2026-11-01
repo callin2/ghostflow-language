@@ -1,0 +1,23 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName Helvetica
+skinparam defaultFontSize 13
+skinparam activityBackgroundColor #F7F9FC
+
+start
+:Int 값을 쓰는 소스;
+if (상수 오버플로, 잘못된 리터럴,\nInt/Number 혼합, 또는\n정적으로 유효하지 않은 변환?) then (예)
+  :컴파일 진단;
+  stop
+else (아니요)
+endif
+:GFB 인코딩 후 스캔 실행;
+if (입력에 따른 오버플로,\n제수 0, 또는 유효하지 않은 변환?) then (예)
+  :스캔 거부\n(안정적 사유 코드, 예: integer-overflow);
+  :새 상태나 의도는 확정되지 않음;\n마지막 승인 결과는 증거로 유지;
+  stop
+else (아니요)
+  :정확한 Int 결과 확정;
+  stop
+endif
+@enduml

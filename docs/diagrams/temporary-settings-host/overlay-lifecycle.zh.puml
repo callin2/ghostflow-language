@@ -1,0 +1,21 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName Helvetica
+skinparam defaultFontSize 13
+hide empty description
+
+state "只有常规值" as Ordinary
+state "临时覆盖层生效\n（常规值保留在下层）" as Overlay
+state "已恢复原值" as Returned
+state "被常规事件取代" as Superseded
+state "恢复以故障发出告终" as Fault
+
+[*] --> Ordinary
+Ordinary --> Overlay : temporary 事件\n（生命周期 Run 或 Until）
+Overlay --> Returned : 取消 / Until 过期 /\nendRun 或新的运行（Run）
+Overlay --> Superseded : 针对受影响目标的\nordinary 事件
+Overlay --> Fault : 恢复时发出故障\n（绝不标记为成功）
+Returned --> Ordinary
+Superseded --> Ordinary
+Fault --> Ordinary
+@enduml

@@ -1,0 +1,16 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName Helvetica
+skinparam defaultFontSize 13
+title 帧式宿主的重置/故障边界（现有契约）
+
+state "就绪" as Ready
+state "已故障" as Faulted
+[*] --> Ready : 新的宿主实例\n（新的 runId）
+Ready --> Ready : 帧成功 /\n发布最后完成的结果
+Ready --> Ready : 预调理验证\n被拒绝（允许重试）
+Ready --> Faulted : 调理或\nVM 分派失败
+Faulted : 故障已锁存
+Faulted : 最后提交的结果\n仍然可用
+Faulted --> [*] : 后续步骤需要\n新的宿主实例
+@enduml

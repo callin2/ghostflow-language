@@ -1,0 +1,21 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName Helvetica
+skinparam defaultFontSize 13
+left to right direction
+title 실행(run)을 위해 결합되는 별도 identity (제안 기록)
+
+rectangle "소스 / 조합\nrevision" as S
+rectangle "컴파일된 프로그램\nidentity (바이트/해시)" as P
+rectangle "설정 revision /\n유효 위치" as G
+rectangle "설치 /\nbinding revision" as I
+rectangle "배포 패키지\nidentity" as K
+rectangle "실행 identity\n(runId; scanId는\n실행 안에서만 순서 보장)" as R
+
+S --> P : 컴파일
+P --> K
+I --> K : bindingRevision
+K --> R : 배포가 실행을 시작
+G --> R : 같은 실행의\nlive 이벤트
+I --> R : 결합
+@enduml

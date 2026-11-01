@@ -1,0 +1,44 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName "Hiragino Sans"
+skinparam defaultFontSize 13
+skinparam ArrowColor #526d76
+
+start
+:スキャン全体を取り込み、検証する;
+if (すべてのコンディショナを開始？) then (すべて開始)
+else (begin が失敗)
+  :すでに開始したハンドルだけをロールバック;
+  stop
+endif
+:入力をコンディショニングし、VM 入力を準備
+committed = false;
+if (準備は成功した？) then (はい)
+else (いいえ)
+  :開始したすべてのコンディショナをロールバック;
+  :VM の状態、時刻、フレーム ID は不変;
+  :有効なリトライを許可;
+  stop
+endif
+:committed = null
+ネイティブ VM を呼び出す;
+if (ネイティブ呼び出しは返った？) then (はい)
+  :committed = ネイティブの戻り値;
+  if (戻り値？) then (1)
+    :コンディショナ、受け入れたホスト時刻、
+    フレーム ID を確定;
+    :trace/outcome JSON をデコード;
+    note right
+      後のエラーはホストを終了させるが、
+      スキャンを取り消すことはできない
+    end note
+  else (0: 既知の拒否)
+    :開始したすべてのコンディショナをロールバック;
+    :有効なリトライを許可;
+  endif
+else (トラップ / アダプタの例外)
+  :ステータス不明: ロールバックを主張しない;
+  :以降のステップを終了;
+endif
+stop
+@enduml

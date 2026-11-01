@@ -1,0 +1,17 @@
+@startuml
+skinparam defaultFontName "PingFang SC"
+skinparam shadowing false
+skinparam ActivityBackgroundColor #F7F9FC
+skinparam ActivityBorderColor #4A6FA5
+title Bool 输出约束的求值
+start
+:候选快照 = 请求的输出;
+repeat
+  :在同一个快照上求值\n所有 `require` / `mutex`;
+  :收集被阻止的目标;
+  :将被阻止的目标置为 false\n（绝不 false -> true）;
+repeat while (快照有变化？) is (是)
+->否;
+:安全意图\n（与声明顺序无关）;
+stop
+@enduml

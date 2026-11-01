@@ -1,0 +1,22 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontSize 13
+skinparam rectangle {
+  BackgroundColor #F8F8F8
+  BorderColor #555555
+}
+left to right direction
+
+rectangle "moisture 입력\n유효 0%..100%, median(5)\nstale_after 3s, recover_after 3" as M
+rectangle "dry = hysteresis\non_below 30%\noff_above 35%" as D
+rectangle "dry_ok\n고장 => false" as DOK
+rectangle "start |> recover(false)\nstop |> recover(true)" as B
+rectangle "watering' 래치" as W
+rectangle "valve, pump" as O
+
+M --> D : Result<Percent>
+D --> DOK : Result<Bool>
+DOK --> W : Bool
+B --> W : Bool 요청
+W --> O
+@enduml

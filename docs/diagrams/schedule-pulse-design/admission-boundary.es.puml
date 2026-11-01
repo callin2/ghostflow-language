@@ -1,0 +1,21 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName Helvetica
+skinparam defaultFontSize 13
+skinparam componentStyle rectangle
+component "Proveedor verificado\n(hechos de ocurrencias Solar,\nnunca .due)" as P
+component "Host nativo / WASM\n(valida el sobre\ny la vinculación)" as H
+rectangle "Núcleo de Rust (un motor portable)" {
+  component "Motor de admisión\n(reloj, gap, dedup,\nresultado del pulso)" as E
+  component "Preludio compilado\n(predicado when,\norden de dependencias)" as W
+  component "Transacción de la VM\n(preparar, consolidar o revertir)" as T
+}
+card "Observación de schedule\n+ Bool .due" as O
+component "Journal / reproducción\n(sin proveedor en vivo)" as J
+P --> H : hechos de cobertura
+H --> E : instantánea del reloj +\ncobertura acotada
+W --> E : predicado en el\ntick de cruce
+E --> T : proyecciones preparadas
+T --> O : si todo el tick tiene éxito
+O --> J
+@enduml

@@ -1,0 +1,42 @@
+@startuml
+skinparam defaultFontName "Hiragino Sans"
+skinparam shadowing false
+skinparam ActivityBackgroundColor #F7F9FC
+skinparam ActivityBorderColor #4A6FA5
+title 入力の処理順序（1つの入力）
+start
+:Driverがサンプルを渡す\n（ソースID、エポック、サンプルID、タイムスタンプ、品質）;
+if (DriverがDisconnectedを報告？) then (はい)
+  #FFE5E5:Result = fault(Disconnected)\n（直ちに伝播）;
+  stop
+else (いいえ)
+endif
+if (新しい物理サンプル？) then (いいえ：重複 / クロックのみ)
+  :フィルタにも復旧にも寄与しない;\n鮮度は更新されない;
+else (はい)
+  if (ペイロード、単位、`valid` 範囲は正常？) then (いいえ)
+    #FFE5E5:Result = fault(Invalid);
+    stop
+  else (はい)
+    :フィルタ状態を更新;
+  endif
+endif
+if (フィルタが準備完了かつ `recover_after` を充足？) then (いいえ)
+  #FFF4D6:Result = fault(NotReady);
+  stop
+else (はい)
+endif
+note right: どの故障もフィルタウィンドウをクリアする。\n復旧には新しい有効サンプルが必要。
+if (最後の有効サンプルの経過時間 < `stale_after`？) then (いいえ)
+  #FFE5E5:Result = fault(Stale);
+  stop
+else (はい)
+  :状態を持つ述語\n（hysteresis、debounce など）;
+  :Result = ok(value)\n品質を保持;
+endif
+stop
+legend bottom
+すべてのResult（okでもfaultでも）は作成者に届き、
+作成者が `case` または `recover` で制御値を選ぶ。
+end legend
+@enduml

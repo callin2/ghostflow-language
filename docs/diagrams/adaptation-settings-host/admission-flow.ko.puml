@@ -1,0 +1,19 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontSize 13
+skinparam ActivityBackgroundColor #F8F8F8
+start
+:step(packet, proposal);
+:인자를 비공개로 복사;
+:identity, 시각, provenance,\n권한, 용량 검사;
+:각 변경 검사: 타입, 격자/범위,\nallowed 범위, maxStep, rolling maxChange;
+if (모든 검사 통과?) then (예)
+  :원자적 core 설정 event\n하나를 제출;
+  :core 승인 후\n이력 기록;
+  :core 결과\n+ 새 revision 반환;
+else (하나라도 실패)
+  :outcome: null\n+ 적응 trace 반환;
+  note right: tick, 시계, 이력, revision\n중 어느 것도 확정하지 않음
+endif
+stop
+@enduml

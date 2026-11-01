@@ -1,0 +1,24 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontSize 13
+skinparam rectangleBorderColor #4A6FA5
+skinparam rectangleBackgroundColor #F7F9FC
+left to right direction
+title Ramificación de una línea de tiempo ghost desde una ocurrencia registrada (§6.8)
+
+rectangle "Línea de tiempo original (preservada)" as O {
+  rectangle "tick 1" as O1
+  rectangle "tick 2" as O2
+  rectangle "tick 3" as O3
+}
+rectangle "Rama ghost (sin sumidero de efectos físicos)" as G {
+  rectangle "tick 2'\n(regla modificada o\nentrada virtual hipotética)" as G2
+  rectangle "tick 3'" as G3
+}
+O1 --> O2
+O2 --> O3
+O1 --> G2 : rama en\nesta ocurrencia
+G2 --> G3
+O2 .. G2 : comparar en el\nmismo tick lógico
+O3 .. G3 : comparar
+@enduml

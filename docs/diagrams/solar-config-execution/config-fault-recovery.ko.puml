@@ -1,0 +1,16 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontSize 13
+hide empty description
+state "Config Result OK" as ok
+ok : Solar admission을 정상 평가
+state "의존 config 고장" as fault
+fault : admission = Unknown(SettingsFault)
+fault : (fault 분기가 참이어도;\n과거 값이나 기본값을 쓰지 않음)
+state "복구 기준선" as base
+base : 놓친 시작을 따라잡지 않음
+[*] --> ok
+ok --> fault : 현재 관측이 고장
+fault --> base : 이후 성공한 관측
+base --> ok : 다음 해당 교차가\n한 번 발생할 수 있음
+@enduml

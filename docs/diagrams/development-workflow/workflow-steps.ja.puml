@@ -1,0 +1,11 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName "Hiragino Sans"
+start
+:1. 作業コンテキストを確立する\n（dev から開始、ベース SHA を記録、\nAGENTS.md を読む、docs:find）;
+:2. タスク契約を 1 つ定める\n（成果、範囲、受け入れ基準、\n前提条件、焦点を絞ったチェック）;
+:3. 完結した範囲限定の引き継ぎを割り当てる\n（1 単位につき 1 ワーカー）;
+:4. 適切な深さで 1 回だけ検証する\n（静的 -> 焦点 -> 完全 CI）;
+:5. タスクを完了する\n（証拠を報告し、再現性を改善）;
+stop
+@enduml

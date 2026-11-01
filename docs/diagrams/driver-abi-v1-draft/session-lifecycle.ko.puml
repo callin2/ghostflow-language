@@ -1,0 +1,21 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName Helvetica
+title 제안된 Driver 세션(epoch) 하나
+
+participant "호스트" as Host
+participant Driver
+Host -> Driver : gfdrv_negotiate(major 1, max_minor)
+Host -> Driver : describe -> 불변 메타데이터
+note over Host : 바인딩 승인\n(메타데이터를 Program 계약과 비교)
+Host -> Driver : open(binding_and_budget)
+Driver --> Host : 세션(새 epoch) 또는 오류, 출력 없음
+loop 스캔마다
+  Host -> Driver : poll -> 순서가 정해진 입력 레코드
+  note over Host : 코어 평가와 확정
+  Host -> Driver : apply(safe 명령) -> 영수증
+end
+Host -> Driver : cancel(command_id) -> 영수증 (선택)
+Host -> Driver : close (정확히 한 번)
+note over Host, Driver : 재시작 = 새 세션 epoch,\n메타데이터와 바인딩 재검증,\n암묵적 재개나 재생 없음
+@enduml

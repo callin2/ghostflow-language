@@ -1,0 +1,22 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName "Hiragino Sans"
+skinparam ArrowColor #555555
+title 検査付きの隣接重複置換
+
+start
+:低水準化された Bool 出力制約;
+if (リストは128エントリ以下か？) then (いいえ)
+  :原本を保持\n（v1 コンパニオン）;
+  stop
+else (はい)
+endif
+:候補生成：\n隣接する完全な重複を統合\n（一意な名前8個 / 出現32回以内のグループ）;
+:独立した有限チェッカー：\nすべての Bool スナップショット、ブロック集合、\n故障文字列、冪等性;
+if (変換され、検査済みか？) then (はい)
+  :最適化済み成果物を出力\n（constraintProof 付き、\nsource-trace-v2 / source-observation-v2）;
+else (変更なし、未サポート、\nまたはチェッカー失敗)
+  :原本を保持\n（v1 コンパニオン）;
+endif
+stop
+@enduml

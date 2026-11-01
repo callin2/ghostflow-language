@@ -1,0 +1,23 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName Helvetica
+skinparam defaultFontSize 13
+start
+:Ejecutar el escenario original;
+if (¿Se cumplen las guardas y el objetivo\nviola lo esperado?) then (no)
+  :original-not-applicable,\noriginal-not-failing o incompleto;
+  stop
+else (sí)
+endif
+repeat
+  :Intentar eliminar la siguiente\nacción no objetivo (en orden);
+  if (¿Válido, termina, se cumplen las guardas,\nmisma violación?) then (sí)
+    :Aceptar; reiniciar desde\nla primera acción;
+  else (no)
+    :Registrar el intento;
+  endif
+repeat while (¿Quedan eliminaciones sin probar\ny maxAttempts?) is (sí)
+-> no;
+:Informar el resultado reproducido\n(single-deletion-minimal, budget-exhausted\no unresolved-candidates);
+stop
+@enduml

@@ -1,0 +1,20 @@
+@startuml
+hide empty description
+skinparam shadowing false
+skinparam defaultFontSize 13
+skinparam state {
+  BackgroundColor #F8F8F8
+  BorderColor #555555
+}
+
+state "admission 없음\nsafe: 펌프 OFF" as Idle
+state "admission 승인\nsafe = requested" as Admitted
+state "트립\n안전 벡터:\n펌프 OFF, 밸브 ON" as Tripped
+
+[*] --> Idle
+Idle --> Admitted : 새 모드 점유가\n허용 범위를 통과\n(스캔 0: automatic, 스캔 4: manual)
+Admitted --> Tripped : 밸브 OFF 상태에서\n펌프 ON 요청\n(스캔 1)
+Tripped --> Tripped : 밸브 요청 복귀\n자동 재시작 없음\n(스캔 2)
+Tripped --> Idle : 중립 프레임:\n모든 모드 점유 false\n(스캔 3)
+Admitted --> Idle : 모든 모드 점유 false
+@enduml

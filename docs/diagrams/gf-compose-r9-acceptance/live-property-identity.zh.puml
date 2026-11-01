@@ -1,0 +1,14 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName Helvetica
+skinparam defaultFontSize 13
+title 实时属性事件与重启中的身份标识（拟议验收）
+
+[*] --> RunA : 运行开始\n（runId A，设置修订版 N）
+RunA --> RunA : 有效的实时属性事件\n所有值作为一个事件应用；\n设置修订版 N -> N+1；\n源码/程序哈希与 runId 不变
+RunA --> RunA : 无效的多属性事件\n整个事件被拒绝；\n没有属性发生变更
+RunA --> RunB : 真实重启\n（GhostFlow 重启事件）
+RunB : 新的 runId B
+RunB : 已接受的设置被持久保留
+RunB : 响应 = 编写的 GhostFlow 逻辑\n（无全局恢复/手动策略）
+@enduml

@@ -1,0 +1,24 @@
+@startuml
+skinparam defaultFontName Helvetica
+skinparam shadowing false
+skinparam rectangleBorderColor #4A6FA5
+skinparam rectangleBackgroundColor #F7F9FC
+title Bucle de un objetivo de control continuo
+rectangle "target\n(consigna)" as T
+rectangle "measure\n(variable de proceso)" as M
+rectangle "controlador PID\nP + I + D + bias" as PID
+rectangle "solicitado\n(recortado al rango de salida)" as R
+rectangle "arbitraje +\nrestricciones de seguridad" as C
+rectangle "objetivo seguro" as S
+rectangle "renderizador de salida\n(aplicado)" as A
+rectangle "proceso +\nretroalimentación" as P
+T --> PID
+M --> PID
+PID --> R
+R --> C
+C --> S
+S --> A
+A --> P
+P --> M : siguiente muestra
+S ..> PID : el anti-windup y el\nseguimiento sin saltos\nusan el objetivo seguro
+@enduml

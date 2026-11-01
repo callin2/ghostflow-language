@@ -1,0 +1,19 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName Helvetica
+skinparam defaultFontSize 13
+skinparam rectangleRoundCorner 8
+title Un contexto de incidente, tres vistas (propuesta)
+
+rectangle "Tupla de contexto del incidente\n\ndefinición / módulo\ninstancia\nrevisión de ajustes + posición efectiva del evento\ninstalación / vinculación\nejecución / escaneo\ntiempo lógico\n(+ enlaces a fuente / restricción)" as T
+
+rectangle "Vista del agricultor\nun bloqueo + siguiente acción" as F
+rectangle "Vista de software\nsalida solicitada / segura,\nfuente y restricción" as S
+rectangle "Vista de hardware\nvinculación, evento del driver,\nhistorial de arranque / eventos" as H
+rectangle "Rechazado como obsoleto o no disponible:\nejecución antigua, esquema / módulo /\nfuente incorrectos, vinculación incorrecta" as R
+
+T --> F
+T --> S
+T --> H
+T ..> R : discrepancia\nde identidad
+@enduml

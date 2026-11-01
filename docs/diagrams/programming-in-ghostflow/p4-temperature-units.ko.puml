@@ -1,0 +1,22 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName "Apple SD Gothic Neo"
+skinparam defaultFontSize 13
+skinparam componentStyle rectangle
+title 물리 임계값 하나, 소스 단위 세 개
+
+rectangle "E16: 18°C" as c
+rectangle "E17: 64.4°F" as f
+rectangle "E18: 291.15K" as k
+component "literal을 정확히 변환한 뒤\nbinary64로 반올림" as conv
+rectangle "정규 Temperature\n291.15 K" as canon
+component "hysteresis(air, on_below, ...)" as h
+rectangle "같은 히터 판단" as out
+
+c --> conv
+f --> conv
+k --> conv
+conv --> canon
+canon --> h
+h --> out
+@enduml

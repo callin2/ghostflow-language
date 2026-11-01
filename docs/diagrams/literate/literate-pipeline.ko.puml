@@ -1,0 +1,23 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName Helvetica
+skinparam rectangleRoundCorner 8
+skinparam ArrowColor #555555
+left to right direction
+
+rectangle "호스트" {
+  rectangle ".ghost.md\n설명 + ghost 펜스" as DOC
+  rectangle "추출기\n(CommonMark,\n최상위 ghost만)" as EXT
+  rectangle "같은 파서와\n타입·시간·자원\n검사" as CHK
+  rectangle "소스맵\n생성 소스 -> 원본\n행/열" as MAP
+}
+rectangle "MCU" {
+  rectangle ".gfb 바이트코드\n(설명·Markdown 없음)" as GFB
+}
+
+DOC --> EXT
+EXT --> CHK : 합친 소스
+EXT --> MAP
+CHK --> GFB : 컴파일된 바이트코드만
+CHK ..> MAP : 진단은 원본\n위치를 가리킴
+@enduml

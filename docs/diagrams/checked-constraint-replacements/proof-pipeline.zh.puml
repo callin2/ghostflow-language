@@ -1,0 +1,22 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName Helvetica
+skinparam ArrowColor #555555
+title 经检查的相邻重复替换
+
+start
+:降级后的 Bool 输出约束;
+if (列表最多 128 项？) then (否)
+  :保留原始版本\n（v1 配套文件）;
+  stop
+else (是)
+endif
+:候选生成：\n合并相邻的完全重复项\n（每组最多 8 个唯一名称 / 32 次出现）;
+:独立的有限检查器：\n所有 Bool 快照、被阻止集合、\n故障字符串、幂等性;
+if (已变换且通过检查？) then (是)
+  :输出优化后的产物\n并附带 constraintProof\n（source-trace-v2 / source-observation-v2）;
+else (无变化、不支持\n或检查器失败)
+  :保留原始版本\n（v1 配套文件）;
+endif
+stop
+@enduml

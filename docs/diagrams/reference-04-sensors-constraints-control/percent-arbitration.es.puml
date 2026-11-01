@@ -1,0 +1,17 @@
+@startuml
+skinparam defaultFontName Helvetica
+skinparam shadowing false
+skinparam ActivityBackgroundColor #F7F9FC
+skinparam ActivityBorderColor #4A6FA5
+title Política de recurso Percent continuo (ejemplo P)
+start
+:Evaluar todas las solicitudes y techos\nsobre una instantánea de entrada + estado anterior;
+if (¿Alguna solicitud o techo en fallo?) then (sí)
+  #FFF4D6:candidato = `safe` redactado (0%)\n(`on_unknown = safe`; conditionsKnown = false);
+else (no)
+  :candidato = `select` (max) de las solicitudes\ntemperatura 70%, humedad 40% -> 70%;
+endif
+:Recortar al techo conocido mínimo\n(viento 20%);
+:Intención segura final de vent_target\nsin fallo: 70% -> 20%; con fallo: 0%;
+stop
+@enduml

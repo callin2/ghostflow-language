@@ -1,0 +1,18 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName Helvetica
+skinparam defaultFontSize 13
+
+start
+:在已完成的步骤之间\nreplaceBinding(candidate);
+:针对同一份源和字节码\n校验完整候选;
+:重新计算 assessment；\n准备全新的 ControlRuntime\n并激活其策略;
+if (有效，且运行 ID 和\n绑定修订版均未使用？) then (是)
+  :发布新运行;
+  :传感器从 NotReady 开始；\nProgram 状态来自源初始化器;
+else (否)
+  :拒绝;
+  :保留先前的运行、绑定、\n调理器状态、assessment\n和最新追踪;
+endif
+stop
+@enduml

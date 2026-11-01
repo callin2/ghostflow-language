@@ -1,0 +1,21 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName Helvetica
+skinparam defaultFontSize 13
+skinparam componentStyle rectangle
+component "经过验证的 provider\n（Solar 触发实例事实，\n绝不提供 .due）" as P
+component "Native / WASM 宿主\n（验证信封\n和绑定）" as H
+rectangle "Rust 核心（一个可移植引擎）" {
+  component "准入引擎\n（时钟、gap、去重、\n脉冲结果）" as E
+  component "编译后的 prelude\n（when 谓词、\n依赖顺序）" as W
+  component "VM 事务\n（暂存、提交或回滚）" as T
+}
+card "调度计划观测\n+ Bool .due" as O
+component "日志 / 重放\n（不使用实时 provider）" as J
+P --> H : 覆盖事实
+H --> E : 时钟快照 +\n有界覆盖
+W --> E : 跨越 tick 上\n的谓词
+E --> T : 暂存的投影
+T --> O : 整个 tick 成功时
+O --> J
+@enduml

@@ -1,0 +1,28 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName Helvetica
+skinparam defaultFontSize 13
+skinparam componentStyle rectangle
+
+actor "호출자" as Caller
+
+rectangle "explainExecution(request)" as API {
+  component "정본 .ghost.md\n소스 재컴파일" as C
+  component "출력 설명 +\n완료된 스캔 snapshot\n+ proof/snapshot join" as J
+  component "장치 identity와\n레코드 검사" as D
+}
+
+rectangle "execution-evidence-result-v1" as R {
+  card "requested, safe,\nauthored" as R1
+  card "장치 상태" as R2
+}
+
+Caller --> C : source, runId, outputId
+Caller --> J : 승인된 스캔 결과
+Caller --> D : expectedDevice,\ndeviceEvidence
+C --> J
+J --> R1
+D --> R2
+
+note right of API : 새 evaluator 없음, 장치 접속 없음,\n디스크에서 import 읽지 않음
+@enduml

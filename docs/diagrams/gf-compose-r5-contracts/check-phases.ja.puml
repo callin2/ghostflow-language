@@ -1,0 +1,27 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName "Hiragino Sans"
+skinparam defaultFontSize 13
+left to right direction
+title 提案する最初の契約プロファイル：各特性を検査する段階
+
+rectangle "型" as T
+rectangle "依存関係" as D
+rectangle "パラメータ境界" as B
+rectangle "排他的オーナー" as X
+rectangle "設置制約の\n互換性" as I
+
+rectangle "コンパイル／静的\n（コンパイル、ロワリング、\nバインディング検証）" as C #EEF5FF
+rectangle "有効化前の\n検証／ゲート" as P #FFF8E6
+rectangle "ランタイム\n（要求／開始または\nステーション認可）" as R #EEFBEF
+
+T --> C : 静的バインディング検証
+D --> C : コンパイル／ロワリング
+D --> P : 有効化前の検証
+B --> C : コンパイル時の検証
+B --> R : 要求／開始の認可
+X --> C : 論理的な権限 +\n別個のバインディング検証
+X --> R : 該当する場合は\nステーション認可
+I --> P : 互換性ゲート
+I --> R : 実際にロワリング／強制\nされた制約のみ
+@enduml

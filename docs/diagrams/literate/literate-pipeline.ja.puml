@@ -1,0 +1,23 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName "Hiragino Sans"
+skinparam rectangleRoundCorner 8
+skinparam ArrowColor #555555
+left to right direction
+
+rectangle "ホスト" {
+  rectangle ".ghost.md\n散文 + ghost フェンス" as DOC
+  rectangle "抽出器\n（CommonMark、\nトップレベルの ghost のみ）" as EXT
+  rectangle "同じパーサと\n型/時間/リソースの\n検査" as CHK
+  rectangle "ソースマップ\n生成 -> 元の\n行/列" as MAP
+}
+rectangle "MCU" {
+  rectangle ".gfb バイトコード\n（散文なし、Markdown なし）" as GFB
+}
+
+DOC --> EXT
+EXT --> CHK : 結合されたソース
+EXT --> MAP
+CHK --> GFB : コンパイル済みバイトコードのみ
+CHK ..> MAP : 診断は元の位置を\n指す
+@enduml

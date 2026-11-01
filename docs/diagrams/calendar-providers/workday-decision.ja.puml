@@ -1,0 +1,25 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName "Hiragino Sans"
+skinparam ArrowColor #555555
+title WorkCalendar の workday/offday 判定順序
+
+start
+if (スナップショットがあり、カバレッジ内で\n有効期限前か？) then (いいえ)
+  :Unknown\n（CalendarMissing または\nCalendarOutOfRange）;
+  stop
+else (はい)
+endif
+if (日付固有の作業例外があるか？) then (はい)
+  :例外を使う\n（work または off）;
+  stop
+else (いいえ)
+endif
+if (祝日か？) then (はい)
+  :祝日の作業ポリシーを適用;
+  stop
+else (いいえ)
+endif
+:週間パターンを適用\n（weeklyWorkMask）;
+stop
+@enduml

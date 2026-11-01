@@ -1,0 +1,29 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontSize 12
+title Emisión de ajustes: admisión y Result resultante
+start
+:Llega un paquete de ajustes
+(edición del operador u observación del productor);
+if (¿Malformado, destino no reconocido,\nPrograma/revisión base obsoletos\no autoridad denegada?) then (sí)
+  :Rechazar antes de la admisión;
+  note right: No se crea ninguna observación
+  stop
+else (no)
+endif
+if (¿Códigos de fallo explícitos en conflicto\ndentro de un agregado?) then (sí)
+  :Rechazar el paquete;
+  stop
+else (no)
+endif
+if (¿Fallo explícito uniforme?) then (sí)
+  :Ese fallo (p. ej., SettingsUnavailable)\npara el grupo direccionado;
+elseif (¿Todas las cargas útiles se validan juntas?) then (sí)
+  :ok(value) para cada config direccionado;
+else (no)
+  :fault(SettingsInvalid)\npara el grupo direccionado;
+endif
+:La emisión aceptada avanza la\nrevisión de observación de ajustes;
+:Todos los consumidores en esta posición\nde evaluación leen el mismo Result actual;
+stop
+@enduml

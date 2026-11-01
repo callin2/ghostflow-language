@@ -1,0 +1,19 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName "Hiragino Sans"
+skinparam defaultFontSize 12
+start
+:prelude を依存順に一度だけ、\n古い記述済み状態に対して評価;
+:コンシューマ W は宣言された\nすべての上流ウィンドウの highwater リビジョンを\nステージ（選択の有無・成否を問わない）;
+if (選択された上流の結果が成功\nかつそのリビジョン > 保存済み highwater?) then (はい)
+  :派生イベントを1つ受け入れ\n同一性 (site, admissionRevision)\n+ 所有する証明ツリー;
+else (いいえ)
+  :新しい下流ポイントなし\n（期限切れ、再選択、再評価）;
+endif
+if (スキャン全体が成功?) then (はい)
+  :ウィンドウ、証明、highwater を確定;
+else (いいえ：ソース、密度、\n算術または意図のエラー)
+  :すべてロールバック;\n再試行は同じ新しさを見る;
+endif
+stop
+@enduml

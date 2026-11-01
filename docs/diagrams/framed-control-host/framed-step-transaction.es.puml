@@ -1,0 +1,27 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName Helvetica
+skinparam defaultFontSize 13
+start
+:Validar y capturar entradas,\nmuestras e indicadores de programación;
+:Iniciar una transacción propiedad de Rust\nen cada acondicionador;
+:Acondicionar las entradas y construir\nla lista completa de entradas generadas;
+:runtime.scan(tiempo lógico explícito);
+if (¿Fallo de acondicionamiento o\nrechazo nativo conocido?) then (sí)
+  :Revertir los acondicionadores;\nconservar tiempo lógico e ID de trama;
+  :El llamador puede reintentar la misma trama;
+  stop
+elseif (¿Estado de consolidación desconocido (trap)?) then (sí)
+  :Terminar el host\n(sin reversión inventada);
+  stop
+else (escaneo positivo)
+  :Consolidar acondicionadores,\ntiempo lógico e ID de trama;
+  if (¿Fallo después de consolidar?) then (sí)
+    :Terminar el host;\nse conserva el resultado consolidado;
+    stop
+  else (no)
+    :Devolver {vm, sensors, signals, frame};
+    stop
+  endif
+endif
+@enduml

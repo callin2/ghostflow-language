@@ -1,7 +1,3 @@
-<!-- translation-source: tests/reference/DECISIONS.md -->
-
-[Korean original](DECISIONS.md)
-
 # Tracking how the original 49 pending decisions were settled
 
 When the individual Reference acceptance cases were first written, 49 of them had the status `decision`: their expected meaning depended on syntax or policy that had not yet been settled. All 49 are now settled. This table maps each one to the current Reference section that defines it and to the form in which it is now verified.

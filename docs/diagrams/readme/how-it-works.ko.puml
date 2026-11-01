@@ -1,0 +1,27 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName Helvetica
+skinparam defaultFontSize 13
+skinparam ArrowColor #526d76
+skinparam rectangle {
+  BackgroundColor #f1f6f5
+  BorderColor #6d858b
+  FontColor #102b35
+  RoundCorner 10
+}
+left to right direction
+
+rectangle "공정을 아는\n사람" as person
+rectangle "AI 도우미\n(선택)" as ai
+rectangle "**.ghost.md 문서**\n의도 + 설명\n+ 실행 가능한 규칙" as doc #e2f7f0
+rectangle "컴파일러\n검증 및 컴파일" as compiler
+rectangle "런타임\n판단 실행\n(LLM 없음)" as runtime
+rectangle "파생 뷰\n추적 기록, 소스 맵,\n다이어그램" as views
+
+person --> doc : 작성 및 검토
+ai ..> doc : 후보 초안 작성
+doc --> compiler
+compiler --> runtime : 컴파일된 GFB
+runtime --> views : 실행 증거
+views ..> doc : "왜?"를 소스까지\n거슬러 설명
+@enduml

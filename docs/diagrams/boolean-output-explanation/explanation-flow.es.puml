@@ -1,0 +1,28 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName Helvetica
+skinparam ArrowColor #555555
+skinparam rectangle {
+  BackgroundColor White
+  BorderColor #555555
+}
+title De la compilación a una explicación unida
+
+rectangle "Compilador\n(IR tipado + escritor de bytes)" as C
+rectangle "Bytes GFB\n(sin cambios)" as B
+rectangle "explanationArtifact\n(sidecar)" as S
+rectangle "Escaneo de la VM\n(testigos de instrucción activados)" as V
+rectangle "TickRecord\n(solo escaneo completado)" as T
+rectangle "prepareOutputExplanation\nproducer.emit" as P
+rectangle "prueba" as PR
+rectangle "joinOutputExplanation\n(instantánea de salida + ejecución esperada)" as J
+
+C --> B
+C --> S
+B --> V
+V --> T : evidencia adjuntada\ntras completar el escaneo
+S --> P
+T --> P
+P --> PR
+PR --> J
+@enduml

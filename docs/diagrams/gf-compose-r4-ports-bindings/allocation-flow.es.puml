@@ -1,0 +1,23 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName Helvetica
+skinparam defaultFontSize 13
+title Asignación estable propuesta (diseño elaborado a mano, no comportamiento del validador)
+
+start
+:Conservar cada vinculación explícita existente;
+note right: Nunca se mueve.\nUna solicitud para moverla\nse convierte en conflicto/propuesta de cambio.
+repeat :Siguiente rol sin vincular\n(orden canónico de nombre de rol lógico);
+  if (¿Tipo de entrada / capacidad explícitos?) then (no)
+    :Idoneidad desconocida:\ndetener la asignación para este rol;
+  elseif (¿Endpoint no usado con dirección\ny tipo semántico coincidentes?) then (no)
+    :Capacidad agotada:\ninformar del conflicto;
+  else (sí)
+    :Compatible en capacidad:\nelegir el primero por orden estable de ID de endpoint;
+    :Vinculación propuesta\n(rol, endpoint, revisiones,\nestado de idoneidad);
+  endif
+repeat while (¿Quedan roles sin vincular?) is (sí)
+->no;
+:Instalación confirmada solo con\nconfirmación del responsable de la instalación\n+ evidencia física;
+stop
+@enduml

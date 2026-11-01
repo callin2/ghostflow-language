@@ -1,0 +1,19 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontSize 13
+hide empty description
+state "待处理" as Pending
+state "非待处理" as Consumed
+
+[*] --> Pending : 宿主报告\n启动事件待处理
+[*] --> Consumed : 宿主报告\n无待处理事件
+Pending --> Pending : 扫描被拒绝\n（事件保留）
+Pending --> Consumed : 第一次成功\n提交的扫描\n(restart_event = true)
+Consumed --> Consumed : 后续扫描\n(restart_event = false)
+Consumed --> Consumed : 程序替换\n（不产生新的启动事件）
+
+note bottom of Pending
+  restart_reason 在整个运行期间保持不变
+  （宿主没有证据时为 Unknown）。
+end note
+@enduml

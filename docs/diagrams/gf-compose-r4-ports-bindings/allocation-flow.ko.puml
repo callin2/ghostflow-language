@@ -1,0 +1,23 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName Helvetica
+skinparam defaultFontSize 13
+title 제안된 안정적 할당 (수작업 설계이며 validator 동작 아님)
+
+start
+:모든 명시적 기존 binding 보존;
+note right: 절대 옮기지 않음.\n옮기려는 요청은\n충돌/변경 제안이 됨.
+repeat :다음 미바인딩 role\n(정규 논리 role 이름 순서);
+  if (입력 종류 / capability가 명시적인가?) then (아니요)
+    :Suitability-unknown:\n이 role의 할당 중단;
+  elseif (direction과 semantic type이 맞는\n미사용 endpoint가 있는가?) then (아니요)
+    :용량 소진:\n충돌 보고;
+  else (예)
+    :Capacity-compatible:\n안정적 endpoint-ID 순서로 첫 후보 선택;
+    :Proposed binding\n(role, endpoint, revision,\nsuitability 상태);
+  endif
+repeat while (미바인딩 role이 더 있는가?) is (예)
+->아니요;
+:Confirmed installation은\n설치 소유자의 확인\n+ 물리 증거가 있을 때만;
+stop
+@enduml

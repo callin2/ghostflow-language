@@ -1,0 +1,14 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontSize 13
+skinparam stateBorderColor #4A6FA5
+skinparam stateBackgroundColor #F7F9FC
+title OnDelay (pregunta 5): enabled es true solo en Active
+
+[*] --> Idle
+Idle --> Waiting : request && !stop
+Waiting --> Idle : stop || !request
+Waiting --> Active : age >= delay
+Active --> Idle : !request || stop
+note "Paro sano o retardo no válido: cualquier fase -> Idle.\nrequest/stop desconocido: se conserva la fase.\nage = elapsed(phase) se reinicia en cada cambio de fase." as N
+@enduml

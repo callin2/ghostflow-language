@@ -1,0 +1,25 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontSize 12
+start
+:node tools/ghostsim-console.mjs program.gfb --bind ...;
+if (¿stdin es una terminal?) then (sí: modo en vivo)
+  :Exigir que stderr también sea terminal;
+  :Escanear a los 0 ms, dibujar el panel;
+  repeat
+    :Temporizador de 100 ms o tecla 1-8 / :toggle;
+    :Escanear una vez en el tiempo transcurrido actual;
+  repeat while (¿:exit o Ctrl-C?) is (no)
+  :Restaurar la pantalla; imprimir un breve resumen;
+  note right: --record y --format se rechazan
+else (no: reproducción por tubería)
+  repeat
+    :Leer un comando por línea;
+    :Alternar / scan N en tiempo virtual;
+    :Imprimir el panel en stderr;
+  repeat while (¿exit o fin de la entrada?) is (no)
+  :Escribir un scenario-result-v1 en stdout\n(TOON predeterminado, --format json);
+  note right: --record escribe un escenario TOON reproducible
+endif
+stop
+@enduml

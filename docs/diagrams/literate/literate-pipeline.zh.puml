@@ -1,0 +1,23 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName Helvetica
+skinparam rectangleRoundCorner 8
+skinparam ArrowColor #555555
+left to right direction
+
+rectangle "宿主" {
+  rectangle ".ghost.md\n说明文字 + ghost 围栏" as DOC
+  rectangle "提取器\n（CommonMark，\n仅顶层 ghost）" as EXT
+  rectangle "相同的解析器与\n类型/时间/资源\n检查" as CHK
+  rectangle "源映射\n生成位置 -> 原始\n行/列" as MAP
+}
+rectangle "MCU" {
+  rectangle ".gfb 字节码\n（无说明文字、无 Markdown）" as GFB
+}
+
+DOC --> EXT
+EXT --> CHK : 拼接后的源代码
+EXT --> MAP
+CHK --> GFB : 仅已编译的字节码
+CHK ..> MAP : 诊断指向\n原始位置
+@enduml

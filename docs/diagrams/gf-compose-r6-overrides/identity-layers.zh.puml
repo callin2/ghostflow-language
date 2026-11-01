@@ -1,0 +1,21 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName Helvetica
+skinparam defaultFontSize 13
+left to right direction
+title 为一次运行而关联的独立身份标识（提议的记录）
+
+rectangle "源 / 组合\n修订版" as S
+rectangle "编译后的程序\n身份标识（字节/哈希）" as P
+rectangle "设置修订版 /\n生效位置" as G
+rectangle "安装 /\n绑定修订版" as I
+rectangle "部署包\n身份标识" as K
+rectangle "运行身份标识\n（runId；scanId 仅在\n一次运行内有序）" as R
+
+S --> P : 编译
+P --> K
+I --> K : bindingRevision
+K --> R : 部署开始一次运行
+G --> R : 同一运行上的\nlive 事件
+I --> R : 关联
+@enduml

@@ -1,0 +1,25 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName "Hiragino Sans"
+title 1 回の灌水判断（watering' を計算）
+
+start
+if (STOP 要求あり、または STOP が故障?) then (はい)
+  :watering' = false;
+elseif (低水位、または low_water が故障?) then (はい)
+  :watering' = false;
+elseif (すでに灌水中?) then (はい)
+  :watering' = true;
+elseif (正常な START がオン\nかつ再起動がブロックされていない?) then (はい)
+  :watering' = true;
+else (いいえ)
+  :watering' = false;
+endif
+:pump, valve <- watering';
+stop
+note right
+  いずれかの入力が故障すると restart_blocked' は true になる。
+  すべての入力が正常で、かつ START がオフのときに
+  限って解除される。
+end note
+@enduml

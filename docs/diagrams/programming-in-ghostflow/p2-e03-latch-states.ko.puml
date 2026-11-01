@@ -1,0 +1,27 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontSize 13
+skinparam StateBackgroundColor #F7F9FC
+skinparam StateBorderColor #4A6FA5
+title E03: running과 restart_blocked (tick마다 전이 하나)
+
+state "Stopped (정지)\nrunning=false\nrestart_blocked=false" as Stopped
+state "Running (운전)\nrunning=true" as Running
+state "RestartBlocked (재시작 차단)\nrunning=false\nrestart_blocked=true" as Blocked
+
+[*] --> Stopped
+Stopped --> Running : START 누름, STOP 해제\n(두 입력 모두 정상)
+Running --> Stopped : STOP 누름(정상),\n재시작 차단 없음
+Stopped --> Blocked : START 또는 STOP fault
+Running --> Blocked : STOP fault, 또는\n재시작 차단이 설정된 채 정지
+Blocked --> Stopped : 두 입력 모두 정상이고\nSTART 해제
+Blocked --> Blocked : START를 계속 누름,\n또는 fault 발생
+
+note right of Running
+  운전 중 START fault가 나면
+  (STOP이 정상이고 해제된 동안)
+  운전은 유지하지만 restart_blocked를
+  설정합니다. 두 입력이 정상인 상태에서
+  START 해제를 관측하면 풀립니다.
+end note
+@enduml

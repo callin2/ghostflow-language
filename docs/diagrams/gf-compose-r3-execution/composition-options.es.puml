@@ -1,0 +1,21 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName Helvetica
+skinparam defaultFontSize 13
+skinparam rectangleRoundCorner 8
+title Dos opciones comparadas (ambas son propuestas)
+
+package "Opción A: composición en el compilador en un solo módulo" {
+  rectangle "east + west\n(nombres calificados)" as A1
+  rectangle "Un módulo GFB1\nun reloj por tick\nuna pasada de seguridad" as A2
+  A1 --> A2 : reducción de importación /\ncalificación
+}
+
+package "Opción B: varias instancias de VM + coordinador" {
+  rectangle "Coordinador\n(provee relojes, ingreso,\npolítica de propagación de fallos)" as C
+  rectangle "VM: east\nmódulo y estado propios" as VE
+  rectangle "VM: west\nmódulo y estado propios" as VW
+  C --> VE
+  C --> VW
+}
+@enduml

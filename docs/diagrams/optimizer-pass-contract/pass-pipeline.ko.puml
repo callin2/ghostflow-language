@@ -1,0 +1,20 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName Helvetica
+skinparam defaultFontSize 13
+
+title 제안하는 최적화기 경계 (설계 전용, 미구현)
+start
+:파싱, 타입 검사, 이름 /\nenum / 다음 상태 해석 (기존 필수 검사);
+:1. 불변 typed 의미 IR + 소스 매핑\n+ 제약 효과 + 검증 결과\n(원래 실행물을 fallback으로 유지);
+:2. 선택적 typed SMT 속성 검사\n(명시적 도메인과 가정);
+:3. 적격한 순수·전역 정의\nBoolean 영역에만 BDD 후보 생성;
+:4. 독립적인 동치 및\ncertificate 검사;
+if (의무가 확립되었는가?) then (예)
+  :검사된 후보 사용\n+ 변환/증명 관계;
+else (SAT 불일치, Unknown, timeout,\n잘못된 certificate, ...)
+  :변경 없는 원본 유지\n+ 제한된 skip 사유 / 진단;
+endif
+:5. 최종 bytecode 방출, 자원 한계 검사,\nprovenance 관계 검증;
+stop
+@enduml

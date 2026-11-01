@@ -1,0 +1,27 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName Helvetica
+skinparam defaultFontSize 13
+left to right direction
+title 제안된 첫 계약 프로필: 각 속성을 검사하는 단계
+
+rectangle "타입" as T
+rectangle "의존성" as D
+rectangle "파라미터 범위" as B
+rectangle "배타적 소유자" as X
+rectangle "설치 제약\n호환성" as I
+
+rectangle "컴파일 / 정적\n(컴파일, lowering,\nbinding 검증)" as C #EEF5FF
+rectangle "활성화 전\n검증 / gate" as P #FFF8E6
+rectangle "런타임\n(요청/시작 또는\nstation 인가)" as R #EEFBEF
+
+T --> C : 정적 binding 검증
+D --> C : 컴파일/lowering
+D --> P : 활성화 전 검증
+B --> C : 컴파일 검증
+B --> R : 요청/시작 인가
+X --> C : 논리 권한 +\n별도 binding 검증
+X --> R : 해당하는 경우\nstation 인가
+I --> P : 호환성 gate
+I --> R : 실제로 lowering/집행되는\n제약만
+@enduml

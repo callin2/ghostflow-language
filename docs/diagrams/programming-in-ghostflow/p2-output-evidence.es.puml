@@ -1,0 +1,27 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontSize 13
+skinparam ActivityBackgroundColor #F7F9FC
+skinparam ActivityBorderColor #4A6FA5
+title De la intención solicitada a la evidencia física (última fila de E05)
+
+start
+:Intención solicitada\n(conexiones <-)\npump=true, valve=false;
+:Restricciones de salida\nrequire pump => valve;
+:Intención segura\n("salida final" en este capítulo)\npump=false, valve=false;
+note right
+  Las restricciones solo bajan
+  true a false. El runtime
+  nunca enciende la válvula
+  para cumplir la regla.
+end note
+:Aplicado (applied)\n(evidencia del renderizador:\nse escribió el comando);
+:Confirmado (confirmed)\n(evidencia de retroalimentación:\nfinal de carrera, encoder, ...);
+note right
+  Aplicado y confirmado quedan
+  fuera de la intención de salida
+  del lenguaje. safe=true no
+  prueba que la bomba funcionó.
+end note
+stop
+@enduml

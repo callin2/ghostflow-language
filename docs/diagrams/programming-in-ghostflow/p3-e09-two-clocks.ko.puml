@@ -1,0 +1,17 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName Helvetica
+
+rectangle "civil 시계\n(시간대, DST, 신뢰된 시계)" as civil
+rectangle "schedule starts:\nDailySlots<15min>\n06:00, 18:45" as sched
+rectangle "starts.due\n(발생이 도착한\ntick에서 true)" as due
+rectangle "phase: Idle -> Watering" as start
+rectangle "단조 시계\nage = elapsed(phase)" as mono
+rectangle "age >= 5min:\nWatering -> Idle" as stop
+
+civil --> sched : 벽시계 시각
+sched --> due : 수용된 발생
+due --> start
+start --> mono : age가 0부터 다시 시작
+mono --> stop : 5min 이상인 첫 tick
+@enduml

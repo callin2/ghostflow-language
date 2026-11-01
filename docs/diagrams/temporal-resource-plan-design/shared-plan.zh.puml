@@ -1,0 +1,24 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName Helvetica
+skinparam defaultFontSize 13
+skinparam ArrowColor #526d76
+
+rectangle "已安装模块\n+ 策略 + 日志容量" as M
+rectangle "GFTA 激活 profile\n（预算）" as P
+rectangle "一个经检查的结构规划\n（几何，不含时间 arena）" as SP
+rectangle "报告\n（fitsBudget、所需容量）" as R
+rectangle "激活" as A
+rectangle "重放" as RP
+
+M --> SP
+P --> SP
+SP --> R : plan_temporal /\nplan_current_temporal_replay
+SP --> A : 同一规划
+SP --> RP : 同一规划
+note right of A
+  分配的容量必须保持在
+  规划的几何范围内；
+  不匹配即拒绝
+end note
+@enduml

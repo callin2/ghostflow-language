@@ -1,0 +1,25 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName Helvetica
+skinparam componentStyle rectangle
+title 提案されているネイティブ境界（ドラフト、未実装）
+
+package "実行ホスト" {
+  [Rustコア\n（評価、確定）] as Core
+  [ホスト\n（バインディング、スケジューリング、ポリシー）] as Host
+}
+package "ドライバ（デバイス固有）" {
+  [エンドポイントI/Oと\n解釈] as Drv
+}
+node "Device / ボード\n（物理I/O、障害時ポリシー）" as Dev
+
+Host --> Core : 順序付けられた入力レコード
+Core --> Host : 安全意図/有効意図
+Host --> Drv : gfdrv_api_v1\n(describe, open, poll,\napply, cancel, close)
+Drv ..> Host : gfdrv_host_v1\n(clock, report)
+Drv --> Dev : エンドポイントとの通信
+note bottom of Core
+  このABIではないもの：Rust ScanDriver（コアのスキャンアダプタ）
+  および gf_* / gf_frame_* WASM ホスト–コアABI
+end note
+@enduml

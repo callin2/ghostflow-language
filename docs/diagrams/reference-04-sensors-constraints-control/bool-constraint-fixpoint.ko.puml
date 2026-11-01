@@ -1,0 +1,17 @@
+@startuml
+skinparam defaultFontName "Apple SD Gothic Neo"
+skinparam shadowing false
+skinparam ActivityBackgroundColor #F7F9FC
+skinparam ActivityBorderColor #4A6FA5
+title Bool 출력 제약의 평가
+start
+:후보 snapshot = 요청된 출력;
+repeat
+  :모든 `require` / `mutex`를\n같은 snapshot에서 평가;
+  :차단된 대상 수집;
+  :차단된 대상을 false로 설정\n(false -> true는 절대 없음);
+repeat while (snapshot이 바뀌었나?) is (예)
+->아니요;
+:안전 의도(safe intent)\n(선언 순서와 무관);
+stop
+@enduml

@@ -1,0 +1,25 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontSize 12
+left to right direction
+
+card "原始\n请求" as O
+card "解释" as I
+card "决定\n（§3 类别）" as D
+card "验证\n条件" as C
+card "代码\n(.ghost.md, GFB)" as P
+card "执行\n(run / scan)" as E
+card "实际设备\n（观测）" as R
+
+O --> I : 外部编写系统
+I --> D : 确认流程 /\n策略应用方
+D --> C : 作者 /\n验证设计者
+C --> P : 编写工具\n+ 编译器
+P --> E : 执行 /\n验证工具
+E --> R : 设备 / 宿主 /\n观测方
+note bottom of D
+  每个环节携带各自的修订版。
+  缺失某个环节时，只有依赖它的
+  声明变为未知。
+end note
+@enduml

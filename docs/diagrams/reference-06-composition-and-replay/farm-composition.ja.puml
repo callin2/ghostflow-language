@@ -1,0 +1,24 @@
+@startuml
+skinparam defaultFontName "Hiragino Sans"
+skinparam shadowing false
+skinparam defaultFontSize 13
+skinparam rectangleBorderColor #4A6FA5
+skinparam rectangleBackgroundColor #F7F9FC
+left to right direction
+title control Farmの合成とバインディングの層（§6.2–§6.4）
+
+rectangle "irrigation.ghost.md\nrevision rev-42 + sha256" as DEF
+rectangle "control Farm" as FARM {
+  rectangle "ルートinput\neast_start" as ES
+  rectangle "instance east:\nIrrigation" as E
+  rectangle "ルートoutput\neast_pump" as EP
+}
+rectangle "設置バインディング\n（controlソースではない）" as BIND
+rectangle "物理エンドポイント\n例：board.RO3" as PHY
+
+DEF ..> E : importが厳密な\nrevisionを固定
+ES --> E : connect east.start
+E --> EP : connect east_pump
+EP --> BIND : 論理ポート
+BIND --> PHY : バインディングrevision
+@enduml

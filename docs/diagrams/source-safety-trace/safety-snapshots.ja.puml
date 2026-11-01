@@ -1,0 +1,17 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName "Hiragino Sans"
+skinparam defaultFontSize 13
+start
+:ラウンド 0：要求された出力のスナップショットを評価;
+repeat
+  :各制約を評価\n(このラウンドの更新「前」の値を取得);
+  if (この規則の最初の違反?) then (はい)
+    :firstViolation を保存\n{round, values, blocked};
+  endif
+repeat while (このラウンドでブロックされた出力がある?) is (はい：次のラウンド)
+->いいえ;
+:終了時のブロックなしラウンドから\nfinal {round, values, satisfied} を保存;
+note right: スナップショットは\n制約ごとに最大 2 つ
+stop
+@enduml

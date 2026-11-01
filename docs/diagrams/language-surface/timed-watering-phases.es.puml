@@ -1,0 +1,16 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName Helvetica
+hide empty description
+
+[*] --> Idle
+Idle --> Open1 : starts.due
+Open1 --> Water1 : age >= 2s
+Water1 --> Stop1 : age >= 5min
+Stop1 --> Idle : age >= 2s
+
+Idle : válvula apagada, bomba apagada
+Open1 : válvula encendida, bomba apagada
+Water1 : válvula encendida, bomba encendida
+Stop1 : válvula encendida, bomba apagada
+@enduml

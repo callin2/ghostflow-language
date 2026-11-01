@@ -1,0 +1,24 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName "Hiragino Sans"
+skinparam rectangleRoundCorner 8
+skinparam ArrowColor #555555
+left to right direction
+
+rectangle "ホストが供給\ninput・センサの読み取り\n（値または fault）" as IN
+rectangle "前状態\nwatering" as PREV
+rectangle "純粋な計算\nlet・fn・if・case" as CALC
+rectangle "次状態\nwatering'" as NEXT
+rectangle "出力接続\npump <- ...;" as OUT
+rectangle "require 制約\nbool 出力をブロック" as REQ
+rectangle "ホスト / レンダラー\n出力を適用し、\nフェイルセーフを担う" as HOST
+
+IN --> CALC
+PREV --> CALC
+CALC --> NEXT
+CALC --> OUT
+NEXT --> OUT : 出力式は\n次状態を読める
+OUT --> REQ : 候補の意図
+REQ --> HOST : 要求意図 / 安全意図
+NEXT ..> PREV : tick の終わりに\nまとめて確定
+@enduml

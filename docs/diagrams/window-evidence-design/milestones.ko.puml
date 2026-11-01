@@ -1,0 +1,15 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontSize 12
+rectangle "엔진 기반\ntemporal.rs Window, checkpoint" as A
+rectangle "GFB4 decoder/verifier\n(로딩만, 실행 아님)" as B
+rectangle "GFB4 + native 실행\nbatch11, REF-04-027/028/029" as C
+rectangle "WASM, host, source trace\nbatch12 전체 gate" as D
+rectangle "중첩 derived window\nbatch13 (window-derived-design.md)" as E
+rectangle "미결: durable restore,\nhot-swap, 추정 증거" as F #FFE0B2
+A --> B
+B --> C
+C --> D
+D --> E
+E --> F
+@enduml

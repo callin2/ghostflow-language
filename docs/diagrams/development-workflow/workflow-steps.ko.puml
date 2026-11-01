@@ -1,0 +1,11 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName "Apple SD Gothic Neo"
+start
+:1. 작업 맥락 확인\n(dev에서 시작, 기준 SHA 기록,\nAGENTS.md 읽기, docs:find);
+:2. 하나의 작업 계약 설정\n(결과, 범위, 완료 기준,\n선행 조건, 집중 검사);
+:3. 완전하고 한정된 인계 배정\n(단위마다 작업자 한 명);
+:4. 적정 깊이로 한 번 검증\n(정적 -> 집중 -> 전체 CI);
+:5. 작업 종료\n(증거 보고, 반복성 개선);
+stop
+@enduml

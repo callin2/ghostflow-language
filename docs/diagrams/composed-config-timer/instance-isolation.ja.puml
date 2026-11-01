@@ -1,0 +1,19 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName "Hiragino Sans"
+skinparam defaultFontSize 13
+skinparam componentStyle rectangle
+component "固定された定義\n（config + タイマー）" as D
+package "結合された Program（共有 Rust コア）" {
+  component "east インスタンス\n独自の config Result、\nemissionRevision、タイマー状態" as East
+  component "west インスタンス\n独自の config Result、\nemissionRevision、タイマー状態" as West
+}
+component "設定トランザクション\n（グローバルな settingsRevision は 1 つ）" as S
+component "論理クロック\n（同じ供給時刻）" as C
+D --> East : インスタンス化
+D --> West : インスタンス化
+S --> East : east の config ID へのイベント
+S ..> West : 変化なし
+C --> East
+C --> West
+@enduml

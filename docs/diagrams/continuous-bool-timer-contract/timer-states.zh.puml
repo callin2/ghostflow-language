@@ -1,0 +1,12 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName "PingFang SC"
+hide empty description
+state "wasTrue = false" as Off
+state "wasTrue = true" as On
+[*] --> Off : 初始 (since = 0)
+Off --> Off : false / 值 0, since' = now
+Off --> On : true / 值 0, since' = now
+On --> On : true / 值 now - since,\nsince' = since
+On --> Off : false / 值 0, since' = now
+@enduml

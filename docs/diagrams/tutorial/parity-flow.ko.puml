@@ -1,0 +1,26 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontSize 13
+skinparam defaultFontName "Apple SD Gothic Neo"
+skinparam componentStyle rectangle
+title 튜토리얼 러너: 예제 하나, VM 두 개
+
+file "NN-name.ghost.md" as src
+component "compileSource\n(실제 컴파일러)" as cc
+file "build/tutorial/NN-name.gfb\n+ .manifest.json, .map.json" as gfb
+component "WASM 런타임\n(Node 호스트)" as wasm
+file ".inputs.csv\n(기록된 VM 입력 스냅샷)" as csv
+component "네이티브 러너\n(target/debug/examples/run)" as nat
+file ".trace.json" as trace
+node "단언: VM 추적이 같음" as cmp
+
+src --> cc
+cc --> gfb
+gfb --> wasm
+wasm --> csv : 정확한 입력을 기록
+gfb --> nat
+csv --> nat
+wasm --> trace
+wasm --> cmp : VM 추적
+nat --> cmp : VM 추적 (JSON)
+@enduml

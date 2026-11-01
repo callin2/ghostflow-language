@@ -1,0 +1,16 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName Helvetica
+skinparam defaultFontSize 13
+title Frontera de reinicio/fallo del host con tramas (contrato existente)
+
+state "Listo" as Ready
+state "En fallo" as Faulted
+[*] --> Ready : nueva instancia de host\n(nuevo runId)
+Ready --> Ready : la trama tiene éxito /\npublicar el último resultado completado
+Ready --> Ready : validación previa al acondicionamiento\nrechazada (se permite reintentar)
+Ready --> Faulted : falla el acondicionamiento\no el despacho de la VM
+Faulted : fallo retenido (latch)
+Faulted : el último resultado consolidado\nsigue disponible
+Faulted --> [*] : los pasos siguientes requieren\nuna nueva instancia de host
+@enduml

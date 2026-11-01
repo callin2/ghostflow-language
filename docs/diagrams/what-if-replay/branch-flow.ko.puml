@@ -1,0 +1,28 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontSize 13
+skinparam defaultFontName "Apple SD Gothic Neo"
+title What-if branch: 기록된 prefix에서 후보 결과까지
+
+start
+:prepareWhatIfReplay
+(source map 검증, 재컴파일,
+바이트코드 + manifest 확인);
+:checkpoint 생성
+GhostFlow/replay-prefix-checkpoint-v1;
+:branch({ branchId, runId, synthetic });
+:새 런타임이 prefix를 재생하고
+결과 digest를 검증;
+:명시적 synthetic 값 적용;
+if (모든 미래 프레임에 필수 입력/샘플이\n모두 있는가?) then (예)
+  :미래 프레임 실행
+(실제 portable core);
+  :후보 결과 + receipt 반환
+(recorded / synthetic 표시);
+else (아니요)
+  :status 'missing-input' 반환
+(누락 이름과 논리 시간,
+branch 프레임 실행 없음);
+endif
+stop
+@enduml

@@ -1,0 +1,26 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName Helvetica
+skinparam defaultFontSize 13
+skinparam rectangleRoundCorner 8
+title Identidades separadas (hechos actuales frente a propuestas)
+
+rectangle "Fuente canónica\ndocumentId + revisionId + sha256" as SRC
+rectangle "Módulo compilado\nhuella + digest del bytecode" as MOD
+rectangle "Instancia de comportamiento\ninstanceId opaco (propuesta)" as INST
+rectangle "Puerto lógico\nid de autor (calificado por instancia, propuesta)" as PORT
+rectangle "Vinculación física\nbindingRevision / digest" as BIND
+rectangle "Revisión de ajustes\n+ posición del evento efectivo (propuesta)" as SET
+rectangle "Ejecución\nrunId" as RUN
+rectangle "Ocurrencia\nejecución + instancia + scanId (propuesta)" as OCC
+rectangle "Etiqueta visible / nombre de archivo\n(solo presentación y traza)" as LBL #EEEEEE
+
+SRC --> MOD : se compila en
+SRC --> INST : revisión de definición fijada
+INST --> PORT : califica
+PORT --> BIND : vinculado por la instalación
+INST --> SET : se une con
+RUN --> OCC : ordena scanId dentro de
+INST --> OCC : califica
+LBL ..> INST : nunca es identidad
+@enduml

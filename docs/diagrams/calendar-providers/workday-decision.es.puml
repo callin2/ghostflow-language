@@ -1,0 +1,25 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName Helvetica
+skinparam ArrowColor #555555
+title Orden de decisión workday/offday de WorkCalendar
+
+start
+if (¿Instantánea presente, dentro de la cobertura\ny antes del vencimiento?) then (no)
+  :Unknown\n(CalendarMissing o\nCalendarOutOfRange);
+  stop
+else (sí)
+endif
+if (¿Excepción de trabajo para la fecha?) then (sí)
+  :Usar la excepción\n(work u off);
+  stop
+else (no)
+endif
+if (¿Día festivo oficial?) then (sí)
+  :Aplicar la política de trabajo\nen días festivos;
+  stop
+else (no)
+endif
+:Aplicar el patrón semanal\n(weeklyWorkMask);
+stop
+@enduml

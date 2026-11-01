@@ -1,0 +1,18 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName Helvetica
+skinparam defaultFontSize 13
+
+rectangle "live 런타임" as Live {
+  rectangle "기록된 tick / 스캔" as Rec
+  rectangle "live 상태, journal, intent,\ntrace/outcome, frame sequence,\n시계, 마지막 outcome" as State
+}
+rectangle "별도의 ghost 인스턴스" as Ghost
+rectangle "replay 결과\n(runtime.replay)" as Result
+actor "호출자" as Caller
+
+Caller --> Ghost : replayTemporal({count, profile,\nmaxPeakTemporalBytes, maxJsonBytes})
+Rec --> Ghost : 가장 오래된 적격 prefix 직전의\ncheckpoint + record
+Ghost --> Result : 성공 시 이것만 교체
+Ghost ..> State : effect 없음,\n변경 없음
+@enduml

@@ -1,20 +1,15 @@
 <!-- translation-source: examples/tutorial/01-latch.ghost.md -->
-[English original](01-latch.ghost.md)
-> 읽기용 번역본입니다. 컴파일할 때는 링크된 원본 `.ghost.md`를 사용하세요.
+[영문 원문](01-latch.ghost.md)
 
 # 자기유지 펌프 튜토리얼
 
-링크된 원본 문서가 작은 제어의 정본이다. `01-latch.ghost`는 실행 불가한 과거 증거로만 보존한다.
-Markdown 설명은 실행되지 않으며 최상위 `ghost` 코드 블록만 소스다.
+이 파일은 작은 자기유지 펌프 제어의 정본 소스(canonical source)입니다. 아래의
+최상위 `ghost` 펜스만 컴파일되며, Markdown 설명은 실행되지 않습니다.
+`01-latch.ghost`는 실행할 수 없는 과거 증거로만 보존합니다. 이 한국어 파일은 읽기용
+번역본이므로, 컴파일할 때는 영문 원문 `.ghost.md`를 사용하세요.
 
-새 시작 입력이 없으면 `watering` 상태는 이전 값을 유지한다. 두 입력이 한 tick에 모두
-true여도 정지 요청이 시작보다 우선한다.
-
-새 revision `issue531-approved-fault-restart-v1`은 입력 고장 정책을 명시한다.
-START 고장은 새 시작을 차단하지만 STOP이 정상이고 해제되어 있으면 기존 운전을
-유지한다. STOP 고장은 운전을 해제한다. 고장으로 정지한 후에는 입력이 정상으로
-복구되고 START를 껐다 켜야 재시작한다. 물리 버튼의 존재를 강제하지 않는다.
-이전 문서의 정확한 bytes는 tests/fixtures/history/issue531에 보존되어 있다.
+`watering`은 래치입니다. 새 시작 요청이 없으면 이전 값을 유지합니다. 한 tick에서
+시작 요청과 정지 요청이 모두 true여도 정지 요청이 이깁니다.
 
 ```ghost
 control LatchingPump {
@@ -42,7 +37,25 @@ control LatchingPump {
 }
 ```
 
-함께 제공된 CSV의 기대 추적:
+revision `issue531-approved-fault-restart-v1`은 입력 고장 정책을 소스에
+명시합니다.
+
+- **START 고장.** 새 시작을 막습니다. 이미 진행 중인 운전은 STOP이 정상이고
+  해제되어 있는 동안 계속될 수 있습니다.
+- **STOP 고장.** 운전을 해제합니다(펌프와 밸브가 꺼집니다).
+- **고장 후 재시작.** 고장으로 운전이 정지되거나 차단되면, 펌프를 다시 시작하기 전에
+  START가 정상이어야 하고 꺼졌다가 다시 켜져야 합니다.
+
+START는 논리적인 요청입니다. 이 예제는 물리 버튼을 요구하지 않습니다.
+이전 소스의 정확한 내용은 tests/fixtures/history/issue531에 보존되어 있습니다.
+
+아래 다이어그램은 `watering`과 `restart_blocked`를 묶은 상태와, 그 사이를 이동하는
+tick별 조건을 보여 줍니다.
+
+![재시작 차단이 있는 래치 상태: 정지, 운전 중, 운전 중(재시작 차단), 정지(재시작 차단)](../../docs/diagrams/tutorial-01-latch/latch-fault-states.ko.svg)
+
+변경되지 않은 동반 CSV([01-latch.csv](01-latch.csv))에 대한 정상 동작의 기대 추적입니다.
+tick 3은 두 입력이 모두 true일 때 STOP이 이기는 것을 보여 줍니다.
 
 | tick | start | stop | watering' | pump / valve |
 |---:|:---:|:---:|:---:|:---:|

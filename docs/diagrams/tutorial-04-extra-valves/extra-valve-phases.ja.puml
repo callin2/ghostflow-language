@@ -1,0 +1,29 @@
+@startuml
+hide empty description
+skinparam shadowing false
+skinparam defaultFontName "Hiragino Sans"
+skinparam defaultFontSize 13
+skinparam state {
+  BackgroundColor #F8F8F8
+  BorderColor #555555
+}
+
+state "Idle\nすべて OFF" as Idle
+state "Open3\nvalve3" as Open3
+state "Water3\nvalve3 + pump" as Water3
+state "Stop3\nvalve3" as Stop3
+state "Switch\nすべて OFF" as Switch
+state "Open4\nvalve4" as Open4
+state "Water4\nvalve4 + pump" as Water4
+state "Stop4\nvalve4" as Stop4
+
+[*] --> Idle
+Idle --> Open3 : extra_starts.due
+Open3 --> Water3 : age >= valve_delay (2s)
+Water3 --> Stop3 : age >= water_time (5min)
+Stop3 --> Switch : age >= stop_delay (2s)
+Switch --> Open4 : age >= valve_delay (2s)
+Open4 --> Water4 : age >= valve_delay (2s)
+Water4 --> Stop4 : age >= water_time (5min)
+Stop4 --> Idle : age >= stop_delay (2s)
+@enduml

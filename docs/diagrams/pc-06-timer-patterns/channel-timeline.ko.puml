@@ -1,0 +1,37 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName Helvetica
+
+concise "on_delay_request (ON 지연 요청)" as R1
+binary "on_delayed (ON 지연 출력)" as O1
+concise "off_delay_request (OFF 지연 요청)" as R2
+binary "off_delayed (OFF 지연 출력)" as O2
+concise "limited_request (제한 요청)" as R3
+binary "limited_run (제한 운전)" as O3
+
+@0
+R1 is true
+O1 is low
+R2 is true
+O2 is high
+R3 is true
+O3 is high
+
+@2
+O1 is high
+
+@4
+R2 is false
+
+@7
+O2 is low
+
+@10
+O3 is low
+
+@12
+R1 is false
+O1 is low
+R3 is false
+
+@enduml

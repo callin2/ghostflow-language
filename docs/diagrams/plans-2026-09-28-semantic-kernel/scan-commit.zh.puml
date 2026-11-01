@@ -1,0 +1,19 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontSize 13
+start
+:获取一个不可变快照\n（输入 + 已提交的旧状态）;
+:同时求值所有转移\n→ 候选状态;
+:求值请求意图\n（不带撇号的 x = 旧状态，x' = 候选值）;
+:应用 Boolean 约束\n→ 安全意图;
+note right
+  约束把输出强制为安全值
+  **不**属于扫描失败。
+end note
+if (求值和校验是否成功？) then (是)
+  :原子地提交候选状态和\nrequested/safe 扫描记录;
+else (否)
+  :回滚：保留之前已提交的状态;\n不暴露任何部分候选结果;
+endif
+stop
+@enduml

@@ -1,0 +1,25 @@
+@startuml
+hide empty description
+skinparam shadowing false
+skinparam defaultFontSize 13
+skinparam state {
+  BackgroundColor #F8F8F8
+  BorderColor #555555
+}
+
+state "已停止\nwatering = false\nrestart_blocked = false" as Stopped
+state "运行中\nwatering = true\nrestart_blocked = false" as Running
+state "运行中，重启被阻止\nwatering = true\nrestart_blocked = true" as RunBlocked
+state "已停止，重启被阻止\nwatering = false\nrestart_blocked = true" as StopBlocked
+
+[*] --> Stopped
+Stopped --> Running : 正常的 START 为 on，\n正常的 STOP 已释放
+Stopped --> StopBlocked : 任一输入故障
+Running --> Stopped : 正常的 STOP 被按下
+Running --> RunBlocked : START 故障，\n正常的 STOP 已释放
+Running --> StopBlocked : STOP 故障，或在 START\n故障期间按下 STOP
+RunBlocked --> Running : 两者均正常，\nSTART 为 off，STOP 已释放
+RunBlocked --> Stopped : 正常的 STOP 被按下，\n正常的 START 为 off
+RunBlocked --> StopBlocked : STOP 故障，或在 START 为 on\n或故障时按下 STOP
+StopBlocked --> Stopped : 两者均正常，START 为 off
+@enduml

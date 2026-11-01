@@ -1,0 +1,26 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName Helvetica
+skinparam defaultFontSize 13
+skinparam ArrowColor #526d76
+
+participant "Host" as H
+participant "Proveedor" as P
+participant "VM nativa\n(Runtime)" as R
+database "Almacenamiento duradero" as D
+participant "Salidas" as O
+
+H -> P : solicitar hechos para el\ndescriptor Solar instalado
+P --> H : hechos de ocurrencias\n(sin bit due)
+H -> R : tick_with_solar(clock, facts)
+R -> R : preparar admisión, evaluar when,\nconsolidar juntos reloj, ledger, estado,\nsalida y journal
+R --> H : resultado + schedule_trace
+H -> R : solar_checkpoint()
+R --> H : bytes GFSO v1
+H -> D : persistir punto de control
+alt el guardado tiene éxito
+  H -> O : publicar / aplicar ON
+else el guardado falla
+  H -> O : detenerse y limpiar salidas
+end
+@enduml

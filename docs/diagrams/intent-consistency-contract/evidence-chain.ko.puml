@@ -1,0 +1,25 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontSize 12
+left to right direction
+
+card "원문\n요청" as O
+card "해석" as I
+card "결정\n(§3 분류)" as D
+card "검증\n조건" as C
+card "코드\n(.ghost.md, GFB)" as P
+card "실행\n(run / scan)" as E
+card "실제 장치\n(관측)" as R
+
+O --> I : 외부 작성 시스템
+I --> D : 확인 흐름 /\n정책 적용 주체
+D --> C : 작성자 /\n검증 설계자
+C --> P : 작성 도구\n+ 컴파일러
+P --> E : 실행 /\n검증 도구
+E --> R : 장치 / host /\n관측자
+note bottom of D
+  연결마다 자체 판본을 가집니다.
+  연결이 빠지면 그 연결에 의존하는
+  주장만 unknown으로 남습니다.
+end note
+@enduml

@@ -1,0 +1,25 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName Helvetica
+skinparam defaultFontSize 13
+skinparam ArrowColor #526d76
+
+start
+:Decodificar la solicitud TOON estricta;
+if (¿Campos, operation y\nbudgetBytes 256–1.000.000 válidos?) then (no)
+  :Error (salida de la CLI 2);
+  stop
+endif
+:Leer el índice de la referencia + capítulos enlazados;
+:Reconstruir el catálogo\n(ID ref-CC-SS, resúmenes);
+if (¿El selector coincide con una sección?) then (no)
+  :status: no_match\n(salida de la CLI 1);
+  stop
+endif
+if (¿La respuesta cabe en budgetBytes?) then (no)
+  :status: budget_exceeded\n+ requiredBytes (salida de la CLI 2);
+  stop
+endif
+:status: ok\nmetadatos + fragmento exacto de Markdown;
+stop
+@enduml

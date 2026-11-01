@@ -1,0 +1,39 @@
+@startuml
+skinparam defaultFontName "PingFang SC"
+skinparam shadowing false
+skinparam defaultFontSize 13
+skinparam rectangle {
+  RoundCorner 8
+}
+left to right direction
+
+rectangle "出现问题\n或条件未满足" as start
+
+rectangle "无效程序\n（名称/语法、类型、\n分支/定义、\n状态边界）" as invalid #FFE0E0
+rectangle "修正源文件" as fix
+
+rectangle "值计算错误\n（溢出、÷0、无效转换）" as calc #FFF0D0
+rectangle "tick 不成功；\n不做部分提交" as nocommit
+
+rectangle "外部数据问题\n（传感器故障、调度计划 Unknown、\n观测缺失/不匹配）" as ext #E0F0FF
+rectangle "显式错误流程；\n绝不视为 False 或允许" as flow
+
+rectangle "设置事件问题" as set #E8E0FF
+rectangle "准入被拒绝：\n保留设置与修订版" as adm
+rectangle "载荷错误：\nfault(SettingsInvalid)，\n修订版前进" as pay
+
+rectangle "已知的未满足条件" as known #E0FFE0
+rectangle "正常判定；\n结果为 False" as falsev
+
+start --> invalid
+invalid --> fix
+start --> calc
+calc --> nocommit
+start --> ext
+ext --> flow
+start --> set
+set --> adm
+set --> pay
+start --> known
+known --> falsev
+@enduml

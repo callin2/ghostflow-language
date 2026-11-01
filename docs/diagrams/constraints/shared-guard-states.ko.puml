@@ -1,0 +1,21 @@
+@startuml
+hide empty description
+skinparam shadowing false
+skinparam defaultFontName Helvetica
+skinparam state {
+  BackgroundColor White
+  BorderColor #555555
+}
+title 공유 Bool guard: admission, trip, 복구 (exclusive group 하나)
+
+[*] --> Idle
+Idle : admit된 활동 없음
+Idle --> Admitted : 새 true claim\n+ 모든 admission 조건\n+ 후보가 safe_output 만족
+Idle --> Idle : 후보가 관계를 위반\n(거부: admission 없음,\n새 보호 출력 없음)
+Admitted : 출력 = 요청 후보
+Admitted --> Admitted : 충돌하는 newcomer claim\n(거부; 기존 admission과\n이전 safe 출력 유지)
+Admitted --> Tripped : 요청 후보가\n필수 관계를 위반
+Tripped : 출력 = 작성된 safe vector\n(예: pump=false, valve=true)
+Tripped --> Tripped : 입력이 정상으로 복귀\n(자동 재시작 없음)
+Tripped --> Idle : 모든 claim이 false인\n관측
+@enduml

@@ -1,0 +1,19 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontSize 13
+participant "设施模型\n(greenhouse-temperature-v1)" as P
+participant "场景宿主" as H
+participant "Rust 控制" as C
+participant "虚拟执行器\n(roof-vent)" as A
+H -> P : 积分到 atMs\n（保持先前已应用的位置不变）
+P --> H : 规范单位 K 的温度
+H -> C : 生成的 Good Temperature 样本
+C --> H : 安全通风口目标
+H -> A : 范围检查 (min..max)
+alt 求值和范围检查均成功
+  H -> H : 提交扫描行
+  A --> H : 安全目标成为下一区间的\n已应用位置
+else 求值或渲染器接受失败
+  H -> H : 终止运行，此边界无行\n（丢弃设施计算结果）
+end
+@enduml

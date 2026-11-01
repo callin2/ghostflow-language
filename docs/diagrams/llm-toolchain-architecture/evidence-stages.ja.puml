@@ -1,0 +1,19 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontSize 12
+left to right direction
+title 出力の証拠: 別々の事実、別々の所有者
+rectangle "Rust コア\n（ghostsim / CLI はここまで）" as CoreBox {
+  card "要求意図" as Req
+  card "安全意図" as Safe
+}
+rectangle "Device（farm-device ファームウェア）" as DeviceBox {
+  card "適用された書き込み\n（レンダラーが受理）" as Applied
+  card "レジスタのラッチ\n（リードバック）" as Latch
+}
+card "確認された効果\n（独立した観測。\n現在のファームウェアは報告しない）" as Confirmed
+Req --> Safe : 制約
+Safe --> Applied : マッピング + 書き込み
+Applied --> Latch : レジスタ読み取り
+Latch --> Confirmed : 接点/負荷を観測
+@enduml

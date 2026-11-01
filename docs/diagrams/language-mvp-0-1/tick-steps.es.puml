@@ -1,0 +1,16 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontSize 12
+start
+:Instantánea de entradas + estado anterior;
+if (¿falta alguna entrada?) then (sí)
+  :Rechazar la entrada\n(si la ausencia importa, el host envía\nuna entrada explícita de fallo/estado);
+  stop
+endif
+:Evaluar todas las expresiones next\n(leen estado anterior + entradas)\n-> un único estado candidato;
+:Evaluar las intenciones\n(estado sin prima = anterior;\nnext.NAME = candidato);
+:Restricciones de seguridad\n(requires, mutex)\nintenciones solicitadas -> seguras;
+:Sin error de evaluación:\nconsolidar juntos\nestado candidato + intenciones solicitadas/seguras;
+:Journal: entradas, estado anterior/nuevo,\nambas intenciones, estrategia, fallos;
+stop
+@enduml

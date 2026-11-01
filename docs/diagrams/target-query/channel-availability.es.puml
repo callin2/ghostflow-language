@@ -1,0 +1,35 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName Helvetica
+skinparam defaultFontSize 13
+title Disponibilidad de un canal seleccionado
+
+start
+:Conservar solo observaciones recientes y vinculadas
+(los informes no válidos se excluyen y
+se registran en diagnostics);
+:Reunir los estados del canal
+y de cada recurso declarado;
+if (¿Los informes discrepan sobre el
+canal o sobre algún recurso?) then (sí)
+  :conflict;
+  stop
+endif
+if (¿El canal declara `resources`?) then (no)
+  :unknown;
+  stop
+endif
+if (¿El canal y cada recurso declarado
+tienen al menos un estado?) then (no)
+  :unknown;
+  stop
+endif
+if (¿Algún estado es reserved?) then (sí)
+  :reserved;
+elseif (¿Algún estado es busy?) then (sí)
+  :busy;
+else (todos available)
+  :available;
+endif
+stop
+@enduml

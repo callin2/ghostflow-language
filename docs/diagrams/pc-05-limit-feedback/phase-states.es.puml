@@ -1,0 +1,39 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName Helvetica
+skinparam ArrowColor #555555
+hide empty description
+
+[*] --> Stopped
+Stopped --> Opening : evento de apertura
+Stopped --> Closing : evento de cierre
+Stopped --> Open : solo final de apertura
+Stopped --> Closed : solo final de cierre
+Closed --> Opening : evento de apertura
+Open --> Closing : evento de cierre
+Opening --> Open : final de apertura visto
+Closing --> Closed : final de cierre visto
+Opening --> WaitClose : evento de cierre
+Closing --> WaitOpen : evento de apertura
+WaitOpen --> Opening : transcurridos 2 s
+WaitClose --> Closing : transcurridos 2 s
+WaitOpen --> WaitClose : evento de cierre
+WaitClose --> WaitOpen : evento de apertura
+WaitOpen --> Open : final de apertura visto
+WaitClose --> Closed : final de cierre visto
+SensorConflict --> Open : solo final de apertura
+SensorConflict --> Closed : solo final de cierre
+SensorConflict --> Stopped : ningún final
+
+state Opening : contactor de apertura ON
+state Closing : contactor de cierre ON
+
+note as N
+Se comprueba primero, desde cualquier estado:
+1. permiso o posición no disponible -> Stopped
+2. ambos finales en true -> SensorConflict
+3. STOP/sobrecarga perdido o ambas
+   solicitudes pulsadas -> Stopped
+   (no desde SensorConflict)
+end note
+@enduml

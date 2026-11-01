@@ -1,0 +1,17 @@
+@startuml
+skinparam defaultFontName "Hiragino Sans"
+skinparam shadowing false
+skinparam ActivityBackgroundColor #F7F9FC
+skinparam ActivityBorderColor #4A6FA5
+title Bool出力制約の評価
+start
+:候補スナップショット = 要求された出力;
+repeat
+  :すべての `require` / `mutex` を\n同じスナップショットに対して評価;
+  :ブロックされた対象を収集;
+  :ブロックされた対象を false にする\n（false -> true には決してしない）;
+repeat while (スナップショットが変化した？) is (はい)
+->いいえ;
+:安全意図\n（宣言順に依存しない）;
+stop
+@enduml

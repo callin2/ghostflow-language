@@ -1,0 +1,20 @@
+@startuml
+hide empty description
+skinparam shadowing false
+skinparam defaultFontSize 13
+skinparam state {
+  BackgroundColor #F8F8F8
+  BorderColor #555555
+}
+
+state "未准入\n安全输出：pump OFF" as Idle
+state "已准入\nsafe = requested" as Admitted
+state "已跳闸\n安全向量：\npump OFF, valve ON" as Tripped
+
+[*] --> Idle
+Idle --> Admitted : 新的模式声明\n通过包络\n（扫描 0：automatic，扫描 4：manual）
+Admitted --> Tripped : 请求 pump ON\n而 valve OFF\n（扫描 1）
+Tripped --> Tripped : valve 请求恢复\n不自动重启\n（扫描 2）
+Tripped --> Idle : 中性帧：\n所有模式声明为 false\n（扫描 3）
+Admitted --> Idle : 所有模式声明为 false
+@enduml

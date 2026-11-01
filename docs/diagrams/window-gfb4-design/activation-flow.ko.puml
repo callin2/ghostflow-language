@@ -1,0 +1,23 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontSize 13
+participant "호스트\n(ControlRuntime)" as Host
+participant "WASM adapter" as Adapter
+participant "Rust 디코더" as Decoder
+participant "Runtime" as RT
+Host -> Host : 비동기 작업 전에\noptions.temporal 캡처
+Host -> Adapter : activateTemporal(profile)
+Adapter -> Decoder : GFTA packet (24+16N 바이트)
+Decoder -> Decoder : 모든 필드를 독립적으로 검사
+alt 유효
+  Decoder -> RT : activate_with_temporal(&TemporalActivation)
+  RT -> RT : engine, buffer,\nJ+1 checkpoint 미리 할당
+  RT --> Host : 활성
+  loop 매 scan
+    Host -> RT : 고정된 timeEpoch로 scan
+  end
+else 거부됨
+  Decoder --> Host : 오류; configuring 상태 보존
+end
+note over Host, RT : 새 time epoch에는 새 session이 필요합니다.
+@enduml

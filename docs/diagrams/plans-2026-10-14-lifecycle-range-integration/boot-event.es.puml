@@ -1,0 +1,19 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontSize 13
+hide empty description
+state "Pendiente" as Pending
+state "No pendiente" as Consumed
+
+[*] --> Pending : el host informa\nevento de arranque pendiente
+[*] --> Consumed : el host informa\nque no hay evento pendiente
+Pending --> Pending : escaneo rechazado\n(el evento se conserva)
+Pending --> Consumed : primer escaneo\nconsolidado con éxito\n(restart_event = true)
+Consumed --> Consumed : escaneos posteriores\n(restart_event = false)
+Consumed --> Consumed : reemplazo del programa\n(sin nuevo evento de arranque)
+
+note bottom of Pending
+  restart_reason permanece fijo durante la ejecución
+  (Unknown cuando el host no tiene evidencia).
+end note
+@enduml

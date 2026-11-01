@@ -1,0 +1,24 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName "Apple SD Gothic Neo"
+skinparam defaultFontSize 13
+skinparam rectangleBorderColor #4A6FA5
+skinparam rectangleBackgroundColor #F7F9FC
+title 단위는 표기를 고르고, 의미는 타입이 담는다
+
+rectangle "25°C   77°F   298.15K" as TL
+rectangle "Temperature\n(정규 단위 K)" as T
+rectangle "5Δ°C   9Δ°F" as DL
+rectangle "TemperatureDelta\n(정규 단위 ΔK)" as TD
+rectangle "Irradiance\n(W/m2, 복사 출력)" as IR
+rectangle "PPFD\n(umol/m2/s, 광자)" as PP
+rectangle "Lux 센서 측정값\n(Lux 타입 없음)" as LX
+rectangle "검증된 변환\n(바인딩/전처리 경계)" as CV
+
+TL --> T : 같은 타입,\n정규 단위로 변환
+DL --> TD : 같은 타입
+T ..> TD : Temperature - Temperature
+IR -[#B03A2E]- PP : <color:#B03A2E>직접 비교 불가</color>
+LX --> CV : 스펙트럼, 보정, 광학 조건
+CV --> PP : 검증된 경우에만
+@enduml

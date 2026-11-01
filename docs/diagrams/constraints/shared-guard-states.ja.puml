@@ -1,0 +1,21 @@
+@startuml
+hide empty description
+skinparam shadowing false
+skinparam defaultFontName "Hiragino Sans"
+skinparam state {
+  BackgroundColor White
+  BorderColor #555555
+}
+title 共有 Bool ガード：受け入れ、トリップ、復旧（排他グループ 1 つ）
+
+[*] --> Idle
+Idle : 受け入れ済みの活動なし
+Idle --> Admitted : 新たな true クレーム\n+ すべての受け入れ条件\n+ 候補が safe_output を満たす
+Idle --> Idle : 候補が関係に違反\n（拒否：受け入れなし、\n新たな保護出力なし）
+Admitted : 出力 = 要求された候補
+Admitted --> Admitted : 競合する新規クレーム\n（拒否：既存の受け入れと\n直前の安全出力を維持）
+Admitted --> Tripped : 要求された候補が\n必須の関係に違反
+Tripped : 出力 = 作成者が定めた安全ベクトル\n（例：pump=false、valve=true）
+Tripped --> Tripped : 入力が正常に戻る\n（自動再始動なし）
+Tripped --> Idle : すべてのクレームが\nfalse の観測
+@enduml

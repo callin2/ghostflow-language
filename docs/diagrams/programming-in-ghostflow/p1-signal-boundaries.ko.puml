@@ -1,0 +1,25 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName "Apple SD Gothic Neo"
+skinparam defaultFontSize 13
+skinparam componentStyle rectangle
+left to right direction
+title E01: 각 값은 어디에서 오는가
+
+rectangle "스위치 접점\n(NO 또는 NC)" as contact
+rectangle "배선 / DI 입력 모듈\n극성 정규화" as di
+rectangle "입력 driver\n+ binding (DI1)" as drv
+package "GhostFlow 프로그램" {
+  rectangle "input switch_on\nResult<Bool, SensorFault>" as sw
+  rectangle "output lamp: Bool" as lamp
+}
+rectangle "binding (RO1)\n+ 출력 renderer" as rend
+rectangle "릴레이 / LED" as relay
+
+contact --> di
+di --> drv
+drv --> sw : 품질이 붙은\nobservation
+sw --> lamp : recover(false)
+lamp --> rend : 요청 값
+rend --> relay
+@enduml

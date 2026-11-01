@@ -1,0 +1,26 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName "Hiragino Sans"
+skinparam rectangle {
+  BackgroundColor White
+  BorderColor #555555
+}
+title GFB モジュールエンベロープ：基本フィールドの順序
+
+rectangle "マジック GFB1" as M
+rectangle "フォーマットバージョン u16" as F
+rectangle "モジュール名、バージョン u32" as N
+rectangle "入力：u16 個数 + (name, type)" as I
+rectangle "状態：u16 個数 + (name, type, default)" as S
+rectangle "フォーマット4のみ：nowInput、timeEpochInput、ルートテーブル" as H
+rectangle "戦略：u16 個数 + 戦略レコード\n（名前、優先度、クエリ blob、\n[フォーマット4：ウィンドウ]、遷移、意図）" as ST
+rectangle "安全制約：u16 個数 + レコード" as K
+
+M -down-> F
+F -down-> N
+N -down-> I
+I -down-> S
+S -down-> H
+H -down-> ST
+ST -down-> K
+@enduml

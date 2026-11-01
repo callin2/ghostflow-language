@@ -1,0 +1,15 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontSize 13
+skinparam stateBorderColor #4A6FA5
+skinparam stateBackgroundColor #F7F9FC
+title OffDelay (pregunta 6): enabled es true en Active y Holding
+
+[*] --> Idle
+Idle --> Active : request && !stop
+Active --> Holding : !request
+Active --> Idle : stop
+Holding --> Active : request
+Holding --> Idle : stop || age >= delay
+note "Holding vence aunque las entradas sean desconocidas.\nParo sano o retardo no válido: cualquier fase -> Idle." as N
+@enduml

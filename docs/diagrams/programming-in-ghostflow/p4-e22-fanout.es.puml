@@ -1,0 +1,19 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontSize 13
+skinparam componentStyle rectangle
+title E22: un paquete de muestras, dos instancias fijadas
+
+rectangle "entradas de la raíz\nair, humidity, light" as in
+component "instance high: HighVpd\n(E19.ghost.md, fijada)" as high
+component "instance low: LowVpd\n(E20.ghost.md, fijada)" as low
+rectangle "air_vpd_value\nvpd_valid" as common
+rectangle "humidify_demand" as hd
+rectangle "ventilate_demand" as vd
+
+in --> high : connect
+in --> low : connect
+high --> common
+high --> hd
+low --> vd
+@enduml

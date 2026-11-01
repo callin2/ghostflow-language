@@ -1,0 +1,16 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName "Hiragino Sans"
+skinparam defaultFontSize 12
+skinparam rectangleBorderColor #4A6FA5
+skinparam rectangleBackgroundColor #F7F9FC
+left to right direction
+title GF-COMPOSE 研究ウェーブ（親 #99）
+rectangle "ウェーブ1\n#100 ユーザー成果\n#101 権限/同一性" as W1
+rectangle "ウェーブ2\n#102 実行\n#103 バインディング\n#105 オーバーライド" as W2
+rectangle "ウェーブ3\n#104 契約\n#106 パッケージ\n#107 インシデント証拠" as W3
+rectangle "ウェーブ4\n#108 受け入れ/引き継ぎ" as W4
+W1 --> W2 : #101 の研究引き継ぎ
+W2 --> W3 : 明示的な依存関係が利用可能
+W3 --> W4 : #100–#107 の成果をレビュー済み
+@enduml

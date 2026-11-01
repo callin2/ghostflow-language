@@ -1,0 +1,20 @@
+@startuml
+skinparam defaultFontName "Apple SD Gothic Neo"
+skinparam shadowing false
+skinparam defaultFontSize 13
+skinparam activityBorderColor #4A6FA5
+skinparam activityBackgroundColor #F7F9FC
+title Program 실행 중 교체 (§6.9)
+
+start
+:새 source revision 또는\nimport closure를 가진 후보;
+if (port·ownership·profile·resource와\nstate 호환성이 유효한가?) then (예)
+  :tick 경계에서 원자적으로 확정;
+  :같은 이름·같은 타입의 state만 이전\n새 state = 선언 기본값\n제거된 state는 사라짐;
+  :이전 입력 cache를 버리고\n새 schema의 완전한\n입력 snapshot을 받음;
+  :새 artifact/source identity와\n새 run 경계;
+else (아니요)
+  :이전 Program 유지;
+endif
+stop
+@enduml

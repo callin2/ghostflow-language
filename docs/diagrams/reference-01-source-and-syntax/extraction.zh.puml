@@ -1,0 +1,19 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontSize 13
+start
+:一个规范的 .ghost.md 文档;
+:按 CommonMark 解析;
+:选择信息字符串恰好为 ghost 的\n顶层围栏代码块\n（反引号或波浪号围栏）;
+note right
+  不可执行：正文、表格、front matter、
+  缩进代码、其他信息字符串、
+  嵌套在列表/引用中或写在更长的
+  展示围栏内的 ghost 围栏、
+  ghost-python、带属性的 ghost
+end note
+:保持文档顺序;\n每个块体以换行结尾;\n块与块之间放一个空行;
+:将结果作为一个程序解析，\n且恰好有一个根 control;
+:在原始文件、行和列\n报告诊断;
+stop
+@enduml

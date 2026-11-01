@@ -1,0 +1,27 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName "Hiragino Sans"
+skinparam defaultFontSize 13
+skinparam activityBorderColor #4A6FA5
+skinparam activityBackgroundColor #F7F9FC
+title 1 つの Bool 入力 x に対する入力品質パターン（tick ごと）
+
+start
+:入力 observed_x を読む\n（Result: ok または fault）;
+if (サンプルは ok(value)?) then (はい)
+  :x_good = true\nx = value;
+else (fault)
+  :x_good = false\nx = remembered_x\n（最後の値。初期値 false はサンプルではない）;
+endif
+:remembered_x' = x;
+if (健全な STOP または\n健全な許可の喪失?) then (はい)
+  :運転をオフにする;
+elseif (有界な運転が期限切れ?) then (はい)
+  :運転を終了する;
+elseif (必要な入力がすべて _good?) then (はい)
+  :新しい遷移を計算する;
+else (いいえ)
+  :前の状態を保持する\n（新しい遷移なし）;
+endif
+stop
+@enduml

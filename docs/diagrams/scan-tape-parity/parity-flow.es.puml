@@ -1,0 +1,20 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontSize 13
+skinparam rectangleRoundCorner 8
+rectangle "Fuente del escenario" as src
+rectangle "Módulo compilado\n(GFB1, compilado una vez)" as mod
+rectangle "Cinta canónica\n(intentos de trama ordenados)" as tape
+rectangle "Nativo: CLI scan_tape\n(cinta TSV -> ScanDriver::scan)" as nat
+rectangle "WASM: FramedGhostFlowRuntime\n(adaptador público con tramas)" as wasm
+rectangle "Resultados por intento\n(accepted, outcome, error)" as res
+rectangle "Comprobaciones\n1. expectativas del escenario\n2. igualdad exacta entre destinos" as cmp
+src --> mod
+mod --> nat
+mod --> wasm
+tape --> nat : serializada como TSV
+tape --> wasm : arreglo exacto
+nat --> res : líneas JSON
+wasm --> res
+res --> cmp
+@enduml

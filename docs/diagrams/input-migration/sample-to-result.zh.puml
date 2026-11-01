@@ -1,0 +1,17 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName Helvetica
+skinparam defaultFontSize 13
+left to right direction
+
+rectangle "生产者\n（Driver、USB、软件）" as P
+rectangle "samples[name] =\n{epoch, id, timestampMs,\nquality, value}" as S
+rectangle "调理\n（滤波、陈旧、\n恢复计数）" as C
+rectangle "input name: T\n读取结果为\nResult<T, SensorFault>" as R
+rectangle "编写的故障策略\n（case 分析或 recover）" as F
+
+P --> S
+S --> C
+C --> R
+R --> F
+@enduml

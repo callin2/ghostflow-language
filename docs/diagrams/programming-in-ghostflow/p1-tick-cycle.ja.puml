@@ -1,0 +1,24 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName "Hiragino Sans"
+skinparam defaultFontSize 13
+skinparam componentStyle rectangle
+left to right direction
+title 1回のtick：実行前に書き留めること
+
+rectangle "取り込まれた入力\n（tickごとに1組）" as in
+rectangle "前状態" as prev
+rectangle "式\n（let、case、if）" as expr
+rectangle "次状態" as next
+rectangle "要求意図" as req
+rectangle "安全意図\n（安全規則の適用後）" as safe
+rectangle "バインディングと\nレンダラーへの出力" as out
+
+in --> expr
+prev --> expr
+expr --> next
+expr --> req
+req --> safe
+safe --> out
+next ..> prev : 次のtickの\n前状態になる
+@enduml

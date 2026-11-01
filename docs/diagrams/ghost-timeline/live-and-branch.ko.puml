@@ -1,0 +1,23 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName Helvetica
+skinparam defaultFontSize 13
+skinparam componentStyle rectangle
+
+package "Live timeline (origin)" {
+  component "Live framed 코어" as L
+  component "Live sink" as S
+  component "AccountingRuntime" as A
+  database "FileLedger" as F
+}
+
+package "Ghost branch" {
+  component "별도의 framed 코어" as B
+}
+
+L --> S : 안전 Bool 의도
+A --> F : 저장 / 승인
+L ..> B : 불변의 승인된 prefix\n(재실행 후 검증)
+
+note bottom of B : live sink, 저장소,\naccounting, live 런타임 핸들 없음
+@enduml

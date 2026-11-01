@@ -1,0 +1,23 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontSize 12
+hide empty description
+[*] --> NoRun
+NoRun : sin cobertura certificada
+Accumulating : unión de [start,end) medidos-verdaderos
+Satisfied : duración cubierta >= duration
+
+NoRun --> Accumulating : certificado Measured true
+Accumulating --> Accumulating : certificado Measured true\nque toca / se solapa
+Accumulating --> Satisfied : la cobertura alcanza la duración
+Satisfied --> Satisfied : Measured true continuo
+Accumulating --> NoRun : evidencia false o no Measured,\nfallo de calidad (piso de reinicio)
+Satisfied --> NoRun : evidencia false o no Measured,\nfallo de calidad (piso de reinicio)
+Accumulating --> NoRun : cambio de época de fuente o de reloj\n(nueva cadena)
+Satisfied --> NoRun : cambio de época de fuente o de reloj\n(nueva cadena)
+note bottom of Accumulating
+  NoObservation: NotReady, no se añade cobertura.
+  Los duplicados nunca hacen avanzar la cobertura.
+  Entrada mal formada: rechazada, estado consolidado intacto.
+end note
+@enduml

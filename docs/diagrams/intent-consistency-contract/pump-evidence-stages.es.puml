@@ -1,0 +1,21 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontSize 12
+left to right direction
+
+card "Comprobación C1\n(muestra válida < 20%\n=> intención segura OFF)" as C1
+card "OFF seguro\n(resultado lógico)" as SO
+card "Solicitud OFF\ntransmitida" as TX
+card "ACK /\nrelectura de registro" as ACK
+card "Retroalimentación de la carga\n(contacto, movimiento, caudal)" as LF
+
+C1 --> SO
+SO --> TX
+TX --> ACK
+ACK --> LF
+note bottom of ACK
+  Afirme solo hasta la última etapa
+  con evidencia, p. ej. "ACK de la solicitud
+  OFF recibido; parada real sin confirmar".
+end note
+@enduml

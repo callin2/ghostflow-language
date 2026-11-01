@@ -1,0 +1,38 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName Helvetica
+skinparam ArrowColor #555555
+hide empty description
+
+[*] --> Idle
+Idle --> Opening : START nuevo,\ncierre confirmado
+Opening --> Settling : apertura confirmada
+Settling --> Watering : 2 s
+Watering --> PumpStopping : 5 min
+PumpStopping --> Closing : siguiente escaneo
+Closing --> Idle : cierre confirmado
+
+Settling --> FaultPumpStopping : agua de fuente baja,\napertura confirmada,\nmovimiento permitido
+Watering --> FaultPumpStopping
+PumpStopping --> FaultPumpStopping
+FaultPumpStopping --> FaultClosing : siguiente escaneo
+FaultPumpStopping --> Faulted : movimiento inhibido
+FaultClosing --> Faulted : cerrada / 10 s /\nmovimiento inhibido
+Faulted --> Idle : RESET nuevo,\nreinicio permitido
+
+state Opening : apertura ON (timeout 10 s)
+state Watering : bomba ON
+state Closing : cierre ON (timeout 10 s)
+state FaultPumpStopping : todo movimiento OFF, alarma ON
+state FaultClosing : cierre ON, alarma ON
+state Faulted : todo movimiento OFF, alarma ON
+
+note as N
+Se comprueba primero, en cada escaneo:
+- cualquier causa de fallo (salvo el caso de cierre
+  ordenado por agua baja) -> Faulted, causa retenida
+- observación no disponible -> Faulted si hay una
+  causa retenida; si no, Idle
+- STOP normal en Idle..Closing -> Idle (sin alarma)
+end note
+@enduml

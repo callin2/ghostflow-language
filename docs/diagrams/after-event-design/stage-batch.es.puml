@@ -1,0 +1,19 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontSize 13
+skinparam activity {
+  BackgroundColor #F8F8F8
+  BorderColor #555555
+}
+start
+:Vencer los resultados cuyo fin de ventana e + d se alcanzó;
+:Reconocer los resultados terminales;
+:Iniciar eventos nuevos en orden de identidad de origen;
+:Aplicar la observación del predicado;
+if (¿error de capacidad o de observación?) then (sí)
+  :Descartar toda mutación preparada\n(reconocimientos, vencimiento,\nmarca máxima de identidad, reloj);
+else (no)
+  :Consolidar el tick completo;
+endif
+stop
+@enduml

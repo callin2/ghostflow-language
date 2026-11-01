@@ -1,0 +1,48 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName Helvetica
+skinparam defaultFontSize 13
+scale 1 as 60 pixels
+hide time-axis
+
+concise "Hora de pared" as T
+concise "Intervalo planificado" as P
+concise "Range .active" as A
+concise "Salida segura" as S
+
+@0
+T is "07:58"
+P is "antes"
+A is "inactivo"
+S is "OFF"
+
+@2
+T is "08:00"
+P is "range(10min)"
+
+@6
+T is "08:04"
+A is "activo"
+S is "ON"
+
+@8
+T is "08:06"
+S is "bloqueada"
+
+@10
+T is "08:08"
+S is "ON"
+
+@12
+T is "08:10"
+P is "finalizado"
+A is "inactivo"
+S is "OFF"
+
+@14
+T is "08:12"
+
+P@2 <-> @12 : planificado [08:00, 08:10)
+A@6 <-> @12 : admisión tardía 08:04: quedan 6 min
+S@8 <-> @10 : bloqueo de seguridad, no se añade al final
+@enduml

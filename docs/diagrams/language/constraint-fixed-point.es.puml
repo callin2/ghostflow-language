@@ -1,0 +1,25 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName Helvetica
+skinparam ArrowColor #555555
+skinparam ActivityBorderColor #555555
+
+start
+:Salidas bool candidatas
+(intención solicitada);
+repeat
+  :Comprobar cada requires / mutex
+  contra la misma instantánea;
+  :Poner a false a la vez la unión
+  de las salidas que deben apagarse;
+repeat while (¿cambió alguna salida?) is (sí)
+-> no;
+:Intención segura
+(satisface todas las restricciones);
+note right
+  Las salidas solo pasan de true a false,
+  así que hay como máximo N rondas con cambios
+  para N salidas bool.
+end note
+stop
+@enduml

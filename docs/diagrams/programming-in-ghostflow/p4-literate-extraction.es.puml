@@ -1,0 +1,19 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontSize 13
+skinparam componentStyle rectangle
+title Documento literario: solo se ejecutan los bloques ghost de nivel superior
+
+file "follow-switch.ghost.md\n(original editable)" as doc
+rectangle "Párrafos de prosa,\notras info strings,\nbloques anidados" as prose
+rectangle "Bloques ```ghost de nivel superior\n(en orden del documento)" as blocks
+component "El compilador une los bloques\nen un único control raíz" as cc
+file "GFB + manifiesto + source map\n(artefactos derivados)" as out
+
+doc --> prose
+doc --> blocks
+prose ..> cc : no se ejecuta\n(solo cambia la revisión)
+blocks --> cc
+cc --> out
+out ..> doc : las ubicaciones de error\napuntan aquí
+@enduml

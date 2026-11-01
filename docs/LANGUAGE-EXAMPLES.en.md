@@ -1,6 +1,3 @@
-<!-- translation-source: docs/LANGUAGE-EXAMPLES.md -->
-[Korean original](LANGUAGE-EXAMPLES.md)
-
 # GhostFlow syntax alternatives: three versions of the same watering program
 
 2026-09-05 · For design comparison only. The code below proposes **new** syntax and cannot run with the current `ghostc`.

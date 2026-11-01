@@ -1,0 +1,31 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName Helvetica
+skinparam defaultFontSize 13
+skinparam rectangleRoundCorner 8
+rectangle "阶段 0\n集成并重设基线" as P0
+rectangle "阶段 1\n标量语义与\nGFB 执行基础" as P1
+rectangle "阶段 2\n有界信号\n纵向切片" as P2
+rectangle "阶段 3\n调度计划与用量核算" as P3
+rectangle "阶段 4\n约束、资源与\n连续控制" as P4
+rectangle "阶段 5\n导入、组合\n与宏" as P5
+rectangle "阶段 6\n设置、观测、\n重放、热替换" as P6
+rectangle "阶段 7\n外部边界审计\n（23 个用例）" as P7
+rectangle "阶段 8\n最终验收" as P8
+P0 --> P1
+P1 --> P2 : Duration/Result 类型
+P1 ..> P3
+P1 ..> P4
+P1 ..> P5
+P3 ..> P4 : 用量核算
+P1 --> P6
+P2 --> P6
+P3 --> P6
+P4 --> P6
+P5 --> P6 : 稳定的描述符
+P6 --> P7 : 稳定的清单与\n观测 schema
+P7 --> P8
+note right of P3 : 还需要 Date/Time、\n设置事件、账本
+note right of P4 : 还需要设置
+note right of P5 : 需要稳定的类型/清单/\n源身份标识
+@enduml

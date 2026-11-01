@@ -1,0 +1,16 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontSize 13
+skinparam activity {
+  BackgroundColor #F8F8F8
+  BorderColor #555555
+}
+start
+:已完成：结构性 pulse 切片\n（解析、类型检查、检查器描述符）;
+:1. 民用触发实例事实\n（提供者只提供事实，绝不计算 .due）;
+:2. 超越 Solar 的\n可移植准入描述符;
+:3. 经验证的字节码、WASM/原生\n激活、前导执行;
+:4. 证明 源 -> 产物 -> 执行；\n移除发射拒绝和宿主 .due;
+:5. 将策略扩展到 Window/Run、\n取消、保持的时钟;
+stop
+@enduml

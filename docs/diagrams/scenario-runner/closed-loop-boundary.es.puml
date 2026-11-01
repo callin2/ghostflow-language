@@ -1,0 +1,19 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontSize 13
+participant "Modelo de planta\n(greenhouse-temperature-v1)" as P
+participant "Host de escenarios" as H
+participant "Control de Rust" as C
+participant "Actuador virtual\n(roof-vent)" as A
+H -> P : integrar hasta atMs\n(posición aplicada anterior constante)
+P --> H : temperatura en K canónico
+H -> C : muestra Temperature Good generada
+C --> H : objetivo seguro de la ventila
+H -> A : comprobación de rango (min..max)
+alt la evaluación y la comprobación de rango tienen éxito
+  H -> H : consolidar la fila del escaneo
+  A --> H : el objetivo seguro pasa a ser la posición aplicada\npara el siguiente intervalo
+else falla la evaluación o la aceptación del renderizador
+  H -> H : terminar la ejecución, sin fila para esta frontera\n(se descarta el cálculo de la planta)
+end
+@enduml

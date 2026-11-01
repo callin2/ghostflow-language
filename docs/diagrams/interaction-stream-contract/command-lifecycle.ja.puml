@@ -1,0 +1,19 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontSize 12
+hide empty description
+[*] --> received
+received --> rejected : 開始されなかった\n（reason 必須）
+received --> started : ドメイン開始の証拠
+started --> completed : 完了の証拠
+started --> cancelled : reason 任意
+started --> failed : reason 必須
+rejected --> [*]
+completed --> [*]
+cancelled --> [*]
+failed --> [*]
+note right of rejected
+  終了状態には
+  後続状態がない
+end note
+@enduml

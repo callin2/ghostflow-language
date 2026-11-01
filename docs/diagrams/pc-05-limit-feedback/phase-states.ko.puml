@@ -1,0 +1,39 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName Helvetica
+skinparam ArrowColor #555555
+hide empty description
+
+[*] --> Stopped
+Stopped --> Opening : 열기 이벤트
+Stopped --> Closing : 닫기 이벤트
+Stopped --> Open : 열림 리밋만 켜짐
+Stopped --> Closed : 닫힘 리밋만 켜짐
+Closed --> Opening : 열기 이벤트
+Open --> Closing : 닫기 이벤트
+Opening --> Open : 열림 리밋 감지
+Closing --> Closed : 닫힘 리밋 감지
+Opening --> WaitClose : 닫기 이벤트
+Closing --> WaitOpen : 열기 이벤트
+WaitOpen --> Opening : 2초 경과
+WaitClose --> Closing : 2초 경과
+WaitOpen --> WaitClose : 닫기 이벤트
+WaitClose --> WaitOpen : 열기 이벤트
+WaitOpen --> Open : 열림 리밋 감지
+WaitClose --> Closed : 닫힘 리밋 감지
+SensorConflict --> Open : 열림 리밋만 켜짐
+SensorConflict --> Closed : 닫힘 리밋만 켜짐
+SensorConflict --> Stopped : 리밋 없음
+
+state Opening : 열기 접촉기 ON
+state Closing : 닫기 접촉기 ON
+
+note as N
+모든 상태에서 먼저 검사:
+1. 허가 또는 위치 정보 없음 -> Stopped
+2. 두 리밋 모두 true -> SensorConflict
+3. STOP/과부하 정상 신호 상실 또는
+   두 요청 동시 누름 -> Stopped
+   (SensorConflict에서는 제외)
+end note
+@enduml

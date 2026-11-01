@@ -1,0 +1,22 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName "Apple SD Gothic Neo"
+start
+:호스트가 사실 패킷 전송\n(시계, 관측, 달력,\n행, 설정 event);
+:Rust가 패킷과 바인딩 검증;
+if (패킷이 유효한가?) then (아니요)
+  :패킷 거부;
+  :아무것도 소비하지 않음\n(설정 event, 발생 ID);
+  stop
+endif
+:컨텍스트 엔진 복제;
+:provider 검증, 설정,\n보호된 Result, 예약\n조건식과 전이 스테이징;
+:스테이징된 값으로 VM tick 실행;
+if (VM tick 성공?) then (예)
+  :스테이징된 컨텍스트와 trace 확정;
+else (아니요)
+  :스테이징된 사본 폐기;
+  :아무것도 소비하지 않음;
+endif
+stop
+@enduml

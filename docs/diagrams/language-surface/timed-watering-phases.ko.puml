@@ -1,0 +1,16 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName "Apple SD Gothic Neo"
+hide empty description
+
+[*] --> Idle
+Idle --> Open1 : starts.due
+Open1 --> Water1 : age >= 2s
+Water1 --> Stop1 : age >= 5min
+Stop1 --> Idle : age >= 2s
+
+Idle : 밸브 꺼짐, 펌프 꺼짐
+Open1 : 밸브 켜짐, 펌프 꺼짐
+Water1 : 밸브 켜짐, 펌프 켜짐
+Stop1 : 밸브 켜짐, 펌프 꺼짐
+@enduml

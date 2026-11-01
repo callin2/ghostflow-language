@@ -1,0 +1,23 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontSize 13
+skinparam rectangleRoundCorner 8
+rectangle "문서형 소스\n(.ghost.md)" as src
+rectangle "compileSource" as cs
+rectangle "writeArtifact\n(검증 후 쓰기)" as wa
+rectangle "GFB 바이트\n(변경 없음)" as gfb
+rectangle "Control manifest\n(변경 없음)" as man
+rectangle ".gfb.map.json\nsource-map-v1:\nnodes, lines, bytecodeSha256,\nsourceDocument, traceMetadata" as map
+rectangle "verifyArtifactSourceMap\n-> sourceDocument" as ver
+rectangle "restoreArtifactSourceMap\n-> 소스 + trace 맵" as res
+src --> cs
+cs --> wa
+wa --> gfb
+wa --> man
+wa --> map
+map --> ver
+gfb --> ver
+map --> res
+gfb --> res
+note bottom of res : 엄격: traceMetadata,\n모듈 지문, 소스 바인딩도 검사
+@enduml

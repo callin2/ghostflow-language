@@ -1,6 +1,3 @@
-<!-- translation-source: docs/reference/06-composition-and-replay.md -->
-[Korean original](06-composition-and-replay.md)
-
 # 6. Composition, replay, and replacement
 
 [Complete contents](../LANGUAGE-REFERENCE.en.md) · [Previous: Settings and observation](05-settings-and-observation.en.md) · [Next: Semantic rules and index](07-semantic-rules-and-index.en.md)

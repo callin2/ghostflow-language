@@ -1,0 +1,25 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName "PingFang SC"
+skinparam defaultFontSize 13
+skinparam componentStyle rectangle
+left to right direction
+title E01：每个值从哪里来
+
+rectangle "开关触点\n（常开或常闭）" as contact
+rectangle "接线 / DI 输入模块\n规范化极性" as di
+rectangle "输入驱动程序\n+ 绑定（DI1）" as drv
+package "GhostFlow 程序" {
+  rectangle "input switch_on\nResult<Bool, SensorFault>" as sw
+  rectangle "output lamp: Bool" as lamp
+}
+rectangle "绑定（RO1）\n+ 输出渲染器" as rend
+rectangle "继电器 / LED" as relay
+
+contact --> di
+di --> drv
+drv --> sw : 带质量信息\n的观测
+sw --> lamp : recover(false)
+lamp --> rend : 请求值
+rend --> relay
+@enduml

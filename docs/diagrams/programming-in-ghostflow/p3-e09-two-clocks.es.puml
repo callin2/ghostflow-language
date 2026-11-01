@@ -1,0 +1,17 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName Helvetica
+
+rectangle "Reloj de calendario\n(zona horaria, DST, reloj confiable)" as civil
+rectangle "schedule starts:\nDailySlots<15min>\n06:00, 18:45" as sched
+rectangle "starts.due\n(true en el tick\nen que llega una ocurrencia)" as due
+rectangle "phase: Idle -> Watering" as start
+rectangle "Reloj monotónico\nage = elapsed(phase)" as mono
+rectangle "age >= 5min:\nWatering -> Idle" as stop
+
+civil --> sched : hora de pared
+sched --> due : ocurrencia admitida
+due --> start
+start --> mono : age se reinicia en 0
+mono --> stop : primer tick en 5min o después
+@enduml

@@ -1,0 +1,44 @@
+@startuml
+' 10초마다 accepted tick 하나; 값은 3.2절과 3.3절의 규칙을 따름
+skinparam defaultFontSize 12
+scale 10 as 90 pixels
+binary "running (Bool)" as C
+concise "continuous_true(running)" as V
+concise "elapsed(running)" as E
+
+@0
+C is low
+V is "0ms"
+E is "0ms"
+
+@10
+C is high
+V is "0ms"
+E is "0ms"
+
+@20
+V is "10s"
+E is "10s"
+
+@30
+V is "20s"
+E is "20s"
+
+@40
+C is low
+V is "0ms"
+E is "0ms"
+
+@50
+V is "0ms"
+E is "10s"
+
+@60
+C is high
+V is "0ms"
+E is "0ms"
+
+@70
+V is "10s"
+E is "10s"
+@enduml

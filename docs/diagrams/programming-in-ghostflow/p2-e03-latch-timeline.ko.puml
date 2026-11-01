@@ -1,0 +1,39 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontSize 13
+title E03: running은 tick 사이에 START를 기억합니다
+
+binary "start" as S
+binary "stop" as P
+binary "running (이전)" as R
+binary "running' = pump" as N
+
+@1
+S is low
+P is low
+R is low
+N is low
+
+@2
+S is high
+N is high
+
+@3
+S is low
+R is high
+
+@4
+S is high
+P is high
+N is low
+
+@5
+S is low
+P is low
+R is low
+
+@6
+
+highlight 2 to 3 : 자기유지 시작
+highlight 4 to 5 : 정지 우선
+@enduml

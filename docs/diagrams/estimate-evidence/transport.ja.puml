@@ -1,0 +1,23 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName Helvetica
+skinparam componentStyle rectangle
+title 推定証拠の受け入れ経路
+
+[ホスト\n（同一性、履歴、カバレッジ）] as Host
+[estimate-evidence.mjs\nEstimateEvidenceRuntime\n（エンコード/デコードのみ）] as JS
+[Rustコア\nestimate_evidence::Session\n（1〜64レコード、追い出しなし）] as Core
+[ネイティブ適合性サンプル\n（同じGFEE v1アダプタ）] as Native
+
+Host --> JS : create / evaluate
+JS --> Core : GFEE v1パケット\n(kind 0 create, kind 1 evaluate)
+Native --> Core : GFEE v1パケット
+Core --> JS : Verdict または Rejection
+JS --> Host : スナップショット（u64は10進数文字列）
+note right of Core
+  宣言された根拠を受け入れるだけ：
+  数値の推定値、コマンド、
+  時間的な許可は生成しない
+  (temporalAdmission: false)
+end note
+@enduml

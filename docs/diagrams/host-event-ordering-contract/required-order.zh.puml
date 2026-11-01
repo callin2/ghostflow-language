@@ -1,0 +1,21 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName Helvetica
+skinparam defaultFontSize 13
+skinparam ParticipantPadding 12
+
+participant "生产者" as P
+participant "宿主入口\n（串行化点）" as H
+participant "核心\n（求值）" as C
+participant "渲染器 /\n设备" as D
+
+P -> H : 1. 接收记录\n（分配 receiptSequence）
+H -> H : 2. 锁存 + 关闭\n不可变批次
+H -> C : 3. 基于单个快照\n校验并求值
+C --> H : 4. 逻辑结果\n（提交或失败尝试）
+H -> H : 5. 捕获已提交证据\n（在钩子之前）
+H -> D : 6. 分发已提交的\n安全意图
+D --> H : 7. 效果结果 =\n新的关联接收记录
+H -> H : 8. 后续批次：仅通过\n显式类型化绑定
+note over P, H : 步骤 1 和 7 可以在边界之间\n异步发生
+@enduml

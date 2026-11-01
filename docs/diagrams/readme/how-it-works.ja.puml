@@ -1,0 +1,27 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName "Hiragino Sans"
+skinparam defaultFontSize 13
+skinparam ArrowColor #526d76
+skinparam rectangle {
+  BackgroundColor #f1f6f5
+  BorderColor #6d858b
+  FontColor #102b35
+  RoundCorner 10
+}
+left to right direction
+
+rectangle "工程を\n理解している人" as person
+rectangle "AIアシスタント\n（任意）" as ai
+rectangle "**.ghost.md 文書**\n意図＋説明\n＋実行可能なルール" as doc #e2f7f0
+rectangle "コンパイラ\n検証してコンパイル" as compiler
+rectangle "ランタイム\n判断を実行\n（LLMなし）" as runtime
+rectangle "派生ビュー\nトレース、ソースマップ、\n図" as views
+
+person --> doc : 書いてレビューする
+ai ..> doc : 候補を下書きする
+doc --> compiler
+compiler --> runtime : コンパイル済みGFB
+runtime --> views : 実行の証拠
+views ..> doc : 「なぜ？」を\nソースまでたどって説明
+@enduml

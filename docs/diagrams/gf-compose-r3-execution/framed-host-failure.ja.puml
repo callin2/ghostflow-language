@@ -1,0 +1,14 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName "Hiragino Sans"
+skinparam defaultFontSize 13
+title フレーム型ホストのリセット／失敗の境界（既存の契約）
+
+[*] --> Ready : 新しいホストインスタンス\n（新しい runId）
+Ready --> Ready : フレーム成功／\n最後に完了した結果を公開
+Ready --> Ready : 前処理前の検証で拒否\n（再試行可能）
+Ready --> Faulted : 前処理または\nVM ディスパッチが失敗
+Faulted : 故障をラッチ
+Faulted : 最後に確定した結果は\n引き続き利用可能
+Faulted --> [*] : 以降のステップには\n新しいホストインスタンスが必要
+@enduml

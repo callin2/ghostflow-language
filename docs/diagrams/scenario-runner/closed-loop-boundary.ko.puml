@@ -1,0 +1,19 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontSize 13
+participant "플랜트 모델\n(greenhouse-temperature-v1)" as P
+participant "시나리오 호스트" as H
+participant "Rust 제어" as C
+participant "가상 액추에이터\n(roof-vent)" as A
+H -> P : atMs까지 적분\n(직전 적용 위치를 일정하게 유지)
+P --> H : 정본 K 단위 온도
+H -> C : 생성된 Good Temperature 샘플
+C --> H : 안전 환기구 목표
+H -> A : 범위 검사 (min..max)
+alt 평가와 범위 검사가 성공
+  H -> H : 스캔 행 확정
+  A --> H : 안전 목표가 다음 구간의\n적용 위치가 됨
+else 평가 또는 renderer 수락 실패
+  H -> H : 실행 종료, 이 경계의 행 없음\n(플랜트 계산 폐기)
+end
+@enduml

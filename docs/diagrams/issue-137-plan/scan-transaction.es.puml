@@ -1,0 +1,18 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontSize 12
+title Rastreador de after_event preparado junto con el escaneo de la VM
+participant "Host de runtime\n(ControlRuntime)" as Host
+participant "Rust AfterEventRuntime\n(WASM)" as AE
+participant "VM de Rust" as VM
+Host -> AE : preparar hechos de eventos explícitos\ny observaciones medidas del predicado
+AE --> Host : resultados any/all propiedad de Rust
+Host -> VM : escaneo con los resultados en entradas\nResult generadas privadas
+alt el escaneo de la VM se consolida
+  VM --> Host : consolidado
+  Host -> AE : consolidar el estado del rastreador
+else el escaneo de la VM se rechaza
+  VM --> Host : rechazado
+  Host -> AE : revertir el estado del rastreador
+end
+@enduml

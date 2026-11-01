@@ -1,0 +1,15 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName "Hiragino Sans"
+skinparam defaultFontSize 13
+skinparam stateBorderColor #4A6FA5
+skinparam stateBackgroundColor #F7F9FC
+title OnDelay（質問 5）：enabled は Active のときだけ true
+
+[*] --> Idle
+Idle --> Waiting : request && !stop
+Waiting --> Idle : stop || !request
+Waiting --> Active : age >= delay
+Active --> Idle : !request || stop
+note "健全な stop または無効な delay：どの段階からも Idle へ。\nrequest/stop が不明：段階を保持する。\nage = elapsed(phase) は段階が変わるたびに再開する。" as N
+@enduml

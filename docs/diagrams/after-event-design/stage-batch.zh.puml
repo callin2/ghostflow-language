@@ -1,0 +1,19 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontSize 13
+skinparam activity {
+  BackgroundColor #F8F8F8
+  BorderColor #555555
+}
+start
+:使窗口终点 e + d 已到达的结果过期;
+:确认终态结果;
+:按源身份标识顺序启动新事件;
+:应用谓词观测;
+if (容量或观测错误？) then (是)
+  :丢弃所有暂存的变更\n（确认、过期、\n身份标识高水位、时钟）;
+else (否)
+  :提交整个 tick;
+endif
+stop
+@enduml

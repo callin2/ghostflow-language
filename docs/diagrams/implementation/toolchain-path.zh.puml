@@ -1,0 +1,23 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName Helvetica
+skinparam defaultFontSize 13
+left to right direction
+
+file "program.ghost.md" as SRC
+rectangle "tools/browser-toolchain.mjs\ncompileSource()" as BT
+rectangle "tools/toolchain.mjs\n（Node + 文件 I/O）" as NT
+rectangle "tools/literate.mjs\n（CommonMark 提取）" as LIT
+rectangle "tools/gfb1.mjs\n（降级）" as GFB
+artifact ".gfb + manifest\n+ .gfb.map.json" as ART
+rectangle "runtimes/wasm\n（参考宿主适配器）" as WASM
+rectangle "crates/ghostflow-core\n（VM、状态、安全）" as CORE
+
+SRC --> BT
+NT --> BT : 封装
+BT --> LIT
+LIT --> GFB
+GFB --> ART
+ART --> WASM
+WASM --> CORE : 暴露
+@enduml

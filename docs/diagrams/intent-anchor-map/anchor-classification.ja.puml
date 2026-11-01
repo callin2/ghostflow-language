@@ -1,0 +1,19 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName "Hiragino Sans"
+skinparam defaultFontSize 12
+hide empty description
+
+state "assumption\nstatus=unconfirmed\n（例: origin=ai）" as AU
+state "intent / premise\nstatus=confirmed" as C
+state "superseded アンカー\n（kind は任意）" as S
+
+[*] --> AU : AI または作成者の推測
+AU --> C : 人が確認し、\nソースを再分類
+AU --> S : 古い仮定を\n散文として残す
+C --> S : より新しい記述に\n置き換え
+
+AU : relation=assumes でのみ\nリンクできる
+C : implements、constrains、\nfallback でリンクできる
+S : 現在のノードには\nリンクできない
+@enduml

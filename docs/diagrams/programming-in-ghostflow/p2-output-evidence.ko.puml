@@ -1,0 +1,27 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontSize 13
+skinparam ActivityBackgroundColor #F7F9FC
+skinparam ActivityBorderColor #4A6FA5
+title 요청 의도에서 물리 증거까지 (E05 마지막 행)
+
+start
+:요청 의도 (requested)\n(<- 연결)\npump=true, valve=false;
+:출력 제약\nrequire pump => valve;
+:안전 의도 (safe)\n(이 장의 "최종 출력")\npump=false, valve=false;
+note right
+  제약은 참을 거짓으로
+  내리기만 합니다. runtime은
+  규칙을 맞추려고 밸브를
+  켜지 않습니다.
+end note
+:적용됨 (applied)\n(렌더러 증거:\n명령을 기록함);
+:확인됨 (confirmed)\n(피드백 증거:\nlimit, encoder, ...);
+note right
+  applied와 confirmed는
+  언어의 출력 의도 밖에 있습니다.
+  safe=true가 펌프가 돌았다는
+  증거는 아닙니다.
+end note
+stop
+@enduml

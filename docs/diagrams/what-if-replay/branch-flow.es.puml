@@ -1,0 +1,27 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontSize 13
+title Rama hipotética: del prefijo registrado al candidato
+
+start
+:prepareWhatIfReplay
+(validar el mapa de fuentes, recompilar,
+comprobar bytecode + manifiesto);
+:Construir el punto de control
+GhostFlow/replay-prefix-checkpoint-v1;
+:branch({ branchId, runId, synthetic });
+:Un runtime nuevo reproduce el prefijo
+y verifica el digest de los resultados;
+:Aplicar los valores sintéticos explícitos;
+if (¿Cada entrada/muestra requerida\npresente en cada trama futura?) then (sí)
+  :Ejecutar las tramas futuras
+(núcleo portable real);
+  :Devolver el candidato + recibos
+(etiquetas recorded / synthetic);
+else (no)
+  :Devolver status 'missing-input'
+(nombres y tiempos lógicos ausentes,
+sin ejecutar tramas de la rama);
+endif
+stop
+@enduml

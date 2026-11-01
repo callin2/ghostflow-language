@@ -1,0 +1,24 @@
+@startuml
+skinparam shadowing false
+skinparam defaultFontName Helvetica
+skinparam ArrowColor #555555
+skinparam rectangle {
+  BackgroundColor White
+  BorderColor #555555
+}
+title if condition then yes else no 的降级（格式 3+）
+
+rectangle "condition" as C
+rectangle "JUMP_IF_FALSE(length(yes) + 3)" as JF
+rectangle "yes" as Y
+rectangle "JUMP(length(no))" as J
+rectangle "no" as N
+rectangle "表达式末尾\n（一个结果类型的值）" as E
+
+C --> JF
+JF --> Y : true\n（顺序执行）
+JF --> N : false\n（向前跳转）
+Y --> J
+J --> E : 向前跳转
+N --> E
+@enduml
