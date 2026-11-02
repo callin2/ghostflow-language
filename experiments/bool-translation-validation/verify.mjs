@@ -15,22 +15,16 @@ import { loaderCases, loaderMutations } from './loader-cases.mjs';
 import { sourceTheoremInput, sourceAdmissionInput } from './source-bridge.mjs';
 import { sourceAdmissionCases, sourceBoundaryCases, sourceStaleMutations } from './source-cases.mjs';
 import { generatedCases, generatedSeed } from './generated-cases.mjs';
+import { leanOutcomeMatches } from '../lean-outcome.mjs';
 
 const here = dirname(fileURLToPath(import.meta.url)), root = resolve(here, '../..');
 const now = () => new Date().toISOString();
 const fixtureNames = ['snapshot-branches', 'boolean-literals', 'wide-branch'];
 const falseProposition = "tactic 'decide' proved that the proposition";
-const infrastructureDiagnostic = /unknown identifier|unknown constant|could not import|unknown module|failed to load|no such file|timed out/i;
-
-export function leanOutcomeMatches(result, log, expectedSuccess, diagnostic) {
-  if (result.error || result.signal || !Number.isInteger(result.status) || infrastructureDiagnostic.test(log)) return false;
-  return (result.status === 0) === expectedSuccess
-    && (!diagnostic || log.includes(diagnostic))
-    && (!expectedSuccess || !log.includes('sorryAx'));
-}
 
 async function sourceIdentity() {
   const paths = ['package.json', 'package-lock.json', 'crates/ghostflow-core/src/lib.rs',
+    'experiments/lean-outcome.mjs',
     'tests/bool-translation-validation.test.mjs', 'tests/bool-generated-certificates.test.mjs'];
   async function walk(path) {
     for (const entry of (await readdir(join(root, path), { withFileTypes: true })).sort((a, b) => a.name.localeCompare(b.name))) {

@@ -538,3 +538,46 @@ receipt SHA-256은 `dffea02e0266dd3cf932ed42563e5ded3433ac8aaf774cb48fe841b85fd2
 후속 검토에서 sensor·sensor-state 실행기에도 같은 기대거절 판정 중복을 확인했다.
 공통 판정기로 묶고 실제 혼합 오류로 회귀를 확인하는 작업과 signed i32 코덱 검증을
 다음 독립 단위로 진행한다. 전체 compiler·실제 Rust 의미 대응·물리 출력의 증명은 남아 있다.
+
+## build183: signed i32 코덱과 공통 Lean 오류 판정
+
+모든 `-2147483648 ≤ n < 2147483648`에 대해4바이트 little-endian 표현의 길이·바이트
+범위·부호·왕복·정규성·유일성을 Lean으로 증명했다. 기존 base-256 증명 방식을 사용하며
+생산 Rust나 Bool 모델을 바꾸지 않았다. 실제 compiler가 만든27개 경계값의 초기값과
+리터럴54개를 전체 GFB 바이트의 정확한 위치에서 읽어 증명에 연결했다. 전체 module
+reader와 원본 해석은 아직 이 수학적 코덱 정리의 신뢰 경계다.
+
+통합 고정 소스 `8c4b407a46f596cffb950ea4a310adeb4accaf51`에서 Lean5회(모델·54개
+바이트 증인 성공, 의도한 등식 거절3개)가 `2026-10-28T21:38:48.511Z`에 exit0으로 끝났다.
+122개 입력 해시는 모두 일치한다. receipt SHA-256은
+`6f63586907781cb0b3fc043a06abba39685d0fdd488355a9a498c116ed688b6a`이며
+`build/int32-wave14-590/`에 보존했다. 재귀 깊이를 넘겼던 첫 시도도 별도 작업 공간에
+보존했고 유한 한도를 명시한 뒤 다시 검사했다. 정리의 의미나 커널 검사를 생략하지 않았다.
+
+build178의 실제 native/WASM 실행물을 해시와 Rust/Cargo100개 소스로 확인해 재사용했다.
+native·plain WASM·framed WASM의2 tick씩, 총6개 trace가 원본 정수와 일치한다. 실제 WASM
+로더가 수용한 변이3개는 각각65537→16777472, MIN→0, -1→16777215로 실행됐지만
+원본 값과 같다는 인증서는 거절됐다. 재사용 관측이며 새로운 runtime build 또는 실제 Rust
+전체 대응 증명으로 세지 않는다. 세부 범위는 [코덱 보고서](../../experiments/int32-codec-validation/proof-report.md)에 있다.
+
+네 JS Lean 실행기의 process 판정을 `experiments/lean-outcome.mjs`로 모으고 각각 입력
+해시에 포함했다. 정수 종료 코드·signal/process 오류·도구 오류·명시된 기대 진단을 검사한다.
+Int 변이는 정확한 등식과 오류 하나라는 추가 조건도 유지한다. 실제 Lean 혼합 오류 로그에
+기존 sensor-state predicate를 적용하면 잘못 통과했고 새 판정은 거절했다. 정상 성공,
+의도한 명제 거절, 혼합 오류, import 오류의4개 실제 probe도 확인했다.
+
+이 공통 판정으로 기존 sensor125·state80 로그를 해시 확인 후 재판정했다. 이는205개
+기존 로그 감사이며 새로운 증명이 아니다. 영수증은 `build/lean-outcome-wave14-590/verification.json`,
+SHA-256 `08517ada1594cea167c541470f82ba724d5cad731747072d556313d8495f0944`다.
+build182의 Bool191개 로그도 같은 방식으로 통과했으며 별도 receipt SHA-256은
+`8598c5fb50844070c0a5dbbcfa82a6bf4d21169d8b5b1c34cb2fef4b073094bd`다.
+독립 검토에서 공통 판정 연결·해시 목록·Int 추가 조건의 열린 P1/P2 결함은 없었다.
+
+공식 build183은 `2026-10-28T21:51:26.651Z`에 exit0으로 완료됐다.14 gate, Rust441,
+주 Node3907 pass /11 TODO /0 fail, 별도 console15와 Python3 pass다. 전체 receipt SHA-256은
+`1f1d03c4919cf4bd8b7be803069d8a158e46a327438bc4e7d1306f2177ca5d1f`이며
+로그·identity·receipt는 `build/evidence/build183/`에 있다. WASM 해시는 build182와 같다.
+생산 compiler/runtime 변경은 없고 coverage 신규 측정 및 장치 시험은 주장하지 않는다.
+
+전체 증명은 계속 열려 있다. 다음 단위는 실제 Rust 표준 정수 checked 연산의 추출이며,
+직접 생성된 본문과 기존 Aeneas primitive 모델을 구분해 의존성을 기록한다.

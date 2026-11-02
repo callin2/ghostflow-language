@@ -927,6 +927,12 @@ For first and last recorded Git commit dates, run `node <skill>/scripts/docs-ind
 | [experiments/bool-translation-validation/fixtures/snapshot-branches.ghost.md](experiments/bool-translation-validation/fixtures/snapshot-branches.ghost.md) | Bool snapshot and branch proof input | md |
 | [experiments/bool-translation-validation/fixtures/wide-branch.ghost.md](experiments/bool-translation-validation/fixtures/wide-branch.ghost.md) | Bool branch with a nonzero high offset byte | md |
 
+## experiments/int32-codec-validation/
+
+| Path | Title | Type |
+| --- | --- | --- |
+| [experiments/int32-codec-validation/proof-report.md](experiments/int32-codec-validation/proof-report.md) | Signed i32 codec validation | md |
+
 ## experiments/rust-reader-validation/
 
 | Path | Title | Type |
@@ -1132,4 +1138,4 @@ For first and last recorded Git commit dates, run `node <skill>/scripts/docs-ind
 | [tests/reference/README.es.md](tests/reference/README.es.md) | Pruebas de aceptación de la Language Reference (por caso) | md |
 | [tests/reference/README.md](tests/reference/README.md) | Language Reference 개별 수용 테스트 | md |
 
-952 documents.
+953 documents.
