@@ -2158,6 +2158,9 @@ climate fault 때의 `air_vpd_value = 0`은 명시적인 표시용 대체값일 
 
 ### E19 — 높은 VPD 가습 요구
 
+<!-- ghostflow:anchor id=GF-INT-PIG-E19-HYSTERESIS kind=intent status=confirmed -->
+> VPD 두 임계값 사이에서는 빠른 전환을 막기 위해 이전 수요를 유지하고, 기후 샘플에 오류가 있으면 수요를 해제한다.
+
 ```ghost
 // E19
 fn exp_0_3_1(x: Number) -> Number {
@@ -2192,6 +2195,7 @@ control HumidificationDemand {
     ok(ppfd) => ppfd >= 200umol/m2/s;
     fault(_) => false;
   };
+  // ghostflow:link id=GF-INT-PIG-E19-HYSTERESIS relation=implements
   state demand: Bool = false;
   demand' = case climate {
     ok(value) => if value > 1.2kPaVPD then true
@@ -2207,6 +2211,9 @@ control HumidificationDemand {
 ```
 
 ### E20 — 낮은 VPD 환기 요구
+
+<!-- ghostflow:anchor id=GF-INT-PIG-E20-HYSTERESIS kind=intent status=confirmed -->
+> VPD 두 임계값 사이에서는 빠른 전환을 막기 위해 이전 수요를 유지하고, 기후 샘플에 오류가 있으면 수요를 해제한다.
 
 ```ghost
 // E20
@@ -2242,6 +2249,7 @@ control VentilationDemand {
     ok(ppfd) => ppfd >= 200umol/m2/s;
     fault(_) => false;
   };
+  // ghostflow:link id=GF-INT-PIG-E20-HYSTERESIS relation=implements
   state demand: Bool = false;
   demand' = case climate {
     ok(value) => if value < 0.4kPaVPD then true
@@ -2257,6 +2265,9 @@ control VentilationDemand {
 ```
 
 ### E21 — VPD와 빛에 따른 관수 요구
+
+<!-- ghostflow:anchor id=GF-INT-PIG-E21-HYSTERESIS kind=intent status=confirmed -->
+> VPD 두 임계값 사이에서는 빠른 전환을 막기 위해 이전 수요를 유지하고, 기후 샘플에 오류가 있으면 수요를 해제한다.
 
 ```ghost
 // E21
@@ -2292,6 +2303,7 @@ control IrrigationDemand {
     ok(ppfd) => ppfd >= 300umol/m2/s;
     fault(_) => false;
   };
+  // ghostflow:link id=GF-INT-PIG-E21-HYSTERESIS relation=implements
   state demand: Bool = false;
   demand' = case climate {
     ok(value) => if value > 1.0kPaVPD then true

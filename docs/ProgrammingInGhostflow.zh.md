@@ -1900,6 +1900,9 @@ RelativeHumidity 是空气湿度。它不是 E10 中使用的土壤湿度 Percen
 
 ### E19 — 高 VPD 加湿需求
 
+<!-- ghostflow:anchor id=GF-INT-PIG-E19-HYSTERESIS kind=intent status=confirmed -->
+> 在两个 VPD 阈值之间保持先前的需求以防止频繁切换；气候样本发生故障时清除该需求。
+
 ```ghost
 // E19
 fn exp_0_3_1(x: Number) -> Number {
@@ -1934,6 +1937,7 @@ control HumidificationDemand {
     ok(ppfd) => ppfd >= 200umol/m2/s;
     fault(_) => false;
   };
+  // ghostflow:link id=GF-INT-PIG-E19-HYSTERESIS relation=implements
   state demand: Bool = false;
   demand' = case climate {
     ok(value) => if value > 1.2kPaVPD then true
@@ -1949,6 +1953,9 @@ control HumidificationDemand {
 ```
 
 ### E20 — 低 VPD 通风需求
+
+<!-- ghostflow:anchor id=GF-INT-PIG-E20-HYSTERESIS kind=intent status=confirmed -->
+> 在两个 VPD 阈值之间保持先前的需求以防止频繁切换；气候样本发生故障时清除该需求。
 
 ```ghost
 // E20
@@ -1984,6 +1991,7 @@ control VentilationDemand {
     ok(ppfd) => ppfd >= 200umol/m2/s;
     fault(_) => false;
   };
+  // ghostflow:link id=GF-INT-PIG-E20-HYSTERESIS relation=implements
   state demand: Bool = false;
   demand' = case climate {
     ok(value) => if value < 0.4kPaVPD then true
@@ -1999,6 +2007,9 @@ control VentilationDemand {
 ```
 
 ### E21 — 基于 VPD 和光照的灌溉需求
+
+<!-- ghostflow:anchor id=GF-INT-PIG-E21-HYSTERESIS kind=intent status=confirmed -->
+> 在两个 VPD 阈值之间保持先前的需求以防止频繁切换；气候样本发生故障时清除该需求。
 
 ```ghost
 // E21
@@ -2034,6 +2045,7 @@ control IrrigationDemand {
     ok(ppfd) => ppfd >= 300umol/m2/s;
     fault(_) => false;
   };
+  // ghostflow:link id=GF-INT-PIG-E21-HYSTERESIS relation=implements
   state demand: Bool = false;
   demand' = case climate {
     ok(value) => if value > 1.0kPaVPD then true

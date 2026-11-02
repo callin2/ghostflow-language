@@ -2080,6 +2080,9 @@ PPFD による制限だけです。
 
 ### E19 — 高 VPD 時の加湿要求
 
+<!-- ghostflow:anchor id=GF-INT-PIG-E19-HYSTERESIS kind=intent status=confirmed -->
+> VPDの2つのしきい値の間では急な切り替わりを防ぐため前の需要を維持し、気候サンプルに異常があれば需要を解除する。
+
 ```ghost
 // E19
 fn exp_0_3_1(x: Number) -> Number {
@@ -2114,6 +2117,7 @@ control HumidificationDemand {
     ok(ppfd) => ppfd >= 200umol/m2/s;
     fault(_) => false;
   };
+  // ghostflow:link id=GF-INT-PIG-E19-HYSTERESIS relation=implements
   state demand: Bool = false;
   demand' = case climate {
     ok(value) => if value > 1.2kPaVPD then true
@@ -2129,6 +2133,9 @@ control HumidificationDemand {
 ```
 
 ### E20 — 低 VPD 時の換気要求
+
+<!-- ghostflow:anchor id=GF-INT-PIG-E20-HYSTERESIS kind=intent status=confirmed -->
+> VPDの2つのしきい値の間では急な切り替わりを防ぐため前の需要を維持し、気候サンプルに異常があれば需要を解除する。
 
 ```ghost
 // E20
@@ -2164,6 +2171,7 @@ control VentilationDemand {
     ok(ppfd) => ppfd >= 200umol/m2/s;
     fault(_) => false;
   };
+  // ghostflow:link id=GF-INT-PIG-E20-HYSTERESIS relation=implements
   state demand: Bool = false;
   demand' = case climate {
     ok(value) => if value < 0.4kPaVPD then true
@@ -2179,6 +2187,9 @@ control VentilationDemand {
 ```
 
 ### E21 — VPD と光による灌水要求
+
+<!-- ghostflow:anchor id=GF-INT-PIG-E21-HYSTERESIS kind=intent status=confirmed -->
+> VPDの2つのしきい値の間では急な切り替わりを防ぐため前の需要を維持し、気候サンプルに異常があれば需要を解除する。
 
 ```ghost
 // E21
@@ -2214,6 +2225,7 @@ control IrrigationDemand {
     ok(ppfd) => ppfd >= 300umol/m2/s;
     fault(_) => false;
   };
+  // ghostflow:link id=GF-INT-PIG-E21-HYSTERESIS relation=implements
   state demand: Bool = false;
   demand' = case climate {
     ok(value) => if value > 1.0kPaVPD then true
