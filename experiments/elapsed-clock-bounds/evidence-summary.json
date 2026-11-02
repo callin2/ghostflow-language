@@ -1,0 +1,65 @@
+{
+  "schemaVersion": 1,
+  "issue": "https://github.com/callin2/ghostflow-language/issues/590#issuecomment-6482980280",
+  "recordedAt": "2026-10-28T23:20:23.779Z",
+  "status": "passed",
+  "productionCompilerProof": false,
+  "scope": "Clock and mathematical elapsed bounds over the existing source-bound full-module epoch execution history",
+  "assumptions": [
+    "AcceptedFrom models nonnegative monotonic integer clocks at most 2^53-1; public JS/Rust clock admission refinement is not proved",
+    "Existing naturalNumbers and natural_laws instantiate the unchanged epoch machine; no f64 operation is evaluated by the bounds theorem"
+  ],
+  "unproved": [
+    "Production f64 subtraction and Rust/model correspondence",
+    "General compiler and source parser correctness",
+    "Actual Duration output expression execution, production scan commit and physical timing"
+  ],
+  "proof": {
+    "path": "build/elapsed-clock-bounds/attempt-2/verification.json",
+    "sha256": "a61fe0743e3072cfc1bef5d8f7f2a893266b0a92c877174951f9ff241f495b22",
+    "startedAt": "2026-10-28T23:14:16.089Z",
+    "finishedAt": "2026-10-28T23:19:06.022Z",
+    "sourceIdentitySha256": "5a64c724ca7d86e69eab0d7bbbaaaca543a5fa4023106a1bff0b670920b32b1b",
+    "lean": {
+      "version": "Lean (version 4.19.0, x86_64-apple-darwin22.6.0, commit 6caaee842e94, Release)",
+      "executableSha256": "e06bfeeb39efd58c2c3b1dece023d212f10c249453a3e6f0742d02741afecf9c"
+    },
+    "checks": 43,
+    "successes": 34,
+    "expectedRejections": 9,
+    "classifierSha256": "91f799137d344cbb8d7adcb9c720e83b48c9d13009f56efaa34b0b85791921f3",
+    "classifierIsHistorical": true,
+    "modelSha256": "0ab5981df4a1e323d50993ddaaf1e98be2d9bb8e11a85a7d027a9615b7226285",
+    "fixtureSha256": "abe723116bd950fbe029b838afb25348ed3c551ae6e4b5b7693358c89de8fdf9"
+  },
+  "readmission": {
+    "path": "build/elapsed-clock-bounds/current-helper-readmission.json",
+    "sha256": "f6cb40f9682bdf44c34dc63f043cc96f39e1ddf64fe15ead6302cf1c5740003c",
+    "kernelRun": false,
+    "checks": 43,
+    "currentClassifierSha256": "803af7195321d545f800d617050724561f0e6be038d9e0ce9c25192dcfbf1202",
+    "sourceChanges": [
+      "experiments/lean-outcome.mjs"
+    ]
+  },
+  "focusedTests": {
+    "command": "node --test tests/lean-outcome.test.mjs tests/elapsed-clock-bounds.test.mjs",
+    "exitCode": 0,
+    "tests": 8,
+    "passed": 8,
+    "failed": 0,
+    "source": "Observed exec_command completion after the shared classifier commits"
+  },
+  "preservedFailures": [
+    {
+      "path": "build/elapsed-clock-bounds/attempt-1/verification.json",
+      "sha256": "ad1ccd9a216d45555700d5454e9877c08f893ecf3d20c4508fd92d6199876fb6",
+      "reason": "Lean 4.19 does not implement automatic Decidable deriving for the Prop structure; replaced with constructive instances"
+    },
+    {
+      "path": "build/elapsed-clock-bounds/receipt-baseline.log",
+      "sha256": "7bece7238f2dc8beeec6623127878582cd200ac8b32c2e7beac15e8714fbfa2b",
+      "reason": "Pre-fix shared classifier accepted an authored sorry warning on an expected-failure path"
+    }
+  ]
+}
