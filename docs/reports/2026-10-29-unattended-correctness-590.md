@@ -507,3 +507,34 @@ coverage 영수증 SHA-256은 `a830a9c94e390ecca58752af7ba4a050d05d62f56d65bd4f7
 #295는 전체 완료로 닫지 않는다. 네 실제 소유 경로의 부분 검사를 추가했으나 통합 변경
 계획 출력은 아직 없고, parameter가 있는 합성 manifest는 현재 설치 host의 허용 범위 밖이다.
 이번 근거는 참조 host 실행이며 Device 영속 저장·재부팅·물리 출력 확인을 뜻하지 않는다.
+
+## build182: 생성된 원본 프로그램의 Bool 인증서
+
+고정 seed `0x590b001`로16개 정본 문서를 생성했다. 상태1–4개·출력1–3개이며 이전 상태
+교환, 생략된 상태의 보존, 앞선 참조, 후보 상태 출력, 분기·부정·논리 연산을 포함한다.
+실패한 사례를 버리거나 다시 뽑지 않는다. 각 원본을 실제 compiler로 컴파일하고 원본 UTF-8
+바이트와 전체 GFB를 기존 독립 reader 및 모든 tick 수에 대한 초기화된 실행 정리에 연결했다.
+이는 고정된 제한 Bool 사례군의 인증이며 임의 GhostFlow 프로그램 전체의 증명이 아니다.
+
+소스 초기값과 GFB 초기값을 각각 바꾼 두 변이는 여전히 유효하게 컴파일·해독되지만,
+기존 소스 또는 module과 같다는 Lean 명제에서는 거절됐다. 검증기의 기대거절 판정도
+process 오류·signal·import/unknown identifier 오류를 통과로 세지 않도록 보완했다.
+독립 검토는16개 사례의 원본·GFB·증명 입력·로그 해시와 두 변이의 실제 오류 위치를 확인했다.
+
+통합 고정 소스는 `ded2875bbf3a5dd4c4a4f4d0528a8e93a6a8a4af`다. 강화된 판정으로 새로
+실행한 Lean 검증은 `2026-10-28T21:42:19.790Z`에 exit0으로 끝났다. **Lean191회**
+(성공122·기대거절69)와 별도 JS admission11개가 통과했다. 합계202를 Lean 실행 수로
+세지 않는다.113개 입력 파일 해시가 모두 일치하며 receipt SHA-256은
+`8b10da31be9da352c120e5bee6f03bb3b438490d58242d86b2b08a0845289585`다.
+각 원본과 GFB·Lean 입력·로그는 `build/bool-generated-wave13-590/`에 보존했다.
+
+공식 build182는 같은 고정 소스에서 `2026-10-28T21:41:17.559Z`에 exit0으로 완료됐다.
+14 gate, Rust441, 주 Node3898 pass /11 TODO /0 fail, 별도 console15와 Python3 pass다.
+receipt SHA-256은 `dffea02e0266dd3cf932ed42563e5ded3433ac8aaf774cb48fe841b85fd26886`이며
+전체 로그·identity·receipt를 `build/evidence/build182/`에 보존했다. WASM은 앞선 build178과
+동일한968394bytes 및 `98d3bb473dc90f68681d974277dc01b17e69516d45c69e55147b7805a608d423`다.
+생산 compiler/runtime는 바뀌지 않았고 coverage를 새로 측정했다고 주장하지 않는다.
+
+후속 검토에서 sensor·sensor-state 실행기에도 같은 기대거절 판정 중복을 확인했다.
+공통 판정기로 묶고 실제 혼합 오류로 회귀를 확인하는 작업과 signed i32 코덱 검증을
+다음 독립 단위로 진행한다. 전체 compiler·실제 Rust 의미 대응·물리 출력의 증명은 남아 있다.
