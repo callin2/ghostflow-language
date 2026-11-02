@@ -82,6 +82,11 @@ Bool 원본 reader는 build170 소스에서 Lean173회와 별도 JS admission11�
 생산 Rust 정수 reader 또는 전체 compiler 대응 증명을 완료한 것으로 바꾸지 않는다.
 공통 Lean process 판정 보완에 따른 기존 로그 재판정도 신규 커널 증명과 구분했다.
 
+build187은 실제 Rust checked 정수 연산의 세 추출 시도와 거절 사유를 보존했다.
+외부 진입 함수의 Lean 출력 유지 및 미지원 intrinsic이 남아 있어 새 Rust 의미 정리는 없다.
+감사기 회귀8개와 공식15 gate 통과는 도구의 실패 판정 근거이며, 위 Rust 대응 의무의
+완료로 세지 않는다. 두 센서의 출처 연결 및 elapsed 시작 시각 전이는 별도 후속 단위다.
+
 `shasum -a 256`으로 이 checkout에서 관측한 별도 판본이다. 앞선 `4861a78`의 역사적 목록과 해시는 그대로 보존한다.
 
 | 파일 | SHA-256 |

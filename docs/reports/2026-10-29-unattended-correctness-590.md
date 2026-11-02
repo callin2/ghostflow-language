@@ -581,3 +581,31 @@ build182의 Bool191개 로그도 같은 방식으로 통과했으며 별도 rece
 
 전체 증명은 계속 열려 있다. 다음 단위는 실제 Rust 표준 정수 checked 연산의 추출이며,
 직접 생성된 본문과 기존 Aeneas primitive 모델을 구분해 의존성을 기록한다.
+
+## build187: 실제 Rust 정수 추출의 한계와 감사기 보완
+
+생산 `ghostflow-core`의 Cargo 문맥에서 실제 표준 라이브러리 `i32::checked_add`와
+`checked_neg`를 세 번 추출했다. 마지막 시도는 두 본문을 transparent Structured LLBC로
+얻었지만 Aeneas가 외부 진입 함수를 Lean 출력에 남기지 않았고, 남은 종속 함수에는
+미지원 `cold_path` 선언이 있었다. 모두 증명 입력으로 거절했다. 새 Rust 정리나 커널
+증명 성공은 없다. 정확한 도구 핀·원본 해시·실패 원인은 [추출 보고서](../../experiments/rust-int-primitives/proof-report.md)에 있다.
+
+감사기는 오래된 성공 영수증, 자기 자신을 포함하는 해시, 미승인 선언, 로컬 wrapper를
+거부하도록 보완했다. 실제로 호출되는 `charon-driver`를 포함해 도구·helper·생산 소스의
+실행 전후 해시를 검사한다. Python 회귀8개와 독립 검토가 통과했다. 이 구조 검사는 증명
+입력 후보의 허용 검사이며 완전한 source-equivalence나 Lean 증명은 아니다.
+
+고정 소스 `4fb732ff9c9fcbe7d4dacda1f52f706ff2a48787`에서 과거 세 산출물의 사본을 다시
+감사해 모두 exit1·rejected를 확인했다. 원본 파일 해시는 그대로였다. 새 추출이나 Lean
+실행을 반복하지 않았다. `2026-10-28T22:16:06.120018Z`의 재검사 receipt는
+`build/rust-int-guard-wave15-590/verification.json`, SHA-256
+`f88f2452b03efd003c84b68903acc3d2e0c1b972c2730522b842c2bb5e3a4035`다.
+
+공식 build187은 같은 소스에서 `2026-10-28T22:24:37.228Z`에 exit0으로 끝났다.
+15 gate, Rust441, 주 Node3907 pass /11 TODO /0 fail, 별도 console15와 Python3+8 pass다.
+receipt SHA-256은 `288f8b6f2d21586f088f8425e062067db60ed940157118bb6f7ca7cfdab82bb3`이며
+전체 로그·identity·receipt를 `build/evidence/build187/`에 보존했다. WASM은 build183과
+같은968394bytes/해시다. 생산 compiler/runtime는 바꾸지 않았고 장치 시험은 하지 않았다.
+
+이 도구 의존성은 실제 Rust 정수 본문 증명만 막는다. 두 입력의 오류 출처 연결과
+`elapsed(state)` 시작 시각 전이 검증은 독립 단위로 계속 진행한다. 전체 compiler 증명은 열려 있다.
