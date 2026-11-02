@@ -166,9 +166,15 @@ phase' = case phase {
 
 Las reglas exactas son:
 
-- El valor inicial es `0ms`.
-- El tick que consolida un cambio de estado inicia un nuevo intervalo; en ese tick el valor es cero.
-- Cada tick aceptado posterior lee la diferencia monotónica desde ese inicio.
+- La evaluación del primer tick aceptado lee `0ms`.
+- Según la regla de snapshot de §2.8, las transiciones y salidas leen el intervalo
+  del inicio del tick. Aunque cambie el estado, la salida `elapsed` ya evaluada
+  sigue usando el intervalo anterior.
+- Al consolidar el cambio se inicia otro intervalo en el tiempo monotónico actual.
+  La observación del temporizador posterior a la consolidación es `0ms` en ese
+  mismo resultado. El trace muestra ese valor; no se recalculan las salidas.
+- El siguiente tick aceptado lee el intervalo nuevo. Con el mismo timestamp lee
+  `0ms`; si el estado no cambia se conserva el inicio del intervalo.
 - Para un estado Bool, tanto false→true como true→false son cambios. Por tanto, `elapsed(running)` significa «cuánto tiempo se ha mantenido el valor actual», **no** el tiempo total en ON.
 - Las etapas no se encadenan dentro de un mismo tick. Una transición ocurre en el primer tick que cumple su condición. El retardo real es, por tanto, al menos el Duration solicitado y normalmente más largo, hasta en un intervalo de tick.
 - Un tick rechazado no cambia el estado del temporizador.
