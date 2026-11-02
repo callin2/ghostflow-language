@@ -933,6 +933,18 @@ For first and last recorded Git commit dates, run `node <skill>/scripts/docs-ind
 | --- | --- | --- |
 | [experiments/elapsed-clock-bounds/proof-report.md](experiments/elapsed-clock-bounds/proof-report.md) | Accepted clock bounds for the source-bound elapsed epoch history | md |
 
+## experiments/elapsed-duration-output/
+
+| Path | Title | Type |
+| --- | --- | --- |
+| [experiments/elapsed-duration-output/proof-report.md](experiments/elapsed-duration-output/proof-report.md) | Source-bound elapsed Duration output | md |
+
+## experiments/elapsed-duration-output/fixtures/
+
+| Path | Title | Type |
+| --- | --- | --- |
+| [experiments/elapsed-duration-output/fixtures/elapsed-output.ghost.md](experiments/elapsed-duration-output/fixtures/elapsed-output.ghost.md) | Elapsed state duration output | md |
+
 ## experiments/elapsed-epoch-validation/
 
 | Path | Title | Type |
@@ -1174,4 +1186,4 @@ For first and last recorded Git commit dates, run `node <skill>/scripts/docs-ind
 | [tests/reference/README.es.md](tests/reference/README.es.md) | Pruebas de aceptación de la Language Reference (por caso) | md |
 | [tests/reference/README.md](tests/reference/README.md) | Language Reference 개별 수용 테스트 | md |
 
-959 documents.
+961 documents.
