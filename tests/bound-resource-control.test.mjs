@@ -49,6 +49,34 @@ const rows = [
   [true, true, true, true, false, true], // simultaneous fresh conflict
 ];
 const logicalNames = ['automatic', 'manual', 'automatic_request', 'manual_request', 'fallback_request', 'valve_request'];
+test('bound host steps preserve real quality conditioning and atomic mode rejection/retry', async t => {
+  const { bound } = compile();
+  const runtime = await BoundResourceControlRuntime.instantiate(wasm(), bound);
+  t.after(() => runtime.dispose());
+  const snapshot = (values, index) => ({ nowMs: index, inputs: {}, samples: Object.fromEntries(logicalNames.map((name, field) => [name,
+    { epoch: 1, id: index + 1, timestampMs: index, quality: 'Good', value: values[field] }])) });
+  const missing = snapshot(rows[0], 0);
+  delete missing.samples.automatic;
+  assert.throws(() => runtime.step(missing));
+  for (let index = 0; index < 4; index++) {
+    const result = runtime.step(snapshot(rows[index], index));
+    assert.deepEqual(result.frame, { scanId: index, logicalTimeMs: index });
+    assert.ok(Object.values(result.sensors).every(reading => reading.ok && reading.quality === 'Good'));
+    if (index === 3) assert.deepEqual(result.vm.safe, { pump: true, valve: true });
+  }
+  const fault = snapshot(rows[3], 4);
+  fault.samples.automatic = { ...fault.samples.automatic, value: false, quality: 'Disconnected' };
+  assert.throws(() => runtime.step(fault));
+  const retry = runtime.step(snapshot(rows[3], 4));
+  assert.deepEqual(retry.frame, { scanId: 4, logicalTimeMs: 4 });
+  assert.equal(retry.sensors.automatic.quality, 'Good');
+  assert.deepEqual(retry.vm.safe, { pump: true, valve: true });
+  const malformed = snapshot(rows[3], 5);
+  malformed.samples.automatic.value = 1;
+  assert.throws(() => runtime.step(malformed), /Bool/);
+  assert.deepEqual(runtime.step(snapshot(rows[3], 5)).frame, { scanId: 5, logicalTimeMs: 5 });
+  assert.throws(() => runtime.scan(frame(bound, rows[3], 6)), /mix/);
+});
 function rails(bound, values, scanId = 0) {
   return softwareQualityRails(bound, Object.fromEntries(logicalNames.map((name, index) => [name, values[index]])), scanId + 1, scanId);
 }
