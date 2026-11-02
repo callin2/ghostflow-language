@@ -2,7 +2,7 @@
   "format": "GhostFlow/programming-book-import-package-v1",
   "root": {
     "filename": "E22.ghost.md",
-    "sha256": "c229bd2dcbf7a07ae0626e2ffb6c2c264988d7739f26c03727a404498bf47d24",
+    "sha256": "71726463b1f7ba2e16ac0560a174a2ddb66432391f053398f06c646d83c55128",
     "canonicalSource": {
       "path": "docs/ProgrammingInGhostflow.md",
       "example": "E22"
@@ -11,8 +11,8 @@
   "imports": [
     {
       "filename": "E19.ghost.md",
-      "revision": "c8a5d37ac09230a9011291a3ae3b053d1bc22773",
-      "sha256": "7bc10efed87a3db2bbf2e5b56fbf0d6c9a45b54117104d3fa0948baa01f695b4",
+      "revision": "041dbfb015b692b9dd9a7879e06b2925462a61fe",
+      "sha256": "e6006e3dbbe4db7ec058a9e5f152cfe927ca524cf081b1747b66d5b61e0de932",
       "canonicalSource": {
         "path": "docs/ProgrammingInGhostflow.md",
         "example": "E19"
@@ -20,8 +20,8 @@
     },
     {
       "filename": "E20.ghost.md",
-      "revision": "c8a5d37ac09230a9011291a3ae3b053d1bc22773",
-      "sha256": "9928297e43cd7c9790e6ca5178e71f4fd815223654fcd0b16fcc9605ea24bf38",
+      "revision": "041dbfb015b692b9dd9a7879e06b2925462a61fe",
+      "sha256": "0c33afee76307db1affcadd5ea7e43260dc6f866fec9afeadb4254358baa5b60",
       "canonicalSource": {
         "path": "docs/ProgrammingInGhostflow.md",
         "example": "E20"
@@ -32,7 +32,7 @@
     {
       "root": {
         "filename": "E31.ghost.md",
-        "sha256": "a526002ca775ee331e3eaa5b3898bcca90eed76b063108f69290fa94c46a588d",
+        "sha256": "d76cbf5332f03ff51f764537b8165446bf3ea1cfc853a0d4f3fc22f2d33440be",
         "canonicalSource": {
           "path": "docs/ProgrammingInGhostflow.md",
           "example": "E31"
@@ -41,8 +41,8 @@
       "imports": [
         {
           "filename": "E21.ghost.md",
-          "revision": "c8a5d37ac09230a9011291a3ae3b053d1bc22773",
-          "sha256": "089daea1b525b0be49685b3595554bfb1aa67091fc995da2d65fb0ef9a24357d",
+          "revision": "041dbfb015b692b9dd9a7879e06b2925462a61fe",
+          "sha256": "d4102e8f521f49e965e76fff7c1dff74a393c83349cb8592c436f699bbce485d",
           "canonicalSource": {
             "path": "docs/ProgrammingInGhostflow.md",
             "example": "E21"
@@ -50,8 +50,8 @@
         },
         {
           "filename": "E20.ghost.md",
-          "revision": "c8a5d37ac09230a9011291a3ae3b053d1bc22773",
-          "sha256": "9928297e43cd7c9790e6ca5178e71f4fd815223654fcd0b16fcc9605ea24bf38",
+          "revision": "041dbfb015b692b9dd9a7879e06b2925462a61fe",
+          "sha256": "0c33afee76307db1affcadd5ea7e43260dc6f866fec9afeadb4254358baa5b60",
           "canonicalSource": {
             "path": "docs/ProgrammingInGhostflow.md",
             "example": "E20"

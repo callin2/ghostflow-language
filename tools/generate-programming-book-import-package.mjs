@@ -4,14 +4,14 @@ import path from 'node:path';
 import { createHash } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 
-export const PROGRAMMING_BOOK_IMPORT_REVISION = 'c8a5d37ac09230a9011291a3ae3b053d1bc22773';
+export const PROGRAMMING_BOOK_IMPORT_REVISION = '041dbfb015b692b9dd9a7879e06b2925462a61fe';
 export const PROGRAMMING_BOOK_DOCUMENT = 'docs/ProgrammingInGhostflow.md';
 export const PROGRAMMING_BOOK_IMPORT_DIRECTORY = 'examples/programming-book-imports-input-v1';
 
 const reviewed = Object.freeze({
-  E19: '7bc10efed87a3db2bbf2e5b56fbf0d6c9a45b54117104d3fa0948baa01f695b4',
-  E20: '9928297e43cd7c9790e6ca5178e71f4fd815223654fcd0b16fcc9605ea24bf38',
-  E21: '089daea1b525b0be49685b3595554bfb1aa67091fc995da2d65fb0ef9a24357d',
+  E19: 'e6006e3dbbe4db7ec058a9e5f152cfe927ca524cf081b1747b66d5b61e0de932',
+  E20: '0c33afee76307db1affcadd5ea7e43260dc6f866fec9afeadb4254358baa5b60',
+  E21: 'd4102e8f521f49e965e76fff7c1dff74a393c83349cb8592c436f699bbce485d',
 });
 const root = fileURLToPath(new URL('../', import.meta.url));
 const sha256 = text => createHash('sha256').update(text).digest('hex');

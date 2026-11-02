@@ -2256,11 +2256,11 @@ E22 は E19 や E20 のソースをコピーしません。代わりに、その
 ```ghost
 // E22
 import HighVpd from "./E19.ghost.md"
-  revision "5e709162753c0aba38d426c1c4e0722edfb04d7b"
-  sha256 "c53372f31c0bfb9b8cf52930c5d9ef02dd36cf7478345410bbc5fb53258fc5c7";
+  revision "041dbfb015b692b9dd9a7879e06b2925462a61fe"
+  sha256 "e6006e3dbbe4db7ec058a9e5f152cfe927ca524cf081b1747b66d5b61e0de932";
 import LowVpd from "./E20.ghost.md"
-  revision "5e709162753c0aba38d426c1c4e0722edfb04d7b"
-  sha256 "af696ac6774f459726853f0a2c65a689b42c7e37c69dd8165f68bb3dab1cbea8";
+  revision "041dbfb015b692b9dd9a7879e06b2925462a61fe"
+  sha256 "0c33afee76307db1affcadd5ea7e43260dc6f866fec9afeadb4254358baa5b60";
 control CombinedVpdDemands {
   input air: Temperature {
     sample = 1s; valid = 0°C .. 50°C;
@@ -3100,11 +3100,11 @@ control FarmerDirectedWatering {
 ```ghost
 // E31
 import Irrigation from "./E21.ghost.md"
-  revision "5e709162753c0aba38d426c1c4e0722edfb04d7b"
-  sha256 "b87dcf69b53e993b8e82f901870f7470c047ea7b0e46f8308361e606c38b2a87";
+  revision "041dbfb015b692b9dd9a7879e06b2925462a61fe"
+  sha256 "d4102e8f521f49e965e76fff7c1dff74a393c83349cb8592c436f699bbce485d";
 import Ventilation from "./E20.ghost.md"
-  revision "5e709162753c0aba38d426c1c4e0722edfb04d7b"
-  sha256 "af696ac6774f459726853f0a2c65a689b42c7e37c69dd8165f68bb3dab1cbea8";
+  revision "041dbfb015b692b9dd9a7879e06b2925462a61fe"
+  sha256 "0c33afee76307db1affcadd5ea7e43260dc6f866fec9afeadb4254358baa5b60";
 control CombinedGreenhouseDemands {
   input air: Temperature {
     sample = 1s; valid = 0°C .. 50°C;
