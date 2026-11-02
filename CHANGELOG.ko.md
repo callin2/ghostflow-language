@@ -5,6 +5,18 @@
 
 ## 미출시
 
+### 2026-11-02 - 바인딩된 Bool 호스트의 품질 입력 ([#618](https://github.com/callin2/ghostflow-language/issues/618))
+
+`BoundResourceControlRuntime.step({ nowMs, inputs, samples })`은 유한 공유 자원
+프로필의 명시적인 Bool 품질 관측을 받습니다. `ControlRuntime`과 같은 WASM
+conditioner와 선언된 품질 rail을 사용합니다. 누락되거나 오류인 mode 관측은
+미확정으로 유지합니다. native scan이 거절되면 conditioner 상태를 되돌리고
+동일한 scan ID로 수정한 관측을 다시 시도할 수 있습니다. 잘못된 packet은
+dispatch 전에 거절합니다. 한 instance에서 호스트 `step`과 native `scan`을
+섞어 호출할 수 없습니다. 기존 raw frame 실행은 유지하며 실제 I/O는 수행하지
+않습니다. 기존 품질 입력 소스 계약의 브라우저 호스트 연결을 보완한 것으로,
+제어 정책의 의미는 바뀌지 않습니다.
+
 ### 2026-10-29 - 설치된 합성 실행 ([#290](https://github.com/callin2/ghostflow-language/issues/290), [#302](https://github.com/callin2/ghostflow-language/issues/302))
 
 InstalledControlHost가 직접 port를 연결하는 한정 `control-v10` 합성 프로필을 승인하고

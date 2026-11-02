@@ -2,6 +2,18 @@
 
 ## Unreleased
 
+### 2026-11-02 - bound Bool host quality inputs ([#618](https://github.com/callin2/ghostflow-language/issues/618))
+
+`BoundResourceControlRuntime.step({ nowMs, inputs, samples })` accepts explicit
+Bool quality observations for the finite shared-resource profile. It uses the
+same WASM conditioners and declared quality rails as `ControlRuntime`. Missing
+or faulted mode observations remain unknown; a rejected native scan rolls back
+conditioner state and retains its scan ID for a corrected retry. Malformed
+packets are rejected before dispatch. An instance cannot mix host `step` calls
+and native `scan` frames. Existing raw-frame execution stays available and no
+physical I/O is performed. This fixes browser host integration of the existing
+input-quality source contract; it does not change control policy semantics.
+
 ### 2026-10-29 - installed composed execution ([#290](https://github.com/callin2/ghostflow-language/issues/290), [#302](https://github.com/callin2/ghostflow-language/issues/302))
 
 InstalledControlHost admits the bounded direct-port `control-v10` composition

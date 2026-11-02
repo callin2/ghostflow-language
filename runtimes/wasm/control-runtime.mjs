@@ -1066,7 +1066,7 @@ async function sha256(value) {
   return [...new Uint8Array(digest)].map(byte => byte.toString(16).padStart(2, '0')).join('');
 }
 
-function sensorConfig(item) {
+export function sensorConfig(item) {
   // sampleMs is descriptive cadence metadata only; step() never polls hardware.
   const exactBounds = item.type === 'Int' ? { min: -2147483648, max: 2147483647 }
     : item.type === 'Duration' ? { min: 0, max: Number.MAX_SAFE_INTEGER }
@@ -1080,11 +1080,11 @@ function sensorConfig(item) {
   };
 }
 
-function hostReading(raw, sensorType) {
+export function hostReading(raw, sensorType) {
   return { ok: raw.ok, value: raw.ok ? (sensorType === 'Bool' ? Boolean(raw.value) : raw.value) : (sensorType === 'Bool' ? false : 0), quality: raw.quality };
 }
 
-function sensorFaultCode(reading) {
+export function sensorFaultCode(reading) {
   if (reading.ok) return 0;
   const code = SENSOR_FAULT_CODE[reading.quality];
   if (code === undefined) throw new Error(`unsupported SensorFault quality ${String(reading.quality)}`);
