@@ -933,6 +933,12 @@ For first and last recorded Git commit dates, run `node <skill>/scripts/docs-ind
 | --- | --- | --- |
 | [experiments/int32-codec-validation/proof-report.md](experiments/int32-codec-validation/proof-report.md) | Signed i32 codec validation | md |
 
+## experiments/rust-int-primitives/
+
+| Path | Title | Type |
+| --- | --- | --- |
+| [experiments/rust-int-primitives/proof-report.md](experiments/rust-int-primitives/proof-report.md) | Actual Rust i32 primitive extraction diagnosis | md |
+
 ## experiments/rust-reader-validation/
 
 | Path | Title | Type |
@@ -1138,4 +1144,4 @@ For first and last recorded Git commit dates, run `node <skill>/scripts/docs-ind
 | [tests/reference/README.es.md](tests/reference/README.es.md) | Pruebas de aceptación de la Language Reference (por caso) | md |
 | [tests/reference/README.md](tests/reference/README.md) | Language Reference 개별 수용 테스트 | md |
 
-953 documents.
+954 documents.
