@@ -14,6 +14,15 @@ and native `scan` frames. Existing raw-frame execution stays available and no
 physical I/O is performed. This fixes browser host integration of the existing
 input-quality source contract; it does not change control policy semantics.
 
+### 2026-10-29 - retain settings across compatible binding replacement ([#295](https://github.com/callin2/ghostflow-language/issues/295), [#590](https://github.com/callin2/ghostflow-language/issues/590))
+
+InstalledControlHost restores its owned settings checkpoint when it accepts a
+compatible sensor binding replacement. The new run retains ordinary Result
+values, faults, revision and history. Run overlays return before the first new-run
+decision; Until overlays retain their deadlines. Control state, timers and sensor
+observations start fresh. Failed replacement preserves the old owner, and composed
+scans cannot race checkpoint capture. See `tests/reference-change-lifecycle.test.mjs`.
+
 ### 2026-10-29 - installed composed execution ([#290](https://github.com/callin2/ghostflow-language/issues/290), [#302](https://github.com/callin2/ghostflow-language/issues/302))
 
 InstalledControlHost admits the bounded direct-port `control-v10` composition

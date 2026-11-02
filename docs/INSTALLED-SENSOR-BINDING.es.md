@@ -274,8 +274,15 @@ publicación.
 - Los candidatos rechazados conservan los ajustes, las superposiciones, el
   historial, el estado, los temporizadores, los acondicionadores, la última
   finalización y la evaluación.
-- El éxito inicia estado, ajustes y acondicionadores nuevos en una ejecución
-  nueva y borra las finalizaciones anteriores.
+- El éxito restaura el checkpoint de ajustes validado del titular, incluidos los
+  valores Result ordinarios, fallos, revisión e historial. Las superposiciones Run
+  regresan antes de la primera decisión nueva; las Until conservan sus plazos y
+  reglas de validez. El estado de control, los temporizadores y acondicionadores
+  empiezan de nuevo y se borran las finalizaciones anteriores.
+- Durante el reemplazo se rechazan los `step` compuestos para no perder ajustes
+  aceptados entre la captura y publicación del checkpoint. Si la restauración
+  falla, se conserva el titular anterior. La composición con parameter sigue
+  fuera de este perfil.
 
 **Cobertura y límites.**
 
