@@ -163,9 +163,15 @@ phase' = case phase {
 
 The exact rules are:
 
-- The initial value is `0ms`.
-- The tick that commits a state change starts a new interval; in that tick the value is zero.
-- Each later accepted tick reads the monotonic difference since that start.
+- Expression evaluation on the first accepted tick reads `0ms`.
+- Under the snapshot rule in §2.8, transitions and outputs read the interval from
+  the beginning of the tick. If the state changes in this tick, its evaluated
+  `elapsed` output still uses the previous interval.
+- Committing the change starts a new interval at the current monotonic time.
+  The post-commit timer observation in the same result is `0ms`. Source traces
+  display this post-commit value; already evaluated outputs are not recalculated.
+- The next accepted tick reads the new interval. The same timestamp gives `0ms`;
+  an unchanged state keeps its interval start.
 - For a Bool state, both false→true and true→false are changes. So `elapsed(running)` means "how long the current value has been held", **not** total ON time.
 - Stages do not cascade within one tick. A transition happens on the first tick that satisfies its condition. The actual delay is therefore at least the requested Duration, and usually longer by up to one tick interval.
 - A rejected tick does not change timer state.

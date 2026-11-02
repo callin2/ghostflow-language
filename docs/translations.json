@@ -2423,31 +2423,31 @@
       "files": {
         "en": {
           "path": "docs/reference/03-time-and-schedules.en.md",
-          "sha256": "5ac960529d84145475db687b376e935582e4f5842c55cd24827ffe4d8372f05e"
+          "sha256": "75e7af7245b55517ef2d7c0dcd164914df52694e1d19d7fa4b550620b44a5270"
         },
         "ko": {
           "path": "docs/reference/03-time-and-schedules.md",
-          "sha256": "dc4ed58103f59fbd6d14a4b189bb166ccac89b49d669dfdfe2a0e0cb452845da",
+          "sha256": "7508ce2827766050bff932670b6c07f96fde48d5beaff977b671a723d26a48c1",
           "from": "en",
-          "sourceSha256": "5ac960529d84145475db687b376e935582e4f5842c55cd24827ffe4d8372f05e"
+          "sourceSha256": "75e7af7245b55517ef2d7c0dcd164914df52694e1d19d7fa4b550620b44a5270"
         },
         "zh": {
           "path": "docs/reference/03-time-and-schedules.zh.md",
-          "sha256": "3ae415e830cef4cb4db07e504c11d80f6821851acad985d6b5781b7b36c5c922",
+          "sha256": "721199ad1660571b55c5e6e5a595618d3dfc5ccca8ae9a0d575b179ee37a6fc0",
           "from": "en",
-          "sourceSha256": "5ac960529d84145475db687b376e935582e4f5842c55cd24827ffe4d8372f05e"
+          "sourceSha256": "75e7af7245b55517ef2d7c0dcd164914df52694e1d19d7fa4b550620b44a5270"
         },
         "es": {
           "path": "docs/reference/03-time-and-schedules.es.md",
-          "sha256": "051cb2b61a8a434ebc4d0827a2343ffa970993f9738720af3c9e2c595c4f0c70",
+          "sha256": "2b6c6ce3b2d001a5521a877b5d3e9a3b9e914f0227859dbb5e4862d404ba64f6",
           "from": "en",
-          "sourceSha256": "5ac960529d84145475db687b376e935582e4f5842c55cd24827ffe4d8372f05e"
+          "sourceSha256": "75e7af7245b55517ef2d7c0dcd164914df52694e1d19d7fa4b550620b44a5270"
         },
         "ja": {
           "path": "docs/reference/03-time-and-schedules.ja.md",
-          "sha256": "19afb28aa439fc5647769b14d934b4c5f428186ac0e50b02a6b5a467b6dbdfed",
+          "sha256": "08c6d86dd124af7dafe8085cdbc206c022f255e9791798ffe859b0ec230f40ab",
           "from": "en",
-          "sourceSha256": "5ac960529d84145475db687b376e935582e4f5842c55cd24827ffe4d8372f05e"
+          "sourceSha256": "75e7af7245b55517ef2d7c0dcd164914df52694e1d19d7fa4b550620b44a5270"
         }
       }
     },
@@ -6375,6 +6375,14 @@
     {
       "path": "experiments/two-sensor-provenance/fixtures/two-recover.ghost.md",
       "reason": "Exact source bytes for the bounded two-input proof fixture; translating would change the certificate identity."
+    },
+    {
+      "path": "experiments/elapsed-epoch-validation/proof-report.md",
+      "reason": "Issue590 bounded elapsed epoch proof and host observations with explicit numerical and runtime proof boundaries."
+    },
+    {
+      "path": "experiments/elapsed-epoch-validation/fixtures/elapsed-toggle.ghost.md",
+      "reason": "Canonical source bytes consumed by the independent elapsed epoch proof reader; not a translated reading projection."
     }
   ]
 }
