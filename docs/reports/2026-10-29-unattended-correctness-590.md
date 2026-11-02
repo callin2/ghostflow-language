@@ -431,3 +431,47 @@ WASM에서 세션의30초를 직접 조회하고, native/WASM의 별도 시간·
 검사가 모두 통과했다. 전체 compiler, production Rust/model 대응, f64 SmallNumberLaws,
 원본 전달 경로와 장치 동작은 여전히 전체 증명의 남은 범위다. 다음 실험은 생산 Rust
 Reader의 실제 본문을 Charon/Aeneas로 추출하고 Lean에서 불변조건부터 확인하는 것이다.
+
+## build176: 생산 Rust Reader 추출물의 첫 커널 증명
+
+생산 Rust `Reader::new`와 `Reader::finished` 본문을 고정된 Charon/Aeneas로 추출했다.
+생성 Lean 파일을 그대로 보존하고, 초기 cursor0·bytes 보존·범위 불변식·종료 판정과
+잔여 바이트 리스트의 관계를7개 정리로 증명했다. 마지막 관계는 cursor가 범위 안에 있다는
+전제가 필요하며, 전제를 제거했을 때의 실제 반례도 확인했다. outer Result의 panic·divergence를
+평범한 파싱 거절로 바꾸지 않았다. 독립 검토도 별도 출력 경로에서 커널 검사를 통과했다.
+
+통합 검증 소스는 `1bcb1771f69d78ca1c1d78f391ef67eea232163d`다.
+Lean4.35 실행은 `2026-10-28T20:52:38.906824Z`에 exit0으로 완료됐다.
+정리7개를 검증하는 baseline과 잘못된 초기 위치·반전된 종료 조건·누락된 범위 전제의
+거절3개가 통과했다. 기록된8개 입력 파일 해시는 모두 일치한다. 영수증 SHA-256은
+`d8a2a82d1f213cdd702d5d6dcc76f764775c5f38a95f6fd9a5558f4aee079437`이며
+`build/rust-reader-wave11-590/`에 보존했다. 표준 Lean 공리3개만 허용한다.
+
+검증기 자체의 잘못된 성공 기록도 막았다. 새 실행은 검사 전에 원자적으로 `running`을
+기록하고, 정상 종료 시 최종 상태를 바꾼다. 강제 종료·일반 실패가 예전 `passed`를 남기지
+않는지 검사한다. assertion을 제거하는 Python 최적화 옵션은 명시적으로 거부한다.
+이3개 회귀 검사를 공식 host gate에 등록했으며, 실제 Lean 실행과는 별도로 센다.
+과거 영수증은 ignored build evidence로 보존하고 source에서 제거했다.
+
+공식 build176은 `2026-10-28T21:02:51.206Z`에 exit0으로 완료됐다.14 gate, Rust441,
+주 Node3891 pass /11 TODO /0 fail, 별도 console15 pass 및 Python3 pass다.
+verification SHA-256은 `2c05ac70cffead88937815489b7d837ef84017d58d00696694816f9e74cf2261`이다.
+WASM은 앞선 build173과 같은968394bytes 및
+`98d3bb473dc90f68681d974277dc01b17e69516d45c69e55147b7805a608d423`이다.
+실행물과 전체 로그·identity·receipt는 `build/evidence/build176/`에 보존했다.
+첫 시도는 GitHub 이름 해석이 제한되어 빌드 번호 발급 전에 종료됐고, 허용된 네트워크에서
+정상 경로로 다시 실행했다. 빌드 번호를 우회하거나 임의로 정하지 않았다.
+
+`take`/정수 reader는 오류 문자열과 ownership 표준 함수의 추출 의존성이 남는다.
+실제 `Value::value_type` 추출물도 고정된 Lean backend에 `F64`가 없어 컴파일되지 않았다.
+임의의 타입·추가 공리를 넣어 통과시킨 것으로 세지 않는다. 자세한 도구 판본과 실패는
+[Rust proof report](../../experiments/rust-reader-validation/proof-report.md)와
+[F64 진단](../../experiments/rust-reader-validation/ValueType-extraction-diagnosis.md)에 있다.
+Rust compiler, Charon/Aeneas translator, 표준 라이브러리 모델은 신뢰 경계이며
+호스트64bit 추출은 ESP32 실행 증명이 아니다. 새 Rust 증명은 로컬 실행·독립 검토 근거다.
+기존 Lean4.19 CI가 이4.35 증명까지 실행한다고 주장하지 않는다.
+
+[현행 증명 의무 목록](2026-10-29-compiler-proof-obligations-590.md)은7개 진입 분기와
+GFB23/24 및 별도25 wrapper까지 구분한다. 이전 수치와 미해결 결함을 현재 것으로 재사용하지
+않으며 전체 컴파일러 의미 보존 의무는 계속 열어 둔다. 다음 독립 검증에서 발견한
+binding 교체 시 일반 설정 소실은 #295에서 별도 실패 재현과 수정으로 진행한다.
