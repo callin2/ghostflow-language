@@ -34,7 +34,7 @@ function bookSource(id) {
   }
   const match = section.match(/```ghost\n([\s\S]*?)\n```/);
   assert.ok(match, `missing executable fence ${id}`);
-  return `# ${id}\n\n\`\`\`ghost\n${match[1]}\n\`\`\`\n`;
+  return `${section.trimEnd()}\n`;
 }
 
 async function simulate(id, source, frames, extra = {}) {

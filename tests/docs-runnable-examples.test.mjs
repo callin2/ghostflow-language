@@ -113,7 +113,7 @@ test('canonical constraint examples distinguish executable local control from ch
   }
 });
 
-function example(section, marker, nextMarker) {
+function example(section, marker, nextMarker, includeProvenance = false) {
   const start = section.indexOf(marker);
   assert.notEqual(start, -1, `missing example ${marker}`);
   const sectionEnd = nextMarker ? section.indexOf(nextMarker, start + marker.length) : section.length;
@@ -124,7 +124,8 @@ function example(section, marker, nextMarker) {
   const end = section.indexOf('\n```', next + 9);
   assert.notEqual(end, -1, `unclosed GhostFlow fence in ${marker}`);
   assert.ok(end < sectionEnd, `unclosed GhostFlow fence within ${marker}`);
-  return `# ${marker}\n\n${section.slice(next, end + 4)}\n`;
+  return includeProvenance ? `${section.slice(start, end + 4)}\n`
+    : `# ${marker}\n\n${section.slice(next, end + 4)}\n`;
 }
 
 for (const [id, section, marker, nextMarker] of [
@@ -163,7 +164,7 @@ for (const [id, section, marker, nextMarker] of [
   ['Programming E37', programming, '### E37 —', '### E98 —'],
 ]) {
   test(`${id} remains executable GhostFlow`, () => {
-    const compiled = compileSourceSync(example(section, marker, nextMarker), { filename: `${id}.ghost.md` });
+    const compiled = compileSourceSync(example(section, marker, nextMarker, true), { filename: `${id}.ghost.md` });
     assert.match(compiled.manifest.format, /^GhostFlow\/control-v\d+$/);
     assert.ok(compiled.bytes.length > 0);
     if (section === programming) {

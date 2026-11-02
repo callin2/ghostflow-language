@@ -2381,6 +2381,9 @@ difieren los umbrales ON/OFF y la condición de PPFD.
 
 ### E19 — Demanda de humidificación por VPD alto
 
+<!-- ghostflow:anchor id=GF-INT-PIG-E19-HYSTERESIS kind=intent status=confirmed origin=ai -->
+> Mantener la demanda anterior entre los dos umbrales de VPD para evitar cambios rápidos; borrar la demanda si falla la muestra climática.
+
 ```ghost
 // E19
 fn exp_0_3_1(x: Number) -> Number {
@@ -2415,6 +2418,7 @@ control HumidificationDemand {
     ok(ppfd) => ppfd >= 200umol/m2/s;
     fault(_) => false;
   };
+  // ghostflow:link id=GF-INT-PIG-E19-HYSTERESIS relation=implements
   state demand: Bool = false;
   demand' = case climate {
     ok(value) => if value > 1.2kPaVPD then true
@@ -2430,6 +2434,9 @@ control HumidificationDemand {
 ```
 
 ### E20 — Demanda de ventilación por VPD bajo
+
+<!-- ghostflow:anchor id=GF-INT-PIG-E20-HYSTERESIS kind=intent status=confirmed origin=ai -->
+> Mantener la demanda anterior entre los dos umbrales de VPD para evitar cambios rápidos; borrar la demanda si falla la muestra climática.
 
 ```ghost
 // E20
@@ -2465,6 +2472,7 @@ control VentilationDemand {
     ok(ppfd) => ppfd >= 200umol/m2/s;
     fault(_) => false;
   };
+  // ghostflow:link id=GF-INT-PIG-E20-HYSTERESIS relation=implements
   state demand: Bool = false;
   demand' = case climate {
     ok(value) => if value < 0.4kPaVPD then true
@@ -2480,6 +2488,9 @@ control VentilationDemand {
 ```
 
 ### E21 — Demanda de riego por VPD y luz
+
+<!-- ghostflow:anchor id=GF-INT-PIG-E21-HYSTERESIS kind=intent status=confirmed origin=ai -->
+> Mantener la demanda anterior entre los dos umbrales de VPD para evitar cambios rápidos; borrar la demanda si falla la muestra climática.
 
 ```ghost
 // E21
@@ -2515,6 +2526,7 @@ control IrrigationDemand {
     ok(ppfd) => ppfd >= 300umol/m2/s;
     fault(_) => false;
   };
+  // ghostflow:link id=GF-INT-PIG-E21-HYSTERESIS relation=implements
   state demand: Bool = false;
   demand' = case climate {
     ok(value) => if value > 1.0kPaVPD then true
@@ -2548,11 +2560,11 @@ revisión exacta y un SHA-256.
 ```ghost
 // E22
 import HighVpd from "./E19.ghost.md"
-  revision "c8a5d37ac09230a9011291a3ae3b053d1bc22773"
-  sha256 "7bc10efed87a3db2bbf2e5b56fbf0d6c9a45b54117104d3fa0948baa01f695b4";
+  revision "041dbfb015b692b9dd9a7879e06b2925462a61fe"
+  sha256 "e6006e3dbbe4db7ec058a9e5f152cfe927ca524cf081b1747b66d5b61e0de932";
 import LowVpd from "./E20.ghost.md"
-  revision "c8a5d37ac09230a9011291a3ae3b053d1bc22773"
-  sha256 "9928297e43cd7c9790e6ca5178e71f4fd815223654fcd0b16fcc9605ea24bf38";
+  revision "041dbfb015b692b9dd9a7879e06b2925462a61fe"
+  sha256 "0c33afee76307db1affcadd5ea7e43260dc6f866fec9afeadb4254358baa5b60";
 control CombinedVpdDemands {
   input air: Temperature {
     sample = 1s; valid = 0°C .. 50°C;
@@ -3565,11 +3577,11 @@ requisitos de memoria y de cómputo.
 ```ghost
 // E31
 import Irrigation from "./E21.ghost.md"
-  revision "c8a5d37ac09230a9011291a3ae3b053d1bc22773"
-  sha256 "089daea1b525b0be49685b3595554bfb1aa67091fc995da2d65fb0ef9a24357d";
+  revision "041dbfb015b692b9dd9a7879e06b2925462a61fe"
+  sha256 "d4102e8f521f49e965e76fff7c1dff74a393c83349cb8592c436f699bbce485d";
 import Ventilation from "./E20.ghost.md"
-  revision "c8a5d37ac09230a9011291a3ae3b053d1bc22773"
-  sha256 "9928297e43cd7c9790e6ca5178e71f4fd815223654fcd0b16fcc9605ea24bf38";
+  revision "041dbfb015b692b9dd9a7879e06b2925462a61fe"
+  sha256 "0c33afee76307db1affcadd5ea7e43260dc6f866fec9afeadb4254358baa5b60";
 control CombinedGreenhouseDemands {
   input air: Temperature {
     sample = 1s; valid = 0°C .. 50°C;

@@ -9,7 +9,7 @@ function source(id) {
   const section = book.slice(book.indexOf(`### ${id} —`));
   const code = /```ghost\n([\s\S]*?)\n```/.exec(section);
   assert.ok(code, `missing ${id}`);
-  return `# ${id}\n\n\`\`\`ghost\n${code[1]}\n\`\`\`\n`;
+  return `${section.slice(0, code.index + code[0].length)}\n`;
 }
 const wasm = () => fs.readFileSync(new URL('../target/wasm32-unknown-unknown/release/ghostflow_wasm.wasm', import.meta.url));
 const sample = (id, value) => ({ epoch: 1, id, timestampMs: id, value, quality: 'Good' });
