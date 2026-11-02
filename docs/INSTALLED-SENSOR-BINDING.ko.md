@@ -221,7 +221,13 @@ instance 입력으로, 또는 instance 출력에서 root 출력으로)만 들어
 
 - 거부된 후보는 설정, overlay, 이력, 상태, 타이머, conditioner, 최근 완료, 평가를
   보존합니다.
-- 성공하면 새 run에서 상태, 설정, conditioner를 새로 시작하고 이전 완료를 지웁니다.
+- 성공하면 소유자의 검증된 설정 checkpoint에서 일반 Result 값, fault, revision,
+  history를 복원합니다. Run overlay는 새 run의 첫 판단 전에 반환하고 Until overlay는
+  기존 만료 시각과 유효성 규칙을 유지합니다. 제어 상태, 타이머, conditioner는 새로
+  시작하며 이전 완료를 지웁니다.
+- 교체 중 합성 `step`을 거부하므로 checkpoint 캡처와 게시 사이에 승인된 설정이
+  사라지지 않습니다. 복원 실패 시 이전 소유자를 보존합니다. parameter를 가진 합성은
+  이 프로필의 범위 밖입니다.
 
 **범위와 한계.**
 

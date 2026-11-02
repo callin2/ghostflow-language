@@ -3508,13 +3508,13 @@
       "files": {
         "en": {
           "path": "CHANGELOG.md",
-          "sha256": "e0342172e20d4c57d6ee34cab7033b11e880759e30c93d4fc3a9e0ae675ecf92"
+          "sha256": "e7eb59088f050bfa9028800643baeb6aa02f16259562b2cf051ce1f98395bfb2"
         },
         "ko": {
           "path": "CHANGELOG.ko.md",
-          "sha256": "cc50de86aa76804a6e8393826bda5e981c0c4f57dcf2246288d4f13a976a49c2",
+          "sha256": "4168dd7b415129ffe256672d7eb9d111c82cf61648a1e32c44d62355329dba1d",
           "from": "en",
-          "sourceSha256": "e0342172e20d4c57d6ee34cab7033b11e880759e30c93d4fc3a9e0ae675ecf92"
+          "sourceSha256": "e7eb59088f050bfa9028800643baeb6aa02f16259562b2cf051ce1f98395bfb2"
         }
       }
     },
@@ -5858,31 +5858,31 @@
       "files": {
         "en": {
           "path": "docs/INSTALLED-SENSOR-BINDING.md",
-          "sha256": "58e1454503eb36078ff50e5b628fe2a785874b4316724342ab706b4406a75855"
+          "sha256": "d30ef2c5745a24eab6558a06fa982d4e3f33699874b51b4ec9855f7aab74b732"
         },
         "ko": {
           "path": "docs/INSTALLED-SENSOR-BINDING.ko.md",
-          "sha256": "8f436429ba9868139d003b28a11d0314a132023906605ef9ae31222526b207d5",
+          "sha256": "fd7a6f8a76478117651c89398eababa85114a9561c9234432d12f462f75fe31f",
           "from": "en",
-          "sourceSha256": "58e1454503eb36078ff50e5b628fe2a785874b4316724342ab706b4406a75855"
+          "sourceSha256": "d30ef2c5745a24eab6558a06fa982d4e3f33699874b51b4ec9855f7aab74b732"
         },
         "zh": {
           "path": "docs/INSTALLED-SENSOR-BINDING.zh.md",
-          "sha256": "066651c5f34c66d149a04f49b9f6bf471cb0d80a5a3c340aa8ce0583f62615cd",
+          "sha256": "24079d1d6625af7dd1cb35e0397c7302b1de82d38ab3d5f736387d9be19eff01",
           "from": "en",
-          "sourceSha256": "58e1454503eb36078ff50e5b628fe2a785874b4316724342ab706b4406a75855"
+          "sourceSha256": "d30ef2c5745a24eab6558a06fa982d4e3f33699874b51b4ec9855f7aab74b732"
         },
         "es": {
           "path": "docs/INSTALLED-SENSOR-BINDING.es.md",
-          "sha256": "214b035a10ec30a539dea322bad6dd149bad237bcfee2faca90e0f3e3b634647",
+          "sha256": "81414f93649b6e11724c1fe76ea31795681e68ab52c3211053deb9cfdf960836",
           "from": "en",
-          "sourceSha256": "58e1454503eb36078ff50e5b628fe2a785874b4316724342ab706b4406a75855"
+          "sourceSha256": "d30ef2c5745a24eab6558a06fa982d4e3f33699874b51b4ec9855f7aab74b732"
         },
         "ja": {
           "path": "docs/INSTALLED-SENSOR-BINDING.ja.md",
-          "sha256": "ba8f801228b7bd95d1f4db3a4ba38d1518e5d00a20992dcbcdc163235521b789",
+          "sha256": "59a6717a3ebea846747110f8ef759ba3ad402376959a404f8ad0a6f7cd762518",
           "from": "en",
-          "sourceSha256": "58e1454503eb36078ff50e5b628fe2a785874b4316724342ab706b4406a75855"
+          "sourceSha256": "d30ef2c5745a24eab6558a06fa982d4e3f33699874b51b4ec9855f7aab74b732"
         }
       }
     },

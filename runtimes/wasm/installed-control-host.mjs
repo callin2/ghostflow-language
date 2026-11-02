@@ -106,10 +106,11 @@ function requireSensorOnlyReplacement(current, next, manifest) {
   }
 }
 
-function activate(wasm, artifact, installation, runId, composed) {
+function activate(wasm, artifact, installation, runId, composed, checkpoint = null) {
   const capabilities = installation.capabilities;
   return composed ? TemporarySettingsHost.instantiate(wasm, artifact,
-    { ...composed.activation, runId, capabilities, outputExplanations: true })
+    { ...composed.activation, runId, capabilities, outputExplanations: true,
+      ...(checkpoint ? { checkpoint, restoreApproved: true } : {}) })
     : ControlRuntime.instantiateFramed(wasm, artifact, { capabilities });
 }
 
@@ -165,6 +166,7 @@ export class InstalledControlHost {
 
   step(frame, settingsEvent = null) {
     this.#live();
+    if (this.#pending && this.#composed) fail('replacement already pending');
     const owned = copy(frame);
     exact(owned, ['bindingRevision', 'nowMs', 'samples', ...(this.#composed ? ['contextFacts'] : [])], 'frame');
     if (!this.#composed && settingsEvent !== null) fail('settings require a composed owner');
@@ -235,7 +237,8 @@ export class InstalledControlHost {
         fail('profile revision cannot change its content');
       }
       requireSensorOnlyReplacement(this.#installation, next, this.#artifact.manifest);
-      candidate = await activate(this.#wasm, this.#artifact, next, runId, this.#composed);
+      const checkpoint = this.#composed ? this.#runtime.checkpoint() : null;
+      candidate = await activate(this.#wasm, this.#artifact, next, runId, this.#composed, checkpoint);
       if (this.#disposed) fail('owner was disposed during preparation');
       const accepted = { runId, sourceSha256: this.#artifact.sourceDocument.sha256,
         bytecodeSha256: this.#artifact.manifest.bytecodeSha256,
