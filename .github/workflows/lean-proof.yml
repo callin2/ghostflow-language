@@ -1,4 +1,4 @@
-name: Lean Bool and PC proof
+name: Lean compiler certificates
 
 on:
   pull_request:
@@ -7,9 +7,14 @@ on:
       - experiments/bool-translation-validation/**
       - experiments/bool-sensor-validation/**
       - experiments/bool-sensor-state-validation/**
+      - experiments/int32-codec-validation/**
+      - experiments/lean-outcome.mjs
       - tests/bool-translation-validation.test.mjs
+      - tests/bool-generated-certificates.test.mjs
       - tests/bool-sensor-validation.test.mjs
       - tests/bool-sensor-state-validation.test.mjs
+      - tests/int32-codec-validation.test.mjs
+      - tests/lean-outcome.test.mjs
       - tools/**
       - crates/ghostflow-core/src/**
       - package.json
@@ -21,9 +26,14 @@ on:
       - experiments/bool-translation-validation/**
       - experiments/bool-sensor-validation/**
       - experiments/bool-sensor-state-validation/**
+      - experiments/int32-codec-validation/**
+      - experiments/lean-outcome.mjs
       - tests/bool-translation-validation.test.mjs
+      - tests/bool-generated-certificates.test.mjs
       - tests/bool-sensor-validation.test.mjs
       - tests/bool-sensor-state-validation.test.mjs
+      - tests/int32-codec-validation.test.mjs
+      - tests/lean-outcome.test.mjs
       - tools/**
       - crates/ghostflow-core/src/**
       - package.json
@@ -49,7 +59,7 @@ jobs:
         with:
           node-version: 22
       - name: Prepare evidence directory
-        run: mkdir -p build/bool-pc-validation build/bool-sensor-validation build/bool-sensor-state-validation
+        run: mkdir -p build/bool-pc-validation build/bool-sensor-validation build/bool-sensor-state-validation build/int32-codec-validation
       - name: Install locked Node dependencies
         shell: bash
         run: |
@@ -80,7 +90,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          node --test tests/bool-translation-validation.test.mjs tests/bool-sensor-validation.test.mjs tests/bool-sensor-state-validation.test.mjs 2>&1 | tee build/bool-pc-validation/node-test.log
+          node --test tests/bool-translation-validation.test.mjs tests/bool-generated-certificates.test.mjs tests/bool-sensor-validation.test.mjs tests/bool-sensor-state-validation.test.mjs tests/int32-codec-validation.test.mjs tests/lean-outcome.test.mjs 2>&1 | tee build/bool-pc-validation/node-test.log
       - name: Check Bool and PC proofs with Lean kernel
         shell: bash
         run: |
@@ -105,6 +115,14 @@ jobs:
           node experiments/bool-sensor-state-validation/verify.mjs \
             --lean "$lean_bin" --evidence-dir build/bool-sensor-state-validation \
             2>&1 | tee build/bool-sensor-state-validation/verify.log
+      - name: Check signed i32 codec certificates with Lean kernel
+        shell: bash
+        run: |
+          set -euo pipefail
+          lean_bin="$("$HOME/.elan/bin/elan" which lean)"
+          node experiments/int32-codec-validation/verify.mjs \
+            --lean "$lean_bin" --evidence-dir build/int32-codec-validation \
+            2>&1 | tee build/int32-codec-validation/verify.log
       - name: Upload proof evidence even on failure
         if: ${{ always() }}
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
@@ -114,5 +132,6 @@ jobs:
             build/bool-pc-validation/
             build/bool-sensor-validation/
             build/bool-sensor-state-validation/
+            build/int32-codec-validation/
           if-no-files-found: warn
           retention-days: 30
