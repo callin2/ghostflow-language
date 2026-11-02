@@ -2381,7 +2381,7 @@ difieren los umbrales ON/OFF y la condición de PPFD.
 
 ### E19 — Demanda de humidificación por VPD alto
 
-<!-- ghostflow:anchor id=GF-INT-PIG-E19-HYSTERESIS kind=intent status=confirmed -->
+<!-- ghostflow:anchor id=GF-INT-PIG-E19-HYSTERESIS kind=intent status=confirmed origin=ai -->
 > Mantener la demanda anterior entre los dos umbrales de VPD para evitar cambios rápidos; borrar la demanda si falla la muestra climática.
 
 ```ghost
@@ -2435,7 +2435,7 @@ control HumidificationDemand {
 
 ### E20 — Demanda de ventilación por VPD bajo
 
-<!-- ghostflow:anchor id=GF-INT-PIG-E20-HYSTERESIS kind=intent status=confirmed -->
+<!-- ghostflow:anchor id=GF-INT-PIG-E20-HYSTERESIS kind=intent status=confirmed origin=ai -->
 > Mantener la demanda anterior entre los dos umbrales de VPD para evitar cambios rápidos; borrar la demanda si falla la muestra climática.
 
 ```ghost
@@ -2489,7 +2489,7 @@ control VentilationDemand {
 
 ### E21 — Demanda de riego por VPD y luz
 
-<!-- ghostflow:anchor id=GF-INT-PIG-E21-HYSTERESIS kind=intent status=confirmed -->
+<!-- ghostflow:anchor id=GF-INT-PIG-E21-HYSTERESIS kind=intent status=confirmed origin=ai -->
 > Mantener la demanda anterior entre los dos umbrales de VPD para evitar cambios rápidos; borrar la demanda si falla la muestra climática.
 
 ```ghost
@@ -2560,11 +2560,11 @@ revisión exacta y un SHA-256.
 ```ghost
 // E22
 import HighVpd from "./E19.ghost.md"
-  revision "c8a5d37ac09230a9011291a3ae3b053d1bc22773"
-  sha256 "7bc10efed87a3db2bbf2e5b56fbf0d6c9a45b54117104d3fa0948baa01f695b4";
+  revision "5e709162753c0aba38d426c1c4e0722edfb04d7b"
+  sha256 "c53372f31c0bfb9b8cf52930c5d9ef02dd36cf7478345410bbc5fb53258fc5c7";
 import LowVpd from "./E20.ghost.md"
-  revision "c8a5d37ac09230a9011291a3ae3b053d1bc22773"
-  sha256 "9928297e43cd7c9790e6ca5178e71f4fd815223654fcd0b16fcc9605ea24bf38";
+  revision "5e709162753c0aba38d426c1c4e0722edfb04d7b"
+  sha256 "af696ac6774f459726853f0a2c65a689b42c7e37c69dd8165f68bb3dab1cbea8";
 control CombinedVpdDemands {
   input air: Temperature {
     sample = 1s; valid = 0°C .. 50°C;
@@ -3577,11 +3577,11 @@ requisitos de memoria y de cómputo.
 ```ghost
 // E31
 import Irrigation from "./E21.ghost.md"
-  revision "c8a5d37ac09230a9011291a3ae3b053d1bc22773"
-  sha256 "089daea1b525b0be49685b3595554bfb1aa67091fc995da2d65fb0ef9a24357d";
+  revision "5e709162753c0aba38d426c1c4e0722edfb04d7b"
+  sha256 "b87dcf69b53e993b8e82f901870f7470c047ea7b0e46f8308361e606c38b2a87";
 import Ventilation from "./E20.ghost.md"
-  revision "c8a5d37ac09230a9011291a3ae3b053d1bc22773"
-  sha256 "9928297e43cd7c9790e6ca5178e71f4fd815223654fcd0b16fcc9605ea24bf38";
+  revision "5e709162753c0aba38d426c1c4e0722edfb04d7b"
+  sha256 "af696ac6774f459726853f0a2c65a689b42c7e37c69dd8165f68bb3dab1cbea8";
 control CombinedGreenhouseDemands {
   input air: Temperature {
     sample = 1s; valid = 0°C .. 50°C;
