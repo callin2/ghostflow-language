@@ -660,10 +660,10 @@ fn validate_gfb1(bytes: &[u8]) -> Result<u16> {
         return fail(ErrorCode::InvalidBytecodeFormat, "bytecode is not GFB1");
     }
     let version = u16::from_le_bytes([bytes[4], bytes[5]]);
-    if !matches!(version, 1..=4 | 10 | 11 | 21 | 22) {
+    if !matches!(version, 1..=4 | 10 | 11 | 16 | 21 | 22) {
         return fail(
             ErrorCode::UnsupportedBytecodeVersion,
-            "supported GFB format versions are 1, 2, 3, 4, 10, 11, 21 and 22",
+            "supported GFB format versions are 1, 2, 3, 4, 10, 11, 16, 21 and 22",
         );
     }
     ghostflow_core::Module::load(bytes).map_err(|error| PortablePackageError {
@@ -1666,9 +1666,10 @@ fn verify_config_bindings(manifest: &Value, module: &ghostflow_core::Module) -> 
             "portable GFB11 profile supports scalar configs and Periodic schedules only",
         ));
     }
+    let solar_profile = module.bytecode_format_version() == 16;
     let configs = manifest["configs"].as_array().unwrap();
     let manifest_schedules = manifest["schedules"].as_array().unwrap();
-    if configs.is_empty() {
+    if configs.is_empty() && !solar_profile {
         return Err(mismatch("portable GFB11 profile requires config streams"));
     }
     let scalar_matches = |actual: MachineValue, expected: &Value| match actual {
@@ -1697,6 +1698,15 @@ fn verify_config_bindings(manifest: &Value, module: &ghostflow_core::Module) -> 
                         "portable GFB11 profile requires Periodic schedule preludes",
                     ));
                 };
+                if solar_profile
+                    && matches!(
+                        &periodic.definition,
+                        ScheduleDefinition::SolarContext { .. }
+                    )
+                {
+                    sites.insert(periodic.site);
+                    continue;
+                }
                 let ScheduleDefinition::Periodic {
                     epoch_id,
                     anchor_ms,
@@ -1796,7 +1806,7 @@ fn verify_config_bindings(manifest: &Value, module: &ghostflow_core::Module) -> 
                 }
                 continue;
             };
-            if config.kind == 3 {
+            if config.kind == 3 || (solar_profile && config.kind != 0) {
                 return Err(mismatch("portable config profile requires scalar payloads"));
             }
             let expected = configs
@@ -1871,7 +1881,7 @@ fn verify_debounce_bindings(manifest: &Value, bytecode: &[u8]) -> Result<()> {
         code: ErrorCode::BytecodeRejected,
         message: format!("native artifact validation failed: {error}"),
     })?;
-    if module.bytecode_format_version() == 11 {
+    if matches!(module.bytecode_format_version(), 11 | 16) {
         verify_config_bindings(manifest, &module)?;
     } else {
         verify_window_bindings(manifest, &module)?;
@@ -2432,6 +2442,138 @@ fn verify_sensor_conditioning(sensor: &serde_json::Map<String, Value>, label: &s
     Ok(())
 }
 
+fn verify_solar_bindings(manifest: &Value, module: &ghostflow_core::Module) -> Result<()> {
+    use ghostflow_core::{context_vm::ScheduleDefinition, schedule_vm::PulseDescriptor};
+    let mismatch = |message: &str| PortablePackageError {
+        code: ErrorCode::ManifestMismatch,
+        message: message.into(),
+    };
+    for field in [
+        "signals",
+        "providers",
+        "calendars",
+        "naturalConditions",
+        "calendarConditions",
+        "objectives",
+        "adaptSettings",
+        "resources",
+    ] {
+        if manifest
+            .get(field)
+            .is_some_and(|value| !value.as_array().is_some_and(Vec::is_empty))
+        {
+            return Err(mismatch("signed GFB16 admits only ordinary Solar pulses"));
+        }
+    }
+    let expected = manifest["schedules"]
+        .as_array()
+        .filter(|schedules| !schedules.is_empty())
+        .ok_or_else(|| mismatch("Solar schedules missing"))?;
+    let requirements = module
+        .schedule_requirements()
+        .ok_or_else(|| mismatch("Solar bytecode descriptors missing"))?;
+    for strategy in &requirements.strategies {
+        if strategy
+            .schedules
+            .iter()
+            .filter(|descriptor| !matches!(descriptor, PulseDescriptor::Config(_)))
+            .count()
+            != expected.len()
+        {
+            return Err(mismatch("Solar schedule count differs from bytecode"));
+        }
+        let mut sites = HashSet::new();
+        for descriptor in &strategy.schedules {
+            if matches!(descriptor, PulseDescriptor::Config(_)) {
+                continue;
+            }
+            let PulseDescriptor::Context(actual) = descriptor else {
+                return Err(mismatch("Solar requires context descriptors"));
+            };
+            let ScheduleDefinition::SolarContext {
+                timezone,
+                latitude,
+                longitude,
+                event,
+                offset_ms,
+                fallback_time_ms,
+                config_ids,
+                weekday_mask,
+            } = &actual.definition
+            else {
+                return Err(mismatch("signed GFB16 admits only Solar descriptors"));
+            };
+            let schedule = expected
+                .iter()
+                .find(|value| value["site"].as_u64() == Some(u64::from(actual.site)))
+                .ok_or_else(|| mismatch("Solar site differs from bytecode"))?;
+            exact_keys(
+                value_object(schedule, "Solar schedule")?,
+                &[
+                    "kind",
+                    "site",
+                    "name",
+                    "timezone",
+                    "latitude",
+                    "longitude",
+                    "event",
+                    "offsetMs",
+                    "configIds",
+                    "policy",
+                ],
+                "Solar schedule",
+                ErrorCode::ManifestMismatch,
+            )?;
+            let policy = &schedule["policy"];
+            let policy_object = value_object(policy, "Solar policy")?;
+            let mut policy_keys = vec!["basis", "when", "clock", "gapMs", "recovery", "fallback"];
+            if policy_object.contains_key("cancelWhen") {
+                policy_keys.push("cancelWhen");
+            }
+            exact_keys(
+                policy_object,
+                &policy_keys,
+                "Solar policy",
+                ErrorCode::ManifestMismatch,
+            )?;
+            if !sites.insert(actual.site)
+                || schedule["kind"] != "solar"
+                || schedule["name"].as_str() != Some(actual.name.as_str())
+                || schedule["timezone"].as_str() != Some(timezone.as_str())
+                || schedule["latitude"].as_f64() != Some(*latitude)
+                || schedule["longitude"].as_f64() != Some(*longitude)
+                || schedule["event"].as_str() != ["rise", "set"].get(usize::from(*event)).copied()
+                || schedule["offsetMs"].as_i64() != Some(*offset_ms)
+                || !schedule["configIds"].as_array().is_some_and(Vec::is_empty)
+                || policy["basis"] != "pulse"
+                || policy["clock"] != "trusted_only"
+                || policy["gapMs"].as_u64() != Some(actual.gap_ms)
+                || policy["recovery"] != "baseline"
+                || policy["fallback"] != "skip"
+                || actual.clock_hold_ms.is_some()
+                || fallback_time_ms.is_some()
+                || weekday_mask.is_some()
+                || !config_ids.is_empty()
+            {
+                return Err(mismatch("Solar descriptor differs from bytecode"));
+            }
+            let default_cancel = Value::String("false".into());
+            for (value, code) in [
+                (&policy["when"], &actual.when),
+                (
+                    policy.get("cancelWhen").unwrap_or(&default_cancel),
+                    &actual.cancel,
+                ),
+            ] {
+                if predicate_projection::encode(value, module).as_deref() != Some(code.as_slice()) {
+                    return Err(mismatch("Solar predicate differs from bytecode"));
+                }
+            }
+        }
+    }
+    Ok(())
+}
+
 fn verify_civil_range_bindings(manifest: &Value, module: &ghostflow_core::Module) -> Result<()> {
     use ghostflow_core::{context_vm::ScheduleDefinition, schedule_vm::PulseDescriptor};
     let mismatch = |message: &str| PortablePackageError {
@@ -2666,7 +2808,10 @@ fn verify_manifest(
     if object["format"].as_str() == Some("GhostFlow/control-v22") {
         keys.push("outputObservations");
     }
-    if object["format"].as_str() == Some("GhostFlow/control-v21") {
+    if matches!(
+        object["format"].as_str(),
+        Some("GhostFlow/control-v15" | "GhostFlow/control-v21")
+    ) {
         for field in [
             "providers",
             "calendars",
@@ -3282,11 +3427,11 @@ pub fn verify_portable_package_with_signature_policy(
     }
     if !matches!(
         payload.bytecode.version.as_str(),
-        "1" | "2" | "3" | "4" | "10" | "11" | "21" | "22"
+        "1" | "2" | "3" | "4" | "10" | "11" | "16" | "21" | "22"
     ) {
         return fail(
             ErrorCode::UnsupportedBytecodeVersion,
-            "payload bytecode version must be 1, 2, 3, 4, 10, 11, 21 or 22",
+            "payload bytecode version must be 1, 2, 3, 4, 10, 11, 16, 21 or 22",
         );
     }
     require_digest(&payload.bytecode.sha256, "payload.bytecode.sha256")?;
@@ -3358,19 +3503,22 @@ pub fn verify_portable_package_with_signature_policy(
         message: format!("native artifact validation failed: {error}"),
     })?;
     let profile_version = module.bytecode_format_version();
-    if !matches!(profile_version, 1..=4 | 10 | 11 | 21) {
+    if !matches!(profile_version, 1..=4 | 10 | 11 | 16 | 21)
+        || (profile_version == 16 && bytecode_version == 22)
+    {
         return fail(
             ErrorCode::UnsupportedBytecodeVersion,
             "unsupported lifecycle base profile",
         );
     }
     if (profile_version == 11) != (payload.manifest.format == "GhostFlow/control-v10")
-        || matches!(profile_version, 11 | 21)
+        || (profile_version == 16) != (payload.manifest.format == "GhostFlow/control-v15")
+        || matches!(profile_version, 11 | 16 | 21)
             != (identity.runtime_abi == "GhostFlow/context-scan-abi-v5")
     {
         return fail(
             ErrorCode::ManifestMismatch,
-            "GFB11/21 requires its matching manifest and context-scan-abi-v5",
+            "GFB11/16/21 requires its matching manifest and context-scan-abi-v5",
         );
     }
     let source_text = String::from_utf8(source_bytes).map_err(|_| PortablePackageError {
@@ -3418,6 +3566,9 @@ pub fn verify_portable_package_with_signature_policy(
         );
     }
     verify_output_observation_bindings(&manifest, &module, &identity.runtime_abi)?;
+    if profile_version == 16 {
+        verify_solar_bindings(&manifest, &module)?;
+    }
     if profile_version == 21 {
         verify_civil_range_bindings(&manifest, &module)?;
     }
@@ -5105,6 +5256,30 @@ mod tests {
                 Err(error) => error,
                 Ok(_) => panic!("{scenario}: invalid signed Int settings accepted"),
             };
+            assert_eq!(
+                error.code,
+                ErrorCode::ManifestMismatch,
+                "{scenario}: {error:?}"
+            );
+            assert!(!called.get(), "{scenario} reached target loader");
+        }
+    }
+
+    #[test]
+    fn signed_solar_pulse_binds_descriptors_and_predicates_before_loader() {
+        let called = std::cell::Cell::new(false);
+        let accept =
+            |bytes: &[u8], _: &TargetLoaderContext<'_>| -> std::result::Result<bool, String> {
+                called.set(true);
+                Ok(ghostflow_core::Module::load(bytes).is_ok())
+            };
+        let mut current = profile(&accept);
+        let formats = strings(&["GhostFlow/control-v15"]);
+        current.supported_manifest_formats = &formats;
+        verify_portable_package(&fixture_for("solar-pulse-valid"), &current).unwrap();
+        assert!(called.replace(false));
+        for scenario in ["solar-pulse-descriptor", "solar-pulse-predicate"] {
+            let error = verify_portable_package(&fixture_for(scenario), &current).unwrap_err();
             assert_eq!(
                 error.code,
                 ErrorCode::ManifestMismatch,

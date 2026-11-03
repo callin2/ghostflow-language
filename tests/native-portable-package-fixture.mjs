@@ -74,6 +74,36 @@ if (gfb10Scenario) {
   process.stdout.write(serializePortablePackage(candidate));
   process.exit(0);
 }
+if (scenario.startsWith('solar-pulse-')) {
+  const source = '# Solar pulse\n\n```ghost\n' + `control SignedSolar {
+    config enabled: Bool = true { access = operator; }
+    schedule dawn: Solar { timezone = "Asia/Seoul"; latitude = 37.5665; longitude = 126.978;
+      at = sun\`rise\`; basis = pulse; when = true; clock = trusted_only;
+      gap = skip_after(60s); recovery = baseline; fallback = skip; }
+    output pump: Bool;
+    pump <- dawn.due;
+  }` + '\n```\n';
+  identity.runtimeAbi = 'GhostFlow/context-scan-abi-v5';
+  identity.requiredCapabilities = [{ kind: 'actuator', name: 'pump', type: 'bool' }];
+  const artifact = await compileSource(source, { filename: 'solar-pulse.ghost.md' });
+  const candidate = structuredClone(await buildPortablePackage(artifact, identity, {
+    signers: [{ keyId: 'test-current-2026', privateKey }],
+    verifyCompilation: (text, { filename }) => compileSource(text, { filename }),
+  }));
+  if (scenario === 'solar-pulse-descriptor' || scenario === 'solar-pulse-predicate') {
+    const manifest = JSON.parse(Buffer.from(candidate.payload.manifest.contentBase64, 'base64').toString('utf8'));
+    if (scenario.endsWith('descriptor')) manifest.schedules[0].longitude++;
+    else manifest.schedules[0].policy.when = 'false';
+    const bytes = encoder.encode(canonicalJson(manifest));
+    candidate.payload.manifest.contentBase64 = Buffer.from(bytes).toString('base64');
+    candidate.payload.manifest.sha256 = Buffer.from(await crypto.subtle.digest('SHA-256', bytes)).toString('hex');
+    const payloadBytes = encoder.encode(canonicalJson(candidate.payload));
+    candidate.payloadSha256 = Buffer.from(await crypto.subtle.digest('SHA-256', payloadBytes)).toString('hex');
+    candidate.signatures[0].signatureBase64 = Buffer.from(await crypto.subtle.sign('Ed25519', privateKey, payloadBytes)).toString('base64');
+  }
+  process.stdout.write(serializePortablePackage(candidate));
+  process.exit(0);
+}
 const configTimerScenario = scenario === 'config-timer-valid';
 if (intSettingsScenario || timeScenario || quantityScenario || configTimerScenario) identity.runtimeAbi = 'GhostFlow/context-scan-abi-v5';
 if (configTimerScenario) identity.requiredCapabilities = [

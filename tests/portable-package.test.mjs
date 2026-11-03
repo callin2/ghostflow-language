@@ -615,3 +615,23 @@ test('GF-TEST-portable-package-adapt: canonical Bool strategy package retains op
   const runtime=await GhostFlowRuntime.instantiate(wasm);try{runtime.load(verified.bytecode.copy());runtime.addCapability('actuator','pump','bool');if(present)runtime.addCapability('sensor','door','bool');runtime.activate();const sensor=verified.manifest.sensors[0];runtime.setBool(sensor.valueInput,true);runtime.setBool(sensor.okInput,true);runtime.setNumber(sensor.faultInput,0);runtime.tick();assert.equal(runtime.trace.requested.pump,present);}finally{runtime.dispose();}
  }
 });
+
+test('signed Solar v15 rejects re-signed descriptor and predicate changes before loading', async () => {
+  const key = await currentKeyPromise;
+  const fixture = scenario => JSON.parse(execFileSync(process.execPath, [
+    path.join(root, 'tests/native-portable-package-fixture.mjs'), scenario,
+  ], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }));
+  let called = false;
+  const options = {
+    ...verifierOptions(key, async () => { called = true; return true; }),
+    supportedRuntimeAbis: ['GhostFlow/context-scan-abi-v5'],
+    supportedManifestFormats: ['GhostFlow/control-v15'],
+  };
+  await verifyPortablePackage(fixture('solar-pulse-valid'), options);
+  assert.ok(called);
+  called = false;
+  for (const scenario of ['solar-pulse-descriptor', 'solar-pulse-predicate']) {
+    await assert.rejects(verifyPortablePackage(fixture(scenario), options), error => error.code === 'source-map-mismatch' && /context schedule manifest/.test(error.cause?.message));
+    assert.equal(called, false);
+  }
+});
