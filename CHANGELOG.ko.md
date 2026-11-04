@@ -5,6 +5,16 @@
 
 ## 미출시
 
+### 2026-11-05 - 유한 타이머 순서 예측 ([#622](https://github.com/callin2/ghostflow-language/issues/622))
+
+모니터링 계획이 Duration 설정으로 제어하는 반복하지 않는 유한 enum 순서를
+설명합니다. 예를 들어 `Idle -> First -> Second -> Rest -> Idle`은 시간이 정해진
+세 단계를 `sequence`로 제공하며 기존 설정 기반 타이머 출력과 반복 `cycle`
+메타데이터의 의미는 유지합니다. 지원하지 않는 전이는 순서 정보를 생략합니다.
+JavaScript와 native 패키지 검증은 선언된 제한된 단계만 허용하고 `cycle`과
+`sequence`가 함께 있는 패턴을 거절합니다. GFB와 실행 의미는 바뀌지 않습니다.
+근거는 `tests/monitoring-plan.test.mjs`입니다.
+
 ### 2026-11-04 - 표시용 모니터링 계획 ([#622](https://github.com/callin2/ghostflow-language/issues/622))
 
 컴파일러가 일정 due를 필수 AND 조건으로 시작하고, 고정 elapsed 타이머 시간에

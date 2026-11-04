@@ -103,3 +103,30 @@ test('configured timed outputs expose the direct Duration setting and enum order
   assert.deepEqual(earlyPatterns.map(pattern => pattern.outputName), ['valve_b']);
   assert.equal(earlyPatterns[0].cycle, undefined);
 });
+
+test('finite timed sequences expose all stages while repeating cycles stay cycles', async () => {
+  const finite = `\`\`\`ghost
+  control Finite {
+    config first_time: Duration = 10s { min = 1s; max = 60s; step = 1s; access = operator; }
+    config second_time: Duration = 20s { min = 1s; max = 60s; step = 1s; access = operator; }
+    config rest_time: Duration = 5s { min = 1s; max = 60s; step = 1s; access = operator; }
+    type Phase = Idle | First | Second | Rest;
+    state phase: Phase = Idle;
+    timer age = elapsed(phase);
+    let first = first_time |> recover(0ms); let second = second_time |> recover(0ms); let rest = rest_time |> recover(0ms);
+    input start: Bool;
+    phase' = case phase { Idle => if (start |> recover(false)) then First else Idle; First => if age >= first then Second else First; Second => if age >= second then Rest else Second; Rest => if age >= rest then Idle else Rest; };
+    output valve_a, valve_b: Bool;
+    valve_a <- phase' == First; valve_b <- phase' == Second;
+  }
+  \`\`\``;
+  const patterns = (await compileSource(finite, { filename: 'finite.ghost.md' })).manifest.monitoring.patterns;
+  const sequence = [{ value: 1, configName: 'first_time' }, { value: 2, configName: 'second_time' }, { value: 3, configName: 'rest_time' }];
+  assert.deepEqual(patterns.map(pattern => pattern.sequence), [sequence, sequence]);
+  assert.equal(patterns[0].cycle, undefined);
+
+  const repeating = finite.replace('Rest => if age >= rest then Idle', 'Rest => if age >= rest then First');
+  const repeatingPatterns = (await compileSource(repeating, { filename: 'repeating.ghost.md' })).manifest.monitoring.patterns;
+  assert.equal(repeatingPatterns[0].sequence, undefined);
+  assert.equal(repeatingPatterns[0].cycle, undefined);
+});

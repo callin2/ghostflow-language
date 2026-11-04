@@ -2,6 +2,16 @@
 
 ## Unreleased
 
+### 2026-11-05 - finite timed sequence forecasts ([#622](https://github.com/callin2/ghostflow-language/issues/622))
+
+Monitoring plans now describe bounded, non-repeating enum sequences controlled by
+Duration settings. For example, `Idle -> First -> Second -> Rest -> Idle` exposes
+the three timed stages as `sequence`, while existing configured timed outputs and
+repeating `cycle` metadata keep their meanings. Unsupported transitions omit the
+sequence. JavaScript and native package verification admit only bounded declared
+stages and reject a pattern containing both `cycle` and `sequence`. GFB and
+execution semantics are unchanged. See `tests/monitoring-plan.test.mjs`.
+
 ### 2026-11-04 - descriptive monitoring plans ([#622](https://github.com/callin2/ghostflow-language/issues/622))
 
 The compiler emits optional `GhostFlow/monitoring-plan-v1` metadata for a directly
