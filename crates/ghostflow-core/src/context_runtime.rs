@@ -425,6 +425,16 @@ pub(crate) struct ContextRuntime {
     clock: ScheduleClockGate,
 }
 
+impl ContextRuntime {
+    pub(crate) fn scalar_setting(&self, id: u32) -> Option<Value> {
+        let stream = self.configs.iter().find(|stream| stream.descriptor.id == id)?;
+        match stream.current.as_ref().ok()? {
+            ConfigValue::Scalar(value) => Some(*value),
+            ConfigValue::Slots(_) => None,
+        }
+    }
+}
+
 pub(crate) struct Stage {
     pub runtime: ContextRuntime,
     pub projections: Vec<[Value; 3]>,

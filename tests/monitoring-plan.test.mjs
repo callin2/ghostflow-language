@@ -83,3 +83,21 @@ test('portable package replay rejects a substituted monitoring plan', async () =
   changed.signatures[0].signatureBase64 = Buffer.from(await crypto.subtle.sign('Ed25519', key.privateKey, payloadBytes)).toString('base64');
   await assert.rejects(verifyPortablePackage(changed, verifyOptions), /monitoring plan does not match canonical source lowering|does not match declared output/);
 });
+
+test('configured timed outputs expose the direct Duration setting and enum order', async () => {
+  const source = `control Settings {\n  config watering: Duration = 10s { min = 1s; max = 60s; step = 1s; access = operator; }\n  type Phase = First | Second;\n  state phase: Phase = First;\n  timer age = elapsed(phase);\n  let phase_limit = watering |> recover(0ms);\n  phase' = case phase { First => if age >= phase_limit then Second else First; Second => if age >= phase_limit then First else Second; };\n  output valve_a, valve_b: Bool;\n  valve_a <- phase' == First;\n  valve_b <- phase' == Second;\n}`;
+  const compiled = await compileSource(source, { filename: 'configured.ghost' });
+  assert.deepEqual(compiled.manifest.monitoring.patterns, [
+    { kind: 'configured-timed-output', outputName: 'valve_a', stateName: 'phase', timerId: 'age', configName: 'watering', activeValue: 0 },
+    { kind: 'configured-timed-output', outputName: 'valve_b', stateName: 'phase', timerId: 'age', configName: 'watering', activeValue: 1 },
+  ]);
+
+  const inputGated = source.replace('output valve_a', 'input interlock: Bool; output valve_a')
+    .replace("valve_a <- phase' == First;", "valve_a <- (phase' == First) && (interlock |> recover(false));");
+  assert.deepEqual((await compileSource(inputGated, { filename: 'interlocked.ghost' })).manifest.monitoring.patterns
+    .map(pattern => pattern.outputName), ['valve_b']);
+
+  const wrongDirection = source.replace('if age >= phase_limit then Second', 'if age < phase_limit then Second');
+  assert.deepEqual((await compileSource(wrongDirection, { filename: 'early-transition.ghost' })).manifest.monitoring.patterns
+    .map(pattern => pattern.outputName), ['valve_b']);
+});

@@ -1509,6 +1509,12 @@ impl Runtime {
                 module.fingerprint,
             )
     }
+    /// Read the currently effective scalar from an installed settings stream.
+    /// A missing or failed reading provides no value.
+    pub fn context_scalar_setting(&self, id: u32) -> Option<Value> {
+        self.context_runtime.as_ref()?.scalar_setting(id)
+    }
+
     pub fn context_state_json(&self) -> Result<String> {
         let module = self
             .module

@@ -868,20 +868,13 @@ fn verify_monitoring_plan(manifest: &Value) -> Result<()> {
     for (index, value) in patterns.iter().enumerate() {
         let label = format!("monitoring.patterns[{index}]");
         let pattern = value_object(value, &label)?;
-        exact_keys(
-            pattern,
-            &[
-                "kind",
-                "outputName",
-                "stateName",
-                "timerId",
-                "durationMs",
-                "scheduleId",
-            ],
-            &label,
-            ErrorCode::ManifestMismatch,
-        )?;
-        if pattern["kind"].as_str() != Some("scheduled-timed-latch") {
+        let configured = pattern["kind"].as_str() == Some("configured-timed-output");
+        exact_keys(pattern, if configured {
+            &["kind", "outputName", "stateName", "timerId", "configName", "activeValue"]
+        } else {
+            &["kind", "outputName", "stateName", "timerId", "durationMs", "scheduleId"]
+        }, &label, ErrorCode::ManifestMismatch)?;
+        if !configured && pattern["kind"].as_str() != Some("scheduled-timed-latch") {
             return Err(mismatch("monitoring pattern kind is unsupported"));
         }
         let name = |key: &str| -> Result<&str> {
@@ -897,6 +890,19 @@ fn verify_monitoring_plan(manifest: &Value) -> Result<()> {
         let output = name("outputName")?;
         let state = name("stateName")?;
         let timer = name("timerId")?;
+        if configured {
+            let config = name("configName")?;
+            if !(pattern["activeValue"] == true || pattern["activeValue"].as_u64().is_some_and(|value| value <= 9_007_199_254_740_991)) {
+                return Err(mismatch("configured monitoring activeValue must be true or a non-negative safe integer"));
+            }
+            if !manifest["configs"].as_array().is_some_and(|configs| configs.iter().any(|candidate| candidate["name"].as_str() == Some(config) && candidate["type"].as_str() == Some("Duration"))) {
+                return Err(mismatch("configured monitoring config must be a declared Duration"));
+            }
+            if !outputs.insert(output) || !manifest["outputs"].as_array().is_some_and(|ports| ports.iter().any(|port| port["name"].as_str() == Some(output) && port["type"].as_str() == Some("Bool"))) || !manifest["timers"].as_array().is_some_and(|timers| timers.iter().any(|candidate| candidate["name"].as_str() == Some(timer) && candidate["state"].as_str() == Some(state))) {
+                return Err(mismatch("configured monitoring pattern does not match output and elapsed timer"));
+            }
+            continue;
+        }
         let schedule = name("scheduleId")?;
         pattern["durationMs"]
             .as_u64()

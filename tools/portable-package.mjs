@@ -84,11 +84,25 @@ function validateMonitoringPlanManifest(manifest) {
   const seenOutputs = new Set();
   for (const [index, pattern] of monitoring.patterns.entries()) {
     const path = `manifest.monitoring.patterns[${index}]`;
-    exactObject(pattern, ['kind', 'outputName', 'stateName', 'timerId', 'durationMs', 'scheduleId'], path);
-    if (pattern.kind !== 'scheduled-timed-latch') fail('manifest-mismatch', `${path}.kind is unsupported`);
+    const keys = pattern.kind === 'configured-timed-output'
+      ? ['kind', 'outputName', 'stateName', 'timerId', 'configName', 'activeValue']
+      : ['kind', 'outputName', 'stateName', 'timerId', 'durationMs', 'scheduleId'];
+    exactObject(pattern, keys, path);
+    if (!['scheduled-timed-latch', 'configured-timed-output'].includes(pattern.kind)) fail('manifest-mismatch', `${path}.kind is unsupported`);
     ghostName(pattern.outputName, `${path}.outputName`);
     ghostName(pattern.stateName, `${path}.stateName`);
     ghostName(pattern.timerId, `${path}.timerId`);
+    if (pattern.kind === 'configured-timed-output') {
+      ghostName(pattern.configName, `${path}.configName`);
+      if (!(pattern.activeValue === true || Number.isSafeInteger(pattern.activeValue) && pattern.activeValue >= 0)) fail('manifest-mismatch', `${path}.activeValue must be true or a non-negative safe integer`);
+      if (outputs.get(pattern.outputName)?.type !== 'Bool'
+        || !manifest.configs.some(config => config.name === pattern.configName && config.type === 'Duration')
+        || timers.get(pattern.timerId)?.state !== pattern.stateName || seenOutputs.has(pattern.outputName)) {
+        fail('manifest-mismatch', `${path} does not match declared output, Duration config and elapsed timer`);
+      }
+      seenOutputs.add(pattern.outputName);
+      continue;
+    }
     ghostName(pattern.scheduleId, `${path}.scheduleId`);
     if (!Number.isSafeInteger(pattern.durationMs) || pattern.durationMs <= 0) fail('manifest-mismatch', `${path}.durationMs must be positive`);
     if (outputs.get(pattern.outputName)?.type !== 'Bool' || !schedules.has(pattern.scheduleId)

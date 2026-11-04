@@ -2188,6 +2188,60 @@ class Lowerer {
     }
   }
   monitoringPatterns() {
+    const referenceIs = (node, name) => node?.kind === 'reference' && node.name === name;
+    const zeroDuration = node => node?.kind === 'literal' && /^0(?:ms|s|min|h|d)$/.test(node.raw);
+    const durationConfig = (node, seen = new Set()) => {
+      if (node?.kind === 'reference') {
+        const symbol = this.symbols.get(node.name);
+        if (symbol?.category === 'config') {
+          const descriptor = this.manifest.configs.find(item => item.id === symbol.id);
+          return descriptor?.type === 'Duration' && descriptor.settings ? node.name : null;
+        }
+        if (symbol?.category === 'let' && !seen.has(node.name)) {
+          seen.add(node.name);
+          return durationConfig(this.lets.get(node.name)?.value, seen);
+        }
+      }
+      if (node?.kind === 'binary' && node.op === '|>' && node.right?.kind === 'call'
+        && node.right.name === 'recover' && node.right.args.length === 1 && zeroDuration(node.right.args[0])) {
+        return durationConfig(node.left, seen);
+      }
+      return null;
+    };
+    const timerComparison = (node, operator) => {
+      if (node?.kind !== 'binary' || node.op !== operator || node.left?.kind !== 'reference') return null;
+      const timer = this.timers.get(node.left.name);
+      const configName = durationConfig(node.right);
+      if (timer?.mode !== 'elapsed' || !configName) return null;
+      return { timerId: node.left.name, configName };
+    };
+    const transitionForTarget = (nextNode, member, enumValues) => {
+      const transition = nextNode.value;
+      if (member === null) {
+        return transition.kind === 'if' && referenceIs(transition.test, nextNode.name)
+          ? timerComparison(transition.yes, '<') : null;
+      }
+      if (transition.kind !== 'case' || !referenceIs(transition.value, nextNode.name)) return null;
+      const branch = transition.branches.find(entry => entry.name === member)?.body;
+      if (branch?.kind !== 'if' || !referenceIs(branch.no, member)
+        || branch.yes?.kind !== 'reference' || branch.yes.name === member || !enumValues.has(branch.yes.name)) return null;
+      return timerComparison(branch.test, '>=');
+    };
+    const outputGate = (node, stateName, member) => {
+      const isNextState = value => value?.kind === 'nextReference' && value.name === stateName;
+      const terms = value => value.kind === 'binary' && value.op === '&&'
+        ? [...terms(value.left), ...terms(value.right)] : [value];
+      const isStateGate = value => member === null ? isNextState(value)
+        : value.kind === 'binary' && value.op === '==' && (
+          isNextState(value.left) && referenceIs(value.right, member)
+          || isNextState(value.right) && referenceIs(value.left, member)
+        );
+      const clauses = terms(node);
+      return clauses.filter(isStateGate).length === 1
+        && clauses.every(value => isStateGate(value) || (
+          value.kind === 'binary' && value.op === '>' && durationConfig(value.left) && zeroDuration(value.right)
+        ));
+    };
     const containsStateOrSchedule = node => {
       const seen = new Set();
       const visit = value => {
@@ -2233,6 +2287,29 @@ class Lowerer {
           kind: 'scheduled-timed-latch', outputName: connection.name, stateName: nextNode.name,
           timerId, durationMs, scheduleId: scheduleIds[0],
         });
+      }
+    }
+    // Configured timed outputs: the output is gated by the exact next-state
+    // value, while that state transition compares its own elapsed timer with
+    // an operator Duration (possibly through the immutable recover-zero let).
+    for (const nextNode of this.ast.body.filter(item => item.kind === 'next')) {
+      const state = this.states.get(nextNode.name);
+      if (!state) continue;
+      const enumValues = this.types.get(state.type.kind);
+      const targets = state.type.kind === 'Bool' ? [null] : [...(enumValues?.keys() ?? [])];
+      for (const memberName of targets) {
+        const comparison = transitionForTarget(nextNode, memberName, enumValues);
+        if (!comparison) continue;
+        const activeValue = memberName === null ? true : this.enumMembers.get(memberName)?.value;
+        if (activeValue === undefined) continue;
+        for (const connection of this.ast.body.filter(item => item.kind === 'connection')) {
+          const output = this.outputs.get(connection.name);
+          if (output?.type.kind !== 'Bool' || !outputGate(connection.value, nextNode.name, memberName)) continue;
+          const timer = this.timers.get(comparison.timerId);
+          if (timer.state !== nextNode.name || patterns.some(item => item.outputName === connection.name)) continue;
+          patterns.push({ kind: 'configured-timed-output', outputName: connection.name, stateName: nextNode.name,
+            timerId: comparison.timerId, configName: comparison.configName, activeValue });
+        }
       }
     }
     return patterns.slice(0, 32);
