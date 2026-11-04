@@ -32,6 +32,7 @@ const TESTS = Object.freeze([
   'tests/periodic-cron-policy.test.mjs', 'tests/daily-slots-policy.test.mjs',
   'tests/daily-runtime.test.mjs', 'tests/daily-slots-runtime.test.mjs',
   'tests/solar-control.test.mjs', 'tests/solar-control-runtime.test.mjs',
+  'tests/monitoring-plan.test.mjs',
   'tests/true-for-integration.test.mjs', 'tests/true-for-driver-contract.test.mjs',
   'tests/true-for-profile.test.mjs',
   'tests/control-runtime-atomicity.test.mjs', 'tests/native-dispatch-status.test.mjs',
