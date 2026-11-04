@@ -27,6 +27,15 @@ dispatch 전에 거절합니다. 한 instance에서 호스트 `step`과 native `
 않습니다. 기존 품질 입력 소스 계약의 브라우저 호스트 연결을 보완한 것으로,
 제어 정책의 의미는 바뀌지 않습니다.
 
+### 2026-10-29 - 호환 바인딩 교체 시 설정 유지 ([#295](https://github.com/callin2/ghostflow-language/issues/295), [#590](https://github.com/callin2/ghostflow-language/issues/590))
+
+InstalledControlHost가 호환 센서 바인딩 교체를 승인할 때 보유한 설정 checkpoint를
+복원합니다. 새 run에서도 일반 설정의 Result 값, fault, revision, history를 유지합니다.
+Run overlay는 새 run의 첫 판단 전에 반환하고 Until overlay는 기존 만료 시각을
+유지합니다. 제어 상태, 타이머, 센서 관측은 새로 시작합니다. 교체 실패 시 기존 소유자를
+보존하고 합성 scan과 checkpoint 캡처의 경합을 차단합니다.
+근거는 `tests/reference-change-lifecycle.test.mjs`입니다.
+
 ### 2026-10-29 - 설치된 합성 실행 ([#290](https://github.com/callin2/ghostflow-language/issues/290), [#302](https://github.com/callin2/ghostflow-language/issues/302))
 
 InstalledControlHost가 직접 port를 연결하는 한정 `control-v10` 합성 프로필을 승인하고

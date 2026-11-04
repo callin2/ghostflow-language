@@ -234,9 +234,21 @@ export const LANGUAGE_TESTS = Object.freeze([
   'tests/program-replacement-host.test.mjs',
   'tests/installed-control-host.test.mjs',
   'tests/installed-composition.test.mjs',
+  'tests/reference-change-lifecycle.test.mjs',
   'tests/bool-translation-validation.test.mjs',
+  'tests/bool-generated-certificates.test.mjs',
+  'tests/int32-codec-validation.test.mjs',
+  'tests/lean-outcome.test.mjs',
+  'tests/lean-proof-workflow.test.mjs',
   'tests/bool-sensor-validation.test.mjs',
   'tests/bool-sensor-state-validation.test.mjs',
+  'tests/two-sensor-provenance.test.mjs',
+  'tests/elapsed-epoch-validation.test.mjs',
+  'tests/elapsed-snapshot-observation.test.mjs',
+  'tests/elapsed-clock-admission.test.mjs',
+  'tests/elapsed-clock-bounds.test.mjs',
+  'tests/elapsed-duration-output.test.mjs',
+  'tests/elapsed-duration-runtime.test.mjs',
   'tests/bool-sensor-runtime.test.mjs',
   'tests/alarm-observation.test.mjs',
   'tests/software-input-reference.test.mjs',
@@ -544,6 +556,8 @@ async function verify(nodeOnly, curriculumOnly) {
       wasmVerified = true;
     }
     report.plcCurriculum.replay.runtime = await verifyCurriculumReplayWasm(fs.readFileSync(wasmPath), { repositoryRoot: root });
+    await gate('python3', ['experiments/rust-reader-validation/test_verify_receipt.py']);
+    await gate('python3', ['experiments/rust-int-primitives/test_receipts.py']);
     // Preserve dev batching and serialize suites that rebuild shared Cargo outputs.
     for (const tests of languageTestBatches(LANGUAGE_TESTS)) {
       await gate(process.execPath, ['--test', '--test-concurrency=1', ...tests]);

@@ -431,3 +431,303 @@ WASM에서 세션의30초를 직접 조회하고, native/WASM의 별도 시간·
 검사가 모두 통과했다. 전체 compiler, production Rust/model 대응, f64 SmallNumberLaws,
 원본 전달 경로와 장치 동작은 여전히 전체 증명의 남은 범위다. 다음 실험은 생산 Rust
 Reader의 실제 본문을 Charon/Aeneas로 추출하고 Lean에서 불변조건부터 확인하는 것이다.
+
+## build176: 생산 Rust Reader 추출물의 첫 커널 증명
+
+생산 Rust `Reader::new`와 `Reader::finished` 본문을 고정된 Charon/Aeneas로 추출했다.
+생성 Lean 파일을 그대로 보존하고, 초기 cursor0·bytes 보존·범위 불변식·종료 판정과
+잔여 바이트 리스트의 관계를7개 정리로 증명했다. 마지막 관계는 cursor가 범위 안에 있다는
+전제가 필요하며, 전제를 제거했을 때의 실제 반례도 확인했다. outer Result의 panic·divergence를
+평범한 파싱 거절로 바꾸지 않았다. 독립 검토도 별도 출력 경로에서 커널 검사를 통과했다.
+
+통합 검증 소스는 `1bcb1771f69d78ca1c1d78f391ef67eea232163d`다.
+Lean4.35 실행은 `2026-10-28T20:52:38.906824Z`에 exit0으로 완료됐다.
+정리7개를 검증하는 baseline과 잘못된 초기 위치·반전된 종료 조건·누락된 범위 전제의
+거절3개가 통과했다. 기록된8개 입력 파일 해시는 모두 일치한다. 영수증 SHA-256은
+`d8a2a82d1f213cdd702d5d6dcc76f764775c5f38a95f6fd9a5558f4aee079437`이며
+`build/rust-reader-wave11-590/`에 보존했다. 표준 Lean 공리3개만 허용한다.
+
+검증기 자체의 잘못된 성공 기록도 막았다. 새 실행은 검사 전에 원자적으로 `running`을
+기록하고, 정상 종료 시 최종 상태를 바꾼다. 강제 종료·일반 실패가 예전 `passed`를 남기지
+않는지 검사한다. assertion을 제거하는 Python 최적화 옵션은 명시적으로 거부한다.
+이3개 회귀 검사를 공식 host gate에 등록했으며, 실제 Lean 실행과는 별도로 센다.
+과거 영수증은 ignored build evidence로 보존하고 source에서 제거했다.
+
+공식 build176은 `2026-10-28T21:02:51.206Z`에 exit0으로 완료됐다.14 gate, Rust441,
+주 Node3891 pass /11 TODO /0 fail, 별도 console15 pass 및 Python3 pass다.
+verification SHA-256은 `2c05ac70cffead88937815489b7d837ef84017d58d00696694816f9e74cf2261`이다.
+WASM은 앞선 build173과 같은968394bytes 및
+`98d3bb473dc90f68681d974277dc01b17e69516d45c69e55147b7805a608d423`이다.
+실행물과 전체 로그·identity·receipt는 `build/evidence/build176/`에 보존했다.
+첫 시도는 GitHub 이름 해석이 제한되어 빌드 번호 발급 전에 종료됐고, 허용된 네트워크에서
+정상 경로로 다시 실행했다. 빌드 번호를 우회하거나 임의로 정하지 않았다.
+
+`take`/정수 reader는 오류 문자열과 ownership 표준 함수의 추출 의존성이 남는다.
+실제 `Value::value_type` 추출물도 고정된 Lean backend에 `F64`가 없어 컴파일되지 않았다.
+임의의 타입·추가 공리를 넣어 통과시킨 것으로 세지 않는다. 자세한 도구 판본과 실패는
+[Rust proof report](../../experiments/rust-reader-validation/proof-report.md)와
+[F64 진단](../../experiments/rust-reader-validation/ValueType-extraction-diagnosis.md)에 있다.
+Rust compiler, Charon/Aeneas translator, 표준 라이브러리 모델은 신뢰 경계이며
+호스트64bit 추출은 ESP32 실행 증명이 아니다. 새 Rust 증명은 로컬 실행·독립 검토 근거다.
+기존 Lean4.19 CI가 이4.35 증명까지 실행한다고 주장하지 않는다.
+
+[현행 증명 의무 목록](2026-10-29-compiler-proof-obligations-590.md)은7개 진입 분기와
+GFB23/24 및 별도25 wrapper까지 구분한다. 이전 수치와 미해결 결함을 현재 것으로 재사용하지
+않으며 전체 컴파일러 의미 보존 의무는 계속 열어 둔다. 다음 독립 검증에서 발견한
+binding 교체 시 일반 설정 소실은 #295에서 별도 실패 재현과 수정으로 진행한다.
+
+## build178: 센서 연결 교체에서 사용자의 설정 보존
+
+REF-06-007의 parameter·운영 설정·의존 문서·설치 binding을 실제로 각각 변경하는
+부분 검사를 만들다가 결함을 발견했다. `allow=false`로 설정하고 같은 프로그램의 센서
+binding만 교체하면, 기존 host가 설정을 초기값 true와 revision0으로 되돌렸다.
+수정 전 검사 `cb5056a06df69eb873cf3bac4335ee96eb9427ef`를 별도 폴더에서 다시 실행해
+실제 `0 !== 1` 실패와 exit1을 보존했다. 관련 컴파일러·host·검사 소스는 통합 전 실패 커밋
+`1e54e5b`와 동일하다. 실패 영수증은 `build/evidence/binding-settings-regression-cb5056a/`
+아래에 있으며 SHA-256은 `dc1729aebc48d1d0f8c0f64ad9d02d8ce1a86a208175b228425ed7ff1bf6dfdb`다.
+
+교체 후보가 기존 host 소유의 설정 checkpoint를 검증·복원한 뒤에만 게시하도록 고쳤다.
+일반 설정 Result와 revision, 설정 이력을 보존하며 VM 상태·타이머·입력 수집은 새 실행으로
+시작한다. Run 임시 설정은 첫 새 실행 판단 전에 반환하고 Until 설정은 기존 기한까지
+유지한다. 후보 준비 중 합성 host의 scan을 거절해 checkpoint 이후 설정 유실도 막았다.
+후보 준비 실패는 기존 실행을 보존한다. 새로운 외부 checkpoint API는 추가하지 않았다.
+
+독립 검토는 집중13개를 통과했고 열린 P1/P2 지적은 없었다. 통합본의 관련 검사36개도
+통과했다. 전체 검증의 고정 소스는 `dab5051c0f6d3bdc9a25aad88f48eb45a8ded8a6`다.
+공식 build178은 `2026-10-28T21:20:44.794Z`에 exit0으로 완료됐으며14 gate, Rust441,
+주 Node3894 pass /11 TODO /0 fail, 별도 console15와 Python3 pass다. 영수증 SHA-256은
+`d315a143b2961e61d05acdf5c372ce090dc15e85f77dfb71b906c020f150efb3`이다.
+전체 로그·identity·receipt는 `build/evidence/build178/`에 보존했다.
+
+전체 검증 종료 후 coverage를 순차 실행해2560개 검사를 통과했다. 기존 지정12개 JS 파일의
+함수476/476, 줄90.35%, V8 block range88.25%다. 수정한 installed host 자체는 이12개
+측정 대상에 포함되지 않으므로 이 수치를 해당 host의 coverage로 주장하지 않는다.
+coverage 영수증 SHA-256은 `a830a9c94e390ecca58752af7ba4a050d05d62f56d65bd4f7bce2c561f4ce86d`다.
+
+#295는 전체 완료로 닫지 않는다. 네 실제 소유 경로의 부분 검사를 추가했으나 통합 변경
+계획 출력은 아직 없고, parameter가 있는 합성 manifest는 현재 설치 host의 허용 범위 밖이다.
+이번 근거는 참조 host 실행이며 Device 영속 저장·재부팅·물리 출력 확인을 뜻하지 않는다.
+
+## build182: 생성된 원본 프로그램의 Bool 인증서
+
+고정 seed `0x590b001`로16개 정본 문서를 생성했다. 상태1–4개·출력1–3개이며 이전 상태
+교환, 생략된 상태의 보존, 앞선 참조, 후보 상태 출력, 분기·부정·논리 연산을 포함한다.
+실패한 사례를 버리거나 다시 뽑지 않는다. 각 원본을 실제 compiler로 컴파일하고 원본 UTF-8
+바이트와 전체 GFB를 기존 독립 reader 및 모든 tick 수에 대한 초기화된 실행 정리에 연결했다.
+이는 고정된 제한 Bool 사례군의 인증이며 임의 GhostFlow 프로그램 전체의 증명이 아니다.
+
+소스 초기값과 GFB 초기값을 각각 바꾼 두 변이는 여전히 유효하게 컴파일·해독되지만,
+기존 소스 또는 module과 같다는 Lean 명제에서는 거절됐다. 검증기의 기대거절 판정도
+process 오류·signal·import/unknown identifier 오류를 통과로 세지 않도록 보완했다.
+독립 검토는16개 사례의 원본·GFB·증명 입력·로그 해시와 두 변이의 실제 오류 위치를 확인했다.
+
+통합 고정 소스는 `ded2875bbf3a5dd4c4a4f4d0528a8e93a6a8a4af`다. 강화된 판정으로 새로
+실행한 Lean 검증은 `2026-10-28T21:42:19.790Z`에 exit0으로 끝났다. **Lean191회**
+(성공122·기대거절69)와 별도 JS admission11개가 통과했다. 합계202를 Lean 실행 수로
+세지 않는다.113개 입력 파일 해시가 모두 일치하며 receipt SHA-256은
+`8b10da31be9da352c120e5bee6f03bb3b438490d58242d86b2b08a0845289585`다.
+각 원본과 GFB·Lean 입력·로그는 `build/bool-generated-wave13-590/`에 보존했다.
+
+공식 build182는 같은 고정 소스에서 `2026-10-28T21:41:17.559Z`에 exit0으로 완료됐다.
+14 gate, Rust441, 주 Node3898 pass /11 TODO /0 fail, 별도 console15와 Python3 pass다.
+receipt SHA-256은 `dffea02e0266dd3cf932ed42563e5ded3433ac8aaf774cb48fe841b85fd26886`이며
+전체 로그·identity·receipt를 `build/evidence/build182/`에 보존했다. WASM은 앞선 build178과
+동일한968394bytes 및 `98d3bb473dc90f68681d974277dc01b17e69516d45c69e55147b7805a608d423`다.
+생산 compiler/runtime는 바뀌지 않았고 coverage를 새로 측정했다고 주장하지 않는다.
+
+후속 검토에서 sensor·sensor-state 실행기에도 같은 기대거절 판정 중복을 확인했다.
+공통 판정기로 묶고 실제 혼합 오류로 회귀를 확인하는 작업과 signed i32 코덱 검증을
+다음 독립 단위로 진행한다. 전체 compiler·실제 Rust 의미 대응·물리 출력의 증명은 남아 있다.
+
+## build183: signed i32 코덱과 공통 Lean 오류 판정
+
+모든 `-2147483648 ≤ n < 2147483648`에 대해4바이트 little-endian 표현의 길이·바이트
+범위·부호·왕복·정규성·유일성을 Lean으로 증명했다. 기존 base-256 증명 방식을 사용하며
+생산 Rust나 Bool 모델을 바꾸지 않았다. 실제 compiler가 만든27개 경계값의 초기값과
+리터럴54개를 전체 GFB 바이트의 정확한 위치에서 읽어 증명에 연결했다. 전체 module
+reader와 원본 해석은 아직 이 수학적 코덱 정리의 신뢰 경계다.
+
+통합 고정 소스 `8c4b407a46f596cffb950ea4a310adeb4accaf51`에서 Lean5회(모델·54개
+바이트 증인 성공, 의도한 등식 거절3개)가 `2026-10-28T21:38:48.511Z`에 exit0으로 끝났다.
+122개 입력 해시는 모두 일치한다. receipt SHA-256은
+`6f63586907781cb0b3fc043a06abba39685d0fdd488355a9a498c116ed688b6a`이며
+`build/int32-wave14-590/`에 보존했다. 재귀 깊이를 넘겼던 첫 시도도 별도 작업 공간에
+보존했고 유한 한도를 명시한 뒤 다시 검사했다. 정리의 의미나 커널 검사를 생략하지 않았다.
+
+build178의 실제 native/WASM 실행물을 해시와 Rust/Cargo100개 소스로 확인해 재사용했다.
+native·plain WASM·framed WASM의2 tick씩, 총6개 trace가 원본 정수와 일치한다. 실제 WASM
+로더가 수용한 변이3개는 각각65537→16777472, MIN→0, -1→16777215로 실행됐지만
+원본 값과 같다는 인증서는 거절됐다. 재사용 관측이며 새로운 runtime build 또는 실제 Rust
+전체 대응 증명으로 세지 않는다. 세부 범위는 [코덱 보고서](../../experiments/int32-codec-validation/proof-report.md)에 있다.
+
+네 JS Lean 실행기의 process 판정을 `experiments/lean-outcome.mjs`로 모으고 각각 입력
+해시에 포함했다. 정수 종료 코드·signal/process 오류·도구 오류·명시된 기대 진단을 검사한다.
+Int 변이는 정확한 등식과 오류 하나라는 추가 조건도 유지한다. 실제 Lean 혼합 오류 로그에
+기존 sensor-state predicate를 적용하면 잘못 통과했고 새 판정은 거절했다. 정상 성공,
+의도한 명제 거절, 혼합 오류, import 오류의4개 실제 probe도 확인했다.
+
+이 공통 판정으로 기존 sensor125·state80 로그를 해시 확인 후 재판정했다. 이는205개
+기존 로그 감사이며 새로운 증명이 아니다. 영수증은 `build/lean-outcome-wave14-590/verification.json`,
+SHA-256 `08517ada1594cea167c541470f82ba724d5cad731747072d556313d8495f0944`다.
+build182의 Bool191개 로그도 같은 방식으로 통과했으며 별도 receipt SHA-256은
+`8598c5fb50844070c0a5dbbcfa82a6bf4d21169d8b5b1c34cb2fef4b073094bd`다.
+독립 검토에서 공통 판정 연결·해시 목록·Int 추가 조건의 열린 P1/P2 결함은 없었다.
+
+공식 build183은 `2026-10-28T21:51:26.651Z`에 exit0으로 완료됐다.14 gate, Rust441,
+주 Node3907 pass /11 TODO /0 fail, 별도 console15와 Python3 pass다. 전체 receipt SHA-256은
+`1f1d03c4919cf4bd8b7be803069d8a158e46a327438bc4e7d1306f2177ca5d1f`이며
+로그·identity·receipt는 `build/evidence/build183/`에 있다. WASM 해시는 build182와 같다.
+생산 compiler/runtime 변경은 없고 coverage 신규 측정 및 장치 시험은 주장하지 않는다.
+
+전체 증명은 계속 열려 있다. 다음 단위는 실제 Rust 표준 정수 checked 연산의 추출이며,
+직접 생성된 본문과 기존 Aeneas primitive 모델을 구분해 의존성을 기록한다.
+
+## build187: 실제 Rust 정수 추출의 한계와 감사기 보완
+
+생산 `ghostflow-core`의 Cargo 문맥에서 실제 표준 라이브러리 `i32::checked_add`와
+`checked_neg`를 세 번 추출했다. 마지막 시도는 두 본문을 transparent Structured LLBC로
+얻었지만 Aeneas가 외부 진입 함수를 Lean 출력에 남기지 않았고, 남은 종속 함수에는
+미지원 `cold_path` 선언이 있었다. 모두 증명 입력으로 거절했다. 새 Rust 정리나 커널
+증명 성공은 없다. 정확한 도구 핀·원본 해시·실패 원인은 [추출 보고서](../../experiments/rust-int-primitives/proof-report.md)에 있다.
+
+감사기는 오래된 성공 영수증, 자기 자신을 포함하는 해시, 미승인 선언, 로컬 wrapper를
+거부하도록 보완했다. 실제로 호출되는 `charon-driver`를 포함해 도구·helper·생산 소스의
+실행 전후 해시를 검사한다. Python 회귀8개와 독립 검토가 통과했다. 이 구조 검사는 증명
+입력 후보의 허용 검사이며 완전한 source-equivalence나 Lean 증명은 아니다.
+
+고정 소스 `4fb732ff9c9fcbe7d4dacda1f52f706ff2a48787`에서 과거 세 산출물의 사본을 다시
+감사해 모두 exit1·rejected를 확인했다. 원본 파일 해시는 그대로였다. 새 추출이나 Lean
+실행을 반복하지 않았다. `2026-10-28T22:16:06.120018Z`의 재검사 receipt는
+`build/rust-int-guard-wave15-590/verification.json`, SHA-256
+`f88f2452b03efd003c84b68903acc3d2e0c1b972c2730522b842c2bb5e3a4035`다.
+
+공식 build187은 같은 소스에서 `2026-10-28T22:24:37.228Z`에 exit0으로 끝났다.
+15 gate, Rust441, 주 Node3907 pass /11 TODO /0 fail, 별도 console15와 Python3+8 pass다.
+receipt SHA-256은 `288f8b6f2d21586f088f8425e062067db60ed940157118bb6f7ca7cfdab82bb3`이며
+전체 로그·identity·receipt를 `build/evidence/build187/`에 보존했다. WASM은 build183과
+같은968394bytes/해시다. 생산 compiler/runtime는 바꾸지 않았고 장치 시험은 하지 않았다.
+
+이 도구 의존성은 실제 Rust 정수 본문 증명만 막는다. 두 입력의 오류 출처 연결과
+`elapsed(state)` 시작 시각 전이 검증은 독립 단위로 계속 진행한다. 전체 compiler 증명은 열려 있다.
+
+## build190: 두 입력의 독립 회복과 오류 출처
+
+두 Bool 입력이 각자 `recover(false)`를 거쳐 자기 출력으로 연결되는373바이트 실제 GFB를
+검증했다. 여섯 입력 slot, 두45바이트 식, 전체 module 소비 및 trace metadata를 묶었다.
+모든 두 입력 Reading과 오래된 payload 조합에 대해 각각의 출력 식이 자기 입력의 값과
+오류 출처만 사용한다는 명제가 Lean 커널을 통과했다. 기존 `SensorMachine`과 trace 용량1은
+변경하지 않았다. 식마다 새 trace로 평가하는 정리이며 전체 scan collector의 증명은 아니다.
+
+최종 소스는 `fa6d3b44e04d91636c4568d97525a2d61fd1284c`다. Lean40회(성공23·목표 정리
+거절17)가 `2026-10-28T22:38:48.286Z`에 exit0으로 끝났고102개 입력 해시가 일치했다.
+receipt SHA-256은 `7c8fe4c16b08d926258bc529c52a6e9200c05ed8179ba208352fee029ebeac1d`이며
+`build/two-sensor-wave16-final-590/`에 있다. 각 slot·site·origin 교환과 source 변경은
+구조적으로 유효한 module임을 먼저 확인한 후 정확한 목표 등식에서 거절했다. 별도 metadata와
+원본 바이트 변이도 해당 정리에서 거절했다. 독립 검토는 증명 입력·로그·해시와 경계를 확인했다.
+
+build183 바이너리를 실제 Rust/Cargo100개 및 바이너리 해시로 확인해 재사용했다. 입력100조합을
+native·WASM·framed·canonical·canonical framed의5경로에서 실행한500scan이 요청·안전 값,
+두 event와 센서 출처에 일치했다. 관측 시각은 `2026-10-28T22:36:44.438Z`, runtime receipt
+SHA-256은 `4b8bd469559ccbc582c86b571073083f43e3ddf9355214f2407ee0f736e14d8c`다.
+새 runtime build, 물리 장치 시험 또는 전체 Rust 의미 대응 증명으로 세지 않는다.
+
+검토 중 runtime helper의 실패 재실행이 과거 passed 파일을 남기는 반례를 재현했다.
+시작 시 running·실패 시 failed를 원자적으로 기록하도록 수정하고 회귀 검사를 추가했다.
+수정 전 build188와 Lean/관측 기록은 보존했고, 최종 소스로 위 검증을 다시 실행했다.
+
+공식 build190은 `2026-10-28T22:42:52.581Z`에 exit0으로 끝났다.15 gate, Rust441,
+주 Node3915 pass /11 TODO /0 fail, console15, Python3+8 pass다. receipt SHA-256은
+`020200989e5812d04c6a3c9d1c526d58566629a63818aee9c5bbab77915a5671`이며
+전체 로그·identity·receipt를 `build/evidence/build190/`에 보존했다. WASM 해시는 build187과 같다.
+CI에도 실제 두 입력 Lean 검사를 추가했다. JS 원본 AST 투영, 일반 f64/Rust 대응과 전체
+compiler 증명은 남는다. 자세한 범위는 [두 입력 보고서](../../experiments/two-sensor-provenance/proof-report.md)에 있다.
+
+## build192: elapsed 시작 시각과 두 관측 시점
+
+원본 문서와 실제 419바이트 GFB 전체를 연결해, 모든 유한 입력 이력에서 초기화 시 현재
+시각 선택·상태 유지 시 시작 시각 보존·상태 변경 시 시작 시각 갱신을 증명했다. 생성된
+회복 식의 반복 평가로 생기는 event도 그대로 모델링했다. Number는 선택·전달만 하며
+Duration 뺄셈이나 실제 Rust VM 대응을 증명한 것은 아니다.
+
+고정 소스 `106beff40020b5b1185f20704f98b2c6e9fa85bd`에서 Lean 51회(성공 32·목표 정리
+거절 19)가 `2026-10-28T23:10:14.752Z`에 exit 0으로 끝났다. 입력 109개와 모든 결과의
+소스·로그 해시가 일치했다. receipt SHA-256은
+`f88e61116dceca0bb69584e3c47c119fa6eaa6d19c158950476c5ce49338c665`다.
+빌드183의 Rust/Cargo 100개 및 바이너리 해시를 확인해 재사용한 101개 이력·1,015 scan도
+5개 실행 경로에서 일치했다. 시각은 `2026-10-28T23:05:21.972Z`, receipt SHA-256은
+`327e9e689fb6f1cd03045a23b7afb80e52213261d3453b4f7bd33d5e28f4d268`다.
+
+검토에서 proof helper의 외부 Lean 버전 조회 중 이전 passed 기록이 남는 문제를 재현하고
+수정했다. 시작 시 running과 실패 시 failed를 원자적으로 남기는 회귀 검사 6개를 통과했다.
+또한 상태 변경 scan에서 제어식은 이전 구간의 시간을 읽고, 확정 후 timer 관측은 새 구간의
+0을 표시한다는 기존 동작을 두 언어의 reference와 같은 실행의 회귀 검사에 명시했다.
+
+공식 build192는 `2026-10-28T23:15:07.294Z`에 exit 0으로 끝났다. 15 gate, Rust 441,
+주 Node 3,923 pass / 11 TODO / 0 fail, console 15, Python 3+8 pass다. 전체 로그·identity·
+receipt는 `build/evidence/build192/`에 보존했다. receipt SHA-256은
+`a4a9a3f4eec40edfd907288c90719c0b739b5bf8436c98df52cd256099e09f91`이다.
+새 WASM은 build183과 같은 해시다. 실제 장치 시험은 하지 않았다.
+
+후속으로 시계의 정수 범위·비감소 전제 아래 경과 시간 범위를 증명하고, 실제 실행 경로의
+상한·역행·거부 뒤 상태 보존을 검사한다. 전체 compiler 증명과 Rust/f64 대응은 열려 있다.
+
+## build194: 경과 시간의 정수 범위와 시계 입력 경계
+
+기존 epoch 이력과 원본·전체 module 인증서를 재사용해, 허용 시각이 비감소 정수이고
+2^53−1 이하라는 전제에서 이전·다음 시작 시각이 현재 시각을 넘지 않음을 증명했다.
+경과 시간의 수학적 차이도 그 범위 안에 있으며, 초기화·reset 시 확정 후 관측은 0이고
+유지 시 두 관측 값이 같다는 정리를 연결했다. 별도 상태 기계를 다시 만들지 않았다.
+
+고정 소스 `b2f8b945d895193d85c0246bb366cf0e921438c4`의 fresh Lean 43회(성공 34·정확한
+목표 정리 거절 9)가 `2026-10-28T23:28:47.774Z`에 exit 0으로 끝났다. 입력 116개와
+모든 소스·로그 및 18개 컴파일된 모델 해시가 일치했다. receipt SHA-256은
+`8ae58adbe0d2aac3ef590ab5fe779ffbdb57a8e0a80d5c7d4a201036d1fc3044`다.
+독립 검토에서 원본·module 결합, 귀납 불변식, 부정 대조의 오류 위치를 확인했다.
+
+실제 canonical plain/framed 테스트 6개는 0·2^31·2^32·2^53−1 주변의 선택한 경계,
+상한 근처 1ms 차이, 동일 시각, 잘못된 시각 호출 이후의 상태·epoch 보존을 확인한다.
+시계 admission 구현이나 IEEE 연산의 전칭 증명은 아니다. 통합 집중 검사는 28개 통과했다.
+
+공식 build194는 `2026-10-28T23:32:56.340Z`에 exit 0으로 끝났다. 15 gate, Rust 441,
+주 Node 3,934 pass / 11 TODO / 0 fail, console 15, Python 3+8 pass다. receipt SHA-256은
+`7e4ddb9a7462023fce39e7eeea50bcdbacf2c022747e5180ac1759b1c3799163`이며
+전체 로그·identity·receipt는 `build/evidence/build194/`에 보존했다.
+
+공통 Lean 판정기는 작성된 `sorry` 경고를 성공·예상 실패 양쪽에서 거절하도록 보완했다.
+실제 거짓 명제의 `decide` 실패 후 `#print axioms`가 출력하는 오류 복구용 `sorryAx`는
+정상 음성 대조와 구분했다. 기존 6개 검증군의 보존 로그 492개를 새 판정기로 재판정했고
+모두 일치했다. 새 커널 실행으로 세지 않는다. replay receipt SHA-256은
+`6b39a604a14709fd7a9abaa9ab82f0970ef9353003d2fb46666948f29c8bec33`다.
+
+실제 Duration 출력식 실행과의 결합을 다음 단위로 진행한다. 수학적 정수 경계만으로
+생산 Rust f64 뺄셈 대응이나 전체 compiler 정확성이 증명됐다고 주장하지 않는다.
+
+## build196: 실제 Duration 출력과 증명 CI 분리
+
+기존 Bool 출력과 epoch 전이는 유지하고 `age_ms <- age`라는 실제 Duration 출력을
+추가했다. 원본 문서·470바이트 전체 GFB·출력 타입·연결·이전 상태 의존성을 함께
+인증했다. 모든 허용 시각 이력에서 출력이 이전 epoch의 수학적 경과시간과 같고
+기존 사건 목록이 보존됨을 증명했다. Nat 뺄셈 모델이며 생산 f64와 Rust 대응은 열려 있다.
+
+초기 fixture의 Markdown 링크 문장을 독립 reader의 제한된 문법이 거절했다. 생산
+컴파일러 오류가 아니며, 문장을 일반 URL 안내로 고친 뒤 다시 인증했다. 실행 코드와
+행 번호·실제 GFB 해시는 같았다. 초기 실패 및 옛 원본 SHA는 기존 기록에 보존했다.
+현재 fixture SHA는 `564f1aeb1a85f4b29a4cd1d302e695e9d88c728ff337c9201ed86e450823f820`이다.
+
+고정 소스 `e26386138c95f9065e793642d232ddb3fe008ab5`에서 fresh Lean 52회가
+`2026-10-29T00:08:22.767Z`에 exit 0으로 끝났다. 성공40·목표 정리 거절12이며
+124개 입력과 모든 로그·21개 모델 산출물 해시가 일치했다. receipt SHA-256은
+`739b0340d914062876bfcaa3b77bb22ed5f7a44223f2b1ecb660682da4ef0113`이다.
+5개 실제 실행 경로의 15 scan, 총75 관측도 상태 전후·출력·고장 출처·사건 수와
+일치했다. 이는 유한 실행 검사이며 Lean 정리의 범위와 구분한다.
+
+공식 build196은 `2026-10-29T00:10:06.846Z`에 exit 0으로 완료됐다. 15 gate,
+Rust441, 주 Node3942 pass/11 TODO/0 fail, console15, Python3+8 pass다.
+receipt SHA-256은 `5ee781d42056168c455c519de34b173dab7e81f763e0ad2d2a4f1fda708d6652`다.
+전체 로그·identity·receipt는 `build/evidence/build196/`에 보존했다. 독립 검토에서
+새 증명과 runtime 검사의 열린 P1/P2는 없었다. 장치 시험은 하지 않았다.
+
+Lean CI를 독립8개 묶음으로 나누고 동시 실행을3개로 제한했다. 묶음별 증거를 남기며
+최종 `proof` 검사는 모두 성공해야 통과한다. 검사 등록 누락을 검토에서 발견해
+공식 실행 목록·경로 필터에 추가했다. 실제 GitHub 실행 결과는 별도로 확인한다.
+다음 단위는 같은 epoch의 `age >= 3000ms` 비교다. 전체 compiler 증명은 계속 열려 있다.

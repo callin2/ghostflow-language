@@ -249,8 +249,13 @@ publication.
 
 - Rejected candidates preserve settings, overlays, history, state, timers,
   conditioners, latest completion and assessment.
-- Success starts fresh state, settings and conditioners in a new run and clears
-  previous completions.
+- Success restores the owner's validated settings checkpoint, including ordinary
+  Result values, faults, revision and history. Run overlays return before the first
+  new-run decision; Until overlays retain their deadlines and validity rules.
+  Control state, timers and conditioners start fresh, and previous completions clear.
+- Composed `step` calls are rejected during replacement so accepted settings cannot
+  be lost between checkpoint capture and publication. Restore failure preserves the
+  previous owner. Parameter-bearing composition remains outside this profile.
 
 **Coverage and limits.**
 
