@@ -23,6 +23,7 @@ export const LANGUAGE_TESTS = Object.freeze([
   'tests/input-recovery-rop.test.mjs',
   'tests/input-fault-restart.test.mjs',
   'tests/output-observation-compiler.test.mjs',
+  'tests/monitoring-plan.test.mjs',
   'tests/output-observation-host.test.mjs',
   'tests/output-observation-package.test.mjs',
   'tests/behavior-projection.test.mjs',

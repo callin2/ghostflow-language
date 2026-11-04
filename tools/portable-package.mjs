@@ -71,6 +71,34 @@ function ghostName(value, path) {
   return value;
 }
 
+function validateMonitoringPlanManifest(manifest) {
+  if (!Object.hasOwn(manifest, 'monitoring')) return;
+  const monitoring = exactObject(manifest.monitoring, ['schema', 'patterns'], 'manifest.monitoring');
+  if (monitoring.schema !== 'GhostFlow/monitoring-plan-v1'
+      || !Array.isArray(monitoring.patterns) || monitoring.patterns.length < 1 || monitoring.patterns.length > 32) {
+    fail('manifest-mismatch', 'manifest.monitoring has an unsupported schema or pattern count');
+  }
+  const outputs = new Map(manifest.outputs.filter(isPlainObject).map(output => [output.name, output]));
+  const schedules = new Set(manifest.schedules.filter(isPlainObject).map(schedule => schedule.name));
+  const timers = new Map(manifest.timers.filter(isPlainObject).map(timer => [timer.name, timer]));
+  const seenOutputs = new Set();
+  for (const [index, pattern] of monitoring.patterns.entries()) {
+    const path = `manifest.monitoring.patterns[${index}]`;
+    exactObject(pattern, ['kind', 'outputName', 'stateName', 'timerId', 'durationMs', 'scheduleId'], path);
+    if (pattern.kind !== 'scheduled-timed-latch') fail('manifest-mismatch', `${path}.kind is unsupported`);
+    ghostName(pattern.outputName, `${path}.outputName`);
+    ghostName(pattern.stateName, `${path}.stateName`);
+    ghostName(pattern.timerId, `${path}.timerId`);
+    ghostName(pattern.scheduleId, `${path}.scheduleId`);
+    if (!Number.isSafeInteger(pattern.durationMs) || pattern.durationMs <= 0) fail('manifest-mismatch', `${path}.durationMs must be positive`);
+    if (outputs.get(pattern.outputName)?.type !== 'Bool' || !schedules.has(pattern.scheduleId)
+        || timers.get(pattern.timerId)?.state !== pattern.stateName || seenOutputs.has(pattern.outputName)) {
+      fail('manifest-mismatch', `${path} does not match declared output, schedule and elapsed timer`);
+    }
+    seenOutputs.add(pattern.outputName);
+  }
+}
+
 function sourceFilename(value, path) {
   if (typeof value !== 'string' || value.length < 10 || value.length > 256
       || value.includes('\0') || !value.endsWith('.ghost.md')) {
@@ -746,6 +774,7 @@ export async function verifyPortablePackage(packageValue, options = {}) {
   if (manifest.format === 'GhostFlow/control-v22') manifestKeys.push('outputObservations');
   if (Object.hasOwn(manifest, 'legacyAdmission')) manifestKeys.push('legacyAdmission');
   if (Object.hasOwn(manifest, 'requiredRuntimeFeatures')) manifestKeys.push('requiredRuntimeFeatures');
+  if (Object.hasOwn(manifest, 'monitoring')) manifestKeys.push('monitoring');
   if (Object.hasOwn(manifest,'adaptPolicy') || Object.hasOwn(manifest,'strategies')) manifestKeys.push('adaptPolicy','strategies');
   exactObject(manifest, manifestKeys, 'manifest');
   const requiredFeatures = requiredRuntimeFeatures(manifest);
@@ -768,6 +797,7 @@ export async function verifyPortablePackage(packageValue, options = {}) {
   for (const field of ['inputs', 'outputs', 'sensors', 'schedules', 'timers', 'signals', 'configs']) {
     if (!Array.isArray(manifest[field])) fail('manifest-mismatch', `manifest.${field} must be an array`);
   }
+  validateMonitoringPlanManifest(manifest);
   const manifestPorts = new Map();
   for (const field of ['inputs', 'outputs']) {
     for (const [index, port] of manifest[field].entries()) {
@@ -922,6 +952,11 @@ export async function verifyPortablePackage(packageValue, options = {}) {
       if (manifest.format !== replay.manifest.format
         || canonicalJson(manifest.outputObservations ?? null) !== canonicalJson(replay.manifest.outputObservations ?? null)) {
         throw new Error('output observation descriptors do not match canonical source lowering');
+      }
+    }
+    if (manifest.monitoring !== undefined || replay.manifest.monitoring !== undefined) {
+      if (canonicalJson(manifest.monitoring ?? null) !== canonicalJson(replay.manifest.monitoring ?? null)) {
+        throw new Error('monitoring plan does not match canonical source lowering');
       }
     }
     if (guarded && canonicalJson(replay.manifest) !== canonicalJson(manifest)) throw new Error('legacy admission manifest does not match canonical source');

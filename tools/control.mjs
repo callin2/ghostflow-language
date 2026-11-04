@@ -1644,6 +1644,10 @@ class Lowerer {
       'import execution requires a verified source closure and composition lowering, which are not yet supported');
     rejectName(this.ast.name, this.ast.loc, 'control');
     this.declare(); this.configureRestartLifecycle(); this.validateAndPopulate();
+    const monitoringPatterns = this.monitoringPatterns();
+    if (monitoringPatterns.length) {
+      this.manifest.monitoring = { schema: 'GhostFlow/monitoring-plan-v1', patterns: monitoringPatterns };
+    }
     for (const check of this.ast.compositionChecks ?? []) {
       const expected = this.resolveType(check.type);
       const actual = this.expression(check.value, new Map(), { allowNext: true }, [], expected);
@@ -2182,6 +2186,56 @@ class Lowerer {
           source: { nodeId: item.id, ...item.loc } });
       }
     }
+  }
+  monitoringPatterns() {
+    const containsStateOrSchedule = node => {
+      const seen = new Set();
+      const visit = value => {
+        if (!value || typeof value !== 'object' || seen.has(value)) return false;
+        seen.add(value);
+        if (value.kind === 'reference' && (this.states.has(value.name) || this.schedules.has(value.name))) return true;
+        if (value.kind === 'nextReference') return true;
+        if (value.kind === 'member' && this.schedules.has(value.base)) return true;
+        return Object.entries(value).some(([key, child]) => key !== 'loc' && visit(child));
+      };
+      return visit(node);
+    };
+    const positiveScheduleConjuncts = node => {
+      if (node.kind === 'binary' && node.op === '&&') {
+        const left = positiveScheduleConjuncts(node.left);
+        const right = positiveScheduleConjuncts(node.right);
+        return left === null || right === null ? null : [...left, ...right];
+      }
+      if (node.kind === 'member' && node.member === 'due' && this.schedules.has(node.base)) return [node.base];
+      return containsStateOrSchedule(node) ? null : [];
+    };
+    const patterns = [];
+    for (const nextNode of this.ast.body.filter(item => item.kind === 'next')) {
+      if (!this.nexts.has(nextNode.name)) continue;
+      const state = this.states.get(nextNode.name);
+      const transition = nextNode.value;
+      if (state?.type.kind !== 'Bool' || transition.kind !== 'if'
+        || transition.test.kind !== 'reference' || transition.test.name !== nextNode.name
+        || transition.yes.kind !== 'binary' || transition.yes.op !== '<'
+        || transition.yes.left.kind !== 'reference') continue;
+      const timerId = transition.yes.left.name;
+      const timer = this.timers.get(timerId);
+      if (timer?.mode !== 'elapsed' || timer.state !== nextNode.name
+        || transition.yes.right.kind !== 'literal') continue;
+      const durationMs = duration(transition.yes.right.raw, transition.yes.right.loc);
+      if (!Number.isSafeInteger(durationMs) || durationMs <= 0) continue;
+      const scheduleIds = positiveScheduleConjuncts(transition.no);
+      if (!scheduleIds || scheduleIds.length !== 1) continue;
+      for (const connection of this.ast.body) {
+        if (connection.kind !== 'connection' || connection.value.kind !== 'nextReference'
+          || connection.value.name !== nextNode.name || this.outputs.get(connection.name)?.type.kind !== 'Bool') continue;
+        patterns.push({
+          kind: 'scheduled-timed-latch', outputName: connection.name, stateName: nextNode.name,
+          timerId, durationMs, scheduleId: scheduleIds[0],
+        });
+      }
+    }
+    return patterns.slice(0, 32);
   }
   addContinuousPolicies() {
     const policies = this.ast.body.filter(item => item.kind === 'continuous-policy');

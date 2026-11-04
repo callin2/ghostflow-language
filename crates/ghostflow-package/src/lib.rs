@@ -840,6 +840,98 @@ fn verify_output_observation_descriptors(manifest: &Value) -> Result<HashSet<Str
     Ok(rails)
 }
 
+fn verify_monitoring_plan(manifest: &Value) -> Result<()> {
+    let Some(plan) = manifest.get("monitoring") else {
+        return Ok(());
+    };
+    let mismatch = |message: &str| PortablePackageError {
+        code: ErrorCode::ManifestMismatch,
+        message: message.into(),
+    };
+    let plan = value_object(plan, "monitoring")?;
+    exact_keys(
+        plan,
+        &["schema", "patterns"],
+        "monitoring",
+        ErrorCode::ManifestMismatch,
+    )?;
+    if plan["schema"].as_str() != Some("GhostFlow/monitoring-plan-v1") {
+        return Err(mismatch("monitoring.schema is unsupported"));
+    }
+    let patterns = plan["patterns"]
+        .as_array()
+        .ok_or_else(|| mismatch("monitoring.patterns must be an array"))?;
+    if patterns.is_empty() || patterns.len() > 32 {
+        return Err(mismatch("monitoring.patterns must contain 1 to 32 entries"));
+    }
+    let mut outputs = HashSet::new();
+    for (index, value) in patterns.iter().enumerate() {
+        let label = format!("monitoring.patterns[{index}]");
+        let pattern = value_object(value, &label)?;
+        exact_keys(
+            pattern,
+            &[
+                "kind",
+                "outputName",
+                "stateName",
+                "timerId",
+                "durationMs",
+                "scheduleId",
+            ],
+            &label,
+            ErrorCode::ManifestMismatch,
+        )?;
+        if pattern["kind"].as_str() != Some("scheduled-timed-latch") {
+            return Err(mismatch("monitoring pattern kind is unsupported"));
+        }
+        let name = |key: &str| -> Result<&str> {
+            let value = pattern[key]
+                .as_str()
+                .ok_or_else(|| mismatch("monitoring pattern names must be strings"))?;
+            require_ghost_name(value, &format!("{label}.{key}"))?;
+            if value.len() > 96 || value.starts_with("__gf_") {
+                return Err(mismatch("monitoring pattern name is invalid"));
+            }
+            Ok(value)
+        };
+        let output = name("outputName")?;
+        let state = name("stateName")?;
+        let timer = name("timerId")?;
+        let schedule = name("scheduleId")?;
+        pattern["durationMs"]
+            .as_u64()
+            .filter(|duration| *duration > 0 && *duration <= 9_007_199_254_740_991)
+            .ok_or_else(|| mismatch("monitoring durationMs must be a positive safe integer"))?;
+        if !outputs.insert(output)
+            || !manifest["outputs"].as_array().is_some_and(|ports| {
+                ports.iter().any(|port| {
+                    port["name"].as_str() == Some(output) && port["type"].as_str() == Some("Bool")
+                })
+            })
+        {
+            return Err(mismatch("monitoring requires unique declared Bool outputs"));
+        }
+        if !manifest["timers"].as_array().is_some_and(|timers| {
+            timers.iter().any(|candidate| {
+                candidate["name"].as_str() == Some(timer)
+                    && candidate["state"].as_str() == Some(state)
+            })
+        }) {
+            return Err(mismatch(
+                "monitoring timer must belong to its declared state",
+            ));
+        }
+        if !manifest["schedules"].as_array().is_some_and(|schedules| {
+            schedules
+                .iter()
+                .any(|candidate| candidate["name"].as_str() == Some(schedule))
+        }) {
+            return Err(mismatch("monitoring schedule must be declared"));
+        }
+    }
+    Ok(())
+}
+
 fn verify_output_observation_bindings(
     manifest: &Value,
     module: &ghostflow_core::Module,
@@ -2808,6 +2900,9 @@ fn verify_manifest(
     if object["format"].as_str() == Some("GhostFlow/control-v22") {
         keys.push("outputObservations");
     }
+    if object.contains_key("monitoring") {
+        keys.push("monitoring");
+    }
     if matches!(
         object["format"].as_str(),
         Some("GhostFlow/control-v15" | "GhostFlow/control-v21")
@@ -2829,6 +2924,7 @@ fn verify_manifest(
     exact_keys(object, &keys, "manifest", ErrorCode::ManifestMismatch)?;
     required_runtime_features(manifest)?;
     verify_output_observation_descriptors(manifest)?;
+    verify_monitoring_plan(manifest)?;
     let format = object["format"]
         .as_str()
         .ok_or_else(|| PortablePackageError {
@@ -3761,6 +3857,123 @@ fn verify_signatures(
 mod tests {
     use super::*;
     use std::process::Command;
+
+    #[test]
+    fn prepared_solar_package_monitoring_is_accepted_and_malformed_plans_are_rejected() {
+        let package: Value = serde_json::from_slice(include_bytes!(
+            "../tests/fixtures/solar-monitoring-622.gfpk.json"
+        ))
+        .unwrap();
+        let payload = &package["payload"];
+        let manifest_bytes = BASE64
+            .decode(payload["manifest"]["contentBase64"].as_str().unwrap())
+            .unwrap();
+        let manifest: Value = serde_json::from_slice(&manifest_bytes).unwrap();
+        let bytecode = BASE64
+            .decode(payload["bytecode"]["contentBase64"].as_str().unwrap())
+            .unwrap();
+        let module = ghostflow_core::Module::load(&bytecode).unwrap();
+        let caps = [Capability {
+            kind: "actuator".into(),
+            name: "running".into(),
+            value_type: "bool".into(),
+        }];
+        verify_manifest(
+            &manifest,
+            "GhostFlow/control-v15",
+            payload["bytecode"]["sha256"].as_str().unwrap(),
+            &caps,
+        )
+        .expect("prepared Solar manifest must pass native manifest verification");
+        assert_eq!(module.bytecode_format_version(), 16);
+        assert_eq!(manifest["monitoring"]["patterns"][0]["durationMs"], 300_000);
+        let loader = |bytes: &[u8], _: &TargetLoaderContext<'_>| {
+            ghostflow_core::Module::load(bytes)
+                .map(|_| true)
+                .map_err(|error| error.to_string())
+        };
+        let identity = &payload["identity"];
+        let compiler_revision = identity["compilerRevision"].as_str().unwrap();
+        let binding_revision = identity["bindingRevision"].as_str().unwrap();
+        let semantics = vec![identity["runtimeSemantics"].as_str().unwrap().to_owned()];
+        let abis = vec![identity["runtimeAbi"].as_str().unwrap().to_owned()];
+        let formats = vec![payload["manifest"]["format"].as_str().unwrap().to_owned()];
+        let available_capabilities: Vec<Capability> = identity["requiredCapabilities"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|item| Capability {
+                kind: item["kind"].as_str().unwrap().to_owned(),
+                name: item["name"].as_str().unwrap().to_owned(),
+                value_type: item["type"].as_str().unwrap().to_owned(),
+            })
+            .collect();
+        let trusted_keys = [TrustedKey {
+            key_id: "rfc8032-test-1-lab-only".into(),
+            public_key: public_key(),
+        }];
+        let profile = VerificationProfile {
+            trusted_keys: &trusted_keys,
+            revoked_key_ids: &[],
+            expected_compiler_revision: compiler_revision,
+            supported_runtime_semantics: &semantics,
+            supported_runtime_features: &[],
+            supported_runtime_abis: &abis,
+            supported_manifest_formats: &formats,
+            available_capabilities: &available_capabilities,
+            expected_binding_revision: binding_revision,
+            target_loader: &loader,
+            limits: VerifierLimits::default(),
+        };
+        verify_portable_package(
+            include_bytes!("../tests/fixtures/solar-monitoring-622.gfpk.json"),
+            &profile,
+        )
+        .expect("prepared Solar package must pass the complete native verifier");
+
+        for scenario in 0..9 {
+            let mut bad = manifest.clone();
+            match scenario {
+                0 => bad["monitoring"]["schema"] = serde_json::json!("other"),
+                1 => bad["monitoring"]["patterns"][0]["kind"] = serde_json::json!("dependency"),
+                2 => bad["monitoring"]["patterns"][0]["durationMs"] = serde_json::json!(0),
+                3 => bad["monitoring"]["patterns"][0]["outputName"] = serde_json::json!("missing"),
+                4 => bad["monitoring"]["patterns"][0]["stateName"] = serde_json::json!("other"),
+                5 => bad["monitoring"]["patterns"][0]["timerId"] = serde_json::json!("missing"),
+                6 => bad["monitoring"]["patterns"][0]["scheduleId"] = serde_json::json!("missing"),
+                7 => bad["monitoring"]["patterns"][0]["extra"] = serde_json::json!(true),
+                _ => bad["outputs"][0]["type"] = serde_json::json!("Number"),
+            }
+            assert_eq!(
+                verify_manifest(
+                    &bad,
+                    "GhostFlow/control-v15",
+                    payload["bytecode"]["sha256"].as_str().unwrap(),
+                    &caps,
+                )
+                .unwrap_err()
+                .code,
+                ErrorCode::ManifestMismatch,
+                "scenario {scenario}"
+            );
+        }
+        let mut bad = manifest.clone();
+        bad["monitoring"]["patterns"] = serde_json::json!([
+            bad["monitoring"]["patterns"][0],
+            bad["monitoring"]["patterns"][0]
+        ]);
+        assert_eq!(
+            verify_manifest(
+                &bad,
+                "GhostFlow/control-v15",
+                payload["bytecode"]["sha256"].as_str().unwrap(),
+                &caps,
+            )
+            .unwrap_err()
+            .code,
+            ErrorCode::ManifestMismatch
+        );
+    }
 
     #[test]
     fn output_observation_manifest_and_bytecode_bindings_are_strict() {

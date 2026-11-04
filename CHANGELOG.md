@@ -2,6 +2,17 @@
 
 ## Unreleased
 
+### 2026-11-04 - descriptive monitoring plans ([#622](https://github.com/callin2/ghostflow-language/issues/622))
+
+The compiler emits optional `GhostFlow/monitoring-plan-v1` metadata for a directly
+connected Bool output whose state starts on a required schedule due conjunct and
+stops at a fixed elapsed-timer duration. At most 32 proven relations are described;
+unsupported expressions omit the relation. This metadata does not change GFB or
+execution semantics. JavaScript package verification replays canonical source to
+check the plan; native package verification checks its bounded schema and declared
+output/timer/state/schedule references. Device owns observed history and conditional
+forecasts; a schedule estimate is not evidence that an output was applied.
+
 ### 2026-11-02 - bound Bool host quality inputs ([#618](https://github.com/callin2/ghostflow-language/issues/618))
 
 `BoundResourceControlRuntime.step({ nowMs, inputs, samples })` accepts explicit

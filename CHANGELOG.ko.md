@@ -5,6 +5,16 @@
 
 ## 미출시
 
+### 2026-11-04 - 표시용 모니터링 계획 ([#622](https://github.com/callin2/ghostflow-language/issues/622))
+
+컴파일러가 일정 due를 필수 AND 조건으로 시작하고, 고정 elapsed 타이머 시간에
+종료하는 상태에 직접 연결된 Bool 출력에 선택적 `GhostFlow/monitoring-plan-v1`
+메타데이터를 생성합니다. 증명된 연결을 최대 32개 설명하며 지원하지 않는 식의
+연결 정보는 생략합니다. GFB와 실행 의미는 바뀌지 않습니다. JavaScript 패키지
+검증은 정규 원문을 다시 컴파일해 계획을 대조하고, native 패키지 검증은 크기 제한과
+선언된 출력·타이머·상태·일정 참조를 확인합니다. 실제 이력과 조건부 예고는 Device가
+담당합니다. 계산된 일정은 출력이 실제 적용됐다는 증거가 아닙니다.
+
 ### 2026-11-02 - 바인딩된 Bool 호스트의 품질 입력 ([#618](https://github.com/callin2/ghostflow-language/issues/618))
 
 `BoundResourceControlRuntime.step({ nowMs, inputs, samples })`은 유한 공유 자원
