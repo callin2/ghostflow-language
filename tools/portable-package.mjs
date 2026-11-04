@@ -71,6 +71,34 @@ function ghostName(value, path) {
   return value;
 }
 
+function validateMonitoringPlanManifest(manifest) {
+  if (!Object.hasOwn(manifest, 'monitoring')) return;
+  const monitoring = exactObject(manifest.monitoring, ['schema', 'patterns'], 'manifest.monitoring');
+  if (monitoring.schema !== 'GhostFlow/monitoring-plan-v1'
+      || !Array.isArray(monitoring.patterns) || monitoring.patterns.length < 1 || monitoring.patterns.length > 32) {
+    fail('manifest-mismatch', 'manifest.monitoring has an unsupported schema or pattern count');
+  }
+  const outputs = new Map(manifest.outputs.filter(isPlainObject).map(output => [output.name, output]));
+  const schedules = new Set(manifest.schedules.filter(isPlainObject).map(schedule => schedule.name));
+  const timers = new Map(manifest.timers.filter(isPlainObject).map(timer => [timer.name, timer]));
+  const seenOutputs = new Set();
+  for (const [index, pattern] of monitoring.patterns.entries()) {
+    const path = `manifest.monitoring.patterns[${index}]`;
+    exactObject(pattern, ['kind', 'outputName', 'stateName', 'timerId', 'durationMs', 'scheduleId'], path);
+    if (pattern.kind !== 'scheduled-timed-latch') fail('manifest-mismatch', `${path}.kind is unsupported`);
+    ghostName(pattern.outputName, `${path}.outputName`);
+    ghostName(pattern.stateName, `${path}.stateName`);
+    ghostName(pattern.timerId, `${path}.timerId`);
+    ghostName(pattern.scheduleId, `${path}.scheduleId`);
+    if (!Number.isSafeInteger(pattern.durationMs) || pattern.durationMs <= 0) fail('manifest-mismatch', `${path}.durationMs must be positive`);
+    if (outputs.get(pattern.outputName)?.type !== 'Bool' || !schedules.has(pattern.scheduleId)
+        || timers.get(pattern.timerId)?.state !== pattern.stateName || seenOutputs.has(pattern.outputName)) {
+      fail('manifest-mismatch', `${path} does not match declared output, schedule and elapsed timer`);
+    }
+    seenOutputs.add(pattern.outputName);
+  }
+}
+
 function sourceFilename(value, path) {
   if (typeof value !== 'string' || value.length < 10 || value.length > 256
       || value.includes('\0') || !value.endsWith('.ghost.md')) {
@@ -312,7 +340,7 @@ function validateGfb1(bytes) {
     fail('invalid-bytecode-format', 'bytecode is not GFB1');
   }
   const version = bytes[4] | (bytes[5] << 8);
-  if (![1, 2, 3, 4, 10, 11, 21, 22].includes(version)) fail('unsupported-bytecode-version', 'supported GFB format versions are 1, 2, 3, 4, 10, 11, 21 and 22');
+  if (![1, 2, 3, 4, 10, 11, 16, 21, 22].includes(version)) fail('unsupported-bytecode-version', 'supported GFB format versions are 1, 2, 3, 4, 10, 11, 16, 21 and 22');
   if (version === 22) {
     if (bytes.byteLength < 16) fail('invalid-bytecode-format', 'truncated GFB22 lifecycle envelope');
     const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
@@ -357,6 +385,23 @@ function validateGfbLifecycle(bytes, lifecycle) {
 
 function validateConfigStreamPackageProfile(manifest, version, runtimeAbi) {
   const stream = version === '11';
+  if (version === '16' || manifest.format === 'GhostFlow/control-v15') {
+    if (version !== '16' || manifest.format !== 'GhostFlow/control-v15'
+      || runtimeAbi !== 'GhostFlow/context-scan-abi-v5'
+      || !Array.isArray(manifest.schedules) || !manifest.schedules.length
+      || manifest.schedules.some(schedule => schedule?.kind !== 'solar' || schedule.day !== undefined
+        || !Array.isArray(schedule.configIds) || schedule.configIds.length
+        || schedule.policy?.basis !== 'pulse' || schedule.policy.clock !== 'trusted_only'
+        || schedule.policy.fallback !== 'skip' || schedule.policy.recovery !== 'baseline')
+      || !Array.isArray(manifest.configs) || manifest.configs.some(config => config.type !== 'Bool')
+      || ['signals', 'providers', 'calendars', 'naturalConditions', 'calendarConditions',
+        'objectives', 'adaptSettings', 'resources'].some(field => manifest[field] !== undefined
+        && (!Array.isArray(manifest[field]) || manifest[field].length))
+      || manifest.accounting !== undefined) {
+      fail('unsupported-runtime-abi', 'signed GFB16 requires ordinary Solar pulse, control-v15 and context-scan-abi-v5');
+    }
+    return;
+  }
   const civil = version === '21';
   if (civil) {
     if (manifest.format !== 'GhostFlow/control-v21' || runtimeAbi !== 'GhostFlow/context-scan-abi-v5'
@@ -630,7 +675,7 @@ function validateEmbeddedArtifacts(payload) {
 
   exactObject(payload.bytecode, ['format', 'version', 'sha256', 'contentBase64'], 'payload.bytecode');
   if (payload.bytecode.format !== 'GFB1') fail('invalid-bytecode-format', 'payload bytecode format must be GFB1');
-  if (!['1', '2', '3', '4', '10', '11', '21', '22'].includes(payload.bytecode.version)) fail('unsupported-bytecode-version', 'payload bytecode version must be 1, 2, 3, 4, 10, 11, 21 or 22');
+  if (!['1', '2', '3', '4', '10', '11', '16', '21', '22'].includes(payload.bytecode.version)) fail('unsupported-bytecode-version', 'payload bytecode version must be 1, 2, 3, 4, 10, 11, 16, 21 or 22');
   digestValue(payload.bytecode.sha256, 'payload.bytecode.sha256');
 
   exactObject(payload.manifest, ['format', 'sha256', 'contentBase64'], 'payload.manifest');
@@ -729,6 +774,7 @@ export async function verifyPortablePackage(packageValue, options = {}) {
   if (manifest.format === 'GhostFlow/control-v22') manifestKeys.push('outputObservations');
   if (Object.hasOwn(manifest, 'legacyAdmission')) manifestKeys.push('legacyAdmission');
   if (Object.hasOwn(manifest, 'requiredRuntimeFeatures')) manifestKeys.push('requiredRuntimeFeatures');
+  if (Object.hasOwn(manifest, 'monitoring')) manifestKeys.push('monitoring');
   if (Object.hasOwn(manifest,'adaptPolicy') || Object.hasOwn(manifest,'strategies')) manifestKeys.push('adaptPolicy','strategies');
   exactObject(manifest, manifestKeys, 'manifest');
   const requiredFeatures = requiredRuntimeFeatures(manifest);
@@ -751,6 +797,7 @@ export async function verifyPortablePackage(packageValue, options = {}) {
   for (const field of ['inputs', 'outputs', 'sensors', 'schedules', 'timers', 'signals', 'configs']) {
     if (!Array.isArray(manifest[field])) fail('manifest-mismatch', `manifest.${field} must be an array`);
   }
+  validateMonitoringPlanManifest(manifest);
   const manifestPorts = new Map();
   for (const field of ['inputs', 'outputs']) {
     for (const [index, port] of manifest[field].entries()) {
@@ -817,10 +864,10 @@ export async function verifyPortablePackage(packageValue, options = {}) {
   for (const [index, schedule] of manifest.schedules.entries()) {
     if (!isPlainObject(schedule)) fail('manifest-mismatch', `manifest.schedules[${index}] must be an object`);
     const name = ghostName(schedule.name, `manifest.schedules[${index}].name`);
-    if (!contextManifest && !civilManifest && profileVersion !== '11') {
+    if (!contextManifest && !civilManifest && !['11', '16'].includes(profileVersion)) {
       addGenerated(schedule.dueInput, `__gf_schedule_due_${name}`, `manifest.schedules[${index}].dueInput`);
-    } else if (profileVersion === '11' && Object.hasOwn(schedule, 'dueInput')) {
-      fail('manifest-mismatch', `manifest.schedules[${index}].dueInput is not a GFB11 Periodic port`);
+    } else if (['11', '16'].includes(profileVersion) && Object.hasOwn(schedule, 'dueInput')) {
+      fail('manifest-mismatch', `manifest.schedules[${index}].dueInput cannot supply a runtime-owned due value`);
     }
   }
   for (const [index, timer] of manifest.timers.entries()) {
@@ -832,14 +879,14 @@ export async function verifyPortablePackage(packageValue, options = {}) {
     manifestCapabilityType(config.type, `manifest.configs[${index}].type`);
     manifestCanonicalUnit(config, `manifest.configs[${index}]`);
     manifestDisplayUnit(config, `manifest.configs[${index}]`);
-    const stream = profileVersion === '11';
+    const stream = ['11', '16'].includes(profileVersion);
     if (stream && (!Number.isInteger(config.id) || config.id <= 0 || config.id > 0xffff_ffff)) fail('manifest-mismatch', `manifest.configs[${index}].id must be a positive u32`);
     manifestIntConfig(config, `manifest.configs[${index}]`, stream);
     manifestTimeConfig(config, `manifest.configs[${index}]`, stream);
   }
-  if (profileVersion === '11'
+  if (['11', '16'].includes(profileVersion)
       && new Set(manifest.configs.map(config => config.id)).size !== manifest.configs.length) {
-    fail('manifest-mismatch', 'GFB11 config IDs must be unique');
+    fail('manifest-mismatch', 'context config IDs must be unique');
   }
 
   exactObject(sourceMap, ['format', 'bytecodeSha256', 'sourceDocument', 'nodes', 'lines', 'traceMetadata',
@@ -907,6 +954,11 @@ export async function verifyPortablePackage(packageValue, options = {}) {
         throw new Error('output observation descriptors do not match canonical source lowering');
       }
     }
+    if (manifest.monitoring !== undefined || replay.manifest.monitoring !== undefined) {
+      if (canonicalJson(manifest.monitoring ?? null) !== canonicalJson(replay.manifest.monitoring ?? null)) {
+        throw new Error('monitoring plan does not match canonical source lowering');
+      }
+    }
     if (guarded && canonicalJson(replay.manifest) !== canonicalJson(manifest)) throw new Error('legacy admission manifest does not match canonical source');
     if (Object.hasOwn(manifest,'adaptPolicy') || Object.hasOwn(replay.manifest,'adaptPolicy')) {
       if (canonicalJson(manifest.adaptPolicy ?? null) !== canonicalJson(replay.manifest.adaptPolicy ?? null)
@@ -914,8 +966,8 @@ export async function verifyPortablePackage(packageValue, options = {}) {
         || !equalBytes(artifacts.bytecode,replay.bytes)) throw new Error('adaptive strategy projection does not match canonical source and bytecode');
     }
     if (!equalBytes(replay.bytes, artifacts.bytecode)) throw new Error('canonical source does not reproduce package bytecode');
-    if (civilManifest && canonicalJson(manifest) !== canonicalJson(compileSourceSync(sourceText, { filename: mappedDocument.filename }).manifest)) {
-      throw new Error('civil Range manifest does not match exact owner source lowering');
+    if ((civilManifest || profileVersion === '16') && canonicalJson(manifest) !== canonicalJson(compileSourceSync(sourceText, { filename: mappedDocument.filename }).manifest)) {
+      throw new Error('context schedule manifest does not match exact owner source lowering');
     }
     if (profileVersion === '11'
         && canonicalJson(manifest.configs) !== canonicalJson(replay.manifest.configs)) {
