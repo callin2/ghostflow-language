@@ -431,7 +431,10 @@ impl ContextRuntime {
     }
 
     pub(crate) fn scalar_setting(&self, id: u32) -> Option<Value> {
-        let stream = self.configs.iter().find(|stream| stream.descriptor.id == id)?;
+        let stream = self
+            .configs
+            .iter()
+            .find(|stream| stream.descriptor.id == id)?;
         match stream.current.as_ref().ok()? {
             ConfigValue::Scalar(value) => Some(*value),
             ConfigValue::Slots(_) => None,
