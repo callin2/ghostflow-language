@@ -12,6 +12,7 @@ execution semantics. JavaScript package verification replays canonical source to
 check the plan; native package verification checks its bounded schema and declared
 output/timer/state/schedule references. Device owns observed history and conditional
 forecasts; a schedule estimate is not evidence that an output was applied.
+The JavaScript runtime consumers accept this monitoring metadata in both legacy and framed manifest validation.
 
 ### 2026-11-02 - bound Bool host quality inputs ([#618](https://github.com/callin2/ghostflow-language/issues/618))
 

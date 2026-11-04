@@ -14,6 +14,7 @@
 검증은 정규 원문을 다시 컴파일해 계획을 대조하고, native 패키지 검증은 크기 제한과
 선언된 출력·타이머·상태·일정 참조를 확인합니다. 실제 이력과 조건부 예고는 Device가
 담당합니다. 계산된 일정은 출력이 실제 적용됐다는 증거가 아닙니다.
+JavaScript 런타임 consumer도 legacy와 framed manifest 검증에서 이 모니터링 메타데이터를 허용합니다.
 
 ### 2026-11-02 - 바인딩된 Bool 호스트의 품질 입력 ([#618](https://github.com/callin2/ghostflow-language/issues/618))
 
