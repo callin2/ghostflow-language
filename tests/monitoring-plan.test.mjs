@@ -87,9 +87,10 @@ test('portable package replay rejects a substituted monitoring plan', async () =
 test('configured timed outputs expose the direct Duration setting and enum order', async () => {
   const source = `control Settings {\n  config watering: Duration = 10s { min = 1s; max = 60s; step = 1s; access = operator; }\n  type Phase = First | Second;\n  state phase: Phase = First;\n  timer age = elapsed(phase);\n  let phase_limit = watering |> recover(0ms);\n  phase' = case phase { First => if age >= phase_limit then Second else First; Second => if age >= phase_limit then First else Second; };\n  output valve_a, valve_b: Bool;\n  valve_a <- phase' == First;\n  valve_b <- phase' == Second;\n}`;
   const compiled = await compileSource(source, { filename: 'configured.ghost' });
+  const cycle = [{ value: 0, configName: 'watering' }, { value: 1, configName: 'watering' }];
   assert.deepEqual(compiled.manifest.monitoring.patterns, [
-    { kind: 'configured-timed-output', outputName: 'valve_a', stateName: 'phase', timerId: 'age', configName: 'watering', activeValue: 0 },
-    { kind: 'configured-timed-output', outputName: 'valve_b', stateName: 'phase', timerId: 'age', configName: 'watering', activeValue: 1 },
+    { kind: 'configured-timed-output', outputName: 'valve_a', stateName: 'phase', timerId: 'age', configName: 'watering', activeValue: 0, cycle },
+    { kind: 'configured-timed-output', outputName: 'valve_b', stateName: 'phase', timerId: 'age', configName: 'watering', activeValue: 1, cycle },
   ]);
 
   const inputGated = source.replace('output valve_a', 'input interlock: Bool; output valve_a')
@@ -98,6 +99,7 @@ test('configured timed outputs expose the direct Duration setting and enum order
     .map(pattern => pattern.outputName), ['valve_b']);
 
   const wrongDirection = source.replace('if age >= phase_limit then Second', 'if age < phase_limit then Second');
-  assert.deepEqual((await compileSource(wrongDirection, { filename: 'early-transition.ghost' })).manifest.monitoring.patterns
-    .map(pattern => pattern.outputName), ['valve_b']);
+  const earlyPatterns = (await compileSource(wrongDirection, { filename: 'early-transition.ghost' })).manifest.monitoring.patterns;
+  assert.deepEqual(earlyPatterns.map(pattern => pattern.outputName), ['valve_b']);
+  assert.equal(earlyPatterns[0].cycle, undefined);
 });

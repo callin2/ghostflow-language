@@ -85,7 +85,7 @@ function validateMonitoringPlanManifest(manifest) {
   for (const [index, pattern] of monitoring.patterns.entries()) {
     const path = `manifest.monitoring.patterns[${index}]`;
     const keys = pattern.kind === 'configured-timed-output'
-      ? ['kind', 'outputName', 'stateName', 'timerId', 'configName', 'activeValue']
+      ? ['kind', 'outputName', 'stateName', 'timerId', 'configName', 'activeValue', ...('cycle' in pattern ? ['cycle'] : [])]
       : ['kind', 'outputName', 'stateName', 'timerId', 'durationMs', 'scheduleId'];
     exactObject(pattern, keys, path);
     if (!['scheduled-timed-latch', 'configured-timed-output'].includes(pattern.kind)) fail('manifest-mismatch', `${path}.kind is unsupported`);
@@ -99,6 +99,21 @@ function validateMonitoringPlanManifest(manifest) {
         || !manifest.configs.some(config => config.name === pattern.configName && config.type === 'Duration')
         || timers.get(pattern.timerId)?.state !== pattern.stateName || seenOutputs.has(pattern.outputName)) {
         fail('manifest-mismatch', `${path} does not match declared output, Duration config and elapsed timer`);
+      }
+      if ('cycle' in pattern) {
+        const { cycle, activeValue } = pattern;
+        if (!Array.isArray(cycle) || cycle.length < 2 || cycle.length > 8) fail('manifest-mismatch', `${path}.cycle length is unsupported`);
+        const values = new Set();
+        for (const stage of cycle) {
+          exactObject(stage, ['value', 'configName'], `${path}.cycle stage`);
+          if (!(typeof activeValue === 'boolean' ? typeof stage.value === 'boolean'
+            : Number.isInteger(stage.value) && stage.value >= 0 && stage.value <= 0xffff_ffff)
+            || values.has(stage.value) || !manifest.configs.some(config => config.name === stage.configName && config.type === 'Duration')) {
+            fail('manifest-mismatch', `${path}.cycle has an invalid stage`);
+          }
+          values.add(stage.value);
+        }
+        if (!cycle.some(stage => stage.value === activeValue && stage.configName === pattern.configName)) fail('manifest-mismatch', `${path}.cycle does not include the active stage`);
       }
       seenOutputs.add(pattern.outputName);
       continue;

@@ -869,7 +869,9 @@ fn verify_monitoring_plan(manifest: &Value) -> Result<()> {
         let label = format!("monitoring.patterns[{index}]");
         let pattern = value_object(value, &label)?;
         let configured = pattern["kind"].as_str() == Some("configured-timed-output");
-        exact_keys(pattern, if configured {
+        exact_keys(pattern, if configured && pattern.contains_key("cycle") {
+            &["kind", "outputName", "stateName", "timerId", "configName", "activeValue", "cycle"]
+        } else if configured {
             &["kind", "outputName", "stateName", "timerId", "configName", "activeValue"]
         } else {
             &["kind", "outputName", "stateName", "timerId", "durationMs", "scheduleId"]
@@ -900,6 +902,32 @@ fn verify_monitoring_plan(manifest: &Value) -> Result<()> {
             }
             if !outputs.insert(output) || !manifest["outputs"].as_array().is_some_and(|ports| ports.iter().any(|port| port["name"].as_str() == Some(output) && port["type"].as_str() == Some("Bool"))) || !manifest["timers"].as_array().is_some_and(|timers| timers.iter().any(|candidate| candidate["name"].as_str() == Some(timer) && candidate["state"].as_str() == Some(state))) {
                 return Err(mismatch("configured monitoring pattern does not match output and elapsed timer"));
+            }
+            if let Some(cycle) = pattern.get("cycle") {
+                let stages = cycle.as_array().filter(|items| (2..=8).contains(&items.len()))
+                    .ok_or_else(|| mismatch("monitoring cycle must contain 2 to 8 stages"))?;
+                let mut values = HashSet::new();
+                let mut active = false;
+                for stage in stages {
+                    let stage = value_object(stage, "monitoring cycle stage")?;
+                    exact_keys(stage, &["value", "configName"], "monitoring cycle stage", ErrorCode::ManifestMismatch)?;
+                    let value = &stage["value"];
+                    let id = if pattern["activeValue"].is_boolean() {
+                        value.as_bool().map(u64::from)
+                    } else {
+                        value.as_u64().filter(|id| *id <= u64::from(u32::MAX))
+                    };
+                    let config_name = stage["configName"].as_str();
+                    if !id.is_some_and(|id| values.insert(id)) || !manifest["configs"].as_array().is_some_and(|configs| {
+                        configs.iter().any(|candidate| candidate["name"].as_str() == config_name && candidate["type"].as_str() == Some("Duration"))
+                    }) {
+                        return Err(mismatch("monitoring cycle has an invalid stage"));
+                    }
+                    active |= value == &pattern["activeValue"] && config_name == Some(config);
+                }
+                if !active {
+                    return Err(mismatch("monitoring cycle does not include the active stage"));
+                }
             }
             continue;
         }

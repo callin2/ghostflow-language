@@ -2242,6 +2242,52 @@ class Lowerer {
           value.kind === 'binary' && value.op === '>' && durationConfig(value.left) && zeroDuration(value.right)
         ));
     };
+    const positiveConfigGate = node => {
+      if (node?.kind !== 'binary' || node.op !== '>' || !zeroDuration(node.right)) return false;
+      const name = durationConfig(node.left);
+      return name != null && this.manifest.configs.some(config => config.name === name && config.settings?.min > 0);
+    };
+    const timedGuard = (node, operator) => timerComparison(node, operator)
+      ?? (node?.kind === 'binary' && node.op === '&&' && positiveConfigGate(node.left)
+        ? timerComparison(node.right, operator) : null);
+    const timedCycle = (next, state, enumValues) => {
+      const expression = next.value;
+      if (state.type.kind === 'Bool') {
+        if (expression.kind !== 'if' || !referenceIs(expression.test, next.name)) return null;
+        const on = timerComparison(expression.yes, '<');
+        const off = timedGuard(expression.no, '>=');
+        return on && off && on.timerId === off.timerId
+          ? { timerId: on.timerId, stages: [
+            { value: true, configName: on.configName }, { value: false, configName: off.configName },
+          ] } : null;
+      }
+      if (!enumValues || enumValues.size < 2 || enumValues.size > 8 || expression.kind !== 'case'
+        || !referenceIs(expression.value, next.name)) return null;
+      const edges = new Map();
+      for (const name of enumValues.keys()) {
+        const branch = expression.branches.find(entry => entry.name === name)?.body;
+        if (branch?.kind !== 'if' || !referenceIs(branch.no, name)
+          || branch.yes?.kind !== 'reference' || !enumValues.has(branch.yes.name)) return null;
+        const time = timedGuard(branch.test, '>=');
+        if (!time) return null;
+        edges.set(name, { ...time, next: branch.yes.name });
+      }
+      const first = edges.keys().next().value;
+      const timerId = edges.get(first).timerId;
+      const stages = [], seen = new Set();
+      let current = first;
+      while (!seen.has(current)) {
+        const edge = edges.get(current);
+        if (edge.timerId !== timerId) return null;
+        seen.add(current);
+        stages.push({ value: this.enumMembers.get(current).value, configName: edge.configName });
+        current = edge.next;
+      }
+      return current === first && stages.length === edges.size ? { timerId, stages } : null;
+    };
+    const cycleGateIsStable = node => node.kind === 'binary' && node.op === '&&'
+      ? cycleGateIsStable(node.left) && cycleGateIsStable(node.right)
+      : node.kind !== 'binary' || node.op !== '>' || positiveConfigGate(node);
     const containsStateOrSchedule = node => {
       const seen = new Set();
       const visit = value => {
@@ -2296,6 +2342,7 @@ class Lowerer {
       const state = this.states.get(nextNode.name);
       if (!state) continue;
       const enumValues = this.types.get(state.type.kind);
+      const cycle = timedCycle(nextNode, state, enumValues);
       const targets = state.type.kind === 'Bool' ? [null] : [...(enumValues?.keys() ?? [])];
       for (const memberName of targets) {
         const comparison = transitionForTarget(nextNode, memberName, enumValues);
@@ -2308,7 +2355,8 @@ class Lowerer {
           const timer = this.timers.get(comparison.timerId);
           if (timer.state !== nextNode.name || patterns.some(item => item.outputName === connection.name)) continue;
           patterns.push({ kind: 'configured-timed-output', outputName: connection.name, stateName: nextNode.name,
-            timerId: comparison.timerId, configName: comparison.configName, activeValue });
+            timerId: comparison.timerId, configName: comparison.configName, activeValue,
+            ...(cycle?.timerId === comparison.timerId && cycleGateIsStable(connection.value) ? { cycle: cycle.stages } : {}) });
         }
       }
     }

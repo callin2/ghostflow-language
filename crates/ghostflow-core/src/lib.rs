@@ -1515,6 +1515,10 @@ impl Runtime {
         self.context_runtime.as_ref()?.scalar_setting(id)
     }
 
+    pub fn context_settings_revision(&self) -> Option<u64> {
+        Some(self.context_runtime.as_ref()?.settings_revision())
+    }
+
     pub fn context_state_json(&self) -> Result<String> {
         let module = self
             .module
