@@ -85,7 +85,7 @@ function validateMonitoringPlanManifest(manifest) {
   for (const [index, pattern] of monitoring.patterns.entries()) {
     const path = `manifest.monitoring.patterns[${index}]`;
     const keys = pattern.kind === 'configured-timed-output'
-      ? ['kind', 'outputName', 'stateName', 'timerId', 'configName', 'activeValue', ...('cycle' in pattern ? ['cycle'] : [])]
+      ? ['kind', 'outputName', 'stateName', 'timerId', 'configName', 'activeValue', ...('cycle' in pattern ? ['cycle'] : []), ...('sequence' in pattern ? ['sequence'] : [])]
       : ['kind', 'outputName', 'stateName', 'timerId', 'durationMs', 'scheduleId'];
     exactObject(pattern, keys, path);
     if (!['scheduled-timed-latch', 'configured-timed-output'].includes(pattern.kind)) fail('manifest-mismatch', `${path}.kind is unsupported`);
@@ -101,6 +101,7 @@ function validateMonitoringPlanManifest(manifest) {
         fail('manifest-mismatch', `${path} does not match declared output, Duration config and elapsed timer`);
       }
       if ('cycle' in pattern) {
+        if ('sequence' in pattern) fail('manifest-mismatch', `${path} cannot contain both cycle and sequence`);
         const { cycle, activeValue } = pattern;
         if (!Array.isArray(cycle) || cycle.length < 2 || cycle.length > 8) fail('manifest-mismatch', `${path}.cycle length is unsupported`);
         const values = new Set();
@@ -114,6 +115,21 @@ function validateMonitoringPlanManifest(manifest) {
           values.add(stage.value);
         }
         if (!cycle.some(stage => stage.value === activeValue && stage.configName === pattern.configName)) fail('manifest-mismatch', `${path}.cycle does not include the active stage`);
+      }
+      if ('sequence' in pattern) {
+        const { sequence, activeValue } = pattern;
+        if (!Array.isArray(sequence) || sequence.length < 2 || sequence.length > 8) fail('manifest-mismatch', `${path}.sequence length is unsupported`);
+        const values = new Set();
+        for (const stage of sequence) {
+          exactObject(stage, ['value', 'configName'], `${path}.sequence stage`);
+          if (!(typeof activeValue === 'boolean' ? typeof stage.value === 'boolean'
+            : Number.isInteger(stage.value) && stage.value >= 0 && stage.value <= 0xffff_ffff)
+            || values.has(stage.value) || !manifest.configs.some(config => config.name === stage.configName && config.type === 'Duration')) {
+            fail('manifest-mismatch', `${path}.sequence has an invalid stage`);
+          }
+          values.add(stage.value);
+        }
+        if (!sequence.some(stage => stage.value === activeValue && stage.configName === pattern.configName)) fail('manifest-mismatch', `${path}.sequence does not include the active stage`);
       }
       seenOutputs.add(pattern.outputName);
       continue;

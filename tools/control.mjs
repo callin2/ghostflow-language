@@ -2285,6 +2285,39 @@ class Lowerer {
       }
       return current === first && stages.length === edges.size ? { timerId, stages } : null;
     };
+    // A finite sequence has one non-timed waiting state which enters a
+    // bounded linear chain of timed states.  Unlike a cycle, the last timed
+    // state returns to that waiting state and never wraps to the first stage.
+    const timedSequence = (next, state, enumValues) => {
+      const expression = next.value;
+      if (!enumValues || enumValues.size < 3 || enumValues.size > 8 || expression.kind !== 'case'
+        || !referenceIs(expression.value, next.name)) return null;
+      const timed = new Map(), waits = [];
+      for (const name of enumValues.keys()) {
+        const branch = expression.branches.find(entry => entry.name === name)?.body;
+        if (branch?.kind !== 'if' || !referenceIs(branch.no, name)
+          || branch.yes?.kind !== 'reference' || !enumValues.has(branch.yes.name)) return null;
+        const time = timedGuard(branch.test, '>=');
+        if (time) timed.set(name, { ...time, next: branch.yes.name });
+        else waits.push({ name, next: branch.yes.name });
+      }
+      if (waits.length !== 1 || timed.size < 2) return null;
+      const wait = waits[0];
+      const first = wait.next;
+      const timerId = timed.get(first)?.timerId;
+      if (!timerId) return null;
+      const stages = [], seen = new Set();
+      let current = first;
+      while (current !== wait.name && !seen.has(current)) {
+        const edge = timed.get(current);
+        if (!edge || edge.timerId !== timerId) return null;
+        seen.add(current);
+        stages.push({ value: this.enumMembers.get(current).value, configName: edge.configName });
+        current = edge.next;
+      }
+      return current === wait.name && seen.size === timed.size && stages.length >= 2 && stages.length <= 8
+        ? { timerId, stages } : null;
+    };
     const cycleGateIsStable = node => node.kind === 'binary' && node.op === '&&'
       ? cycleGateIsStable(node.left) && cycleGateIsStable(node.right)
       : node.kind !== 'binary' || node.op !== '>' || positiveConfigGate(node);
@@ -2343,6 +2376,7 @@ class Lowerer {
       if (!state) continue;
       const enumValues = this.types.get(state.type.kind);
       const cycle = timedCycle(nextNode, state, enumValues);
+      const sequence = timedSequence(nextNode, state, enumValues);
       const targets = state.type.kind === 'Bool' ? [null] : [...(enumValues?.keys() ?? [])];
       for (const memberName of targets) {
         const comparison = transitionForTarget(nextNode, memberName, enumValues);
@@ -2356,7 +2390,8 @@ class Lowerer {
           if (timer.state !== nextNode.name || patterns.some(item => item.outputName === connection.name)) continue;
           patterns.push({ kind: 'configured-timed-output', outputName: connection.name, stateName: nextNode.name,
             timerId: comparison.timerId, configName: comparison.configName, activeValue,
-            ...(cycle?.timerId === comparison.timerId && cycleGateIsStable(connection.value) ? { cycle: cycle.stages } : {}) });
+            ...(cycle?.timerId === comparison.timerId && cycleGateIsStable(connection.value) ? { cycle: cycle.stages } : {}),
+            ...(sequence?.timerId === comparison.timerId && cycleGateIsStable(connection.value) ? { sequence: sequence.stages } : {}) });
         }
       }
     }

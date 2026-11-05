@@ -869,6 +869,11 @@ fn verify_monitoring_plan(manifest: &Value) -> Result<()> {
         let label = format!("monitoring.patterns[{index}]");
         let pattern = value_object(value, &label)?;
         let configured = pattern["kind"].as_str() == Some("configured-timed-output");
+        if configured && pattern.contains_key("cycle") && pattern.contains_key("sequence") {
+            return Err(mismatch(
+                "monitoring configured pattern cannot contain both cycle and sequence",
+            ));
+        }
         exact_keys(
             pattern,
             if configured && pattern.contains_key("cycle") {
@@ -880,6 +885,16 @@ fn verify_monitoring_plan(manifest: &Value) -> Result<()> {
                     "configName",
                     "activeValue",
                     "cycle",
+                ]
+            } else if configured && pattern.contains_key("sequence") {
+                &[
+                    "kind",
+                    "outputName",
+                    "stateName",
+                    "timerId",
+                    "configName",
+                    "activeValue",
+                    "sequence",
                 ]
             } else if configured {
                 &[
@@ -995,6 +1010,46 @@ fn verify_monitoring_plan(manifest: &Value) -> Result<()> {
                 if !active {
                     return Err(mismatch(
                         "monitoring cycle does not include the active stage",
+                    ));
+                }
+            }
+            if let Some(sequence) = pattern.get("sequence") {
+                let stages = sequence
+                    .as_array()
+                    .filter(|items| (2..=8).contains(&items.len()))
+                    .ok_or_else(|| mismatch("monitoring sequence must contain 2 to 8 stages"))?;
+                let mut values = HashSet::new();
+                let mut active = false;
+                for stage in stages {
+                    let stage = value_object(stage, "monitoring sequence stage")?;
+                    exact_keys(
+                        stage,
+                        &["value", "configName"],
+                        "monitoring sequence stage",
+                        ErrorCode::ManifestMismatch,
+                    )?;
+                    let value = &stage["value"];
+                    let id = if pattern["activeValue"].is_boolean() {
+                        value.as_bool().map(u64::from)
+                    } else {
+                        value.as_u64().filter(|id| *id <= u64::from(u32::MAX))
+                    };
+                    let config_name = stage["configName"].as_str();
+                    if !id.is_some_and(|id| values.insert(id))
+                        || !manifest["configs"].as_array().is_some_and(|configs| {
+                            configs.iter().any(|candidate| {
+                                candidate["name"].as_str() == config_name
+                                    && candidate["type"].as_str() == Some("Duration")
+                            })
+                        })
+                    {
+                        return Err(mismatch("monitoring sequence has an invalid stage"));
+                    }
+                    active |= value == &pattern["activeValue"] && config_name == Some(config);
+                }
+                if !active {
+                    return Err(mismatch(
+                        "monitoring sequence does not include the active stage",
                     ));
                 }
             }
@@ -3960,6 +4015,94 @@ fn verify_signatures(
 mod tests {
     use super::*;
     use std::process::Command;
+
+    #[test]
+    fn signed_finite_monitoring_package_reaches_the_real_native_loader() {
+        let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
+        let output = Command::new("node")
+            .arg(root.join("tests/native-monitoring-package-fixture.mjs"))
+            .current_dir(&root)
+            .output()
+            .unwrap();
+        assert!(
+            output.status.success(),
+            "{}",
+            String::from_utf8_lossy(&output.stderr)
+        );
+        let loader = |bytes: &[u8], context: &TargetLoaderContext<'_>| {
+            assert_eq!(
+                context.manifest["monitoring"]["patterns"][0]["sequence"]
+                    .as_array()
+                    .unwrap()
+                    .len(),
+                2
+            );
+            ghostflow_core::Module::load(bytes)
+                .map(|_| true)
+                .map_err(|error| error.to_string())
+        };
+        let abis = strings(&["GhostFlow/context-scan-abi-v5"]);
+        let formats = strings(&["GhostFlow/control-v10"]);
+        let capabilities = [
+            Capability {
+                kind: "actuator".into(),
+                name: "pump".into(),
+                value_type: "bool".into(),
+            },
+            Capability {
+                kind: "sensor".into(),
+                name: "start".into(),
+                value_type: "bool".into(),
+            },
+        ];
+        let mut current = profile(&loader);
+        current.supported_runtime_abis = &abis;
+        current.supported_manifest_formats = &formats;
+        current.available_capabilities = &capabilities;
+        verify_portable_package(&output.stdout, &current).unwrap();
+    }
+
+    #[test]
+    fn finite_monitoring_sequences_and_cycles_require_bounded_declared_stages() {
+        let manifest = serde_json::json!({
+            "configs": [{"name": "first_time", "type": "Duration"}, {"name": "rest_time", "type": "Duration"}],
+            "outputs": [{"name": "valve", "type": "Bool"}],
+            "timers": [{"name": "age", "state": "phase"}],
+            "monitoring": {"schema": "GhostFlow/monitoring-plan-v1", "patterns": [{
+                "kind": "configured-timed-output", "outputName": "valve", "stateName": "phase",
+                "timerId": "age", "configName": "first_time", "activeValue": 1,
+                "sequence": [{"value": 1, "configName": "first_time"}, {"value": 2, "configName": "rest_time"}]
+            }]}
+        });
+        verify_monitoring_plan(&manifest).unwrap();
+        let mut cycle = manifest.clone();
+        let pattern = cycle["monitoring"]["patterns"][0].as_object_mut().unwrap();
+        let stages = pattern.remove("sequence").unwrap();
+        pattern.insert("cycle".into(), stages);
+        verify_monitoring_plan(&cycle).unwrap();
+        for scenario in 0..8 {
+            let mut bad = manifest.clone();
+            let pattern = &mut bad["monitoring"]["patterns"][0];
+            match scenario {
+                0 => pattern["cycle"] = pattern["sequence"].clone(),
+                1 => pattern["sequence"] = serde_json::json!([]),
+                2 => {
+                    pattern["sequence"] =
+                        serde_json::json!([{"value": 1, "configName": "first_time"}])
+                }
+                3 => pattern["sequence"][1]["value"] = serde_json::json!(1),
+                4 => pattern["sequence"][1]["configName"] = serde_json::json!("undeclared"),
+                5 => pattern["sequence"][0]["value"] = serde_json::json!(3),
+                6 => pattern["sequence"][0]["extra"] = serde_json::json!(true),
+                _ => pattern["sequence"][1]["value"] = serde_json::json!(4_294_967_296u64),
+            }
+            assert_eq!(
+                verify_monitoring_plan(&bad).unwrap_err().code,
+                ErrorCode::ManifestMismatch,
+                "scenario {scenario}"
+            );
+        }
+    }
 
     #[test]
     fn prepared_solar_package_monitoring_is_accepted_and_malformed_plans_are_rejected() {
