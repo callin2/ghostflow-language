@@ -1093,7 +1093,7 @@ export function sensorFaultCode(reading) {
 
 function inputValue(value, inputType, label) { return typedValue(value, inputType, label); }
 
-function verifySourceBoundContext(artifact, compiledBytes, manifest, bytecodeFormat) {
+function verifySourceBoundContext(artifact, compiledBytes, manifest, bytecodeFormat, hardwareProfiles) {
   if (![11, 12].includes(bytecodeFormat)
     && artifact.sourceClosure === undefined && manifest?.sensorInstances === undefined) return;
   const { sourceDocument, sourceClosure } = artifact;
@@ -1107,6 +1107,7 @@ function verifySourceBoundContext(artifact, compiledBytes, manifest, bytecodeFor
   }
   const rebuilt = compileSourceSync(sourceDocument.text, {
     filename: sourceDocument.filename,
+    hardwareProfiles,
     ...(sourceClosure === undefined ? {} : { sourceClosure: sourceClosure.documents }),
   });
   if (!equalBytes(rebuilt.bytes, compiledBytes)) throw new Error('composition bytecode does not match canonical source');
@@ -1137,7 +1138,7 @@ async function instantiateControlRuntime(wasmBytes, artifact = {}, options, inst
     bytecodeFormat = view.getUint16(14, true);
   }
   const checkedManifest = validateManifest(manifest, { ...options, bytecodeFormat });
-  verifySourceBoundContext(artifact, compiledBytes, manifest, bytecodeFormat);
+  verifySourceBoundContext(artifact, compiledBytes, manifest, bytecodeFormat, options.hardwareProfiles);
   validateOutputObservationRails(checkedManifest.manifest, compiledBytes);
   if (checkedManifest.manifest.outputObservations?.length) {
     if (instantiateRuntime !== FramedGhostFlowRuntime.instantiate) throw new Error('output observations require a framed host');
