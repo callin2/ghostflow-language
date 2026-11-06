@@ -951,11 +951,12 @@ export async function verifyPortablePackage(packageValue, options = {}) {
   if (!Array.isArray(sourceMap.nodes) || (sourceMap.lines !== null && !Array.isArray(sourceMap.lines))) {
     fail('source-map-mismatch', 'source map nodes/lines have an unsupported shape');
   }
+  const replayOptions = { filename: mappedDocument.filename, hardwareProfiles: options.hardwareProfiles };
   if (Object.hasOwn(sourceMap, 'sourceClosure')) {
     try {
       if (sourceMap.sourceClosure?.format !== 'GhostFlow/source-closure-v1') throw new Error('invalid source closure format');
       const replay = compileSourceSync(sourceText, {
-        filename: mappedDocument.filename, sourceClosure: sourceMap.sourceClosure.documents,
+        ...replayOptions, sourceClosure: sourceMap.sourceClosure.documents,
       });
       if (!equalBytes(replay.bytes, artifacts.bytecode)
           || canonicalJson(replay.manifest) !== canonicalJson(manifest)
@@ -988,7 +989,7 @@ export async function verifyPortablePackage(packageValue, options = {}) {
   } else try {
     const extraction = extractLiterate(sourceText, { filename: mappedDocument.filename });
     const guarded = Object.hasOwn(manifest,'legacyAdmission');
-    const replay = guarded ? compileSourceSync(sourceText, { filename: mappedDocument.filename })
+    const replay = guarded ? compileSourceSync(sourceText, replayOptions)
       : compileControl(extraction.code, { filename: mappedDocument.filename });
     if (canonicalJson(requiredRuntimeFeatures(replay.manifest)) !== canonicalJson(requiredFeatures)) {
       throw new Error('runtime features do not match canonical source lowering');
@@ -1011,7 +1012,7 @@ export async function verifyPortablePackage(packageValue, options = {}) {
         || !equalBytes(artifacts.bytecode,replay.bytes)) throw new Error('adaptive strategy projection does not match canonical source and bytecode');
     }
     if (!equalBytes(replay.bytes, artifacts.bytecode)) throw new Error('canonical source does not reproduce package bytecode');
-    if ((civilManifest || profileVersion === '16') && canonicalJson(manifest) !== canonicalJson(compileSourceSync(sourceText, { filename: mappedDocument.filename }).manifest)) {
+    if ((civilManifest || profileVersion === '16') && canonicalJson(manifest) !== canonicalJson(compileSourceSync(sourceText, replayOptions).manifest)) {
       throw new Error('context schedule manifest does not match exact owner source lowering');
     }
     if (profileVersion === '11'
