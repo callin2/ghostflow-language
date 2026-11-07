@@ -5,6 +5,18 @@
 
 ## 미출시
 
+### 2026-11-07 - 외부 취소 조건이 있는 유한 모니터링 계획 ([#622](https://github.com/callin2/ghostflow-language/issues/622), [Device #329](https://github.com/callin2/farm-device/issues/329))
+
+버그 수정: 외부 정지 조건으로 감싼 경우 이미 인식할 수 있는 유한 타이머 순서도
+생략되던 문제를 고쳤습니다. `phase' = if stop_pressed then Idle else case phase { ... }`는
+취소 조건이 Bool 입력·복구·불변 별칭·순수 Bool 식으로만 구성되고 순서의 유일한
+대기 경계로 복귀하면 `configured-timed-output`과 `sequence` 메타데이터를 유지합니다.
+state·시간·설정에 의존하거나 복귀 경계를 증명하지 못한 조건은 계속 지원하지 않습니다.
+대기 상태와 계속 누른 시작 입력을 반복 cycle 예측으로 바꾸지 않으며 Duration 단계는
+실시간 설정 이름을 유지합니다. Reference §2.8의 상태·타이머 규칙과 GFB 바이트·실행·ABI는
+바뀌지 않고 재컴파일하면 설명용 manifest 메타데이터만 추가됩니다.
+동일한 bytecode와 portable replay를 포함한 회귀 근거는 `tests/monitoring-plan.test.mjs`입니다.
+
 ### 2026-11-05 - 유한 타이머 순서 예측 ([#622](https://github.com/callin2/ghostflow-language/issues/622))
 
 모니터링 계획이 Duration 설정으로 제어하는 반복하지 않는 유한 enum 순서를
