@@ -2316,7 +2316,40 @@ class Lowerer {
         current = edge.next;
       }
       return current === wait.name && seen.size === timed.size && stages.length >= 2 && stages.length <= 8
-        ? { timerId, stages } : null;
+        ? { timerId, stages, waitingMember: wait.name } : null;
+    };
+    // Only external Bool cancellation can be ignored by a conditional forecast.
+    // In particular, a timer/state/config guard may become true before its end.
+    // null = unsupported dependency, false = constant Bool, true = input-derived.
+    const externalBoolean = (node, seen = new Set()) => {
+      if (node?.kind === 'literal' && ['true', 'false'].includes(node.raw)) return false;
+      if (node?.kind === 'reference') {
+        const symbol = this.symbols.get(node.name);
+        if (symbol?.category === 'input' && symbol.type.kind === 'Bool'
+          || this.sensors.get(node.name)?.type.kind === 'Bool') return true;
+        if (symbol?.category === 'let' && !seen.has(node.name)) {
+          return externalBoolean(this.lets.get(node.name)?.value, new Set([...seen, node.name]));
+        }
+        return null;
+      }
+      if (node?.kind === 'unary' && node.op === '!') return externalBoolean(node.value, seen);
+      let terms;
+      if (node?.kind === 'binary' && ['&&', '||', '==', '!='].includes(node.op)) terms = [node.left, node.right];
+      else if (node?.kind === 'binary' && node.op === '|>' && node.right?.kind === 'call'
+        && node.right.name === 'recover' && node.right.args.length === 1 && node.right.named.length === 0) {
+        terms = [node.left, node.right.args[0]];
+      } else if (node?.kind === 'if') terms = [node.test, node.yes, node.no];
+      else return null;
+      const dependencies = terms.map(term => externalBoolean(term, seen));
+      return dependencies.includes(null) ? null : dependencies.some(Boolean);
+    };
+    const externallyCancelledSequence = (next, state, enumValues) => {
+      const expression = next.value;
+      if (expression.kind !== 'if' || expression.yes.kind !== 'reference'
+        || externalBoolean(expression.test) !== true) return null;
+      const inner = { ...next, value: expression.no };
+      const sequence = timedSequence(inner, state, enumValues);
+      return sequence?.waitingMember === expression.yes.name ? { inner, sequence } : null;
     };
     const cycleGateIsStable = node => node.kind === 'binary' && node.op === '&&'
       ? cycleGateIsStable(node.left) && cycleGateIsStable(node.right)
@@ -2376,10 +2409,11 @@ class Lowerer {
       if (!state) continue;
       const enumValues = this.types.get(state.type.kind);
       const cycle = timedCycle(nextNode, state, enumValues);
-      const sequence = timedSequence(nextNode, state, enumValues);
+      const cancelledSequence = externallyCancelledSequence(nextNode, state, enumValues);
+      const sequence = cancelledSequence?.sequence ?? timedSequence(nextNode, state, enumValues);
       const targets = state.type.kind === 'Bool' ? [null] : [...(enumValues?.keys() ?? [])];
       for (const memberName of targets) {
-        const comparison = transitionForTarget(nextNode, memberName, enumValues);
+        const comparison = transitionForTarget(cancelledSequence?.inner ?? nextNode, memberName, enumValues);
         if (!comparison) continue;
         const activeValue = memberName === null ? true : this.enumMembers.get(memberName)?.value;
         if (activeValue === undefined) continue;

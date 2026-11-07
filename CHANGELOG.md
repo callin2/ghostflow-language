@@ -2,6 +2,19 @@
 
 ## Unreleased
 
+### 2026-11-07 - finite monitoring plans with external cancellation ([#622](https://github.com/callin2/ghostflow-language/issues/622), [Device #329](https://github.com/callin2/farm-device/issues/329))
+
+Bug fix: an external stop wrapper previously hid an otherwise recognized finite
+timed sequence. `phase' = if stop_pressed then Idle else case phase { ... }` now
+retains `configured-timed-output` and `sequence` metadata when cancellation uses
+only Bool inputs, recovery, immutable aliases and pure Bool expressions, and
+resets to the sequence's unique waiting boundary. State, time, settings and
+unproven reset guards remain unsupported. Waiting and held start inputs do not
+create repeating-cycle forecasts. Duration stages retain live setting names.
+The state/timer rules in Reference §2.8, GFB bytes, execution and ABI are unchanged;
+recompilation adds only descriptive manifest metadata. Regression evidence is in
+`tests/monitoring-plan.test.mjs`, including unchanged bytecode and portable replay.
+
 ### 2026-11-05 - finite timed sequence forecasts ([#622](https://github.com/callin2/ghostflow-language/issues/622))
 
 Monitoring plans now describe bounded, non-repeating enum sequences controlled by
