@@ -7,6 +7,8 @@ import test from 'node:test';
 import { fileURLToPath } from 'node:url';
 import { compileSource as compileInBrowser } from '../tools/browser-toolchain.mjs';
 import { compileSource as compileInNode } from '../tools/toolchain.mjs';
+import { inspectSourceChanges as diffBrowser, planSourceUpdate as planBrowser, verifySourceUpdate as verifyBrowser } from '../tools/browser-toolchain.mjs';
+import { inspectSourceChanges as diffNode, planSourceUpdate as planNode, verifySourceUpdate as verifyNode } from '../tools/toolchain.mjs';
 import { sha256Hex } from '../tools/sha256.mjs';
 import { ControlRuntime } from '../runtimes/wasm/control-runtime.mjs';
 
@@ -54,6 +56,8 @@ test('browser public compiler graph contains no Node builtin or Buffer dependenc
   const modules = browserModuleGraph(fileURLToPath(browserEntry));
   assert.ok(modules.has(path.join(root, 'tools/compile-source.mjs')));
   assert.ok(modules.has(path.join(root, 'tools/interaction-schema.mjs')));
+  assert.ok(modules.has(path.join(root, 'tools/source-changes.mjs')));
+  assert.ok(modules.has(path.join(root, 'tools/update-request.mjs')));
   assert.ok(modules.has(path.join(root, 'tools/bound-resource-control.mjs')));
   const runtimeSnapshotModules = browserModuleGraph(fileURLToPath(runtimeSnapshotEntry));
   assert.ok(runtimeSnapshotModules.has(path.join(root, 'tools/interaction-runtime-snapshot.mjs')));
@@ -64,6 +68,14 @@ test('browser public compiler graph contains no Node builtin or Buffer dependenc
   const boundModules = browserModuleGraph(path.join(root, 'runtimes/wasm/bound-resource-control.mjs'));
   assert.ok(boundModules.has(path.join(root, 'runtimes/wasm/framed-runtime.mjs')));
   assert.ok(boundModules.has(path.join(root, 'tools/bound-resource-control.mjs')));
+});
+
+test('browser and Node expose the same update comparator and preflight implementation', () => {
+  assert.equal(diffBrowser, diffNode);
+  assert.equal(planBrowser, planNode);
+  assert.equal(verifyBrowser, verifyNode);
+  const before = '# Example\n```ghost\ncontrol Demo { config delay: Duration = 5s; output active: Bool; active <- true; }\n```';
+  assert.deepEqual(diffBrowser(before, before.replace('5s', '8s')), diffNode(before, before.replace('5s', '8s')));
 });
 
 test('shared SHA-256 matches Node across padding, UTF-8, binary, and source-limit inputs', () => {

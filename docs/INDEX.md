@@ -369,6 +369,8 @@ For first and last recorded Git commit dates, run `node <skill>/scripts/docs-ind
 | [docs/SOURCE-SAFETY-TRACE.ko.md](SOURCE-SAFETY-TRACE.ko.md) | 소스 및 안전 관측 계약 | md |
 | [docs/SOURCE-SAFETY-TRACE.md](SOURCE-SAFETY-TRACE.md) | Source and safety observation contract | md |
 | [docs/SOURCE-SAFETY-TRACE.zh.md](SOURCE-SAFETY-TRACE.zh.md) | 源码与安全观测契约 | md |
+| [docs/SOURCE-UPDATES.ko.md](SOURCE-UPDATES.ko.md) | GhostFlow 원문 변경 비교와 업데이트 범위 | md |
+| [docs/SOURCE-UPDATES.md](SOURCE-UPDATES.md) | GhostFlow Source Change Comparison and Update Scope | md |
 | [docs/SUNCALC-ATTRIBUTION.es.md](SUNCALC-ATTRIBUTION.es.md) | Atribución de SunCalc para el proveedor solar portable | md |
 | [docs/SUNCALC-ATTRIBUTION.ja.md](SUNCALC-ATTRIBUTION.ja.md) | ポータブル太陽プロバイダにおけるSunCalcの帰属表示 | md |
 | [docs/SUNCALC-ATTRIBUTION.ko.md](SUNCALC-ATTRIBUTION.ko.md) | 이식 가능한 태양 공급자의 SunCalc 저작자 표시 | md |
@@ -3475,4 +3477,4 @@ For first and last recorded Git commit dates, run `node <skill>/scripts/docs-ind
 | [docs/research/GF-COMPOSE-R9-ACCEPTANCE.md](research/GF-COMPOSE-R9-ACCEPTANCE.md) | GF-COMPOSE R9: acceptance and implementation handoff | md |
 | [docs/research/GF-COMPOSE-R9-ACCEPTANCE.zh.md](research/GF-COMPOSE-R9-ACCEPTANCE.zh.md) | GF-COMPOSE R9：验收与实现交接 | md |
 
-2731 documents.
+2733 documents.

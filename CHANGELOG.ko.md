@@ -5,6 +5,16 @@
 
 ## 미출시
 
+### 2026-11-09 - 공용 원문 비교와 변경 범위 사전 검사 ([API #258](https://github.com/callin2/farm_studio_api/issues/258))
+
+브라우저와 Node가 설정 기본값·설정 정의·제어 규칙·논리 입출력·하드웨어 선언을
+같은 모듈로 구조 비교한다. `ghostdiff.mjs`는 이 모듈을 쓰는 읽기 전용 CLI다.
+형식화된 범위 요청은 원문 작성 전에 허용 항목과 의존 보류 항목을 나누고,
+작성된 후보가 승인한 대상을 벗어나지 않았는지 검사한다. 컴파일·import 해석·
+호스트 메타데이터 확인·설치를 대신하지 않는다. 런타임 의미·GFB·ABI는 그대로다.
+회귀 검증은 `source-changes`, `update-request`, `ghostdiff`, browser-toolchain의
+공용 export 및 브라우저 의존성 검사에 포함한다.
+
 ### 2026-11-07 - 외부 취소 조건이 있는 유한 모니터링 계획 ([#622](https://github.com/callin2/ghostflow-language/issues/622), [Device #329](https://github.com/callin2/farm-device/issues/329))
 
 버그 수정: 외부 정지 조건으로 감싼 경우 이미 인식할 수 있는 유한 타이머 순서도
