@@ -464,6 +464,8 @@ For first and last recorded Git commit dates, run `node <skill>/scripts/docs-ind
 | [docs/SOURCE-SAFETY-TRACE.ko.md](docs/SOURCE-SAFETY-TRACE.ko.md) | 소스 및 안전 관측 계약 | md |
 | [docs/SOURCE-SAFETY-TRACE.md](docs/SOURCE-SAFETY-TRACE.md) | Source and safety observation contract | md |
 | [docs/SOURCE-SAFETY-TRACE.zh.md](docs/SOURCE-SAFETY-TRACE.zh.md) | 源码与安全观测契约 | md |
+| [docs/SOURCE-UPDATES.ko.md](docs/SOURCE-UPDATES.ko.md) | GhostFlow 원문 변경 비교와 업데이트 범위 | md |
+| [docs/SOURCE-UPDATES.md](docs/SOURCE-UPDATES.md) | GhostFlow Source Change Comparison and Update Scope | md |
 | [docs/SUNCALC-ATTRIBUTION.es.md](docs/SUNCALC-ATTRIBUTION.es.md) | Atribución de SunCalc para el proveedor solar portable | md |
 | [docs/SUNCALC-ATTRIBUTION.ja.md](docs/SUNCALC-ATTRIBUTION.ja.md) | ポータブル太陽プロバイダにおけるSunCalcの帰属表示 | md |
 | [docs/SUNCALC-ATTRIBUTION.ko.md](docs/SUNCALC-ATTRIBUTION.ko.md) | 이식 가능한 태양 공급자의 SunCalc 저작자 표시 | md |
@@ -1186,4 +1188,4 @@ For first and last recorded Git commit dates, run `node <skill>/scripts/docs-ind
 | [tests/reference/README.es.md](tests/reference/README.es.md) | Pruebas de aceptación de la Language Reference (por caso) | md |
 | [tests/reference/README.md](tests/reference/README.md) | Language Reference 개별 수용 테스트 | md |
 
-961 documents.
+963 documents.

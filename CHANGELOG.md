@@ -2,6 +2,17 @@
 
 ## Unreleased
 
+### 2026-11-09 - shared source changes and update-scope preflight ([API #258](https://github.com/callin2/farm_studio_api/issues/258))
+
+Browser and Node now share structural comparison for config defaults, config
+definitions, control rules, logical I/O and hardware declarations. `ghostdiff.mjs`
+is a read-only CLI over that same module. Typed update-scope requests partition
+eligible items and their deferred dependencies before authoring, then check actual
+candidates against approved targets. These checks do not replace compilation,
+import resolution, host metadata admission or installation. Runtime semantics,
+GFB and ABI are unchanged. Tests: `source-changes`, `update-request`, `ghostdiff`
+and the browser-toolchain shared-export/portable-graph checks.
+
 ### 2026-11-07 - finite monitoring plans with external cancellation ([#622](https://github.com/callin2/ghostflow-language/issues/622), [Device #329](https://github.com/callin2/farm-device/issues/329))
 
 Bug fix: an external stop wrapper previously hid an otherwise recognized finite

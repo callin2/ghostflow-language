@@ -3508,13 +3508,13 @@
       "files": {
         "en": {
           "path": "CHANGELOG.md",
-          "sha256": "6907aa8d63c3e403558b5c0221193b8acf59efc5685ab2c40d9de4afe6dd63bd"
+          "sha256": "9b7ad88f1fc7806357cb7810cde0f81164fc6b4c9f143800dadac5d99b583806"
         },
         "ko": {
           "path": "CHANGELOG.ko.md",
-          "sha256": "d96d72519b0a1cf75315da04330d4c6226c5f8a85e5414e63fb0253b8ead0c64",
+          "sha256": "31afe20dbb575f7179009976092c026da369e88d8969ec703562b1afbeba6bca",
           "from": "en",
-          "sourceSha256": "6907aa8d63c3e403558b5c0221193b8acf59efc5685ab2c40d9de4afe6dd63bd"
+          "sourceSha256": "9b7ad88f1fc7806357cb7810cde0f81164fc6b4c9f143800dadac5d99b583806"
         }
       }
     },
@@ -5935,6 +5935,23 @@
           "sha256": "52d240ef92434d5384b77681236649e7927cddf465b2061b0d4a9eeeca940362",
           "from": "en",
           "sourceSha256": "8428a7adc6eeb56a608aa48dc4f5c8814732d225b4d6856cae372a9e4f09f1c6"
+        }
+      }
+    },
+    {
+      "document": "docs/SOURCE-UPDATES.md",
+      "baseLanguage": "en",
+      "canonical": "en",
+      "files": {
+        "en": {
+          "path": "docs/SOURCE-UPDATES.md",
+          "sha256": "692c3d8571d8bbe6b1712a2965173dc8a007bef7dfd228f8b80976bd28d5edb3"
+        },
+        "ko": {
+          "path": "docs/SOURCE-UPDATES.ko.md",
+          "sha256": "336ee0596c547be8af5a076a42d32973f4942edc82b9ded529380ed1569ed406",
+          "from": "en",
+          "sourceSha256": "692c3d8571d8bbe6b1712a2965173dc8a007bef7dfd228f8b80976bd28d5edb3"
         }
       }
     }
