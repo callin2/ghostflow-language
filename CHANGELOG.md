@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+### 2026-11-12 - Reject rolling limits in hosts that cannot enforce them ([#96](https://github.com/callin2/ghostflow-language/issues/96))
+
+Both public WASM control entry points reject programs with accounting limits before loading the program. An accounting-aware host must check the limit before allowing the output to turn on. The explicit accounting replay path continues to enforce its recorded reservations.
+
 ### 2026-11-11 - presence-only capability strategy matching (#156)
 
 Strategy matches may omit the capability type. The compiler resolves the declared

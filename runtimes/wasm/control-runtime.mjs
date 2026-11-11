@@ -1142,6 +1142,10 @@ async function instantiateControlRuntime(wasmBytes, artifact = {}, options, inst
   if (options.instructionWitnesses !== undefined && typeof options.instructionWitnesses !== 'boolean') throw new Error('instructionWitnesses must be Boolean');
   if (options.instructionWitnesses && instantiateRuntime !== FramedGhostFlowRuntime.instantiate) throw new Error('instruction witnesses require a framed host');
   const { bytes: bytecode, manifest } = artifact;
+  const accountingConstraints = manifest?.accounting?.constraints;
+  if (accountingConstraints !== undefined && (!Array.isArray(accountingConstraints) || accountingConstraints.length !== 0)) {
+    throw new Error('accounting limits require a host that enforces output admission');
+  }
   const wasm = new Uint8Array(bytes(wasmBytes, 'wasmBytes'));
   // Copy caller-owned bytecode before awaiting digest verification (TOCTOU-safe).
   const compiledBytes = new Uint8Array(bytes(bytecode, 'bytes'));
