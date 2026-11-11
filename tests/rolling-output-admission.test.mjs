@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join, resolve } from 'node:path';
+import { join } from 'node:path';
 import test from 'node:test';
 import { encode } from '@toon-format/toon';
 import { compileSource, writeArtifact } from '../tools/toolchain.mjs';
@@ -25,6 +25,10 @@ test('rolling output requests are admitted until the budget is full, then expire
       actions.push({ kind: 'scan', atMs, contextFacts: contextFacts(atMs), accountingFacts: { localDay: 1, wallMs: 1_700_000_000_000 + atMs, clockTrusted: true } });
       if (index < 6) actions.push({ kind: 'outputApplied', reservationId: id(index + 1), receiptId: id(100 + index), account: 'pump_applied', resourceId: 7, startMs: atMs, endMs: atMs + 5_000, localDay: 1 });
     }
+    for (const [atMs, clockTrusted] of [[62_500, true], [63_000, false]]) {
+      actions.push({ kind: 'scan', atMs, contextFacts: contextFacts(atMs),
+        accountingFacts: { localDay: 1, wallMs: 1_700_000_000_000 + atMs, clockTrusted } });
+    }
     actions.push({ kind: 'outputRequest', reservationId: id(8), account: 'pump_applied', resourceId: 7, atMs: 70_000, durationMs: 5_000 });
     actions.push({ kind: 'scan', atMs: 70_000, contextFacts: contextFacts(70_000), accountingFacts: { localDay: 1, wallMs: 1_700_000_070_000, clockTrusted: true } });
     const scenario = {
@@ -37,14 +41,30 @@ test('rolling output requests are admitted until the budget is full, then expire
     const result = runScenario(artifactPath, scenarioPath, { format: 'json' });
     assert.equal(result.success, true, result.encoded);
     const rows = JSON.parse(result.encoded).scans;
-    assert.equal(rows.length, 8);
+    assert.equal(rows.length, 10);
     for (const [index, row] of rows.slice(0, 6).entries()) {
       assert.equal(row.admissions.find(item => item.admittedAtMs === index * 5_000)?.status, 'Inserted');
     }
     const seventh = rows[6].admissions.find(item => item.admittedAtMs === 30_000);
     assert.equal(seventh.status, 'Rejected');
-    const expired = rows[7].admissions.find(item => item.admittedAtMs === 70_000);
+    const expired = rows[9].admissions.find(item => item.admittedAtMs === 70_000);
     assert.equal(expired.status, 'Inserted');
+    const budget = row => {
+      const [entry] = row.rollingBudgets;
+      assert.equal(entry.account, 'pump_applied');
+      assert.equal(entry.stage, 'applied');
+      assert.deepEqual([entry.resourceId, entry.windowMs, entry.limitMs, entry.reserveMs], [7, 60_000, 30_000, 5_000]);
+      return entry.evidence;
+    };
+    const atLimit = budget(rows[6]);
+    assert.deepEqual([atLimit.usedMs, atLimit.reservedMs, atLimit.blocked, atLimit.blockReason, atLimit.nextReleaseMs],
+      ['30000', '0', true, 'rolling-budget', '65000']);
+    const partial = budget(rows[7]);
+    assert.deepEqual([partial.usedMs, partial.reservedMs, partial.blocked, partial.nextReleaseMs], ['27500', '0', true, '65000']);
+    assert.equal(budget(rows[8]), null, 'unknown clock must not present a trusted budget');
+    const afterExpiry = budget(rows[9]);
+    assert.deepEqual([afterExpiry.usedMs, afterExpiry.reservedMs, afterExpiry.blocked, afterExpiry.blockReason],
+      ['20000', '5000', false, null]);
     actions[0] = { ...actions[0], durationMs: 5_001 };
     writeFileSync(scenarioPath, encode(scenario));
     assert.throws(() => runScenario(artifactPath, scenarioPath, { format: 'json' }),

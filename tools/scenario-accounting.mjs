@@ -17,6 +17,11 @@ const accounting = new AccountingRuntime(instance.exports, {
 });
 const bindingByStream = new Map(scenario.accounting.bindings.map(item => [item.evidenceStream, item]));
 const resultBindings = manifest.accounting.bindings.filter(item => item.resultInputs);
+const appliedAccounts = new Set(manifest.accounting.bindings
+  .filter(binding => binding.operation === 'on_time' && binding.evidenceBinding.stage === 'applied')
+  .map(binding => binding.name));
+const rollingLimits = manifest.accounting.constraints.flatMap(group => group.limits)
+  .filter(limit => limit.basis?.kind === 'rolling' && appliedAccounts.has(limit.account));
 
 try {
   if (resultBindings.length !== 1) throw new Error('accounting scenario requires exactly one projected Result');
@@ -47,8 +52,7 @@ try {
           localDay: action.localDay,
         }, async () => true);
       } else if (action.kind === 'outputRequest') {
-        const limit = manifest.accounting.constraints.flatMap(group => group.limits)
-          .find(item => item.account === action.account && item.basis?.kind === 'rolling');
+        const limit = rollingLimits.find(item => item.account === action.account);
         if (!limit) throw new Error(`no rolling constraint for ${action.account}`);
         const binding = scenario.accounting.bindings.find(item => item.account === action.account);
         if (binding.resourceId !== action.resourceId) throw new Error('output request does not match its account resource');
@@ -90,7 +94,22 @@ try {
           wallMs: BigInt(action.accountingFacts.wallMs),
           clockTrusted: action.accountingFacts.clockTrusted,
         });
+        const rollingBudgets = rollingLimits.map(limit => {
+          const { resourceId } = scenario.accounting.bindings.find(item => item.account === limit.account);
+          const windowMs = limit.basis.durationMs;
+          const evidence = action.accountingFacts.clockTrusted ? accounting.explainRolling({
+            resourceId, nowMs: action.atMs, windowMs, limitMs: limit.boundMs, reserveMs: limit.reserveMs,
+          }) : null;
+          return { account: limit.account, resourceId, stage: 'applied', windowMs,
+            limitMs: limit.boundMs, reserveMs: limit.reserveMs, evidence: evidence && {
+              usedMs: String(evidence.usedMs), reservedMs: String(evidence.reservedMs),
+              blocked: evidence.blocked, blockReason: evidence.blockReason,
+              nextReleaseMs: evidence.nextReleaseMs === null ? null : String(evidence.nextReleaseMs),
+              ledgerRevision: String(evidence.ledgerRevision),
+            } };
+        });
         console.log(JSON.stringify({ scanId: scanId++, logicalTimeMs: action.atMs, trace,
+          ...(rollingBudgets.length ? { rollingBudgets } : {}),
           admissions: [...pendingAdmissions.values()].map(({ status, account, resourceId, requestedMs, atMs }) =>
             ({ status, account, resourceId, requestedMs, admittedAtMs: atMs })) }));
       }
