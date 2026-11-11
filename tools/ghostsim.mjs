@@ -298,6 +298,9 @@ export function validateScenario(scenario, manifest) {
         const rollingLimit = manifest.accounting.constraints.flatMap(group => group.limits)
           .find(limit => limit.account === action.account && limit.basis?.kind === 'rolling');
         if (!rollingLimit) throw new Error(`${location}: account has no rolling constraint`);
+        if (action.durationMs > rollingLimit.reserveMs) {
+          throw new Error(`${location}.durationMs: exceeds the compiled rolling reserve`);
+        }
         break;
       }
       case 'outputApplied': {

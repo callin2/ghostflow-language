@@ -57,7 +57,7 @@ try {
         const reservationId = Uint8Array.from(Buffer.from(action.reservationId, 'hex'));
         const status = await accounting.reserveRolling({ reservationId, resourceId: action.resourceId,
           admittedAtMs: BigInt(action.atMs), windowMs: BigInt(limit.basis.durationMs),
-          limitMs: BigInt(limit.boundMs), reserveMs: BigInt(action.durationMs) }, async () => true);
+          limitMs: BigInt(limit.boundMs), reserveMs: BigInt(limit.reserveMs) }, async () => true);
         if (status !== 'Duplicate') {
           pendingAdmissions.set(action.reservationId, { status, account: action.account, resourceId: action.resourceId,
             requestedMs: action.durationMs, atMs: action.atMs });

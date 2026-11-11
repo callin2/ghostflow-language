@@ -8,7 +8,7 @@ import { compileSource, writeArtifact } from '../tools/toolchain.mjs';
 import { runScenario } from '../tools/ghostsim.mjs';
 
 test('rolling output requests are admitted until the budget is full, then expire', async () => {
-  const source = `# Rolling output admission\n\n\`\`\`ghost\ncontrol RollingOutput {\n  resource pump: BoolActuator;\n  event normal_started: Event;\n  account pump_applied = on_time(pump, stage: applied, persistence: durable);\n  account starts = count_events(normal_started, over: local_day("UTC"), persistence: durable);\n  constraints Budget { limit used(pump_applied, rolling(60s)) <= 30s { reserve = 1s; on_unknown = block; } }\n  output ready: Bool; ready <- case starts.count { ok(count) => count >= 0; fault(_) => false; };\n}\n\`\`\`\n`;
+  const source = `# Rolling output admission\n\n\`\`\`ghost\ncontrol RollingOutput {\n  resource pump: BoolActuator;\n  event normal_started: Event;\n  account pump_applied = on_time(pump, stage: applied, persistence: durable);\n  account starts = count_events(normal_started, over: local_day("UTC"), persistence: durable);\n  constraints Budget { limit used(pump_applied, rolling(60s)) <= 30s { reserve = 5s; on_unknown = block; } }\n  output ready: Bool; ready <- case starts.count { ok(count) => count >= 0; fault(_) => false; };\n}\n\`\`\`\n`;
   const artifact = await compileSource(source, { filename: 'rolling-output.ghost.md' });
   const directory = mkdtempSync(join(tmpdir(), 'ghostflow-rolling-output-'));
   try {
@@ -45,6 +45,11 @@ test('rolling output requests are admitted until the budget is full, then expire
     assert.equal(seventh.status, 'Rejected');
     const expired = rows[7].admissions.find(item => item.admittedAtMs === 70_000);
     assert.equal(expired.status, 'Inserted');
+    actions[0] = { ...actions[0], durationMs: 5_001 };
+    writeFileSync(scenarioPath, encode(scenario));
+    assert.throws(() => runScenario(artifactPath, scenarioPath, { format: 'json' }),
+      /exceeds the compiled rolling reserve/);
+    actions[0] = actions[1];
     const receiptIndex = actions.findIndex(action => action.kind === 'outputApplied');
     actions[receiptIndex] = { ...actions[receiptIndex], account: 'starts' };
     writeFileSync(scenarioPath, encode(scenario));
