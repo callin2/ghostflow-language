@@ -586,6 +586,22 @@ impl ContextRuntime {
         })
     }
 
+    pub(crate) fn stage_daily_paused(
+        &self,
+        descriptors: &[PulseDescriptor],
+        clock: ClockSnapshot<'_>,
+    ) -> Result<Self> {
+        let mut staged = self.clone();
+        staged.clock.poll(clock)?;
+        for (descriptor, engine) in descriptors.iter().zip(&mut staged.engines) {
+            let (PulseDescriptor::Context(desc), Some(engine)) = (descriptor, engine) else {
+                return Err(invalid("UTC Daily schedule binding mismatch"));
+            };
+            engine.observe_daily_paused(desc, clock)?;
+        }
+        Ok(staged)
+    }
+
     fn validate_observation(&self, observation: &ProviderObservation) -> Result<()> {
         let binding = self
             .bindings

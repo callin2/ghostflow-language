@@ -352,7 +352,7 @@ Rules for the common fields:
 | Range duration from an operator `Duration` config (supported UTC profiles) | Allowed when the initial value proves non-overlap. An accepted live setting event recomputes the current occurrence from its frozen planned start, without a new due pulse or occurrence identity. |
 | Tide `run(_, within(_))` | Supported. |
 
-Window requires a trusted observed scan for `.open`. An observation gap or baseline can miss admission even while the planned interval has time left. Later observed scans can reflect the predicate in `.open`, and `.due` stays false for a consumed occurrence. Run starts only at an observed crossing, counts duration from actual admission on the monotonic clock, and ends immediately when cancelled. The checkpoint retains the latest terminal UTC day across reboot and treats older days as consumed. A new boot starts with no active Run.
+Window requires a trusted observed scan for `.open`. An observation gap or baseline can miss admission even while the planned interval has time left. Later observed scans can reflect the predicate in `.open`, and `.due` stays false for a consumed occurrence. Run starts only at an observed crossing, counts duration from actual admission on the monotonic clock, and ends immediately when cancelled. The checkpoint retains the latest terminal UTC day across reboot and treats older days as consumed. A new boot starts with no active Run. Paused host observation consumes missed crossings and ends an active Run without evaluating the control. The first resumed scan does not admit a crossing through the pause.
 
 **Bounded admission for natural events.** These rules keep missing predictions or an uncertain clock from silently creating occurrences:
 

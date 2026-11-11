@@ -160,7 +160,7 @@ impl Fixture {
             blob(&mut b, if empty { &[1, 0] } else { &self.output });
         }
         b.extend([0, 0]);
-        if matches!(self.version, 7 | 11 | 12 | 21) {
+        if matches!(self.version, 7 | 11 | 12 | 21 | 28) {
             b.extend([0, 0]); // objective count
         }
         b
@@ -2215,4 +2215,152 @@ fn solar_predicates_can_read_preceding_schedule_projections() {
         assert_eq!(tick.safe_intents["due"], Value::Bool(due));
         assert_eq!(tick.schedule_trace.len(), 2);
     }
+}
+
+fn utc_daily_driver(
+    run: bool,
+    projection: u8,
+    boot_epoch: u64,
+) -> ghostflow_core::scan::ScanDriver {
+    let mut schedule = vec![if run { 25 } else { 24 }];
+    schedule.extend(7u32.to_le_bytes());
+    string(&mut schedule, "morning");
+    schedule.extend(60_000u64.to_le_bytes());
+    schedule.extend(1_000u64.to_le_bytes());
+    schedule.extend(100u64.to_le_bytes());
+    schedule.extend([0, 0, 0]);
+    blob(&mut schedule, &[1, 1]);
+    blob(&mut schedule, &[1, 0]);
+    let fixture = Fixture {
+        version: 28,
+        states: 1,
+        entries: vec![schedule],
+        transition: Some(vec![4, 0, 0, 10]),
+        output: vec![58, 0, 0, projection],
+        ..Fixture::default()
+    };
+    let mut runtime = Runtime::new(8);
+    runtime.install(Module::load(&fixture.bytes()).unwrap(), false);
+    runtime
+        .activate_with_context(&ghostflow_core::context_runtime::Activation {
+            boot_epoch,
+            terminal_capacity: 8,
+            bindings: Vec::new(),
+        })
+        .unwrap();
+    runtime.into_scan_driver()
+}
+
+fn utc_daily_clock(
+    boot_epoch: u64,
+    monotonic_ms: u64,
+    wall_ms: Option<u64>,
+) -> ghostflow_core::schedule_clock::ClockSnapshot<'static> {
+    use ghostflow_core::schedule_clock::{ClockSnapshot, ClockTrust};
+    ClockSnapshot {
+        boot_epoch,
+        monotonic_ms,
+        wall_ms,
+        trust: if wall_ms.is_some() {
+            ClockTrust::Trusted
+        } else {
+            ClockTrust::Unknown("RTC unavailable")
+        },
+        uncertainty_ms: None,
+        source_revision: Some("UTC"),
+    }
+}
+
+fn utc_daily_scan(
+    driver: &mut ghostflow_core::scan::ScanDriver,
+    clock: ghostflow_core::schedule_clock::ClockSnapshot<'_>,
+) -> ghostflow_core::scan::ScanOutcomeV1 {
+    driver
+        .scan_with_context(
+            ghostflow_core::scan::ScanFrameV1 {
+                scan_id: driver.next_scan_id().unwrap(),
+                logical_time_ms: clock.monotonic_ms,
+                inputs: Vec::new(),
+            },
+            clock,
+            &ghostflow_core::context_runtime::Facts::default(),
+        )
+        .unwrap()
+}
+
+#[test]
+fn utc_daily_pause_consumes_crossing_without_a_control_scan() {
+    const DAY: u64 = 86_400_000;
+    for run in [false, true] {
+        // Both a witnessed paused crossing and a crossing first seen on
+        // resume are missed, even though the pause is shorter than skip_after.
+        for observe_crossing in [false, true] {
+            let mut driver = utc_daily_driver(run, 0, 1);
+            driver
+                .observe_daily_context_paused(utc_daily_clock(1, 0, Some(999)))
+                .unwrap();
+            if observe_crossing {
+                driver
+                    .observe_daily_context_paused(utc_daily_clock(1, 0, Some(1_000)))
+                    .unwrap();
+            }
+            assert_eq!(driver.runtime().state("s0"), Some(Value::Bool(false)));
+            assert_eq!(driver.runtime().intent("due"), None);
+            assert!(driver.runtime().journal().is_empty());
+            assert_eq!(driver.next_scan_id(), Some(0));
+            assert_eq!(driver.scan_last_time_ms(), None);
+            let paused = driver.runtime().context_checkpoint().unwrap();
+            assert!(driver
+                .observe_daily_context_paused(utc_daily_clock(2, 0, Some(1_000)))
+                .is_err());
+            assert_eq!(driver.runtime().context_checkpoint().unwrap(), paused);
+
+            let resumed = utc_daily_scan(&mut driver, utc_daily_clock(1, 1, Some(1_001)));
+            assert_eq!(resumed.trace.safe_intents["due"], Value::Bool(false));
+            assert_eq!(driver.runtime().state("s0"), Some(Value::Bool(true)));
+            let checkpoint = driver.runtime().context_checkpoint().unwrap();
+            let mut rebooted = utc_daily_driver(run, 0, 3);
+            rebooted.restore_context_checkpoint(&checkpoint).unwrap();
+            utc_daily_scan(&mut rebooted, utc_daily_clock(3, 0, Some(999)));
+            let rewound = utc_daily_scan(&mut rebooted, utc_daily_clock(3, 1, Some(1_000)));
+            assert_eq!(rewound.trace.safe_intents["due"], Value::Bool(false));
+            utc_daily_scan(&mut rebooted, utc_daily_clock(3, DAY, Some(DAY + 999)));
+            let next = utc_daily_scan(
+                &mut rebooted,
+                utc_daily_clock(3, DAY + 1, Some(DAY + 1_000)),
+            );
+            assert_eq!(next.trace.safe_intents["due"], Value::Bool(true));
+        }
+    }
+}
+
+#[test]
+fn utc_daily_pause_cancels_an_active_run_even_without_a_trusted_clock() {
+    let mut driver = utc_daily_driver(true, 2, 1);
+    utc_daily_scan(&mut driver, utc_daily_clock(1, 0, Some(999)));
+    let admitted = utc_daily_scan(&mut driver, utc_daily_clock(1, 1, Some(1_000)));
+    assert_eq!(admitted.trace.safe_intents["due"], Value::Bool(true));
+    assert!(driver
+        .observe_daily_context_paused(utc_daily_clock(2, 1, None))
+        .is_err());
+    assert_eq!(driver.next_scan_id(), Some(2));
+    driver
+        .observe_daily_context_paused(utc_daily_clock(1, 1, None))
+        .unwrap();
+    assert_eq!(driver.next_scan_id(), Some(2));
+    assert_eq!(driver.runtime().journal().len(), 2);
+    let resumed = utc_daily_scan(&mut driver, utc_daily_clock(1, 2, Some(1_001)));
+    assert_eq!(resumed.trace.safe_intents["due"], Value::Bool(false));
+}
+
+#[test]
+fn utc_daily_window_resume_requires_a_new_observed_scan_for_open() {
+    let mut driver = utc_daily_driver(false, 2, 1);
+    driver
+        .observe_daily_context_paused(utc_daily_clock(1, 0, Some(999)))
+        .unwrap();
+    let resumed = utc_daily_scan(&mut driver, utc_daily_clock(1, 1, Some(1_001)));
+    assert_eq!(resumed.trace.safe_intents["due"], Value::Bool(false));
+    let observed = utc_daily_scan(&mut driver, utc_daily_clock(1, 2, Some(1_002)));
+    assert_eq!(observed.trace.safe_intents["due"], Value::Bool(true));
 }

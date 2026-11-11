@@ -221,6 +221,11 @@ impl ScanDriver {
         self.runtime
     }
 
+    /// Observe the paused UTC Daily clock without changing the scan ID or scalar frame.
+    pub fn observe_daily_context_paused(&mut self, clock: ClockSnapshot<'_>) -> Result<()> {
+        self.runtime.observe_daily_context_paused(clock)
+    }
+
     pub fn restore_context_checkpoint(&mut self, bytes: &[u8]) -> Result<()> {
         self.runtime.restore_context_checkpoint(bytes)
     }

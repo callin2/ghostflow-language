@@ -355,7 +355,7 @@ Reglas de los campos comunes:
 | Duración del Range a partir de un `Duration` config de operador (perfiles UTC admitidos) | Se permite cuando el valor inicial demuestra la ausencia de solapamiento. Un evento aceptado de ajuste en vivo recalcula la ocurrencia actual a partir de su inicio planificado congelado, sin un nuevo pulso due ni una nueva identidad de ocurrencia. |
 | `run(_, within(_))` de Tide | Admitido. |
 
-En una observación confiable, `.open` sigue el predicado dentro de la ventana y `.due` solo se emite una vez. Una discontinuidad de observación o una línea base puede perder la admisión. Run solo se admite en el cruce observado, mide el tiempo monotónico desde la admisión y termina al cancelarse. Un punto de control conserva el último día UTC terminado y da por consumidos los días anteriores. El reinicio no reanuda un Run activo.
+En una observación confiable, `.open` sigue el predicado dentro de la ventana y `.due` solo se emite una vez. Una discontinuidad de observación o una línea base puede perder la admisión. Run solo se admite en el cruce observado, mide el tiempo monotónico desde la admisión y termina al cancelarse. Un punto de control conserva el último día UTC terminado y da por consumidos los días anteriores. El reinicio no reanuda un Run activo. La observación durante la pausa consume los cruces perdidos y termina un Run activo sin evaluar el control. El primer escaneo al reanudar no admite cruces de la pausa.
 
 **Admisión acotada para eventos naturales.** Estas reglas evitan que las predicciones ausentes o un reloj incierto creen ocurrencias en silencio:
 

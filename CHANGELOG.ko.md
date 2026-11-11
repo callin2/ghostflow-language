@@ -13,7 +13,7 @@ Daily와 DailySlots 실행기는 `schedule_checkpoint`와 `restore_schedule_chec
 
 ### 2026-11-12 - UTC Daily Window와 Run 실행 ([#153](https://github.com/callin2/ghostflow-language/issues/153))
 
-요일을 선택할 수 있는 고정 UTC Daily 예약에서 `basis = window(5min)`과 `basis = run(5min, on_time)`을 사용할 수 있습니다. Run은 `cancel_when`을 명시합니다. 두 조합을 GFB28로 컴파일하고 각 발생을 한 번만 시작합니다. Window는 현재 조건을 반영합니다. Run은 실제 시작부터 시간을 재고 취소되거나 만료되면 끝납니다. Daily Window/Run 시험은 네이티브와 WASM 스캔을 대조합니다.
+요일을 선택할 수 있는 고정 UTC Daily 예약에서 `basis = window(5min)`과 `basis = run(5min, on_time)`을 사용할 수 있습니다. Run은 `cancel_when`을 명시합니다. 두 조합을 GFB28로 컴파일하고 각 발생을 한 번만 시작합니다. Window는 현재 조건을 반영합니다. Run은 실제 시작부터 시간을 재고 취소되거나 만료되면 끝납니다. Daily Window/Run 시험은 네이티브와 WASM 스캔을 대조합니다. 호스트가 일시 정지 중에도 제어 실행 없이 예약 시각을 관측할 수 있으며, 진행 중인 Run은 일시 정지에서 끝납니다.
 
 ### 2026-11-12 - 구형 GFB10 수용 제거 ([#620](https://github.com/callin2/ghostflow-language/issues/620))
 

@@ -26,6 +26,7 @@ pub struct Engine {
     next_slot_key: u64,
     added_at_wall: BTreeMap<u64, u64>,
     active_run: Option<ActiveRun>,
+    daily_paused: bool,
     last_plan: BTreeMap<String, u64>,
     pending_grace: BTreeMap<String, (u64, String, String)>,
     range: Option<RangeEngine>,
@@ -945,6 +946,7 @@ impl Engine {
             next_slot_key,
             added_at_wall: BTreeMap::new(),
             active_run: None,
+            daily_paused: false,
             last_plan: BTreeMap::new(),
             pending_grace: BTreeMap::new(),
             range: if matches!(
@@ -1208,24 +1210,17 @@ impl Engine {
             ScheduleDefinition::AtPulse { at_ms } => {
                 staged.at_pulse(desc.site, *at_ms, &observed, when, &mut decision)?
             }
-            ScheduleDefinition::UtcDaily {
-                at_ms,
-                duration_ms,
-                run,
-                weekday_mask,
-                ..
-            } => staged.utc_daily(
-                desc.site,
-                *at_ms,
-                *duration_ms,
-                *run,
-                *weekday_mask,
-                &observed,
-                clock.monotonic_ms,
-                when,
-                cancel,
-                &mut decision,
-            )?,
+            ScheduleDefinition::UtcDaily { .. } => {
+                staged.utc_daily(
+                    desc,
+                    &observed,
+                    clock.monotonic_ms,
+                    when,
+                    cancel,
+                    &mut decision,
+                )?;
+                staged.daily_paused = false;
+            }
             ScheduleDefinition::AtWindow { at_ms, duration_ms } => staged.at_window(
                 desc.site,
                 *at_ms,
@@ -2446,20 +2441,43 @@ impl Engine {
         }
     }
 
-    #[allow(clippy::too_many_arguments)]
+    pub(crate) fn observe_daily_paused(
+        &mut self,
+        desc: &ScheduleDescriptor,
+        clock: ClockSnapshot<'_>,
+    ) -> Result<()> {
+        self.daily_paused = true;
+        let observed = self.clock.poll(clock)?;
+        self.utc_daily(
+            desc,
+            &observed,
+            clock.monotonic_ms,
+            false,
+            true,
+            &mut Decision::default(),
+        )
+    }
+
     fn utc_daily(
         &mut self,
-        site: u32,
-        start: u64,
-        duration: u64,
-        run: bool,
-        weekday_mask: u8,
+        desc: &ScheduleDescriptor,
         clock: &crate::schedule_clock::ClockObservation<'_>,
         monotonic_ms: u64,
         when: bool,
         cancel: bool,
         out: &mut Decision,
     ) -> Result<()> {
+        let ScheduleDefinition::UtcDaily {
+            at_ms: start,
+            duration_ms: duration,
+            run,
+            weekday_mask,
+            ..
+        } = desc.definition
+        else {
+            return Err(invalid("UTC Daily schedule required"));
+        };
+        let site = desc.site;
         const DAY: u64 = 86_400_000;
         const MAX_WALL: u64 = 253_402_300_799_999;
         if run {
@@ -2540,9 +2558,9 @@ impl Engine {
         }
         let planned = day * DAY + start;
         let end = planned + duration;
-        let observed = clock.disposition == ClockDisposition::Observed;
+        let observed = clock.disposition == ClockDisposition::Observed && !self.daily_paused;
         let high_water = clock.previous_trusted_high_water_ms.unwrap_or(0);
-        let gap = clock.disposition == ClockDisposition::ObservationGap;
+        let gap = clock.disposition == ClockDisposition::ObservationGap || self.daily_paused;
         let crossed = previous < planned && now >= planned && planned > high_water;
         let outcome = if run {
             if !crossed && !baseline {

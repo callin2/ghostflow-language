@@ -1590,6 +1590,33 @@ impl Runtime {
         }
         self.tick_inner(None, Some((clock, facts)), None)
     }
+    /// Consume UTC Daily occurrences during a host pause without evaluating a control scan.
+    /// An active Run ends at the pause, and the first resumed observation cannot admit a missed crossing.
+    pub fn observe_daily_context_paused(
+        &mut self,
+        clock: schedule_clock::ClockSnapshot<'_>,
+    ) -> Result<()> {
+        let module = self
+            .module
+            .as_ref()
+            .filter(|module| module.format_version == 28)
+            .ok_or_else(|| Error::new("UTC Daily context profile required"))?;
+        let selected = self
+            .active_strategy
+            .ok_or_else(|| Error::new("UTC Daily context is not active"))?;
+        let requirements = module
+            .schedules
+            .as_ref()
+            .ok_or_else(|| Error::new("no UTC Daily context requirements"))?;
+        let staged = self
+            .context_runtime
+            .as_ref()
+            .ok_or_else(|| Error::new("no context runtime"))?
+            .stage_daily_paused(&requirements.strategies[selected].schedules, clock)?;
+        self.context_runtime = Some(staged);
+        Ok(())
+    }
+
     pub fn context_checkpoint(&self) -> Result<Vec<u8>> {
         let module = self
             .module
