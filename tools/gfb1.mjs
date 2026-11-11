@@ -406,7 +406,6 @@ function lowerCoreModule(ast) {
         if(seenExecutable)throw new CompileError('stateful prelude declarations must precede transitions and intents');
         if(![12,13].includes(a.length))throw new CompileError('daily-pulse expects 12 or 13 arguments');
         const [siteAtom,scheduleName,timezone,atAtom,missingAtom,repeatedAtom,basisAtom,clockAtom,gapAtom,recoveryAtom,fallbackAtom,...tail]=a;
-        if (tail.length === 2 && format !== 27) throw new CompileError('weekday Daily requires control-v27');
         const weekdayMask = tail.length === 2 ? Number(unsignedAtom(tail[0],127n,'invalid weekday mask')) : 0;
         const whenForm = tail.length === 2 ? tail[1] : tail[0];
         const site=Number(unsignedAtom(siteAtom,4294967295n,'invalid schedule site'));
@@ -770,6 +769,7 @@ function emitGfb(moduleIr, { onExpressions } = {}) {
   const weekdayNatural=preludeKinds.has('solar-weekday-pulse')||preludeKinds.has('tide-weekday-run');
   if(weekdayNatural&&(hasPid||[...preludeKinds].some(kind=>!['solar-weekday-pulse','tide-weekday-run'].includes(kind))))throw new CompileError('weekday natural profile requires filtered Solar/Tide schedules only');
   const weekdayDaily = strategies.some(strategy => strategy.extensions.preludes.some(prelude => prelude.kind === 'daily' && prelude.value.weekdayMask));
+  if (weekdayDaily && (hasPid || strategies.some(strategy => strategy.extensions.preludes.some(prelude => prelude.kind !== 'daily')))) throw new CompileError('weekday Daily requires only Daily pulse preludes');
   const format=weekdayDaily?27:preludeKinds.has('solar-weekday-pulse')||preludeKinds.has('tide-weekday-run')?24:preludeKinds.has('at-window')?23:civilRange?21:timeSlotsRange?20:liveRangeStart?19:calendarExecution?18:preludeKinds.has('solar-context-pulse')?16:preludeKinds.has('holiday-daily-pulse')?15:preludeKinds.has('at-pulse')?14:extendedNatural?13:preludeKinds.has('utc-range')?12:hasContext?11:hasDailySlots?9:hasDaily?8:hasPid?7:hasTrueFors?6:hasSchedules?5:temporal?4:format3?3:intDeclarations||intExpressions?2:1;
   const w=new Writer();w.bytes(UTF8.encode('GFB1'));w.u16(format);w.str(name);w.u32(version);
   const typeCode=type=>TYPE[type.toLowerCase()];
@@ -840,7 +840,7 @@ function emitGfb(moduleIr, { onExpressions } = {}) {
     for(const i of s.intents){w.str(i.name);w.u8(typeCode(i.type));w.u32(i.expr.length);w.bytes(i.expr);}
   }
   w.u16(constraints.length);for(const c of constraints){w.u8(({requires:1,mutex:2,requires_any:3})[c.kind]);w.u16(c.names.length);for(const n of c.names)w.str(n);}
-  if(format===7||format>=11){w.u16(compiledObjectives.length);for(const objective of compiledObjectives){w.str(objective.name);w.str(objective.outputPort);for(const index of objective.indices)w.u16(index);if(format>=11)w.u16(objective.targetOkIndex);w.u64(objective.period);w.u64(objective.late);w.u8(objective.direction==='direct'?0:1);for(const value of objective.numbers)w.f64(value);}}
+  if(format===7||format>=11&&format!==27){w.u16(compiledObjectives.length);for(const objective of compiledObjectives){w.str(objective.name);w.str(objective.outputPort);for(const index of objective.indices)w.u16(index);if(format>=11)w.u16(objective.targetOkIndex);w.u64(objective.period);w.u64(objective.late);w.u8(objective.direction==='direct'?0:1);for(const value of objective.numbers)w.f64(value);}}
   return w.finish();
 }
 

@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+### 2026-11-11 - weekday filters for Daily pulses ([#155](https://github.com/callin2/ghostflow-language/issues/155))
+
+Reference §3.8 now executes a Daily pulse with ``on = day`mon..fri``` without a calendar binding. The scheduled local date determines eligibility. The declared seconds and milliseconds and the explicit DST policies still govern the occurrence. `control-v27` and GFB27 use the existing Daily occurrence facts. See `tests/daily-runtime.test.mjs` and `tests/ghostsim-daily.test.mjs`.
+
 ### 2026-11-09 - shared source changes and update-scope preflight ([API #258](https://github.com/callin2/farm_studio_api/issues/258))
 
 Browser and Node now share structural comparison for config defaults, config

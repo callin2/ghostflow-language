@@ -5,6 +5,10 @@
 
 ## 미출시
 
+### 2026-11-11 - Daily 펄스 요일 필터 ([#155](https://github.com/callin2/ghostflow-language/issues/155))
+
+Reference §3.8의 Daily 펄스에 ``on = day`mon..fri```를 쓰면 달력 연결 없이 실행된다. 예약의 현지 날짜가 실행 요일을 결정한다. 선언한 초·밀리초와 DST 정책은 그대로 적용한다. `control-v27`과 GFB27은 기존 Daily 발생 자료를 사용한다. `tests/daily-runtime.test.mjs`와 `tests/ghostsim-daily.test.mjs`에서 검증한다.
+
 ### 2026-11-09 - 공용 원문 비교와 변경 범위 사전 검사 ([API #258](https://github.com/callin2/farm_studio_api/issues/258))
 
 브라우저와 Node가 설정 기본값·설정 정의·제어 규칙·논리 입출력·하드웨어 선언을

@@ -432,7 +432,7 @@ impl ScanDriver {
                     .runtime
                     .module
                     .as_ref()
-                    .is_some_and(|m| matches!(m.format_version, 5 | 6 | 8 | 9)))
+                    .is_some_and(|m| matches!(m.format_version, 5 | 6 | 8 | 9 | 27)))
             || (self.runtime.context_runtime.is_some()
                 && ((name == "__gf_time_epoch"
                     && self.runtime.module.as_ref().is_some_and(|m| {

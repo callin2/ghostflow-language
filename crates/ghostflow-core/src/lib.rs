@@ -69,6 +69,7 @@ impl Type {
                     | 6
                     | 7
                     | 8
+                    | 27
                     | 9
                     | 10
                     | 11
@@ -332,6 +333,7 @@ impl Module {
                 | 6
                 | 7
                 | 8
+                | 27
                 | 9
                 | 10
                 | 11
@@ -406,7 +408,7 @@ impl Module {
 
         let mut temporal = if matches!(
             format_version,
-            4 | 5 | 6 | 8 | 9 | 10 | 11 | 12 | 13 | 14 | 15 | 16 | 18 | 19 | 20 | 21 | 23 | 24
+            4 | 5 | 6 | 8 | 9 | 10 | 11 | 12 | 13 | 14 | 15 | 16 | 18 | 19 | 20 | 21 | 23 | 24 | 27
         ) {
             Some(temporal_vm::TemporalRequirements::load_header(
                 &mut reader,
@@ -418,7 +420,7 @@ impl Module {
         };
         let mut schedules = matches!(
             format_version,
-            5 | 6 | 8 | 9 | 10 | 11 | 12 | 13 | 14 | 15 | 16 | 18 | 19 | 20 | 21 | 23 | 24
+            5 | 6 | 8 | 9 | 10 | 11 | 12 | 13 | 14 | 15 | 16 | 18 | 19 | 20 | 21 | 23 | 24 | 27
         )
         .then(|| schedule_vm::ScheduleRequirements {
             strategies: Vec::new(),
@@ -444,7 +446,7 @@ impl Module {
 
             let (windows, schedule_count, true_for_count, mut result_trace_bound) = if matches!(
                 format_version,
-                5 | 6 | 8 | 9 | 10 | 11 | 12 | 13 | 14 | 15 | 16 | 18 | 19 | 20 | 21 | 23 | 24
+                5 | 6 | 8 | 9 | 10 | 11 | 12 | 13 | 14 | 15 | 16 | 18 | 19 | 20 | 21 | 23 | 24 | 27
             ) {
                 let loaded = schedule_vm::load_prelude(
                     &mut reader,
@@ -610,6 +612,16 @@ impl Module {
             })
         {
             return Err(Error::new("GFB format 9 requires a DailySlots schedule"));
+        }
+        if format_version == 27
+            && !schedules.as_ref().is_some_and(|requirements| {
+                requirements.strategies.iter().all(|strategy| {
+                    strategy.schedules.iter().any(|entry| matches!(entry, schedule_vm::PulseDescriptor::Daily(d) if d.weekday_mask != 0))
+                        && strategy.schedules.iter().all(|entry| matches!(entry, schedule_vm::PulseDescriptor::Daily(_)))
+                })
+            })
+        {
+            return Err(Error::new("GFB format 27 requires weekday-filtered Daily schedules"));
         }
         if let Some(requirements) = &true_fors {
             if requirements
@@ -1660,7 +1672,7 @@ impl Runtime {
         if self
             .module
             .as_ref()
-            .is_some_and(|m| matches!(m.format_version, 8 | 9))
+            .is_some_and(|m| matches!(m.format_version, 8 | 9 | 27))
         {
             return Err(Error::new("civil schedules require schedule activation"));
         }
@@ -1673,9 +1685,11 @@ impl Runtime {
         if !self
             .module
             .as_ref()
-            .is_some_and(|m| matches!(m.format_version, 8 | 9))
+            .is_some_and(|m| matches!(m.format_version, 8 | 9 | 27))
         {
-            return Err(Error::new("schedule activation requires GFB8 or GFB9"));
+            return Err(Error::new(
+                "schedule activation requires Daily or DailySlots bytecode",
+            ));
         }
         self.activate_schedule_core(activation)
     }
@@ -1726,7 +1740,7 @@ impl Runtime {
         if self
             .module
             .as_ref()
-            .is_some_and(|m| matches!(m.format_version, 8 | 9))
+            .is_some_and(|m| matches!(m.format_version, 8 | 9 | 27))
         {
             return Err(Error::new("civil schedules require schedule facts"));
         }
@@ -1748,8 +1762,8 @@ impl Runtime {
             .module
             .as_ref()
             .ok_or_else(|| Error::new("no module installed"))?;
-        if module.format_version != 8 {
-            return Err(Error::new("GFSF2 schedule facts require GFB8"));
+        if !matches!(module.format_version, 8 | 27) {
+            return Err(Error::new("GFSF2 schedule facts require GFB8 or GFB27"));
         }
         self.tick_with_schedule_inputs(clock, facts)
     }
@@ -3329,7 +3343,23 @@ fn verify_expression_with_prelude(
             58 => {
                 if !matches!(
                     format_version,
-                    5 | 6 | 8 | 9 | 10 | 11 | 12 | 13 | 14 | 15 | 16 | 18 | 19 | 20 | 21 | 23 | 24
+                    5 | 6
+                        | 8
+                        | 9
+                        | 10
+                        | 11
+                        | 12
+                        | 13
+                        | 14
+                        | 15
+                        | 16
+                        | 18
+                        | 19
+                        | 20
+                        | 21
+                        | 23
+                        | 24
+                        | 27
                 ) {
                     return Err(Error::new("schedule projection requires GFB format 5"));
                 }
