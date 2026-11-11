@@ -19,7 +19,9 @@ test('rolling output requests are admitted until the budget is full, then expire
     const contextFacts = atMs => ({ clock: { monotonicMs: atMs, bootEpoch: 1, wallMs: null, uncertaintyMs: null, trusted: false, unknownReason: 'NoClock', sourceRevision: 'clock-v1' }, natural: [], schedules: [], settings: null });
     for (let index = 0; index < 7; index += 1) {
       const atMs = index * 5_000;
-      actions.push({ kind: 'outputRequest', reservationId: id(index + 1), account: 'pump_applied', resourceId: 7, atMs, durationMs: 5_000 });
+      const request = { kind: 'outputRequest', reservationId: id(index + 1), account: 'pump_applied', resourceId: 7, atMs, durationMs: 5_000 };
+      actions.push(request);
+      if (index === 0) actions.push(request);
       actions.push({ kind: 'scan', atMs, contextFacts: contextFacts(atMs), accountingFacts: { localDay: 1, wallMs: 1_700_000_000_000 + atMs, clockTrusted: true } });
       if (index < 6) actions.push({ kind: 'outputApplied', reservationId: id(index + 1), receiptId: id(100 + index), account: 'pump_applied', resourceId: 7, startMs: atMs, endMs: atMs + 5_000, localDay: 1 });
     }
@@ -36,10 +38,22 @@ test('rolling output requests are admitted until the budget is full, then expire
     assert.equal(result.success, true, result.encoded);
     const rows = JSON.parse(result.encoded).scans;
     assert.equal(rows.length, 8);
+    for (const [index, row] of rows.slice(0, 6).entries()) {
+      assert.equal(row.admissions.find(item => item.admittedAtMs === index * 5_000)?.status, 'Inserted');
+    }
     const seventh = rows[6].admissions.find(item => item.admittedAtMs === 30_000);
     assert.equal(seventh.status, 'Rejected');
     const expired = rows[7].admissions.find(item => item.admittedAtMs === 70_000);
     assert.equal(expired.status, 'Inserted');
+    const receiptIndex = actions.findIndex(action => action.kind === 'outputApplied');
+    actions[receiptIndex] = { ...actions[receiptIndex], account: 'starts' };
+    writeFileSync(scenarioPath, encode(scenario));
+    const rejected = runScenario(artifactPath, scenarioPath, { format: 'json' });
+    assert.equal(rejected.success, false);
+    assert.deepEqual(JSON.parse(rejected.encoded).error, {
+      actionIndex: receiptIndex,
+      message: 'applied output does not match its reservation account and resource',
+    });
   } finally {
     rmSync(directory, { recursive: true, force: true });
   }

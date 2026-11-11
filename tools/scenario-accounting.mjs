@@ -50,15 +50,24 @@ try {
         const limit = manifest.accounting.constraints.flatMap(group => group.limits)
           .find(item => item.account === action.account && item.basis?.kind === 'rolling');
         if (!limit) throw new Error(`no rolling constraint for ${action.account}`);
+        const binding = scenario.accounting.bindings.find(item => item.account === action.account);
+        if (binding.resourceId !== action.resourceId) throw new Error('output request does not match its account resource');
+        const previous = pendingAdmissions.get(action.reservationId);
+        if (previous && previous.account !== action.account) throw new Error('output reservation already belongs to another account');
         const reservationId = Uint8Array.from(Buffer.from(action.reservationId, 'hex'));
         const status = await accounting.reserveRolling({ reservationId, resourceId: action.resourceId,
           admittedAtMs: BigInt(action.atMs), windowMs: BigInt(limit.basis.durationMs),
           limitMs: BigInt(limit.boundMs), reserveMs: BigInt(action.durationMs) }, async () => true);
-        pendingAdmissions.set(action.reservationId, { status, account: action.account, resourceId: action.resourceId,
-          requestedMs: action.durationMs, atMs: action.atMs });
+        if (status !== 'Duplicate') {
+          pendingAdmissions.set(action.reservationId, { status, account: action.account, resourceId: action.resourceId,
+            requestedMs: action.durationMs, atMs: action.atMs });
+        }
       } else if (action.kind === 'outputApplied') {
         const pending = pendingAdmissions.get(action.reservationId);
         if (!pending) throw new Error(`unknown output reservation ${action.reservationId}`);
+        if (pending.account !== action.account || pending.resourceId !== action.resourceId) {
+          throw new Error('applied output does not match its reservation account and resource');
+        }
         if (pending.status !== 'Inserted') throw new Error(`output reservation was not admitted: ${pending.status}`);
         const reservationId = Uint8Array.from(Buffer.from(action.reservationId, 'hex'));
         const receiptId = Uint8Array.from(Buffer.from(action.receiptId, 'hex'));
