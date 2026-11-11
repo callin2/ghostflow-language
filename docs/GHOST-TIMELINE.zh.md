@@ -7,7 +7,7 @@
 
 它是一个桌面参考宿主，使用真实的 Rust 判定、触发实例（occurrence）和用量核算的所有者。它不操作硬件，也不确立渲染器回执的真实性。
 
-**支持的 profile。** 所选 profile 是一个独立的规范 `.ghost.md` GFB10 `control`，具有：
+**支持的 profile。** 所选 profile 是一个独立的规范 `.ghost.md` GFB11 `control`，具有：
 
 - Periodic 调度计划；
 - 可选的现有设置；以及

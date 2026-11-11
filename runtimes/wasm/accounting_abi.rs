@@ -266,7 +266,7 @@ pub unsafe extern "C" fn gf_accounting_restore(
     }
 }
 
-/// Activate one GFB10 accounting control. Provider bindings are empty because
+/// Activate one GFB11 accounting control. Provider bindings are empty because
 /// accounting Results are produced only from the paired Rust ledger.
 #[no_mangle]
 pub unsafe extern "C" fn gf_activate_accounting(
@@ -286,7 +286,7 @@ pub unsafe extern "C" fn gf_activate_accounting(
     control.complete(result)
 }
 
-/// Tick a GFB10 control with a Result constructed inside Rust from the exact
+/// Tick a GFB11 control with a Result constructed inside Rust from the exact
 /// durable ledger revision. No caller-supplied ok/count/fault projection exists.
 #[no_mangle]
 pub unsafe extern "C" fn gf_tick_accounting(

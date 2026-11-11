@@ -539,7 +539,7 @@ impl ContextRuntime {
                 },
                 _ => {
                     return Err(invalid(
-                        "GFB10 context activation cannot mix legacy schedule packets",
+                        "context activation cannot mix legacy schedule packets",
                     ))
                 }
             };

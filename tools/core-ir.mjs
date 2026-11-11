@@ -57,7 +57,7 @@ export function lowerExpression(form, env, allowNext = false) {
           : ['due','missed','active'];
       const field = fields.indexOf(args[1]);
       if (field < 0) throw new CompileError(head === 'true-for-read' ? 'true_for projection field' : head === 'window-read' ? 'temporal projection field' : 'schedule projection field');
-      if (head === 'schedule-read' && field === 2 && !env.contextSchedules) throw new CompileError('schedule active requires GFB10');
+      if (head === 'schedule-read' && field === 2 && !env.contextSchedules) throw new CompileError('schedule active requires context scheduling');
       const type = head === 'schedule-read' || head === 'true-for-read' && field <= 1 || head === 'window-read' && field === 0
         ? 'Bool' : head === 'window-read' && field === 1 ? typeOf(binding.payloadType) : 'Number';
       return { kind: head === 'window-read' ? 'window_projection' : head === 'schedule-read' ? 'schedule_projection' : 'true_for_projection',

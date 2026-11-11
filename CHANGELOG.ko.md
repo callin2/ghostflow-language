@@ -5,6 +5,10 @@
 
 ## 미출시
 
+### 2026-11-12 - 구형 GFB10 수용 제거 ([#620](https://github.com/callin2/ghostflow-language/issues/620))
+
+실행기와 패키지 검증기는 바이트코드 형식 10과 그 구형 `control-v9` 패키지를 거절합니다. 현행 컴파일러로 정본 `.ghost.md`를 다시 컴파일하면 됩니다. GFB11 Periodic 및 DailySlots 시험으로 현행 예약과 설정 경로를 확인합니다.
+
 ### 2026-11-12 - 원문 재검증에 같은 하드웨어 프로필 사용 ([#626](https://github.com/callin2/ghostflow-language/pull/626))
 
 패키지 검증과 원문에 연결된 WASM 활성화는 원문을 다시 컴파일할 때 호스트가 제공한 고정 하드웨어 프로필을 전달합니다. 생성된 바이트코드와 필요한 원문·매니페스트 근거는 기존대로 대조합니다.

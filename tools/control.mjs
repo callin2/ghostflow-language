@@ -4932,7 +4932,7 @@ export function compileControl(source, { filename = '<control>', emitBytecode = 
   return lowered;
 }
 
-/** Compile the bounded accounting slice to one executable GFB10 control. */
+/** Compile the bounded accounting slice to one executable GFB11 control. */
 export function compileAccountingControl(source, { filename = '<control>' } = {}) {
   if (typeof filename !== 'string' || !filename) internal('filename must be a non-empty string');
   const ast = new ControlParser(source, filename).parse();

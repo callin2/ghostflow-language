@@ -1,4 +1,4 @@
-//! GFB10 typed schedule/provider requirements and GFSF4 evidence.
+//! Typed schedule/provider requirements and GFSF4 evidence.
 
 use crate::{natural_context::NaturalKind, work_calendar::WorkCalendarSnapshot};
 use crate::{Error, Field, Reader, Result, Type};
@@ -509,18 +509,8 @@ pub(crate) fn load_schedule(
         5 => {
             let epoch_id = text(reader)?;
             let anchor_ms = exact(reader)?;
-            let every = if format == 10 {
-                DurationSetting {
-                    id: 0,
-                    name: text(reader)?,
-                    operator_editable: flag(reader)?,
-                    initial_ms: exact(reader)?,
-                    min_ms: exact(reader)?,
-                    max_ms: exact(reader)?,
-                    step_ms: exact(reader)?,
-                }
-            } else {
-                let id = reader.u32()?;
+            let id = reader.u32()?;
+            let every =
                 if id == 0 {
                     let interval = exact(reader)?;
                     DurationSetting {
@@ -568,8 +558,7 @@ pub(crate) fn load_schedule(
                         max_ms: max as u64,
                         step_ms: step as u64,
                     }
-                }
-            };
+                };
             if every.min_ms == 0
                 || every.step_ms == 0
                 || every.max_ms < every.min_ms
@@ -671,56 +660,24 @@ pub(crate) fn load_schedule(
         }
         9 => {
             let timezone = text(reader)?;
-            let (config_id, setting, operator_editable, grid_ms, capacity, initial_minutes) =
-                if format == 10 {
-                    let setting = text(reader)?;
-                    let operator_editable = flag(reader)?;
-                    let grid_ms = exact(reader)?;
-                    let capacity = reader.u16()?;
-                    let count = reader.u16()?;
-                    if grid_ms == 0
-                        || 86_400_000 % grid_ms != 0
-                        || capacity == 0
-                        || capacity > 1440
-                        || count > capacity
-                    {
-                        return Err(Error::new("invalid configured slots bound"));
-                    }
-                    let mut minutes = Vec::with_capacity(usize::from(count));
-                    for _ in 0..count {
-                        let minute = reader.u16()?;
-                        if minute >= 1440
-                            || u64::from(minute) * 60_000 % grid_ms != 0
-                            || minutes.last().is_some_and(|last| *last >= minute)
-                        {
-                            return Err(Error::new("invalid configured slot"));
-                        }
-                        minutes.push(minute);
-                    }
-                    (0, setting, operator_editable, grid_ms, capacity, minutes)
-                } else {
-                    let config_id = reader.u32()?;
-                    let config = prior
-                        .iter()
-                        .find_map(|p| match p {
-                            crate::schedule_vm::PulseDescriptor::Config(c) if c.id == config_id => {
-                                Some(c)
-                            }
-                            _ => None,
-                        })
-                        .ok_or_else(|| Error::new("TimeSlots config must precede consumer"))?;
-                    let crate::settings_stream::ConfigValue::Slots(slots) = &config.initial else {
-                        return Err(Error::new("DailySlots config must be TimeSlots"));
-                    };
-                    (
-                        config_id,
-                        config.name.clone(),
-                        config.operator_editable,
-                        config.grid_ms,
-                        config.capacity,
-                        slots.iter().map(|(_, minute)| *minute).collect(),
-                    )
-                };
+            let config_id = reader.u32()?;
+            let config = prior
+                .iter()
+                .find_map(|p| match p {
+                    crate::schedule_vm::PulseDescriptor::Config(c) if c.id == config_id => Some(c),
+                    _ => None,
+                })
+                .ok_or_else(|| Error::new("TimeSlots config must precede consumer"))?;
+            let crate::settings_stream::ConfigValue::Slots(slots) = &config.initial else {
+                return Err(Error::new("DailySlots config must be TimeSlots"));
+            };
+            let (setting, operator_editable, grid_ms, capacity, initial_minutes) = (
+                config.name.clone(),
+                config.operator_editable,
+                config.grid_ms,
+                config.capacity,
+                slots.iter().map(|(_, minute)| *minute).collect::<Vec<_>>(),
+            );
             let range_duration_ms = if format >= 20 {
                 let value = exact(reader)?;
                 if value == 0 {
@@ -1017,7 +974,7 @@ mod calendar18_loader_tests {
         ] {
             assert!(load_schedule(&mut Reader::new(&bytes), 17, 18, &[]).is_err());
         }
-        for format in [10, 11, 12, 13, 14, 15, 16, 17] {
+        for format in [11, 12, 13, 14, 15, 16, 17] {
             assert!(load_schedule(&mut Reader::new(&endpoint), 17, format, &[]).is_err());
         }
         // The original static Range contract still permits an interval across midnight.

@@ -1,4 +1,4 @@
-//! GFB10 schedule state. Each scan clones the engine; the caller commits the
+//! Context schedule state. Each scan clones the engine; the caller commits the
 //! staged clone only after the whole VM scan succeeds.
 
 use crate::context_vm::{

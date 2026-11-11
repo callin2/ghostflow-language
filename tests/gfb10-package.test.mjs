@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import test from 'node:test';
+import { GhostFlowRuntime } from '../runtimes/wasm/ghostflow-runtime.mjs';
 import { canonicalJson } from '../tools/canonical-json.mjs';
 import {
   PortablePackageError,
@@ -40,129 +41,27 @@ async function signedPeriodicPackage() {
     availableCapabilities: identity.requiredCapabilities,
     expectedBindingRevision: identity.bindingRevision,
   };
-  return { key, packageValue, options };
+  return { packageValue, options };
 }
 
-test('REF-03-036 verifies a genuine pinned GFB10 package through the target loader', async () => {
+test('a genuine historical GFB10 package cannot reach the target loader', async () => {
   const { packageValue, options } = await signedPeriodicPackage();
-  const pinnedBytecode = Buffer.from(fixture.payload.bytecode.contentBase64, 'base64');
-  let loaderCalls = 0;
-  const verified = await verifyPortablePackage(packageValue, {
-    ...options,
-    verifyBytecode: async bytes => {
-      loaderCalls += 1;
-      assert.deepEqual(Buffer.from(bytes), pinnedBytecode);
-      return true;
-    },
-  });
-
   assert.equal(packageValue.payload.bytecode.version, '10');
   assert.equal(packageValue.payload.bytecode.sha256, 'd00203644d730cc0112921d96889ba240de6e8f7255d064a137a54c666d3b17e');
-  assert.equal(verified.manifest.format, 'GhostFlow/control-v9');
-  assert.equal(loaderCalls, 1);
+  await assert.rejects(verifyPortablePackage(packageValue, {
+    ...options,
+    verifyBytecode: () => assert.fail('retired GFB10 must not reach the target loader'),
+  }), error => error instanceof PortablePackageError && error.code === 'unsupported-bytecode-version');
 });
 
-test('pinned GFB10 package requires target bytecode acceptance', async () => {
-  const { packageValue, options } = await signedPeriodicPackage();
-  let loaderCalls = 0;
-  await assert.rejects(
-    () => verifyPortablePackage(packageValue, {
-      ...options,
-      verifyBytecode: async () => {
-        loaderCalls += 1;
-        return false;
-      },
-    }),
-    error => error instanceof PortablePackageError && error.code === 'bytecode-rejected',
-  );
-  assert.equal(loaderCalls, 1);
-});
-
-test('re-signed historical GFB10 rejects new sensor instance provenance before the target loader', async () => {
-  const { key, packageValue, options } = await signedPeriodicPackage();
-  const predecessor = structuredClone(packageValue);
-  let loaderCalls = 0;
-  const verification = { ...options, verifyBytecode: async () => { loaderCalls++; return true; } };
-  await verifyPortablePackage(packageValue, verification);
-  assert.equal(loaderCalls, 1, 'the unchanged genuine predecessor remains accepted');
-
-  for (const instances of [[], [{ name: 'unrelated', provenance: 'not-in-signed-source' }]]) {
-    const changed = structuredClone(packageValue);
-    const manifest = JSON.parse(Buffer.from(changed.payload.manifest.contentBase64, 'base64').toString('utf8'));
-    manifest.sensorInstances = instances;
-    const bytes = encoder.encode(canonicalJson(manifest));
-    changed.payload.manifest.contentBase64 = Buffer.from(bytes).toString('base64');
-    changed.payload.manifest.sha256 = await digest(bytes);
-    await resign(changed, key);
-
-    assert.deepEqual(changed.payload.bytecode, predecessor.payload.bytecode);
-    assert.deepEqual(changed.payload.source, predecessor.payload.source);
-    assert.deepEqual(changed.payload.sourceMap, predecessor.payload.sourceMap);
-    await assert.rejects(() => verifyPortablePackage(changed, verification), error =>
-      error instanceof PortablePackageError && error.code === 'manifest-mismatch'
-        && /historical GFB10 profile does not support sensorInstances/.test(error.message));
-    assert.equal(loaderCalls, 1, 'new descriptors reject before bytecode verification');
+test('the production WASM loader rejects original GFB10 bytes', async () => {
+  const wasm = fs.readFileSync(new URL('../target/wasm32-unknown-unknown/release/ghostflow_wasm.wasm', import.meta.url));
+  const runtime = await GhostFlowRuntime.instantiate(wasm);
+  try {
+    const historical = Buffer.from(fixture.payload.bytecode.contentBase64, 'base64');
+    assert.equal(historical.readUInt16LE(4), 10);
+    assert.throws(() => runtime.load(historical), /unsupported GFB format/);
+  } finally {
+    runtime.dispose();
   }
-  assert.deepEqual(packageValue, predecessor, 'the pinned predecessor is not migrated or overwritten');
-});
-
-test('re-signed historical GFB10 rejects runtime feature metadata before the target loader', async () => {
-  const { key, packageValue, options } = await signedPeriodicPackage();
-  let loaderCalls = 0;
-  const verification = { ...options, supportedRuntimeFeatures: ['percent-range-v1'],
-    verifyBytecode: async () => { loaderCalls++; return true; } };
-  await verifyPortablePackage(packageValue, verification);
-  assert.equal(loaderCalls, 1);
-  const changed = structuredClone(packageValue);
-  const manifest = JSON.parse(Buffer.from(changed.payload.manifest.contentBase64, 'base64').toString('utf8'));
-  manifest.requiredRuntimeFeatures = ['percent-range-v1'];
-  const bytes = encoder.encode(canonicalJson(manifest));
-  changed.payload.manifest.contentBase64 = Buffer.from(bytes).toString('base64');
-  changed.payload.manifest.sha256 = await digest(bytes);
-  await resign(changed, key);
-  await assert.rejects(() => verifyPortablePackage(changed, verification), error =>
-    error instanceof PortablePackageError && error.code === 'manifest-mismatch'
-      && /historical GFB10 profile does not support requiredRuntimeFeatures/.test(error.message));
-  assert.equal(loaderCalls, 1);
-});
-
-test('portable package descriptors continue to reject reserved GFB5 through GFB9', async () => {
-  const { key, packageValue, options } = await signedPeriodicPackage();
-  for (const version of ['5', '6', '7', '8', '9']) {
-    const changed = structuredClone(packageValue);
-    changed.payload.bytecode.version = version;
-    await resign(changed, key);
-    await assert.rejects(
-      () => verifyPortablePackage(changed, options),
-      error => error instanceof PortablePackageError && error.code === 'unsupported-bytecode-version',
-    );
-  }
-});
-
-test('re-signed malformed GFB10 rejects before the delegated loader', async () => {
-  const { key, packageValue, options } = await signedPeriodicPackage();
-  const changed = structuredClone(packageValue);
-  const bytecode = Buffer.from(changed.payload.bytecode.contentBase64, 'base64').subarray(0, -1);
-  const bytecodeSha256 = await digest(bytecode);
-  changed.payload.bytecode.contentBase64 = bytecode.toString('base64');
-  changed.payload.bytecode.sha256 = bytecodeSha256;
-  for (const artifact of ['manifest', 'sourceMap']) {
-    const value = JSON.parse(Buffer.from(changed.payload[artifact].contentBase64, 'base64').toString('utf8'));
-    value.bytecodeSha256 = bytecodeSha256;
-    if (value.traceMetadata) value.traceMetadata.bytecodeSha256 = bytecodeSha256;
-    const bytes = encoder.encode(canonicalJson(value));
-    changed.payload[artifact].contentBase64 = Buffer.from(bytes).toString('base64');
-    changed.payload[artifact].sha256 = await digest(bytes);
-  }
-  await resign(changed, key);
-
-  await assert.rejects(
-    () => verifyPortablePackage(changed, {
-      ...options,
-      verifyBytecode: async () => assert.fail('malformed GFB10 must reject before the delegated loader'),
-    }),
-    error => error instanceof PortablePackageError
-      && error.code === 'source-map-mismatch'
-      && error.cause?.message === 'source trace module fingerprint mismatch',
-  );
 });

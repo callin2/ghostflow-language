@@ -385,14 +385,14 @@ function validateGfb1(bytes) {
     fail('invalid-bytecode-format', 'bytecode is not GFB1');
   }
   const version = bytes[4] | (bytes[5] << 8);
-  if (![1, 2, 3, 4, 10, 11, 16, 18, 21, 22, 26, 27].includes(version)) fail('unsupported-bytecode-version', 'unsupported GFB format version');
+  if (![1, 2, 3, 4, 11, 16, 18, 21, 22, 26, 27].includes(version)) fail('unsupported-bytecode-version', 'unsupported GFB format version');
   if (version === 22) {
     if (bytes.byteLength < 16) fail('invalid-bytecode-format', 'truncated GFB22 lifecycle envelope');
     const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
     const innerLength = view.getUint32(6, true);
     if (innerLength < 6 || innerLength > bytes.byteLength - 10) fail('invalid-bytecode-format', 'invalid GFB22 base payload length');
     const innerVersion = view.getUint16(14, true);
-    if (![1, 2, 3, 4, 10, 11, 21, 26].includes(innerVersion)) fail('unsupported-bytecode-version', 'unsupported GFB22 base profile');
+    if (![1, 2, 3, 4, 11, 21, 26].includes(innerVersion)) fail('unsupported-bytecode-version', 'unsupported GFB22 base profile');
   }
   return String(version);
 }
@@ -759,7 +759,7 @@ function validateEmbeddedArtifacts(payload) {
 
   exactObject(payload.bytecode, ['format', 'version', 'sha256', 'contentBase64'], 'payload.bytecode');
   if (payload.bytecode.format !== 'GFB1') fail('invalid-bytecode-format', 'payload bytecode format must be GFB1');
-  if (!['1', '2', '3', '4', '10', '11', '16', '18', '21', '22', '26', '27'].includes(payload.bytecode.version)) fail('unsupported-bytecode-version', 'unsupported payload bytecode version');
+  if (!['1', '2', '3', '4', '11', '16', '18', '21', '22', '26', '27'].includes(payload.bytecode.version)) fail('unsupported-bytecode-version', 'unsupported payload bytecode version');
   digestValue(payload.bytecode.sha256, 'payload.bytecode.sha256');
 
   exactObject(payload.manifest, ['format', 'sha256', 'contentBase64'], 'payload.manifest');
@@ -837,22 +837,18 @@ export async function verifyPortablePackage(packageValue, options = {}) {
   validateLegacyAdmission({ bytes: artifacts.bytecode, manifest, sourceDocument: sourceText });
   if ((bytecodeVersion === '22') !== (lifecycle !== null)) fail('manifest-mismatch', 'GFB22 bytecode requires matching lifecycle metadata');
   if (lifecycle) validateGfbLifecycle(artifacts.bytecode, manifest.lifecycle);
-  const contextManifest = profileVersion === '10';
   const civilManifest = profileVersion === '21';
   const calendarManifest = profileVersion === '18';
   const weekdayManifest = profileVersion === '26';
   const manifestKeys = ['format', 'name', 'inputs', 'outputs', 'sensors', 'schedules', 'timers', 'signals', 'configs', 'bytecodeSha256'];
   if (Object.hasOwn(manifest, 'sensorInstances')) {
-    if (contextManifest && !sourceMap.sourceClosure) {
-      fail('manifest-mismatch', 'historical GFB10 profile does not support sensorInstances');
-    }
     manifestKeys.push('sensorInstances');
     if (!Array.isArray(manifest.sensorInstances)) fail('manifest-mismatch', 'manifest.sensorInstances must be an array');
     // These compiler-derived descriptors are compared in full with canonical
     // source lowering below; a signature cannot substitute instance provenance.
   }
   if (weekdayManifest) manifestKeys.push('weekdayConditions');
-  if (contextManifest || civilManifest || weekdayManifest || calendarManifest) {
+  if (civilManifest || weekdayManifest || calendarManifest) {
     for (const key of ['providers', 'calendars', 'naturalConditions', 'calendarConditions', 'accounting', 'resources', 'objectives', 'adaptSettings']) {
       if (Object.hasOwn(manifest, key)) manifestKeys.push(key);
     }
@@ -865,9 +861,6 @@ export async function verifyPortablePackage(packageValue, options = {}) {
   if (Object.hasOwn(manifest,'adaptPolicy') || Object.hasOwn(manifest,'strategies')) manifestKeys.push('adaptPolicy','strategies');
   exactObject(manifest, manifestKeys, 'manifest');
   const requiredFeatures = requiredRuntimeFeatures(manifest);
-  if (contextManifest && requiredFeatures.length) {
-    fail('manifest-mismatch', 'historical GFB10 profile does not support requiredRuntimeFeatures');
-  }
   const supportedFeatures = options.supportedRuntimeFeatures === undefined
     ? new Set() : supportedSet(options.supportedRuntimeFeatures, 'supportedRuntimeFeatures');
   for (const feature of requiredFeatures) {
@@ -875,7 +868,6 @@ export async function verifyPortablePackage(packageValue, options = {}) {
   }
   if (manifest.format !== packageValue.payload.manifest.format) fail('manifest-mismatch', 'manifest format does not match descriptor');
   if (profileVersion === '4' && !['GhostFlow/control-v4', 'GhostFlow/control-v22'].includes(manifest.format)) fail('manifest-mismatch', 'GFB format 4 requires a control-v4 or control-v22 manifest');
-  if (contextManifest && manifest.format !== 'GhostFlow/control-v9') fail('manifest-mismatch', 'GFB format 10 requires a control-v9 manifest');
   if (profileVersion === '11' && manifest.format !== 'GhostFlow/control-v10') fail('manifest-mismatch', 'GFB format 11 requires a control-v10 manifest');
   validateConfigStreamPackageProfile(manifest, profileVersion, identity.runtimeAbi);
   validateOutputObservationPackageProfile(manifest, profileVersion, identity.runtimeAbi);
@@ -951,7 +943,7 @@ export async function verifyPortablePackage(packageValue, options = {}) {
   for (const [index, schedule] of manifest.schedules.entries()) {
     if (!isPlainObject(schedule)) fail('manifest-mismatch', `manifest.schedules[${index}] must be an object`);
     const name = ghostName(schedule.name, `manifest.schedules[${index}].name`);
-    if (!contextManifest && !civilManifest && !['11', '16', '27'].includes(profileVersion)) {
+    if (!civilManifest && !['11', '16', '27'].includes(profileVersion)) {
       addGenerated(schedule.dueInput, `__gf_schedule_due_${name}`, `manifest.schedules[${index}].dueInput`);
     } else if (['11', '16', '27'].includes(profileVersion) && Object.hasOwn(schedule, 'dueInput')) {
       fail('manifest-mismatch', `manifest.schedules[${index}].dueInput cannot supply a runtime-owned due value`);
@@ -1007,26 +999,6 @@ export async function verifyPortablePackage(packageValue, options = {}) {
       }
     } catch (error) {
       fail('source-map-mismatch', 'source closure does not match signed artifacts', error);
-    }
-  } else if (contextManifest) {
-    // The current compiler emits GFB11 for context source. A signed GFB10
-    // artifact cannot be reproduced by recompiling it with that compiler.
-    // Keep its source map bound to the signed source and bytecode, then require
-    // the target's native GFB10 loader below to accept the exact bytes.
-    try {
-      const extraction = extractLiterate(sourceText, { filename: mappedDocument.filename });
-      if (canonicalJson(sourceMap.lines) !== canonicalJson(extraction.sourceMap)) {
-        throw new Error('GFB10 extraction map does not match canonical source');
-      }
-      if (sourceMap.traceMetadata !== null) {
-        verifySourceTraceMetadata(sourceMap.traceMetadata, artifacts.bytecode, sourceMap.nodes, {
-          sourceDocumentSha256: sourceSha256, bytecodeSha256,
-          requireRevisionIdentity: true, sourceDocument: mappedDocument,
-          extractionMap: sourceMap.lines, timerDescriptors: manifest.timers,
-        });
-      }
-    } catch (error) {
-      fail('source-map-mismatch', 'GFB10 source map does not match signed artifacts', error);
     }
   } else try {
     const extraction = extractLiterate(sourceText, { filename: mappedDocument.filename });

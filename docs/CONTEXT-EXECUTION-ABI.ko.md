@@ -4,7 +4,7 @@
 # 컨텍스트 실행 ABI
 
 이 문서는 *컨텍스트 기반* 예약과 Result를 위해 호스트와 이식 가능한 Rust VM 사이에
-맺는 바이너리 계약을 정의합니다. GFB10(`control-v9`)은 다음 형식을 Rust VM에서
+맺는 바이너리 계약을 정의합니다. GFB11(`control-v10`)은 다음 형식을 Rust VM에서
 실행합니다.
 
 - Periodic 예약
@@ -13,6 +13,8 @@
 - Tide Run 예약
 - 설정 기반 DailySlots
 - natural Result와 accounting Result
+
+실행기와 패키지 검증기는 구형 GFB10(`control-v9`)을 거절합니다. 정본 원문을 다시 컴파일하면 현행 산출물을 만들 수 있습니다.
 
 이후 프로필은 같은 ABI에 달력 경계(GFB18), Holiday Daily(GFB15), 공유 설정
 Solar(GFB16)를 추가합니다.
@@ -98,7 +100,7 @@ admission(수용)된 Run은 완료될 때까지 원래의 계획 시각과 행 r
 ## 실행 descriptor
 
 컴파일된 프로그램의 각 예약이나 Result는 GFB 헤더 안의 *태그가 붙은 전략 prelude*로
-기술됩니다. GFB10은 GFB 시간 헤더와 태그가 붙은 전략 prelude를 유지합니다.
+기술됩니다. GFB11은 GFB 시간 헤더와 태그가 붙은 전략 prelude를 유지합니다.
 
 - 기존 태그 0–4는 레이아웃을 그대로 유지합니다.
 - 태그 5–9는 공통 접두부 `u32 site, string name, u64 gapMs`로 시작하고 Bool 식
@@ -107,11 +109,11 @@ admission(수용)된 Run은 완료될 때까지 원래의 계획 시각과 행 r
 
 | Tag | 공통 접두부와 식 사이의 본문 |
 | --- | --- |
-| 5 Periodic | string epochId, u64 anchorMs, string setting, u8 operatorEditable, u64 initialMs/minMs/maxMs/stepMs |
+| 5 Periodic | string epochId, u64 anchorMs, u32 configId (0 → u64 intervalMs) |
 | 6 Cron | string timezone, u8 dstMissing/dstRepeated, u8 count 뒤에 u8 필드 값이 오는 목록 5개 |
 | 7 Calendar Daily | string timezone, u64 atMs, string calendar, u8 offday/dstMissing/dstRepeated |
 | 8 Tide Run | string timezone/provider, u8 high, i64 offsetMs, u64 runMs/withinMs |
-| 9 Config DailySlots | string timezone/setting, u8 operatorEditable, u64 gridMs, u16 capacity, u16 initialCount, u16 minutes, u8 dstMissing/dstRepeated |
+| 9 Config DailySlots | string timezone, u32 configId, u8 dstMissing/dstRepeated |
 | 10 Natural Result | u32 site, string name, u8 kind, string provider/classification, u16 ok/value/fault 입력 인덱스 |
 | 11 Accounting Result | u32 site, string name/account/event/timezone, u16 ok/value/fault 입력 인덱스 |
 

@@ -4,7 +4,7 @@
 # コンテキスト実行 ABI
 
 この文書は、*コンテキスト駆動*のスケジュールと Result について、ホストとポータブルな
-Rust VM の間のバイナリ契約を定義します。GFB10（`control-v9`）は、次の形式を
+Rust VM の間のバイナリ契約を定義します。GFB11（`control-v10`）は、次の形式を
 Rust VM で実行します。
 
 - Periodic スケジュール
@@ -13,6 +13,8 @@ Rust VM で実行します。
 - Tide Run スケジュール
 - config に基づく DailySlots
 - natural Result と accounting Result
+
+ランタイムとパッケージ検証器は旧 GFB10（`control-v9`）を拒否します。正準ソースを再コンパイルすると現行の成果物が得られます。
 
 後続のプロファイルは、同じ ABI をカレンダー境界（GFB18）、Holiday Daily（GFB15）、
 共有 config の Solar（GFB16）で拡張しています。
@@ -100,7 +102,7 @@ accounting の射影を運ぶことができません。
 ## 実行可能なディスクリプタ
 
 コンパイル済みプログラム内の各スケジュールまたは Result は、GFB ヘッダ内の*タグ付き
-ストラテジ prelude* によって記述されます。GFB10 は GFB の時間ヘッダとタグ付き
+ストラテジ prelude* によって記述されます。GFB11 は GFB の時間ヘッダとタグ付き
 ストラテジ prelude を保持します。
 
 - 既存のタグ 0–4 はレイアウトを維持します。
@@ -111,11 +113,11 @@ accounting の射影を運ぶことができません。
 
 | タグ | 共通プレフィックスと式の間の本体 |
 | --- | --- |
-| 5 Periodic | string epochId, u64 anchorMs, string setting, u8 operatorEditable, u64 initialMs/minMs/maxMs/stepMs |
+| 5 Periodic | string epochId, u64 anchorMs, u32 configId (0 → u64 intervalMs) |
 | 6 Cron | string timezone, u8 dstMissing/dstRepeated, u8 の個数とそれに続く u8 フィールド値からなる 5 つのリスト |
 | 7 Calendar Daily | string timezone, u64 atMs, string calendar, u8 offday/dstMissing/dstRepeated |
 | 8 Tide Run | string timezone/provider, u8 high, i64 offsetMs, u64 runMs/withinMs |
-| 9 Config DailySlots | string timezone/setting, u8 operatorEditable, u64 gridMs, u16 capacity, u16 initialCount, u16 minutes, u8 dstMissing/dstRepeated |
+| 9 Config DailySlots | string timezone, u32 configId, u8 dstMissing/dstRepeated |
 | 10 Natural Result | u32 site, string name, u8 kind, string provider/classification, u16 ok/value/fault の入力インデックス |
 | 11 Accounting Result | u32 site, string name/account/event/timezone, u16 ok/value/fault の入力インデックス |
 

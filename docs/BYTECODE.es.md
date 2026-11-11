@@ -323,7 +323,7 @@ produce un resultado tipado.
 
 **La guarda de Percent (60) y `percent-range-v1`.** La aritmética dinámica de
 Percent usa el opcode aditivo `60` en los perfiles que admiten las guardas de
-tiempo existentes, excepto el GFB10 histórico. Las disposiciones de los módulos y
+tiempo existentes. Las disposiciones de los módulos y
 la selección de formato no cambian.
 
 - El manifiesto del compilador declara
@@ -343,10 +343,7 @@ Los verificadores de paquetes exigen que el destino permita explícitamente
 `percent-range-v1`. La opción de JS es `supportedRuntimeFeatures`; el perfil de
 verificación de Rust usa `supported_runtime_features`. La declaración debe
 coincidir con el programa compilado. El host de referencia comprueba el módulo
-cargado antes de la activación. El GFB10 histórico no puede declarar ni contener la
-nueva instrucción; la fuente actual se compila a perfiles actuales. Los programas
-GFB10 existentes siguen pudiendo cargarse sin una nueva declaración de
-funcionalidad.
+cargado antes de la activación. El entorno de ejecución y los verificadores de paquetes rechazan el GFB10 histórico (`control-v9`). Vuelve a compilar el código fuente canónico para generar un artefacto actual.
 
 **Guardas de rango (54, 55, 60).** Cada guarda deja sin cambios un Number válido y,
 en caso contrario, rechaza el tick:

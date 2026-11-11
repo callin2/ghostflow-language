@@ -267,7 +267,7 @@ fn gfb12_range_loads_active_and_rejects_old_profiles_and_malformed_recurrences()
             ..
         })
     ));
-    for version in [5, 8, 9, 10, 11] {
+    for version in [5, 8, 9, 11] {
         fixture.version = version;
         rejected(&fixture, "invalid prelude kind");
     }

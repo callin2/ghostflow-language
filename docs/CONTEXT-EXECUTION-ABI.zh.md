@@ -3,7 +3,7 @@
 
 # 上下文执行 ABI
 
-本文档定义宿主（host）与可移植 Rust VM 之间针对*上下文驱动*的调度计划和 Result 的二进制契约。GFB10（`control-v9`）在 Rust VM 中执行以下形式：
+本文档定义宿主（host）与可移植 Rust VM 之间针对*上下文驱动*的调度计划和 Result 的二进制契约。GFB11（`control-v10`）在 Rust VM 中执行以下形式：
 
 - Periodic 调度计划
 - Cron 调度计划
@@ -11,6 +11,8 @@
 - Tide Run 调度计划
 - 由 config 支撑的 DailySlots
 - 自然 Result 与用量核算 Result
+
+运行时和包验证器拒绝历史 GFB10（`control-v9`）。重新编译规范源文件可生成当前格式的产物。
 
 后续 profile 在同一 ABI 上扩展了日历边界（GFB18）、Holiday Daily（GFB15）以及共享 config 的 Solar（GFB16）。
 
@@ -77,7 +79,7 @@ Rust 校验绑定并做出所有判定：
 
 ## 可执行描述符
 
-已编译程序中的每个调度计划或 Result 都由 GFB 头部中的一个*带标签的策略 prelude* 描述。GFB10 保留 GFB 时间头部以及带标签的策略 prelude：
+已编译程序中的每个调度计划或 Result 都由 GFB 头部中的一个*带标签的策略 prelude* 描述。GFB11 保留 GFB 时间头部以及带标签的策略 prelude：
 
 - 现有标签 0–4 保持其布局不变。
 - 标签 5–9 以公共前缀 `u32 site, string name, u64 gapMs` 开头，并以 Bool 表达式块 `when, cancel` 结尾。
@@ -85,11 +87,11 @@ Rust 校验绑定并做出所有判定：
 
 | 标签 | 公共前缀与表达式之间的主体 |
 | --- | --- |
-| 5 Periodic | string epochId, u64 anchorMs, string setting, u8 operatorEditable, u64 initialMs/minMs/maxMs/stepMs |
+| 5 Periodic | string epochId, u64 anchorMs, u32 configId (0 → u64 intervalMs) |
 | 6 Cron | string timezone, u8 dstMissing/dstRepeated, 五个列表，每个为 u8 计数后接 u8 字段值 |
 | 7 Calendar Daily | string timezone, u64 atMs, string calendar, u8 offday/dstMissing/dstRepeated |
 | 8 Tide Run | string timezone/provider, u8 high, i64 offsetMs, u64 runMs/withinMs |
-| 9 Config DailySlots | string timezone/setting, u8 operatorEditable, u64 gridMs, u16 capacity, u16 initialCount, u16 minutes, u8 dstMissing/dstRepeated |
+| 9 Config DailySlots | string timezone, u32 configId, u8 dstMissing/dstRepeated |
 | 10 Natural Result | u32 site, string name, u8 kind, string provider/classification, u16 ok/value/fault 输入索引 |
 | 11 Accounting Result | u32 site, string name/account/event/timezone, u16 ok/value/fault 输入索引 |
 

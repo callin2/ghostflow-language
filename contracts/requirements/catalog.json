@@ -394,8 +394,8 @@
         "path": "docs/BYTECODE.md",
         "heading": "Safety records and host manifest",
         "lines": [
-          483,
-          486
+          479,
+          482
         ],
         "sha256": "1e147b07413192889f0427f91c3c126a8da3ba839e0dcac5193969dfc8aa6ce1"
       },
@@ -415,8 +415,8 @@
         "path": "docs/BYTECODE.md",
         "heading": "Safety records and host manifest",
         "lines": [
-          483,
-          483
+          479,
+          479
         ],
         "sha256": "5bb0a87473dc5357394cb0c1cc770813b53d78dd66c4cbace3ff7e2db9ffec6c"
       },
@@ -789,8 +789,8 @@
         "path": "docs/BYTECODE.md",
         "heading": "Query opcodes",
         "lines": [
-          469,
-          479
+          465,
+          475
         ],
         "sha256": "46dfc3ce5216a8254c17fee814457e08a66abc1a25770f58615a16fc628f9b59"
       },
@@ -812,8 +812,8 @@
         "path": "docs/BYTECODE.md",
         "heading": "Safety records and host manifest",
         "lines": [
-          483,
-          485
+          479,
+          481
         ],
         "sha256": "91048d0c34b8969e35e89b75a61851456b2cebb900efed2f63a04962df98402b"
       },
@@ -833,8 +833,8 @@
         "path": "docs/BYTECODE.md",
         "heading": "Safety records and host manifest",
         "lines": [
-          483,
-          487
+          479,
+          483
         ],
         "sha256": "1e147b07413192889f0427f91c3c126a8da3ba839e0dcac5193969dfc8aa6ce1"
       },
@@ -856,8 +856,8 @@
         "path": "docs/BYTECODE.md",
         "heading": "Safety records and host manifest",
         "lines": [
-          483,
-          488
+          479,
+          484
         ],
         "sha256": "0ee4132ae946bb93cd842a3e8683701f40e1c42cb4bc66c06c7d47949a995855"
       },
@@ -993,8 +993,8 @@
         "path": "crates/ghostflow-core/src/lib.rs",
         "heading": "fn monotonic_input_failure_is_atomic()",
         "lines": [
-          4862,
-          4884
+          4801,
+          4823
         ],
         "sha256": "a9a83443a83a4ad006cf9ee304d0f38b8bb14332b54bda1fa0c9ffecc2a583fc"
       },

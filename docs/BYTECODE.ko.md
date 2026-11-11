@@ -281,7 +281,7 @@ compact opcode를 거부하고 현재의 직선 바이트를 유지합니다.
   형식 1이나 2를 선택할 수 있습니다.
 
 **Percent guard (60)와 `percent-range-v1`.** 동적 Percent 산술은 기존 time guard를 허용하는
-프로필(과거의 GFB10 제외)에서 추가 opcode `60`을 사용합니다. 모듈 레이아웃과 형식 선택은
+프로필에서 추가 opcode `60`을 사용합니다. 모듈 레이아웃과 형식 선택은
 바뀌지 않습니다.
 
 - 컴파일러 매니페스트는 `requiredRuntimeFeatures: ["percent-range-v1"]`을 선언합니다.
@@ -296,8 +296,7 @@ compact opcode를 거부하고 현재의 직선 바이트를 유지합니다.
 package verifier는 대상이 `percent-range-v1`을 명시적으로 허용할 것을 요구합니다. JS 옵션은
 `supportedRuntimeFeatures`이고, Rust 검증 프로필은 `supported_runtime_features`를
 사용합니다. 선언은 컴파일된 프로그램과 일치해야 합니다. 참조 호스트는 activation 전에 로드된
-모듈을 검사합니다. 과거의 GFB10은 새 instruction을 선언하거나 포함할 수 없으며, 현재 소스는
-현재 프로필로 컴파일됩니다. 기존 GFB10 프로그램은 새 기능 선언 없이도 계속 로드할 수 있습니다.
+모듈을 검사합니다. 실행기와 패키지 검증기는 구형 GFB10(`control-v9`)을 거절합니다. 정본 원문을 다시 컴파일하면 현행 산출물을 만들 수 있습니다.
 
 **범위 guard (54, 55, 60).** 각 guard는 유효한 Number를 그대로 두고, 그렇지 않으면 tick을
 거부합니다.

@@ -4,8 +4,8 @@
 # ABI de ejecución de contexto
 
 Este documento define el contrato binario entre un host y la VM portable de
-Rust para las programaciones y los Results *impulsados por contexto*. GFB10
-(`control-v9`) ejecuta estas formas en la VM de Rust:
+Rust para las programaciones y los Results *impulsados por contexto*. GFB11
+(`control-v10`) ejecuta estas formas en la VM de Rust:
 
 - programaciones Periodic
 - programaciones Cron
@@ -13,6 +13,8 @@ Rust para las programaciones y los Results *impulsados por contexto*. GFB10
 - programaciones Run de marea (Tide)
 - DailySlots respaldados por config
 - Results naturales y de contabilización de uso
+
+El entorno de ejecución y los verificadores de paquetes rechazan el GFB10 histórico (`control-v9`). Vuelve a compilar el código fuente canónico para generar un artefacto actual.
 
 Perfiles posteriores amplían la misma ABI con límites de calendario (GFB18),
 Holiday Daily (GFB15) y Solar con config compartida (GFB16).
@@ -111,7 +113,7 @@ Unknown tipado, nunca evidencia fabricada.
 ## Descriptores ejecutables
 
 Cada programación o Result de un programa compilado se describe mediante un
-*preludio de estrategia etiquetado* en la cabecera GFB. GFB10 conserva la
+*preludio de estrategia etiquetado* en la cabecera GFB. GFB11 conserva la
 cabecera temporal de GFB y los preludios de estrategia etiquetados:
 
 - Las etiquetas existentes 0–4 conservan su disposición.
@@ -123,11 +125,11 @@ cabecera temporal de GFB y los preludios de estrategia etiquetados:
 
 | Etiqueta | Cuerpo entre el prefijo común y las expresiones |
 | --- | --- |
-| 5 Periodic | string epochId, u64 anchorMs, string setting, u8 operatorEditable, u64 initialMs/minMs/maxMs/stepMs |
+| 5 Periodic | string epochId, u64 anchorMs, u32 configId (0 → u64 intervalMs) |
 | 6 Cron | string timezone, u8 dstMissing/dstRepeated, cinco listas de u8 count seguido de valores de campo u8 |
 | 7 Calendar Daily | string timezone, u64 atMs, string calendar, u8 offday/dstMissing/dstRepeated |
 | 8 Tide Run | string timezone/provider, u8 high, i64 offsetMs, u64 runMs/withinMs |
-| 9 Config DailySlots | string timezone/setting, u8 operatorEditable, u64 gridMs, u16 capacity, u16 initialCount, u16 minutes, u8 dstMissing/dstRepeated |
+| 9 Config DailySlots | string timezone, u32 configId, u8 dstMissing/dstRepeated |
 | 10 Natural Result | u32 site, string name, u8 kind, string provider/classification, u16 índices de entrada ok/value/fault |
 | 11 Accounting Result | u32 site, string name/account/event/timezone, u16 índices de entrada ok/value/fault |
 

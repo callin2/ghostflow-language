@@ -10,7 +10,7 @@ and accounting owners. It does not operate hardware, and it does not establish
 the authenticity of renderer receipts.
 
 **Supported profile.** The selected profile is a standalone canonical
-`.ghost.md` GFB10 control with:
+`.ghost.md` GFB11 control with:
 
 - Periodic schedules;
 - optional existing settings; and

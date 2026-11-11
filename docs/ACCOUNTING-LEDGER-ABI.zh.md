@@ -52,7 +52,7 @@ Profile 限制：
 
 `tests/stage-accounting-control.test.mjs` 比较原生与 WASM 的追踪结果、查询以及完整的快照字节。在 REF-03-021 中，一个被阻止的 20s 请求得到：请求 20000ms，安全 0ms，已应用 Unknown，已确认 Unknown。物理 Driver 行为和存储持久性是单独的验收证据。
 
-本 ABI 通过 WebAssembly 把 Rust 用量核算账本暴露给宿主。GFB10 的计数 Result 在可移植控制 VM 内部使用配对的账本执行。与源绑定的滚动预留准入是参考宿主的一项显式操作；ABI 不会自动把控制输出绑定到资源。
+本 ABI 通过 WebAssembly 把 Rust 用量核算账本暴露给宿主。GFB11 的计数 Result 在可移植控制 VM 内部使用配对的账本执行。与源绑定的滚动预留准入是参考宿主的一项显式操作；ABI 不会自动把控制输出绑定到资源。
 
 `AccountingRuntime.instantiateSource(wasmBytes, document, options)` 编译一个确切的规范 `.ghost.md` 文档，并按名称选择一个已声明的账户。它接受以下两者之一：
 

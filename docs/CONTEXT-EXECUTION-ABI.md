@@ -1,7 +1,7 @@
 # Context execution ABI
 
 This document defines the binary contract between a host and the portable Rust
-VM for *context-driven* schedules and Results. GFB10 (`control-v9`) executes
+VM for *context-driven* schedules and Results. GFB11 (`control-v10`) executes
 these forms in the Rust VM:
 
 - Periodic schedules
@@ -10,6 +10,8 @@ these forms in the Rust VM:
 - Tide Run schedules
 - config-backed DailySlots
 - natural and accounting Results
+
+The runtime and package verifiers reject historical GFB10 (`control-v9`). Recompile its canonical source to produce a current artifact.
 
 Later profiles extend the same ABI with calendar boundaries (GFB18), Holiday
 Daily (GFB15) and shared-config Solar (GFB16).
@@ -100,7 +102,7 @@ evidence.
 ## Executable descriptors
 
 Each schedule or Result in a compiled program is described by a *tagged
-strategy prelude* in the GFB header. GFB10 keeps the GFB temporal header and the
+strategy prelude* in the GFB header. GFB11 keeps the GFB temporal header and the
 tagged strategy preludes:
 
 - Existing tags 0–4 keep their layouts.
@@ -111,11 +113,11 @@ tagged strategy preludes:
 
 | Tag | Body between common prefix and expressions |
 | --- | --- |
-| 5 Periodic | string epochId, u64 anchorMs, string setting, u8 operatorEditable, u64 initialMs/minMs/maxMs/stepMs |
+| 5 Periodic | string epochId, u64 anchorMs, u32 configId (0 → u64 intervalMs) |
 | 6 Cron | string timezone, u8 dstMissing/dstRepeated, five lists of u8 count followed by u8 field values |
 | 7 Calendar Daily | string timezone, u64 atMs, string calendar, u8 offday/dstMissing/dstRepeated |
 | 8 Tide Run | string timezone/provider, u8 high, i64 offsetMs, u64 runMs/withinMs |
-| 9 Config DailySlots | string timezone/setting, u8 operatorEditable, u64 gridMs, u16 capacity, u16 initialCount, u16 minutes, u8 dstMissing/dstRepeated |
+| 9 Config DailySlots | string timezone, u32 configId, u8 dstMissing/dstRepeated |
 | 10 Natural Result | u32 site, string name, u8 kind, string provider/classification, u16 ok/value/fault input indices |
 | 11 Accounting Result | u32 site, string name/account/event/timezone, u16 ok/value/fault input indices |
 

@@ -13,7 +13,7 @@ Es un host de referencia de escritorio que usa los responsables reales en Rust
 de decisiones, ocurrencias y contabilización. No opera hardware y no establece
 la autenticidad de los recibos del renderizador.
 
-**Perfil admitido.** El perfil seleccionado es un control GFB10 canónico
+**Perfil admitido.** El perfil seleccionado es un control GFB11 canónico
 independiente `.ghost.md` con:
 
 - programaciones Periodic;
