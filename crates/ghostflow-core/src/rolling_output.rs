@@ -234,8 +234,21 @@ impl RollingOutputOwner {
             return LedgerRead::Unknown;
         }
         let p = self.policy;
-        self.ledger
-            .explain_rolling(p.resource_id, now_ms, p.window_ms, p.limit_ms, p.reserve_ms)
+        let result = self.ledger.explain_rolling(
+            p.resource_id,
+            now_ms,
+            p.window_ms,
+            p.limit_ms,
+            p.reserve_ms,
+        );
+        match result {
+            LedgerRead::Known(mut evidence) if self.unresolved_lease().is_some() => {
+                evidence.blocked = true;
+                evidence.next_release_ms = None;
+                LedgerRead::Known(evidence)
+            }
+            result => result,
+        }
     }
 
     /// Release uncertainty after the host has continuously kept this output

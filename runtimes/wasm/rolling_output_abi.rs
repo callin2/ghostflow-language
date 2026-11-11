@@ -1,5 +1,6 @@
 use ghostflow_core::accounting::{
-    AccountingConfig, OutputAdmission, OutputLease, RollingOutputOwner, RollingOutputPolicy,
+    AccountingConfig, LedgerRead, OutputAdmission, OutputLease, RollingOutputOwner,
+    RollingOutputPolicy,
 };
 
 pub struct RollingOutputHandle {
@@ -163,4 +164,34 @@ pub unsafe extern "C" fn gf_rolling_output_ack(handle: *mut RollingOutputHandle)
     };
     handle.pending.clear();
     handle.lease.map_or(0, OutputLease::deadline_ms)
+}
+
+/// A durable explanation, with the same first five fields as the accounting ABI.
+/// 1 is known, 2 is unknown or not yet acknowledged, 0 is an invalid argument.
+#[no_mangle]
+pub unsafe extern "C" fn gf_rolling_output_explain(
+    handle: *const RollingOutputHandle,
+    now_ms: u64,
+    output: *mut u64,
+) -> u32 {
+    let Some(handle) = handle.as_ref() else {
+        return 0;
+    };
+    if output.is_null() {
+        return 0;
+    }
+    if !handle.pending.is_empty() {
+        return 2;
+    }
+    let LedgerRead::Known(evidence) = handle.owner.explain(now_ms) else {
+        return 2;
+    };
+    std::slice::from_raw_parts_mut(output, 5).copy_from_slice(&[
+        evidence.used_ms,
+        evidence.reserved_ms,
+        u64::from(evidence.blocked),
+        u64::from(evidence.next_release_ms.is_some()),
+        evidence.next_release_ms.unwrap_or(0),
+    ]);
+    1
 }
