@@ -1,0 +1,27 @@
+{
+  "sourceRevision": "issue222-periodic-settings-result-v1",
+  "cases": [
+    {
+      "supersedesSha256": "bd9376dd843f2d6713776f9db084b187596b2b2cda0f49d8346b88b6ad013407",
+      "case": {
+        "id": "REF-03-037",
+        "issue": "https://github.com/callin2/ghostflow-language/issues/222",
+        "references": [
+          "03-time-and-schedules.md#periodic",
+          "04-sensors-constraints-control.md#410-mode와-live-settings",
+          "05-settings-and-observation.md#atomic-live-event"
+        ],
+        "rule": "Periodic interval live 변경은 같은 program/run의 atomic settings event이며 과거 occurrence를 내지 않고 phase 연속 규칙은 명시해야 한다.",
+        "scope": "host",
+        "status": "specified",
+        "given": "같은 run에서 한 event가 interval=10min과 함께 알 수 없는 대상 또는 범위를 넘는 기존 설정을 변경한다.",
+        "when": "event를 검증한다.",
+        "then": "대상이 알 수 없으면 전체 요청을 거부하고 settings revision과 위상을 유지한다. 승인된 기존 대상의 payload 오류는 두 대상에 fault(SettingsInvalid)를 함께 내고 settings revision을 한 번 전진시킨다. Periodic은 새 발생을 막는다. 유효값이 돌아오면 원래 anchor의 다음 발생만 실행한다. 원문, bytecode와 run identity는 유지한다.",
+        "reason": "Reference 3.7 및 5.2의 admission rejection과 settings Result emission을 구분한다. 이전 문구는 변경 이력에 그대로 보존한다.",
+        "softwareObservationPorts": [],
+        "sourceRevision": "issue222-periodic-settings-result-v1"
+      }
+    }
+  ],
+  "decision": "https://github.com/callin2/ghostflow-language/issues/274#issuecomment-6445458117"
+}

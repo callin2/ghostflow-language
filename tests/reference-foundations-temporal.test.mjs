@@ -11,6 +11,7 @@ import { TemporarySettingsHost } from '../runtimes/wasm/temporary-settings-host.
 import { solarContextEvidence } from '../runtimes/wasm/context-abi.mjs';
 import { SolarSchedule, SOLAR_CALCULATION } from '../runtimes/wasm/solar-schedule.mjs';
 import { compileSource } from '../tools/compile-source.mjs';
+import { loadReferenceCases } from '../tools/reference-cases.mjs';
 import { softwareQualityObservations, softwareQualityRails } from './helpers/software-quality-observations.mjs';
 
 const root = fileURLToPath(new URL('..', import.meta.url));
@@ -355,27 +356,30 @@ test('At Window rejects incompatible projections and mismatched old profiles bef
   await assert.rejects(ControlRuntime.instantiateFramed(wasm, oldWire, { context: activation }), /matching GFB|profile|format/);
 });
 
+const atomicPeriodic = () => compile(`control AtomicInterval {
+  config interval: Duration = 15min { min = 1min; max = 1h; step = 1min; access = operator; }
+  config other: Percent = 50% { min = 0%; max = 100%; step = 1%; access = operator; }
+  schedule cycle: Periodic { every = interval; anchor = instant(datetime\`1970-01-01T00:00:00Z\`);
+    interval_change = preserve_anchor; basis = pulse; when = true;
+    clock = trusted_only; gap = skip_after(1h); recovery = baseline; fallback = skip; }
+  output due: Bool; due <- cycle.due;
+}`);
+const periodicFrame = (artifact, at) => frame(at, { ...facts(at), schedules: [{ site: artifact.manifest.schedules[0].site,
+  coverageStartMs: 0, coverageEndMs: 3_600_000, provider: null, calendar: null, rows: [] }] });
+
 test('REF-03-037 invalid target rejects the whole Periodic settings event without changing run identity or phase', async t => {
   assert.match(reference('REF-03-037').given, /interval=10min.*invalid setting/);
-  const artifact = await compile(`control AtomicInterval {
-    config interval: Duration = 15min { min = 1min; max = 1h; step = 1min; access = operator; }
-    config other: Bool = true { access = operator; }
-    schedule cycle: Periodic { every = interval; anchor = instant(datetime\`1970-01-01T00:00:00Z\`);
-      interval_change = preserve_anchor; basis = pulse; when = true;
-      clock = trusted_only; gap = skip_after(1h); recovery = baseline; fallback = skip; }
-    output due: Bool; due <- cycle.due;
-  }`);
+  const artifact = await atomicPeriodic();
   const ids = Object.fromEntries(artifact.manifest.configs.map(c => [c.name, c.id]));
   const host = await TemporarySettingsHost.instantiate(wasm, artifact, { runId: 'run-590-periodic',
     grants: { operator: Object.values(ids) }, context: activation });
   t.after(() => host.dispose());
-  const packet = at => frame(at, { ...facts(at), schedules: [{ site: artifact.manifest.schedules[0].site,
-    coverageStartMs: 0, coverageEndMs: 3_600_000, provider: null, calendar: null, rows: [] }] });
+  const packet = at => periodicFrame(artifact, at);
   host.step(packet(0)); host.step(packet(1_000_000));
   const before = host.snapshot(), bytes = Uint8Array.from(artifact.bytes);
   const changes = [
     { configId: ids.interval, result: { ok: true, type: 'Duration', value: 600_000 } },
-    { configId: 999_999, result: { ok: true, type: 'Bool', value: false } },
+    { configId: 999_999, result: { ok: true, type: 'Percent', value: 60 } },
   ];
   const event = { kind: 'ordinary', eventId: 'interval-ten', programFingerprint: before.programFingerprint,
     sourceSha256: before.sourceSha256, runId: before.runId, baseRevision: 0, actor: 'operator', reason: 'reference fixture', changes };
@@ -398,6 +402,59 @@ test('REF-03-037 invalid target rejects the whole Periodic settings event withou
   assert.equal(valid.outcome.vm.safe.due, false, 'a valid live change does not catch up the past ten-minute occurrence');
   assert.equal(host.step(packet(1_200_000)).outcome.vm.safe.due, true, 'preserve_anchor retains the next twenty-minute phase');
   assert.deepEqual(artifact.bytes, bytes);
+});
+
+test('REF-03-037 an invalid Periodic settings payload faults the whole group and resumes at the next anchored occurrence', async t => {
+  const current = loadReferenceCases(root).cases.find(entry => entry.id === 'REF-03-037');
+  assert.equal(current.issue, 'https://github.com/callin2/ghostflow-language/issues/222');
+  assert.match(current.then, /fault\(SettingsInvalid\).*원래 anchor/);
+  assert.equal(current.predecessor.path, 'tests/reference/cases-input-v1/02-time-control.json');
+  const artifact = await atomicPeriodic();
+  const ids = Object.fromEntries(artifact.manifest.configs.map(c => [c.name, c.id]));
+  const host = await TemporarySettingsHost.instantiate(wasm, artifact, { runId: 'run-periodic-payload',
+    grants: { operator: Object.values(ids) }, context: activation });
+  t.after(() => host.dispose());
+  const packet = at => periodicFrame(artifact, at);
+  host.step(packet(0));
+  const before = host.snapshot();
+  const bytes = artifact.bytes.slice();
+  const edit = (eventId, baseRevision, percent) => ({
+    kind: 'ordinary', eventId, baseRevision, programFingerprint: before.programFingerprint,
+    sourceSha256: before.sourceSha256, runId: before.runId, actor: 'operator', reason: 'reference fixture',
+    changes: [
+      { configId: ids.interval, result: { ok: true, type: 'Duration', value: 600_000 } },
+      { configId: ids.other, result: { ok: true, type: 'Percent', value: percent } },
+    ],
+  });
+  const failed = host.step(packet(900_000), edit('out-of-range', 0, 110));
+  assert.equal(failed.accepted, true);
+  assert.equal(failed.snapshot.core.state.settingsRevision, 1);
+  for (const setting of failed.snapshot.core.state.settings) {
+    assert.deepEqual(setting.result, { ok: false, fault: 'SettingsInvalid' });
+    assert.equal(setting.emissionRevision, 1);
+  }
+  assert.equal(failed.outcome.vm.safe.due, false);
+  const recovered = host.step(packet(1_000_001), edit('restore', 1, 60));
+  assert.equal(recovered.snapshot.core.state.settingsRevision, 2);
+  assert.deepEqual(recovered.snapshot.core.state.settings.map(setting => setting.result), [
+    { ok: true, value: 600_000 }, { ok: true, value: 60 },
+  ]);
+  for (const row of [failed, recovered]) {
+    assert.equal(row.snapshot.runId, before.runId);
+    assert.equal(row.snapshot.programFingerprint, before.programFingerprint);
+  }
+  assert.deepEqual(artifact.bytes, bytes);
+  assert.equal(recovered.outcome.vm.safe.due, false);
+  assert.equal(host.step(packet(1_199_999)).outcome.vm.safe.due, false);
+  assert.equal(host.step(packet(1_200_000)).outcome.vm.safe.due, true);
+
+  const withEdit = (at, settings) => ({ ...packet(at), contextFacts: { ...packet(at).contextFacts, settings } });
+  const rows = native(t, artifact, [packet(0), withEdit(900_000, failed.coreEvent),
+    withEdit(1_000_001, recovered.coreEvent), packet(1_199_999), packet(1_200_000)], 'context-settings-periodic-v1');
+  assert.deepEqual(rows.map(row => row.accepted), [true, true, true, true, true]);
+  assert.deepEqual(rows.map(row => row.outcome.trace.safe.due), [false, false, false, false, true]);
+  assert.deepEqual(rows[1].settings, failed.snapshot.core.state);
+  assert.deepEqual(rows[2].settings, recovered.snapshot.core.state);
 });
 
 test('REF-03-040 admitted natural Run crosses midnight independently of its source date', async t => {
