@@ -255,13 +255,14 @@ function lowerCoreModule(ast) {
   const rawWindowCount=strategies.reduce((total,{raw})=>total+raw.slice(3).filter(form=>Array.isArray(form)&&form[0]==='window').length,0);
   const contextHeads=['at-pulse','at-window','periodic-pulse','cron-pulse','calendar-daily-pulse','holiday-daily-pulse','solar-context-pulse','solar-weekday-pulse','tide-run','tide-weekday-run','config-daily-slots-pulse','utc-range','calendar-range','civil-range'];
   const rawScheduleCount=strategies.reduce((total,{raw})=>total+raw.slice(3).filter(form=>Array.isArray(form)&&['solar-pulse','daily-pulse','daily-slots-pulse','config-stream',...contextHeads].includes(form[0])).length,0);
-  const hasContext=strategies.some(({raw})=>raw.slice(3).some(form=>Array.isArray(form)&&['config-stream',...contextHeads,'natural-result','accounting-result','calendar-result'].includes(form[0])));
-  const rawNaturalCount=strategies.reduce((total,{raw})=>total+raw.slice(3).filter(form=>Array.isArray(form)&&['natural-result','accounting-result','calendar-result'].includes(form[0])).length,0);
+  const resultHeads=['natural-result','accounting-result','calendar-result','weekday-result'];
+  const hasContext=strategies.some(({raw})=>raw.slice(3).some(form=>Array.isArray(form)&&['config-stream',...contextHeads,...resultHeads].includes(form[0])));
+  const rawResultCount=strategies.reduce((total,{raw})=>total+raw.slice(3).filter(form=>Array.isArray(form)&&resultHeads.includes(form[0])).length,0);
   const hasDaily=strategies.some(({raw})=>raw.slice(3).some(form=>Array.isArray(form)&&form[0]==='daily-pulse'));
   const hasDailySlots=strategies.some(({raw})=>raw.slice(3).some(form=>Array.isArray(form)&&form[0]==='daily-slots-pulse'));
   const hasSolar=strategies.some(({raw})=>raw.slice(3).some(form=>Array.isArray(form)&&form[0]==='solar-pulse'));
   const rawTrueForCount=strategies.reduce((total,{raw})=>total+raw.slice(3).filter(form=>Array.isArray(form)&&form[0]==='true-for').length,0);
-  const rawPreludeCount=rawWindowCount+rawScheduleCount+rawTrueForCount+rawNaturalCount;
+  const rawPreludeCount=rawWindowCount+rawScheduleCount+rawTrueForCount+rawResultCount;
   const hasSchedules=rawScheduleCount>0;
   const hasTrueFors=rawTrueForCount>0;
   const taggedPreludes=hasSchedules||hasTrueFors||hasContext;
