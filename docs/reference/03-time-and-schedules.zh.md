@@ -345,7 +345,7 @@ cancel_when := Bool                                   // 当前民用 range 必�
 | Tide 回退 | 仅 `fallback = skip`。 |
 | 其他触发器 | 保持仅可信时钟和 skip 回退。 |
 | `At` Window | 有界的可执行 Window 配置档。 |
-| 固定 UTC `Daily` 的 Window 或准点 Run | GFB28，时长为不超过 24 小时的常量，无日期选择器，并采用 trusted-only 和 baseline 策略。 |
+| 固定 UTC `Daily` 的 Window 或准点 Run | GFB28，时长为不超过 24 小时的常量，可选择星期几，并采用 trusted-only 和 baseline 策略。 |
 
 在可信观测中，窗口内的 `.open` 跟随当前条件，每个事件只产生一次 `.due`。观测空档或基线扫描可能错过准入。Run 只在观测到越过计划时间时开始，从实际准入时用单调时钟计时，并在取消时结束。检查点保留已处理的事件标识。重启后不会恢复正在运行的 Run。
 | 不可变 UTC Daily 和非空静态 DailySlots Range | 静态证明不重叠；以 GFB12 执行。 |

@@ -8,7 +8,7 @@ Daily and DailySlots runtimes can now export and restore exact-Program terminal 
 
 ### 2026-11-12 - Execute UTC Daily Window and Run ([#153](https://github.com/callin2/ghostflow-language/issues/153))
 
-Immutable UTC Daily schedules can use `basis = window(5min)` or `basis = run(5min, on_time)` with an explicit `cancel_when` for Run. These combinations now emit GFB28 and keep one admission per occurrence. Window follows its current predicate. Run measures time from admission and stops on cancellation or expiry. The Daily Window/Run test compares native and WASM scans.
+Immutable UTC Daily schedules with an optional weekday selector can use `basis = window(5min)` or `basis = run(5min, on_time)` with an explicit `cancel_when` for Run. These combinations now emit GFB28 and keep one admission per occurrence. Window follows its current predicate. Run measures time from admission and stops on cancellation or expiry. The Daily Window/Run test compares native and WASM scans.
 
 ### 2026-11-12 - Retire GFB10 admission ([#620](https://github.com/callin2/ghostflow-language/issues/620))
 

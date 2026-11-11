@@ -37,6 +37,7 @@ pub enum ScheduleDefinition {
         run: bool,
         dst_missing: u8,
         dst_repeated: u8,
+        weekday_mask: u8,
     },
     AtWindow {
         at_ms: u64,
@@ -849,10 +850,12 @@ pub(crate) fn load_schedule(
             let duration_ms = exact(reader)?;
             let dst_missing = reader.u8()?;
             let dst_repeated = reader.u8()?;
+            let weekday_mask = reader.u8()?;
             if at_ms >= 86_400_000
                 || !(1..=86_400_000).contains(&duration_ms)
                 || dst_missing > 1
                 || dst_repeated > 3
+                || weekday_mask > 127
             {
                 return Err(Error::new("invalid UTC Daily basis bounds"));
             }
@@ -862,6 +865,7 @@ pub(crate) fn load_schedule(
                 run: kind == 25,
                 dst_missing,
                 dst_repeated,
+                weekday_mask,
             }
         }
         20 if format == 23 => {

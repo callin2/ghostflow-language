@@ -345,7 +345,7 @@ Rules for the common fields:
 | Tide fallback | Only `fallback = skip`. |
 | Other triggers | Keep trusted-only clock and skip fallback. |
 | `At` Window | The bounded executable Window profile. |
-| Immutable UTC `Daily` Window or on-time Run | GFB28 with a constant duration of at most 24 hours, no day selector and the trusted-only baseline policy. |
+| Immutable UTC `Daily` Window or on-time Run | GFB28 with a constant duration of at most 24 hours, an optional weekday selector and the trusted-only baseline policy. |
 
 Window requires a trusted observed scan for `.open`. An observation gap or baseline can miss admission even while the planned interval has time left. Later observed scans can reflect the predicate in `.open`, and `.due` stays false for a consumed occurrence. Run starts only at an observed crossing, counts duration from actual admission on the monotonic clock, and ends immediately when cancelled. The checkpoint preserves consumed identities across reboot. A new boot starts with no active Run.
 | Immutable UTC Daily and nonempty static DailySlots Range | Static non-overlap is proved; executes as GFB12. |

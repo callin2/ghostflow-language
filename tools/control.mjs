@@ -1773,7 +1773,7 @@ class Lowerer {
       }
       this.manifest.format = 'GhostFlow/control-v28';
     }
-    if (this.manifest.schedules.some(schedule => schedule.kind === 'daily' && schedule.day?.kind === 'weekday')) {
+    if (this.manifest.schedules.some(schedule => schedule.kind === 'daily' && schedule.day?.kind === 'weekday' && schedule.policy.basis === 'pulse')) {
       if (contextForms.length
         || this.manifest.schedules.some(schedule => schedule.kind !== 'daily' || schedule.policy.basis !== 'pulse')
         || ['configs','providers','calendars','naturalConditions','calendarConditions','objectives','resources','adaptSettings','signals']
@@ -4569,7 +4569,7 @@ class Lowerer {
       }
       if (schedule.kind === 'daily' && ['window', 'run'].includes(schedule.policy.basis?.kind)) {
         return [schedule.policy.basis.kind === 'window' ? 'daily-window' : 'daily-run', ...base,
-          String(schedule.atMs), String(schedule.policy.basis.durationMs), schedule.dstMissing, schedule.dstRepeated, when, cancel];
+          String(schedule.atMs), String(schedule.policy.basis.durationMs), schedule.dstMissing, schedule.dstRepeated, String(schedule.day?.mask ?? 0), when, cancel];
       }
       if (schedule.kind === 'at') return schedule.policy.basis?.kind === 'window'
         ? ['at-window', ...base, String(schedule.atMs), String(schedule.policy.basis.durationMs), when, cancel]
@@ -4967,7 +4967,8 @@ export function compileAccountingControl(source, { filename = '<control>' } = {}
 /** Only this bounded civil pulse slice has a VM/provider transport. */
 export function isDailyWindowRun(item) {
   const basis = item.policy?.basis;
-  return item.scheduleType === 'Daily' && item.timezone === 'UTC' && !item.on && !item.calendar
+  return item.scheduleType === 'Daily' && item.timezone === 'UTC' && !item.calendar
+    && (!item.on || /^day`[a-z.,]+`$/.test(item.on.value) && !['day`workday`','day`offday`','day`holiday`'].includes(item.on.value))
     && item.at?.kind === 'literal' && item.at.raw.startsWith('time`')
     && basis?.kind === 'call' && !basis.named.length
     && (basis.name === 'window' && basis.args.length === 1

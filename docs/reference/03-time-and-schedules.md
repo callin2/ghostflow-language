@@ -347,7 +347,7 @@ cancel_when := Bool                                   // 현재 civil range에�
 | Tide fallback | `fallback = skip`만 허용합니다. |
 | 다른 trigger | trusted-only clock과 skip fallback을 유지합니다. |
 | `At` Window | 제한된 실행 가능 Window profile입니다. |
-| 고정 UTC `Daily` Window 또는 정시 Run | 24시간 이하의 상수 길이와 날짜 선택 없는 trusted-only baseline 정책을 사용하는 GFB28입니다. |
+| 고정 UTC `Daily` Window 또는 정시 Run | 24시간 이하의 상수 길이와 선택적 요일 조건과 trusted-only baseline 정책을 사용하는 GFB28입니다. |
 
 Window의 `.open`에는 신뢰할 수 있는 관측 스캔이 필요합니다. 관측 공백이나 기준선 스캔에서는 계획 구간이 남아 있어도 시작을 놓칠 수 있습니다. 이후 관측 스캔의 `.open`은 현재 조건을 반영하고, 이미 처리한 발생의 `.due`는 다시 켜지지 않습니다. Run은 관측된 시각 통과 때만 실제로 시작하며, 시작 이후 단조 시계로 길이를 재고 취소되면 즉시 끝납니다. 체크포인트는 재부팅 후에도 이미 처리한 발생의 식별자를 보존합니다. 새 부팅에서는 진행 중인 Run이 없습니다.
 | 불변 UTC Daily와 비어 있지 않은 정적 DailySlots Range | 정적 non-overlap을 증명하며 GFB12로 실행합니다. |

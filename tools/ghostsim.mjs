@@ -95,6 +95,7 @@ export function validateScenario(scenario, manifest) {
     || manifest.format === 'GhostFlow/control-v18'
     || manifest.format === 'GhostFlow/control-v21'
     || manifest.format === 'GhostFlow/control-v26'
+    || manifest.format === 'GhostFlow/control-v28'
     || manifest.format === 'GhostFlow/control-v12' && !hasSolar;
   if (hasContext) {
     if (scenario.context === undefined) throw new Error('context control requires explicit context activation');

@@ -2765,22 +2765,39 @@ fn verify_daily_window_run_bindings(
                 run,
                 dst_missing,
                 dst_repeated,
+                weekday_mask,
             } = actual.definition
             else {
                 return Err(mismatch("UTC Daily basis differs from bytecode"));
             };
+            let mut keys = vec![
+                "kind",
+                "site",
+                "name",
+                "timezone",
+                "atMs",
+                "dstMissing",
+                "dstRepeated",
+                "policy",
+            ];
+            if weekday_mask != 0 {
+                keys.push("day");
+                let day = value_object(&entry["day"], "Daily weekday rule")?;
+                exact_keys(
+                    day,
+                    &["kind", "mask"],
+                    "Daily weekday rule",
+                    ErrorCode::ManifestMismatch,
+                )?;
+                if entry["day"]["kind"] != "weekday"
+                    || entry["day"]["mask"].as_u64() != Some(u64::from(weekday_mask))
+                {
+                    return Err(mismatch("Daily weekday mask differs from bytecode"));
+                }
+            }
             exact_keys(
                 value_object(entry, "UTC Daily")?,
-                &[
-                    "kind",
-                    "site",
-                    "name",
-                    "timezone",
-                    "atMs",
-                    "dstMissing",
-                    "dstRepeated",
-                    "policy",
-                ],
+                &keys,
                 "UTC Daily",
                 ErrorCode::ManifestMismatch,
             )?;
@@ -2827,7 +2844,6 @@ fn verify_daily_window_run_bindings(
                         || basis["admission"] != "on_time"
                         || policy.get("cancelWhen").is_none()))
                 || (!run && (basis["kind"] != "window" || policy.get("cancelWhen").is_some()))
-                || entry.get("day").is_some()
                 || entry.get("dueInput").is_some()
             {
                 return Err(mismatch("UTC Daily manifest differs from bytecode"));

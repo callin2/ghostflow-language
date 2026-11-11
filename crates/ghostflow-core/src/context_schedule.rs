@@ -1210,12 +1210,14 @@ impl Engine {
                 at_ms,
                 duration_ms,
                 run,
+                weekday_mask,
                 ..
             } => staged.utc_daily(
                 desc.site,
                 *at_ms,
                 *duration_ms,
                 *run,
+                *weekday_mask,
                 &observed,
                 clock.monotonic_ms,
                 when,
@@ -2449,6 +2451,7 @@ impl Engine {
         start: u64,
         duration: u64,
         run: bool,
+        weekday_mask: u8,
         clock: &crate::schedule_clock::ClockObservation<'_>,
         monotonic_ms: u64,
         when: bool,
@@ -2516,6 +2519,9 @@ impl Engine {
             return Err(invalid("UTC Daily occurrence batch exceeds capacity"));
         }
         for day in earliest..=latest {
+            if weekday_mask != 0 && weekday_mask & (1 << ((day + 4) % 7)) == 0 {
+                continue;
+            }
             let planned = day * DAY + start;
             let end = planned + duration;
             let id = format!("{site}:daily:{day}");
@@ -3424,6 +3430,7 @@ mod tests {
                 run: true,
                 dst_missing: 0,
                 dst_repeated: 0,
+                weekday_mask: 0,
             },
             when: vec![],
             cancel: vec![],

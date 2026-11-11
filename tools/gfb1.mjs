@@ -497,7 +497,7 @@ function lowerCoreModule(ast) {
         if(preludeNames.has(scheduleName))throw new CompileError('duplicate prelude name');preludeNames.add(scheduleName);
         const gapMs=unsignedAtom(gapAtom,9007199254740991n,'invalid schedule gap');
         if(!gapMs)throw new CompileError('invalid schedule gap');
-        const expected={ 'daily-window':6,'daily-run':6,'at-pulse':3,'at-window':4,'solar-context-pulse':9,'solar-weekday-pulse':10,'cron-pulse':10,'calendar-daily-pulse':8,'holiday-daily-pulse':7,'tide-run':8,'tide-weekday-run':9,'config-daily-slots-pulse':6,'utc-range':6,'calendar-range':8,'civil-range':7 }[h];
+        const expected={ 'daily-window':7,'daily-run':7,'at-pulse':3,'at-window':4,'solar-context-pulse':9,'solar-weekday-pulse':10,'cron-pulse':10,'calendar-daily-pulse':8,'holiday-daily-pulse':7,'tide-run':8,'tide-weekday-run':9,'config-daily-slots-pulse':6,'utc-range':6,'calendar-range':8,'civil-range':7 }[h];
         if(h==='periodic-pulse'?![5,6].includes(payload.length):h==='config-daily-slots-pulse'?![6,7].includes(payload.length):payload.length!==expected)throw new CompileError(`${h} has invalid arity`);
         const [whenForm,cancelForm]=payload.slice(-2);
         const when=checkedExpression(whenForm,contextEnv(),false),cancel=checkedExpression(cancelForm,contextEnv(),false);
@@ -511,7 +511,8 @@ function lowerCoreModule(ast) {
           const at=unsignedAtom(data[0],86_399_999n,'invalid Daily start');
           const duration=unsignedAtom(data[1],86_400_000n,'invalid Daily duration');
           if(!duration||h==='daily-window'&&cancelForm!=='false')throw new CompileError('invalid Daily basis policy');
-          detail={at,duration,missing:dst(data[2]),repeated:repeated(data[3])};
+          const weekdayMask=Number(unsignedAtom(data[4],127n,'invalid UTC Daily weekday mask'));
+          detail={at,duration,missing:dst(data[2]),repeated:repeated(data[3]),weekdayMask};
         }else if(h==='solar-context-pulse'||h==='solar-weekday-pulse'){
           const [timezone,latitude,longitude,event,offset,fallback,dependencies,weekdayMask]=data;
           if(!['rise','set'].includes(event))throw new CompileError('invalid Solar event');
@@ -824,7 +825,7 @@ function emitGfb(moduleIr, { onExpressions } = {}) {
     if(prelude.kind==='solar-context-pulse'||prelude.kind==='solar-weekday-pulse'){w.str(d.timezone);w.f64(d.latitude);w.f64(d.longitude);w.u8(d.event==='rise'?0:1);w.i64(d.offset);w.u64(d.fallbackAt);w.u16(d.configIds.length);for(const id of d.configIds)w.u32(id);if(prelude.kind==='solar-weekday-pulse')w.u8(d.weekdayMask);}
     else if(prelude.kind==='at-pulse'){w.u64(d.at);}
     else if(prelude.kind==='at-window'){w.u64(d.at);w.u64(d.duration);}
-    else if(['daily-window','daily-run'].includes(prelude.kind)){w.u64(d.at);w.u64(d.duration);w.u8(d.missing);w.u8(d.repeated);}
+    else if(['daily-window','daily-run'].includes(prelude.kind)){w.u64(d.at);w.u64(d.duration);w.u8(d.missing);w.u8(d.repeated);w.u8(d.weekdayMask);}
     else if(prelude.kind==='civil-range'){w.str(d.timezone);w.u64(d.duration);w.u16(d.starts.length);for(const start of d.starts)w.u64(start);w.u8(missingCode(d.missing));w.u8(repeatedCode(d.repeated));}
     else if(prelude.kind==='utc-range'||prelude.kind==='calendar-range'){w.str(d.timezone);if(Array.isArray(d.duration)&&d.duration[0]==='duration-config'){w.u64(0n);w.u32(Number(d.duration[1]));}else w.u64(d.duration);if(format>=19)w.u32(d.startConfigId??0);w.u16(d.starts.length);for(const start of d.starts)w.u64(start);if(prelude.kind==='calendar-range'){w.str(d.calendar);w.u8(d.selector==='offday'?1:0);}}
     else if(prelude.kind==='periodic-pulse'){w.str(d.epoch);w.u64(d.anchor);w.u32(d.configId);if(d.configId===0)w.u64(d.literal);}

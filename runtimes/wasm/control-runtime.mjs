@@ -346,7 +346,7 @@ function validateContextManifest(input, bytecodeFormat) {
   for (const item of schedules) {
     name(item.name, 'schedule.name'); safeInteger(item.site, 'schedule.site', 1, 0xffff_ffff);
     if (manifest.format === DAILY_WINDOW_RUN_FORMAT) {
-      keys(item, ['kind','site','name','timezone','dstMissing','dstRepeated','policy','atMs'], [], 'UTC Daily');
+      keys(item, ['kind','site','name','timezone','dstMissing','dstRepeated','policy','atMs'], ['day'], 'UTC Daily');
       const policy = record(item.policy, 'UTC Daily policy');
       const basis = record(policy.basis, 'UTC Daily basis');
       const run = basis.kind === 'run';
@@ -357,6 +357,11 @@ function validateContextManifest(input, bytecodeFormat) {
         || (run ? basis.admission !== 'on_time' : basis.kind !== 'window')
         || policy.clock !== 'trusted_only' || policy.recovery !== 'baseline' || policy.fallback !== 'skip') {
         throw new Error('unsupported UTC Daily policy');
+      }
+      if (item.day !== undefined) {
+        keys(record(item.day, 'Daily weekday rule'), ['kind','mask'], [], 'Daily weekday rule');
+        if (item.day.kind !== 'weekday') throw new Error('invalid UTC Daily weekday rule');
+        safeInteger(item.day.mask, 'Daily weekday mask', 1, 127);
       }
       safeInteger(item.atMs, 'Daily atMs', 0, 86_399_999);
       safeInteger(basis.durationMs, 'Daily durationMs', 1, 86_400_000);

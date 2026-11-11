@@ -447,7 +447,9 @@ function validateConfigStreamPackageProfile(manifest, version, runtimeAbi) {
       || runtimeAbi !== 'GhostFlow/context-scan-abi-v5'
       || !Array.isArray(manifest.schedules) || !manifest.schedules.length
       || manifest.schedules.some(schedule => schedule?.kind !== 'daily' || schedule.timezone !== 'UTC'
-        || schedule.day !== undefined || !['window','run'].includes(schedule.policy?.basis?.kind))
+        || (schedule.day !== undefined && (schedule.day?.kind !== 'weekday' || !Number.isInteger(schedule.day.mask)
+          || schedule.day.mask < 1 || schedule.day.mask > 127))
+        || !['window','run'].includes(schedule.policy?.basis?.kind))
       || ['configs','signals','providers','calendars','naturalConditions','calendarConditions','objectives','adaptSettings','resources']
         .some(field => manifest[field] !== undefined && (!Array.isArray(manifest[field]) || manifest[field].length))
       || manifest.accounting !== undefined) {

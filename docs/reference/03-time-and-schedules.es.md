@@ -348,7 +348,7 @@ Reglas de los campos comunes:
 | Respaldo de Tide | Solo `fallback = skip`. |
 | Otros disparadores | Mantienen el reloj solo de confianza y el respaldo skip. |
 | Window de `At` | El perfil Window ejecutable acotado. |
-| Window o Run puntual de `Daily` fijo en UTC | GFB28, con duración constante de hasta 24 horas, sin selector de día y con política trusted-only y baseline. |
+| Window o Run puntual de `Daily` fijo en UTC | GFB28, con duración constante de hasta 24 horas, con selector semanal opcional y con política trusted-only y baseline. |
 
 En una observación confiable, `.open` sigue el predicado dentro de la ventana y `.due` solo se emite una vez. Una discontinuidad de observación o una línea base puede perder la admisión. Run solo se admite en el cruce observado, mide el tiempo monotónico desde la admisión y termina al cancelarse. Un punto de control conserva las identidades consumidas. El reinicio no reanuda un Run activo.
 | Range de Daily UTC inmutable y de DailySlots estático no vacío | Se demuestra estáticamente la ausencia de solapamiento; se ejecuta como GFB12. |
