@@ -1034,7 +1034,7 @@ calendar = workers;
 - `holiday`는 공휴일 날짜 목록에 속하는지를 뜻합니다.
 - 같은 날짜에 `work` 예외가 있어도 공휴일 사실은 유지됩니다. 주간 패턴과 공휴일 근무 정책은 영향을 주지 않습니다.
 - `holiday`, `workday`, `offday`에 대한 Daily pulse는 typed 달력과 명시적인 공통/DST 정책을 사용합니다. ``on = day`mon..fri` ``를 쓰는 Daily pulse는 예약의 현지 날짜를 기준으로 판단하므로 달력이 필요 없습니다. 선언한 시각의 정밀도와 DST 정책은 유지됩니다.
-- `workday`, `offday`, `holiday` selector를 쓰는 일반 `calendar_is`는 아래와 같은 typed Result를 반환합니다. 그 제한된 실행 profile은 명시적인 UTC 달력 binding을 요구합니다. 다른 시간대 profile은 activation에서 거부하며, 호스트가 미리 계산한 eligibility 값을 공급하지 않습니다.
+- 일반 `calendar_is` 조건에는 `timezone: "Area/City"`를 선택해 지정할 수 있으며 기본값은 UTC다. 연결한 달력도 같은 시간대를 사용한다. 호스트는 신뢰할 수 있는 시각에서 구한 현지 날짜를 제공한다. 시각의 오차 범위가 자정을 걸치면 `ClockUnknown`이다. 실행기가 달력 스냅샷으로 그 날짜의 종류를 판단한다.
 
 **달력의 합성과 버전 관리.**
 

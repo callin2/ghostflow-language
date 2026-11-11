@@ -4242,7 +4242,16 @@ class Lowerer {
         origins: [{ tag: node.id, nodeId: node.id, kind: 'weekday-condition', name: 'local_day_is' }], sample: scanSample() };
     }
     if (node.name === 'calendar_is') {
-      if (node.args.length !== 2 || node.named.length) error(node.loc, 'calendar_is expects a calendar and one day classification');
+      if (node.args.length !== 2 || node.named.length > 1 || node.named.some(arg => arg.name !== 'timezone')) {
+        error(node.loc, 'calendar_is expects a calendar, day classification and optional timezone');
+      }
+      const timezoneNode = node.named[0]?.value;
+      const timezone = timezoneNode?.raw ?? 'UTC';
+      if (timezoneNode) {
+        if (timezoneNode.kind !== 'literal' || !timezoneNode.quoted || !timezone.trim()) error(timezoneNode.loc, 'calendar_is timezone must be an IANA timezone string');
+        try { new Intl.DateTimeFormat('en-US', { timeZone: timezone }); }
+        catch { error(timezoneNode.loc, 'calendar_is timezone must be an IANA timezone string'); }
+      }
       const calendarRef = node.args[0];
       const calendar = calendarRef.kind === 'reference' ? this.calendars.get(calendarRef.name) : null;
       if (!calendar) error(calendarRef.loc, 'calendar_is first argument must name a typed calendar');
@@ -4255,7 +4264,7 @@ class Lowerer {
       for (const role of ['ok', 'value', 'fault']) this.addInput(projectionInputs[role], role === 'fault' ? NUMBER : BOOL, node.loc);
       if (!this.hasClock) { this.addInput(`${RESERVED_PREFIX}now_ms`, NUMBER, node.loc); this.hasClock = true; }
       if (!this.gfbInputs.some(input => input[1] === `${RESERVED_PREFIX}time_epoch`)) this.addInput(`${RESERVED_PREFIX}time_epoch`, NUMBER, node.loc);
-      (this.manifest.calendarConditions ??= []).push({ site: node.id, calendar: calendar.name, classification: match[1], timezone: 'UTC',
+      (this.manifest.calendarConditions ??= []).push({ site: node.id, calendar: calendar.name, classification: match[1], timezone,
         result: { value: 'Bool', error: 'CalendarFault' }, projectionInputs });
       return { type: resultType(BOOL, semanticType('CalendarFault')), ok: `input.${projectionInputs.ok}`, value: `input.${projectionInputs.value}`,
         faultCode: `input.${projectionInputs.fault}`, originTag: numberAtom(node.id),

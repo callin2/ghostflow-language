@@ -2423,31 +2423,31 @@
       "files": {
         "en": {
           "path": "docs/reference/03-time-and-schedules.en.md",
-          "sha256": "1ee282bbb921da3969da28622cf680d86501b07ed3e36d01de6b6fb9c4bcc23b"
+          "sha256": "637aa037b57c33a0aa8728b76ef95843cf53a6defb890909de6e0c55851756e8"
         },
         "ko": {
           "path": "docs/reference/03-time-and-schedules.md",
-          "sha256": "0742f5d512801d389a214e8e41fd9ecbba381fbc021c2fefd8a424792be5cd23",
+          "sha256": "80470121e6de8f04093618cd514cb29fbdffd6e0e80fc5da8b7cff6905115612",
           "from": "en",
-          "sourceSha256": "1ee282bbb921da3969da28622cf680d86501b07ed3e36d01de6b6fb9c4bcc23b"
+          "sourceSha256": "637aa037b57c33a0aa8728b76ef95843cf53a6defb890909de6e0c55851756e8"
         },
         "zh": {
           "path": "docs/reference/03-time-and-schedules.zh.md",
-          "sha256": "769a41903f9fb49182823fa20d7de690bf054c321149b88836562d3787bf6a55",
+          "sha256": "5809db4b16b4876c6dd36d840327152a8028214640ce68d77b8ea81c771af4c0",
           "from": "en",
-          "sourceSha256": "1ee282bbb921da3969da28622cf680d86501b07ed3e36d01de6b6fb9c4bcc23b"
+          "sourceSha256": "637aa037b57c33a0aa8728b76ef95843cf53a6defb890909de6e0c55851756e8"
         },
         "es": {
           "path": "docs/reference/03-time-and-schedules.es.md",
-          "sha256": "43785c6910bb0d5137b53c8f663ea841dbc3008cbe437f8492e23780bdf33620",
+          "sha256": "4adcc5ce5e57162292771e484ed97e221a2a40c5991ff4cb37d47483f64723bd",
           "from": "en",
-          "sourceSha256": "1ee282bbb921da3969da28622cf680d86501b07ed3e36d01de6b6fb9c4bcc23b"
+          "sourceSha256": "637aa037b57c33a0aa8728b76ef95843cf53a6defb890909de6e0c55851756e8"
         },
         "ja": {
           "path": "docs/reference/03-time-and-schedules.ja.md",
-          "sha256": "79954ed92a13f46aa953e23016395b5a99db9c2300b8db60a14d3bafa04edb93",
+          "sha256": "56238407d97202d04443ec75b7886111c87e5da91c7bbd6a73a452e8c8aed010",
           "from": "en",
-          "sourceSha256": "1ee282bbb921da3969da28622cf680d86501b07ed3e36d01de6b6fb9c4bcc23b"
+          "sourceSha256": "637aa037b57c33a0aa8728b76ef95843cf53a6defb890909de6e0c55851756e8"
         }
       }
     },
@@ -3508,13 +3508,13 @@
       "files": {
         "en": {
           "path": "CHANGELOG.md",
-          "sha256": "ffc4ad011c91d08324cc34484136df2a56e0c4f5fde9a65d014594485febf434"
+          "sha256": "dad27a4c182ee22728f198658e07a7e0def0c8d1e3c0d0f445e3d24834eebe90"
         },
         "ko": {
           "path": "CHANGELOG.ko.md",
-          "sha256": "27fe0ff94e6f2fd674476b2e3b964afe64f60491b6151b16a68f41baee0fe0a0",
+          "sha256": "7a417c425e0b068e78647615e807a8c79fad24df8fec3b877a48b74d71eb3af4",
           "from": "en",
-          "sourceSha256": "ffc4ad011c91d08324cc34484136df2a56e0c4f5fde9a65d014594485febf434"
+          "sourceSha256": "dad27a4c182ee22728f198658e07a7e0def0c8d1e3c0d0f445e3d24834eebe90"
         }
       }
     },

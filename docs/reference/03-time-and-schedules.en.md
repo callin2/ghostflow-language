@@ -1032,7 +1032,7 @@ An incompatible calendar kind or a missing binding is an activation error. The c
 - `holiday` means membership in the public-holiday date list.
 - A `work` exception for the same date keeps the holiday fact. The weekly pattern and the holiday work policy do not affect it.
 - Daily pulses for `holiday`, `workday` and `offday` use typed calendars and explicit common/DST policies. A Daily pulse with ``on = day`mon..fri` `` uses the scheduled local date and needs no calendar. The weekday filter preserves the declared time precision and DST policy.
-- Ordinary `calendar_is` with a `workday`, `offday` or `holiday` selector returns the typed Result shown below. Its bounded executable profile requires an explicit UTC calendar binding. Other timezone profiles are rejected at activation, and the host does not supply a precomputed eligibility value.
+- An ordinary `calendar_is` condition accepts an optional `timezone: "Area/City"` argument and defaults to UTC. The binding must use the same zone. The host supplies a civil date resolved from a trusted clock. If its uncertainty crosses midnight, the result is `ClockUnknown`. The runtime classifies that date using the calendar snapshot.
 
 **Composing and versioning calendars.**
 

@@ -660,7 +660,7 @@ fn validate_gfb1(bytes: &[u8]) -> Result<u16> {
         return fail(ErrorCode::InvalidBytecodeFormat, "bytecode is not GFB1");
     }
     let version = u16::from_le_bytes([bytes[4], bytes[5]]);
-    if !matches!(version, 1..=4 | 10 | 11 | 16 | 21 | 22 | 26 | 27) {
+    if !matches!(version, 1..=4 | 10 | 11 | 16 | 18 | 21 | 22 | 26 | 27) {
         return fail(
             ErrorCode::UnsupportedBytecodeVersion,
             "unsupported GFB format version",
@@ -2952,6 +2952,73 @@ fn verify_weekday_daily_bindings(manifest: &Value, module: &ghostflow_core::Modu
     Ok(())
 }
 
+fn verify_calendar_query_bindings(manifest: &Value, module: &ghostflow_core::Module) -> Result<()> {
+    use ghostflow_core::{schedule_vm::PulseDescriptor, work_calendar::DaySelector};
+
+    let mismatch = || PortablePackageError {
+        code: ErrorCode::ManifestMismatch,
+        message: "signed calendar Result differs from bytecode".into(),
+    };
+    for key in [
+        "schedules",
+        "signals",
+        "providers",
+        "naturalConditions",
+        "objectives",
+        "adaptSettings",
+        "resources",
+    ] {
+        if manifest
+            .get(key)
+            .is_some_and(|value| !value.as_array().is_some_and(Vec::is_empty))
+        {
+            return Err(mismatch());
+        }
+    }
+    let conditions = manifest["calendarConditions"]
+        .as_array()
+        .filter(|v| !v.is_empty())
+        .ok_or_else(mismatch)?;
+    let calendars = manifest["calendars"]
+        .as_array()
+        .filter(|v| !v.is_empty())
+        .ok_or_else(mismatch)?;
+    let requirements = module.schedule_requirements().ok_or_else(mismatch)?;
+    for strategy in &requirements.strategies {
+        if strategy.schedules.len() != conditions.len() {
+            return Err(mismatch());
+        }
+        for (actual, projection) in strategy.schedules.iter().zip(conditions) {
+            let PulseDescriptor::Calendar(actual) = actual else {
+                return Err(mismatch());
+            };
+            let (selector, calendar_type) = match actual.selector {
+                DaySelector::Workday => ("workday", "WorkCalendar"),
+                DaySelector::Offday => ("offday", "WorkCalendar"),
+                DaySelector::Holiday => ("holiday", "HolidayCalendar"),
+            };
+            let field = |suffix| format!("__gf_calendar_{}_{suffix}", actual.site);
+            let expected = serde_json::json!({
+                "site": actual.site, "calendar": actual.calendar, "timezone": actual.timezone, "classification": selector,
+                "result": {"value":"Bool", "error":"CalendarFault"},
+                "projectionInputs": {"ok": field("ok"), "value": field("value"), "fault": field("fault")},
+            });
+            if *projection != expected
+                || calendars
+                    .iter()
+                    .filter(|item| {
+                        **item == serde_json::json!({"name":actual.calendar,"type":calendar_type})
+                    })
+                    .count()
+                    != 1
+            {
+                return Err(mismatch());
+            }
+        }
+    }
+    Ok(())
+}
+
 fn verify_civil_range_bindings(manifest: &Value, module: &ghostflow_core::Module) -> Result<()> {
     use ghostflow_core::{context_vm::ScheduleDefinition, schedule_vm::PulseDescriptor};
     let mismatch = |message: &str| PortablePackageError {
@@ -3194,7 +3261,12 @@ fn verify_manifest(
     }
     if matches!(
         object["format"].as_str(),
-        Some("GhostFlow/control-v15" | "GhostFlow/control-v21" | "GhostFlow/control-v26")
+        Some(
+            "GhostFlow/control-v15"
+                | "GhostFlow/control-v18"
+                | "GhostFlow/control-v21"
+                | "GhostFlow/control-v26"
+        )
     ) {
         for field in [
             "providers",
@@ -3812,7 +3884,7 @@ pub fn verify_portable_package_with_signature_policy(
     }
     if !matches!(
         payload.bytecode.version.as_str(),
-        "1" | "2" | "3" | "4" | "10" | "11" | "16" | "21" | "22" | "26" | "27"
+        "1" | "2" | "3" | "4" | "10" | "11" | "16" | "18" | "21" | "22" | "26" | "27"
     ) {
         return fail(
             ErrorCode::UnsupportedBytecodeVersion,
@@ -3888,7 +3960,7 @@ pub fn verify_portable_package_with_signature_policy(
         message: format!("native artifact validation failed: {error}"),
     })?;
     let profile_version = module.bytecode_format_version();
-    if !matches!(profile_version, 1..=4 | 10 | 11 | 16 | 21 | 26 | 27)
+    if !matches!(profile_version, 1..=4 | 10 | 11 | 16 | 18 | 21 | 26 | 27)
         || (profile_version == 16 && bytecode_version == 22)
     {
         return fail(
@@ -3898,9 +3970,10 @@ pub fn verify_portable_package_with_signature_policy(
     }
     if (profile_version == 11) != (payload.manifest.format == "GhostFlow/control-v10")
         || (profile_version == 16) != (payload.manifest.format == "GhostFlow/control-v15")
+        || (profile_version == 18) != (payload.manifest.format == "GhostFlow/control-v18")
         || (profile_version == 26) != (payload.manifest.format == "GhostFlow/control-v26")
         || (profile_version == 27) != (payload.manifest.format == "GhostFlow/control-v27")
-        || matches!(profile_version, 11 | 16 | 21 | 26)
+        || matches!(profile_version, 11 | 16 | 18 | 21 | 26)
             != (identity.runtime_abi == "GhostFlow/context-scan-abi-v5")
     {
         return fail(
@@ -3955,6 +4028,9 @@ pub fn verify_portable_package_with_signature_policy(
     verify_output_observation_bindings(&manifest, &module, &identity.runtime_abi)?;
     if profile_version == 16 {
         verify_solar_bindings(&manifest, &module)?;
+    }
+    if profile_version == 18 {
+        verify_calendar_query_bindings(&manifest, &module)?;
     }
     if profile_version == 21 {
         verify_civil_range_bindings(&manifest, &module)?;
