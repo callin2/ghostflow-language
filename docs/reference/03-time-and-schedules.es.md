@@ -1034,7 +1034,7 @@ Un tipo de calendario incompatible o una vinculación ausente es un error de act
 
 - `holiday` significa pertenencia a la lista de fechas de días festivos oficiales.
 - Una excepción `work` para la misma fecha conserva el hecho de día festivo. El patrón semanal y la política de trabajo en festivos no lo afectan.
-- Los pulsos Daily para `holiday`, `workday` y `offday` usan calendarios tipados y políticas comunes/de DST explícitas. Las etiquetas de día de la semana para pulsos Daily siguen fuera de este alcance de ejecución.
+- Los pulsos Daily para `holiday`, `workday` y `offday` usan calendarios tipados y políticas comunes/de DST explícitas. Un pulso Daily con ``on = day`mon..fri` `` usa la fecha local programada y no necesita calendario. El filtro mantiene la precisión de la hora y la política de DST declaradas.
 - `calendar_is` ordinario con un selector `workday`, `offday` o `holiday` devuelve el Result tipado que se muestra más abajo. Su perfil ejecutable acotado requiere una vinculación explícita de calendario UTC. Los perfiles de otras zonas horarias se rechazan en la activación, y el host no aporta un valor de elegibilidad precalculado.
 
 **Composición y versionado de calendarios.**

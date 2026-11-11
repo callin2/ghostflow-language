@@ -38,6 +38,8 @@ pub struct DailyPulseDescriptor {
     pub dst_missing: u8,
     /// 0 first, 1 second, 2 both, 3 skip.
     pub dst_repeated: u8,
+    /// Sunday is bit 0; zero denotes an unfiltered legacy Daily.
+    pub weekday_mask: u8,
     pub gap_ms: u64,
     pub when: Vec<u8>,
 }
@@ -260,7 +262,7 @@ pub(crate) fn load_prelude(
                     }));
                 (site, name)
             }
-            3 if matches!(format, 8 | 9 | 10 | 11 | 12 | 13 | 14 | 15 | 16) => {
+            3 if matches!(format, 8 | 9 | 10 | 11 | 12 | 13 | 14 | 15 | 16 | 27) => {
                 let site = reader.u32()?;
                 let name = reader.string()?;
                 let timezone = reader.string()?;
@@ -271,7 +273,15 @@ pub(crate) fn load_prelude(
                 {
                     return Err(Error::new("invalid Daily descriptor"));
                 }
-                for _ in 0..4 {
+                let weekday_mask = reader.u8()?;
+                if if format == 27 {
+                    weekday_mask > 127
+                } else {
+                    weekday_mask != 0
+                } {
+                    return Err(Error::new("invalid Daily weekday mask"));
+                }
+                for _ in 0..3 {
                     if reader.u8()? != 0 {
                         return Err(Error::new("unsupported Daily policy"));
                     }
@@ -307,6 +317,7 @@ pub(crate) fn load_prelude(
                         at_ms,
                         dst_missing,
                         dst_repeated,
+                        weekday_mask,
                         gap_ms,
                         when,
                     }));

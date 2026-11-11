@@ -58,7 +58,7 @@ A question without a tag has still not been verified against a physical Device, 
 18. [Is self-holding supported?](#q18)
 19. [Can I move a particular device when the user cancels partway through?](#q19)
 20. [How do I schedule an operation at sunrise?](#q20)
-21. [Can I schedule operations by day of the week? [Partially unsupported]](#q21)
+21. [Can I schedule operations by day of the week?](#q21)
 22. [Can I control a device based on its accumulated operating time? [Partially unsupported]](#q22)
 23. [Can I run cleaning based on the daily operation count regardless of automatic or manual mode?](#q23)
 24. [Can I change just the operating time later without a firmware update? [Changed]](#q24)
@@ -1153,13 +1153,12 @@ which preserves the boundary between schedule evaluation and device control.
 - `fallback = skip` and recovery: [Reference §3.9 Fallback and recovery for natural references](reference/03-time-and-schedules.md#자연-기준의-fallback과-회복)
 
 <a id="q21"></a>
-## 21. Can I schedule operations by day of the week? [Partially unsupported]
+## 21. Can I schedule operations by day of the week?
 
-> **Current dev status:** The weekday-range filter ``day`mon..fri` `` is unsupported. The alternative below—``day`workday` ``/``day`offday` `` with an installation calendar—is supported. [Current contract](reference/03-time-and-schedules.md#38-dst-자정과-work-calendar).
+A weekday range such as ``day`mon..fri` `` can filter a `Daily` pulse in its declared timezone. A site calendar still defines `workday` and `offday`. [Current contract](reference/03-time-and-schedules.en.md).
 
 Express a weekday condition in the schedule's `on` field. For example, to start at 6:00 AM Monday through Friday,
 combine the time condition with the weekday condition below.
-This fragment uses syntax selected in the Reference, but the current compiler's weekday-range filter does not support it yet.
 For a schedule that compiles and runs with the current compiler, use ``day`workday` `` or ``day`offday` `` with an installation calendar.
 
 ```ghost

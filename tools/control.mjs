@@ -1766,7 +1766,16 @@ class Lowerer {
       }
       this.manifest.format = 'GhostFlow/control-v26';
     }
-    if (this.manifest.schedules.some(schedule => schedule.day?.kind === 'weekday')) {
+    if (this.manifest.schedules.some(schedule => schedule.kind === 'daily' && schedule.day?.kind === 'weekday')) {
+      if (contextForms.length
+        || this.manifest.schedules.some(schedule => schedule.kind !== 'daily' || schedule.policy.basis !== 'pulse')
+        || ['configs','providers','calendars','naturalConditions','calendarConditions','objectives','resources','adaptSettings','signals']
+          .some(key => this.manifest[key]?.length) || this.manifest.accounting) {
+        error(this.ast.loc, 'weekday Daily profile requires Daily pulse schedules only');
+      }
+      this.manifest.format = 'GhostFlow/control-v27';
+    }
+    if (this.manifest.schedules.some(schedule => schedule.kind !== 'daily' && schedule.day?.kind === 'weekday')) {
       if (solarForms.length || contextForms.some(form => !['solar-weekday-pulse', 'tide-weekday-run'].includes(form[0]))
         || this.manifest.schedules.some(schedule => !['solar', 'tide'].includes(schedule.kind) || schedule.day?.kind !== 'weekday')
         || ['configs', 'calendars', 'naturalConditions', 'calendarConditions', 'objectives', 'resources', 'adaptSettings', 'signals']
@@ -2851,7 +2860,11 @@ class Lowerer {
     const match = /^day`([^`]+)`$/.exec(item.on.value);
     if (!match) error(item.on, 'Daily on requires a day tagged literal');
     const kind = match[1];
-    if (!['holiday', 'workday', 'offday'].includes(kind)) error(item.on, 'Daily day rule currently requires holiday, workday or offday');
+    if (['sun','mon','tue','wed','thu','fri','sat'].includes(kind) || kind.includes('..') || kind.includes(',')) {
+      if (item.calendar) error(item.calendar, 'Daily weekday selector does not use a calendar');
+      return this.resolveNaturalWeekday(item);
+    }
+    if (!['holiday', 'workday', 'offday'].includes(kind)) error(item.on, 'Daily day rule requires a weekday, holiday, workday or offday');
     if (!item.calendar) error(item.on, `Daily ${kind} rule requires calendar`);
     const calendar = this.calendars.get(item.calendar.value);
     if (!calendar) error(item.calendar, `unknown calendar ${item.calendar.value}`);
@@ -4429,10 +4442,11 @@ class Lowerer {
   solarForms() {
     return this.manifest.schedules.filter(schedule => schedule.kind === 'solar' && !this.configStreams.length && !schedule.day
       || ['daily', 'daily-slots'].includes(schedule.kind) && schedule.policy.basis === 'pulse'
-        && schedule.policy.clock === 'trusted_only' && !schedule.day && !schedule.selectedConfig).map(schedule => schedule.kind === 'daily' ? [
+        && schedule.policy.clock === 'trusted_only' && (!schedule.day || schedule.day.kind === 'weekday') && !schedule.selectedConfig).map(schedule => schedule.kind === 'daily' ? [
       'daily-pulse', String(schedule.site), schedule.name, schedule.timezone, String(schedule.atMs),
       schedule.dstMissing, schedule.dstRepeated, schedule.policy.basis, schedule.policy.clock,
-      String(schedule.policy.gapMs), schedule.policy.recovery, schedule.policy.fallback, schedule.policy.when,
+      String(schedule.policy.gapMs), schedule.policy.recovery, schedule.policy.fallback,
+      ...(schedule.day?.kind === 'weekday' ? [String(schedule.day.mask)] : []), schedule.policy.when,
     ] : schedule.kind === 'daily-slots' ? [
       'daily-slots-pulse', String(schedule.site), schedule.name, schedule.timezone, String(schedule.gridMs),
       schedule.dstMissing, schedule.dstRepeated, schedule.policy.basis, schedule.policy.clock,
@@ -4878,7 +4892,7 @@ export function compileAccountingControl(source, { filename = '<control>' } = {}
 /** Only this bounded civil pulse slice has a VM/provider transport. */
 export function isExecutablePulseSchedule(item) {
   return item.scheduleType === 'Solar' || item.scheduleType === 'At' || (item.scheduleType === 'Daily'
-    && (!item.on && !item.calendar || item.on && item.calendar && ['day`workday`', 'day`offday`', 'day`holiday`'].includes(item.on.value))
+    && (!item.calendar || item.on && ['day`workday`', 'day`offday`', 'day`holiday`'].includes(item.on.value))
     && item.at?.kind === 'literal' && item.at.raw.startsWith('time`')
     && item.policy?.basis?.name === 'pulse' && item.policy?.clock?.name === 'trusted_only')
     || (item.scheduleType === 'DailySlots' && item.selected

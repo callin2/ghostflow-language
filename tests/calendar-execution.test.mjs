@@ -45,7 +45,7 @@ test('Calendar selectors retain typed bindings and missing-reference diagnostics
     [program('workday'), /workday requires WorkCalendar/],
     [program().replace('calendar = calendar_days;', 'calendar = absent;'), /unknown calendar absent/],
     [program().replace('calendar = calendar_days;', ''), /requires calendar/],
-    [program('mon..fri'), /currently requires holiday, workday or offday/],
+    [program('mon..fri'), /weekday.*calendar/i],
   ]) await assert.rejects(() => compileSource(source), diagnostic);
 });
 

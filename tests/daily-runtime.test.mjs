@@ -1,6 +1,10 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import test from 'node:test';
+import { execFileSync } from 'node:child_process';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { compileSource } from '../tools/toolchain.mjs';
 import { GhostFlowRuntime } from '../runtimes/wasm/ghostflow-runtime.mjs';
 import { ControlRuntime } from '../runtimes/wasm/control-runtime.mjs';
@@ -64,4 +68,36 @@ test('ControlRuntime admits Daily occurrence only after valid runtime-owned sche
     scheduleFacts: facts(site, 100, planned, { kind: 'solar' }) }), /kind mismatch/);
   assert.equal(runtime.lastNowMs, 0);
   assert.equal(runtime.step({ nowMs: 100, scheduleFacts: facts(site, 100, planned) }).vm.safe.due, true);
+});
+
+test('weekday Daily uses the scheduled local date and preserves subsecond precision', async t => {
+  const source = entry.source.replace(/at = time`[^\x60]+`;/,
+    'at = time\x6006:30:15.250\x60;\n    on = day\x60mon..fri\x60;');
+  const artifact = await compileSource(source, { filename: 'weekday-daily.ghost.md' });
+  assert.equal(artifact.manifest.format, 'GhostFlow/control-v27');
+  assert.deepEqual(artifact.manifest.schedules[0].day, { kind: 'weekday', mask: 62 });
+  assert.equal(artifact.manifest.schedules[0].atMs, 23_415_250);
+  const directory = fs.mkdtempSync(join(tmpdir(), 'weekday-daily-'));
+  t.after(() => fs.rmSync(directory, { recursive: true, force: true }));
+  const moduleFile = join(directory, 'daily.gfb');
+  const tapeFile = join(directory, 'daily.json');
+  fs.writeFileSync(moduleFile, artifact.bytes);
+  const native = fileURLToPath(new URL('../target/release/examples/solar_tape' + (process.platform === 'win32' ? '.exe' : ''), import.meta.url));
+  for (const [date, expected] of [['2026-11-09', true], ['2026-11-13', true], ['2026-11-14', false], ['2026-11-15', false]]) {
+    const runtime = await ControlRuntime.instantiateFramed(wasm(), artifact, { schedule: { bootEpoch: 7, terminalCapacity: 8 } });
+    const occurrence = Date.parse(`${date}T06:30:15.250+09:00`);
+    const sourceDay = Date.parse(`${date}T00:00:00.000Z`) / 86400000;
+    const scheduleFacts = nowMs => facts(artifact.manifest.schedules[0].site, nowMs, occurrence - 1 + nowMs, {
+      coverageFromWallMs: occurrence - 1000, coverageToWallMs: occurrence + 1000,
+      rows: [{ sourceDay, fold: 0, available: true, scheduledWallMs: occurrence, providerRevision: 'iana-test', contextRevision: 'seoul' }],
+    });
+    const outcomes = [false, expected, false];
+    try {
+      assert.deepEqual([0, 1, 2].map(nowMs => runtime.step({ nowMs, scheduleFacts: scheduleFacts(nowMs) }).vm.safe.due), outcomes, date);
+    } finally { runtime.dispose(); }
+    fs.writeFileSync(tapeFile, JSON.stringify({ bootEpoch: 7, terminalCapacity: 8,
+      scans: [0, 1, 2].map(nowMs => ({ inputs: {}, solarFacts: scheduleFacts(nowMs) })) }));
+    const rows = execFileSync(native, [moduleFile, tapeFile], { encoding: 'utf8' }).trim().split('\n').map(line => JSON.parse(line));
+    assert.deepEqual(rows.map(row => row.trace?.safe.due), outcomes, date);
+  }
 });
