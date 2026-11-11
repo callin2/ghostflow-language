@@ -708,7 +708,7 @@ insufficient information gives `Unknown`.
 The following is selected control syntax.
 
 > **Implementation status.** The current compiler accepts typed `match` and `match always`.
-> `where` and presence-only matches omitting type are not yet supported.
+> Presence-only matches omitting the type check capability presence at activation. `where` predicates are not yet supported and the example below is design notation.
 > The `where` example below is design notation.
 
 ```ghost

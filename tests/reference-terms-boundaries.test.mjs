@@ -175,8 +175,8 @@ test('REF-04-067: boundary oracle rejects wrong missing and malformed owner link
 });
 
 const implementationQualifiers = [
-    ['.en.md', '4.6', /`where` and presence-only matches omitting type are not yet supported/, /The `where` example below is design notation/],
-    ['.md', '4.6', /`where`와 type을 생략한\s+presence-only match는 아직 지원하지 않는다/, /아래 `where` 예시는 설계 표기다/],
+    ['.en.md', '4.6', /Presence-only matches omitting the type check capability presence at activation/, /`where` predicates are not yet supported/],
+    ['.md', '4.6', /type을 생략한 presence-only match는 활성화 시 capability 존재를 검사한다/, /`where` 조건은 아직 지원하지 않으며/],
     ['.en.md', '4.12', /`degraded Name` is a selected design alternative unsupported by the current native Temperature PID profile/, /`checkpoint` is a selected design alternative unsupported by the current native Temperature PID profile/],
     ['.md', '4.12', /`degraded Name`은 선택된 설계 대안이며 현재 native Temperature PID profile이 받지 않는다/, /`checkpoint`는\s+선택된 설계 대안이며 현재 native Temperature PID profile이 받지 않는다/],
     ['.en.md', '4.13', /A full fallback branch in `otherwise` is a selected design alternative not yet supported/,

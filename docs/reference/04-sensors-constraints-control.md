@@ -678,7 +678,7 @@ input moisture?: Percent;
 다음은 선택된 control 문법이다.
 
 > **구현 상태.** 현재 compiler는 typed `match`와 `match always`를 받는다.
-> `where`와 type을 생략한 presence-only match는 아직 지원하지 않는다. 아래 `where` 예시는 설계 표기다.
+> type을 생략한 presence-only match는 활성화 시 capability 존재를 검사한다. `where` 조건은 아직 지원하지 않으며 아래 예시는 설계 표기다.
 
 ```ghost
 adapt irrigation_policy {

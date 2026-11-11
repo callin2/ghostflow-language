@@ -5,6 +5,13 @@
 
 ## 미출시
 
+### 2026-11-11 - type을 생략한 capability 전략 선택 (#156)
+
+strategy match에서 capability 타입을 생략할 수 있습니다. 컴파일러는 선언된
+capability 타입을 확인해 타입을 명시한 match와 같은 활성화 시 질의를 만듭니다.
+존재 여부는 변하는 센서 값이 아니라 설치 profile에서 확인합니다. metadata `where`
+조건은 제한된 문법과 호스트 평가 계약이 마련될 때까지 계속 거절합니다.
+
 ### 2026-11-09 - 공용 원문 비교와 변경 범위 사전 검사 ([API #258](https://github.com/callin2/farm_studio_api/issues/258))
 
 브라우저와 Node가 설정 기본값·설정 정의·제어 규칙·논리 입출력·하드웨어 선언을

@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+### 2026-11-11 - presence-only capability strategy matching (#156)
+
+Strategy matches may omit the capability type. The compiler resolves the declared
+capability type and emits the same activation-time query used by typed matches.
+Presence is checked against the installation profile, not changing sensor samples.
+Metadata `where` predicates remain explicitly unsupported until their bounded
+grammar and host evaluation contract are implemented.
+
 ### 2026-11-09 - shared source changes and update-scope preflight ([API #258](https://github.com/callin2/farm_studio_api/issues/258))
 
 Browser and Node now share structural comparison for config defaults, config

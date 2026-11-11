@@ -132,6 +132,27 @@ control ProfileAND {
   assert.deepEqual(captures[0], captures[1], 'plain and framed Rust owners agree on captured profile admission and execution');
 });
 
+test('presence-only capability matches compile to a typed activation query', async () => {
+  const source = `# Presence only
+
+\`\`\`ghost
+control PresenceOnly {
+  input scheduled: Bool;
+  input moisture?: Percent;
+  output pump: Bool;
+  adapt policy {
+    strategy WithMoisture priority 10 match (moisture: sensor) { pump <- scheduled |> recover(false); }
+    strategy Baseline priority 0 match always { pump <- false; }
+  }
+}
+\`\`\`
+`;
+  const artifact = await compileSource(source, { filename: 'presence-only.ghost.md' });
+  const strategy = artifact.manifest.strategies.find(item => item.name === 'WithMoisture');
+  assert.deepEqual(strategy.match, [{ role: 'moisture', kind: 'sensor', type: 'Percent' }]);
+  assert.equal(strategy.outputNames[0], 'pump');
+});
+
 test('REF-04-035 explicit absent sensor selects Baseline', async () => {
   const host = await ControlRuntime.instantiateFramed(wasm, artifact, { capabilities: [] });
   softwareQualityObservations(host);

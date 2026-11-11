@@ -2485,7 +2485,6 @@ class Lowerer {
         const key = `${capability.kind}:${capability.role}`;
         if (seenCapabilities.has(key)) error(capability.loc, `duplicate strategy capability ${key}`);
         seenCapabilities.add(key);
-        if (!capability.type) error(capability.loc, 'presence-only strategy match requires host capability selection and is not yet supported');
         let declared;
         if (capability.kind === 'sensor') {
           declared = this.sensors.get(capability.role);
