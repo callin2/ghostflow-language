@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import test from 'node:test';
+import { RollingOutputRuntime } from '../runtimes/wasm/rolling-output-runtime.mjs';
 
 const binary = readFileSync(new URL('../target/wasm32-unknown-unknown/release/ghostflow_wasm.wasm', import.meta.url));
 
@@ -71,5 +72,69 @@ test('WASM does not grant a watering deadline before saving the reservation', as
     assert.equal(save(handle), 145_000n);
   } finally {
     wasm.gf_rolling_output_close(handle);
+  }
+});
+
+const source = [
+  '# Rolling watering',
+  '',
+  '```ghost',
+  'control Water {',
+  '  input manual: Bool;',
+  '  resource irrigation: BoolActuator;',
+  '  account watering = on_time(irrigation, stage: applied, persistence: durable);',
+  '  constraints Budget { limit used(watering, rolling(60s)) <= 30s { reserve = 5s; on_unknown = block; } }',
+  '  output valve: Bool;',
+  '  valve <- manual |> recover(false);',
+  '}',
+  '```',
+].join('\n');
+
+test('an authored policy binds to the installed output and cannot authorize ON on a failed commit', async () => {
+  let checkpoint = null;
+  let nextCommit;
+  const store = {
+    read: async () => checkpoint,
+    commit: async (bytes, expected) => {
+      if (nextCommit && !await nextCommit) return false;
+      if (expected === null ? checkpoint !== null : !checkpoint || !Buffer.from(expected).equals(checkpoint)) return false;
+      checkpoint = bytes;
+      return true;
+    },
+  };
+  const binding = { resource: 'irrigation', output: 'valve', resourceId: 7 };
+  const options = { nowMs: 0, binding, maxIntervals: 8, store };
+  await assert.rejects(RollingOutputRuntime.open(binary, source, {
+    ...options, binding: { ...binding, output: 'other' },
+  }), /verified Bool resource and output/);
+  const runtime = await RollingOutputRuntime.open(binary, source, options);
+  try {
+    for (let now = 0; now < 30_000; now += 5_000) {
+      assert.deepEqual(await runtime.requestOn(now), { status: 'allowed', deadlineMs: now + 5_000 });
+      await runtime.recordOff(now, now + 5_000);
+    }
+    assert.deepEqual(await runtime.requestOn(64_999), { status: 'budget-exceeded' });
+    assert.deepEqual(runtime.explain(64_999), {
+      usedMs: 25_001n, reservedMs: 0n, blocked: true, nextReleaseMs: 65_000n,
+    });
+    let rejectCommit;
+    nextCommit = new Promise(resolve => { rejectCommit = resolve; });
+    const pending = runtime.requestOn(65_000);
+    await assert.rejects(runtime.requestOn(65_000), /unavailable while saving/);
+    rejectCommit(false);
+    await assert.rejects(pending, /not committed/);
+    assert.deepEqual(await runtime.requestOn(65_000), { status: 'unavailable' });
+  } finally {
+    runtime.dispose();
+  }
+  nextCommit = undefined;
+  const recovered = await RollingOutputRuntime.open(binary, source, options);
+  const duplicate = await RollingOutputRuntime.open(binary, source, options);
+  try {
+    assert.deepEqual(await recovered.requestOn(65_000), { status: 'allowed', deadlineMs: 70_000 });
+    await assert.rejects(duplicate.requestOn(65_000), /not committed/);
+  } finally {
+    recovered.dispose();
+    duplicate.dispose();
   }
 });

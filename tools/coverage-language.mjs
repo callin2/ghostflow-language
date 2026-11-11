@@ -17,7 +17,7 @@ const TESTS = Object.freeze([
   'tests/reference-change-lifecycle.test.mjs',
   'tests/literate.test.mjs', 'tests/policy.test.mjs',
   'tests/output-conformance.test.mjs', 'tests/schedule.test.mjs', 'tests/scheduled-admission.test.mjs',
-  'tests/signals-wasm.test.mjs', 'tests/station-wasm.test.mjs', 'tests/accounting-wasm.test.mjs', 'tests/toolchain.test.mjs',
+  'tests/signals-wasm.test.mjs', 'tests/station-wasm.test.mjs', 'tests/accounting-wasm.test.mjs', 'tests/rolling-output-owner-wasm.test.mjs', 'tests/toolchain.test.mjs',
   // Compiler diagnostics and temporal lowering suites exercise the public
   // Reference grammar added after the original coverage allowlist.
   'tests/compiler-syntax-diagnostics.test.mjs', 'tests/compiler-syntax-structure.test.mjs',
