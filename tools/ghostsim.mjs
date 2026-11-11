@@ -286,6 +286,30 @@ export function validateScenario(scenario, manifest) {
         requireI32(action.localDay, `${location}.localDay`);
         break;
       }
+      case 'outputRequest': {
+        requireShape(action, ['kind', 'reservationId', 'account', 'resourceId', 'atMs', 'durationMs'], location);
+        if (!scenario.accounting) throw new Error(`${location}: output request requires accounting activation`);
+        if (typeof action.reservationId !== 'string' || !/^[0-9a-f]{32}$/u.test(action.reservationId)) throw new Error(`${location}.reservationId: expected 16-byte lowercase hex identity`);
+        if (!Number.isSafeInteger(action.resourceId) || action.resourceId < 0) throw new Error(`${location}.resourceId: expected nonnegative integer`);
+        for (const field of ['atMs', 'durationMs']) requireNonnegative(action[field], `${location}.${field}`);
+        if (action.durationMs === 0) throw new Error(`${location}.durationMs: expected positive duration`);
+        const descriptor = manifest.accounting?.bindings?.find(item => item.name === action.account);
+        if (!descriptor || descriptor.operation !== 'on_time') throw new Error(`${location}: unknown on_time account ${action.account}`);
+        const rollingLimit = manifest.accounting.constraints.flatMap(group => group.limits)
+          .find(limit => limit.account === action.account && limit.basis?.kind === 'rolling');
+        if (!rollingLimit) throw new Error(`${location}: account has no rolling constraint`);
+        break;
+      }
+      case 'outputApplied': {
+        requireShape(action, ['kind', 'reservationId', 'receiptId', 'account', 'resourceId', 'startMs', 'endMs', 'localDay'], location);
+        if (!scenario.accounting) throw new Error(`${location}: applied output requires accounting activation`);
+        for (const field of ['reservationId', 'receiptId']) if (typeof action[field] !== 'string' || !/^[0-9a-f]{32}$/u.test(action[field])) throw new Error(`${location}.${field}: expected 16-byte lowercase hex identity`);
+        if (!Number.isSafeInteger(action.resourceId) || action.resourceId < 0) throw new Error(`${location}.resourceId: expected nonnegative integer`);
+        for (const field of ['startMs', 'endMs']) requireNonnegative(action[field], `${location}.${field}`);
+        if (action.endMs <= action.startMs) throw new Error(`${location}: applied interval must be positive`);
+        requireI32(action.localDay, `${location}.localDay`);
+        break;
+      }
       case 'scan':
         requireFields(action, ['kind', 'atMs'], ['solarFacts', 'scheduleFacts', 'contextFacts', 'accountingFacts', 'events'], location);
         if (!Number.isSafeInteger(action.atMs) || action.atMs < 0) throw new Error(`${location}: atMs must be an exact nonnegative integer`);
