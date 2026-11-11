@@ -269,7 +269,7 @@ test('At Window ends at the exact half-open boundary and cannot infer an open le
 
 test('At Window admits the first true condition once, even when it turns true again later', async t => {
   const artifact = await compile(atWindowProgram()), planned = 28_800_000;
-  const times = [0, 50_000, 100_000, 150_000, 150_001, 200_000, 250_000, 299_999, 300_000];
+  const times = [0, 50_000, 100_000, 150_000, 150_001, 200_000, 250_000, 309_999, 310_000];
   const allowed = at => (at >= 150_000 && at < 200_000) || at >= 250_000;
   const rows = await parity(t, artifact, times.map(at => frame(at,
     facts(at, planned - 10_000 + at), { allowed: allowed(at) })), 'context-settings-v1');
