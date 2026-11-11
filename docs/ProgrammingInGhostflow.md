@@ -1852,6 +1852,7 @@ provider는 관측이나 예측을 공급하고, 프로그램은 그것이 무�
 
 | 내장 이름 | 시그니처와 목적 | 문맥, 경계와 예제 |
 |---|---|---|
+| `local_day_is` | ``local_day_is(day`mon..fri`, timezone: "Asia/Seoul") -> Result<Bool,ClockFault>`` | 신뢰할 수 있는 현재 현지 날짜의 요일을 확인합니다. 새 동작의 시작 조건으로 쓰기 전에 시계 오류를 명시적으로 처리합니다. [평일 세 구역 예제](../tests/monitoring-plan.test.mjs). |
 | `calendar_is` | ``calendar_is(calendar, day`workday` or day`offday` or day`holiday`) -> Result<Bool,CalendarFault>`` | GFB18의 명시적 UTC binding을 쓰는 typed WorkCalendar 또는 HolidayCalendar. 누락, coverage 밖, 만료, 신뢰할 수 없는 시계의 사실은 fault를 보존합니다. 성공한 Bool을 부정하기 전에 fault를 명시적으로 처리합니다. [실행된 달력 경계](../tests/reference-calendar-boundary.test.mjs). |
 | `tide_is` | ``tide_is(provider, tide`spring` or tide`neap`) -> Result<Bool,TemporalContextFault>`` | 선언된 TidePredictions provider. 예측이 없거나 오래되었거나 시계 문맥이 없으면 fault입니다. [자연 조건](../tests/natural-condition-contract.test.mjs). |
 | `moon_is` | ``moon_is(provider, moon`phase`) -> Result<Bool,TemporalContextFault>`` | LunarEphemeris provider; 위상: new, waxing_crescent, first_quarter, waxing_gibbous, full, waning_gibbous, last_quarter, waning_crescent. [자연 조건](../tests/natural-condition-contract.test.mjs). |

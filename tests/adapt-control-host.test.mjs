@@ -2,8 +2,12 @@ import { softwareQualityAbi, softwareQualityObservations } from './helpers/softw
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import { createHash } from 'node:crypto';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import test from 'node:test';
-import { compileSource } from '../tools/toolchain.mjs';
+import { encode } from '@toon-format/toon';
+import { compileSource, writeArtifact } from '../tools/toolchain.mjs';
+import { runScenario } from '../tools/ghostsim.mjs';
 import { ControlRuntime } from '../runtimes/wasm/control-runtime.mjs';
 import { GhostFlowRuntime } from '../runtimes/wasm/ghostflow-runtime.mjs';
 import { FramedGhostFlowRuntime } from '../runtimes/wasm/framed-runtime.mjs';
@@ -190,6 +194,23 @@ control MetadataSelection {
         assert.equal(host.step({ nowMs: 0, inputs: {} }).vm.requested.pump, capabilities.length > 0);
       } finally { host.dispose(); }
     }
+  }
+  const directory = fs.mkdtempSync(join(tmpdir(), 'ghostflow-metadata-selection-'));
+  try {
+    const artifactPath = join(directory, 'metadata.gfb');
+    const scenarioPath = join(directory, 'metadata.toon');
+    writeArtifact(compiled, artifactPath);
+    for (const capabilities of [[], [moisture]]) {
+      fs.writeFileSync(scenarioPath, encode({
+        format: 'GhostFlow/scenario-v1', id: 'metadata-selection',
+        initialInputs: [], keyBindings: [], capabilities, actions: [{ kind: 'scan', atMs: 0 }],
+      }));
+      const result = runScenario(artifactPath, scenarioPath, { format: 'json' });
+      assert.equal(result.success, true, result.encoded);
+      assert.equal(JSON.parse(result.encoded).scans[0].requestedVirtualIntent.pump, capabilities.length > 0);
+    }
+  } finally {
+    fs.rmSync(directory, { recursive: true, force: true });
   }
   await assert.rejects(compileSource(source.replace('moisture.type == Bool', 'moisture > 30%')), /strategy where accepts only/);
   await assert.rejects(compileSource(source.replace('moisture.type == Bool', 'unknown.type == Bool')), /strategy where references unmatched capability unknown/);

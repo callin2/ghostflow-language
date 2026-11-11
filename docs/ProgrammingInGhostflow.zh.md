@@ -1631,6 +1631,7 @@ node tools/ghostc.mjs follow-switch.ghost.md build/follow-switch.gfb
 
 | 内置函数 | 签名与用途 | 上下文、边界与示例 |
 |---|---|---|
+| `local_day_is` | ``local_day_is(day`mon..fri`, timezone: "Asia/Seoul") -> Result<Bool,ClockFault>`` | 根据可信的当前本地日期检查星期。在用布尔值允许新启动前，必须显式处理时钟故障。 [三个分区的工作日示例](../tests/monitoring-plan.test.mjs). |
 | `calendar_is` | ``calendar_is(calendar, day`workday` or day`offday` or day`holiday`) -> Result<Bool,CalendarFault>`` | 带类型的 WorkCalendar 或 HolidayCalendar，在 GFB18 中需要显式的 UTC 绑定。缺失、超出覆盖范围、已过期或时钟不可信的事实会保留故障；在对成功的 Bool 取反之前，必须先显式处理故障。[已执行的日历边界](../tests/reference-calendar-boundary.test.mjs)。 |
 | `tide_is` | ``tide_is(provider, tide`spring` or tide`neap`) -> Result<Bool,TemporalContextFault>`` | 已声明的 TidePredictions 提供者。预测或时钟上下文缺失/陈旧时为故障。[自然条件](../tests/natural-condition-contract.test.mjs)。 |
 | `moon_is` | ``moon_is(provider, moon`phase`) -> Result<Bool,TemporalContextFault>`` | LunarEphemeris 提供者；月相：new、waxing_crescent、first_quarter、waxing_gibbous、full、waning_gibbous、last_quarter、waning_crescent。[自然条件](../tests/natural-condition-contract.test.mjs)。 |

@@ -115,10 +115,11 @@ export function encodeContextActivation(profile) {
 }
 
 export function encodeContextFacts(packet) {
-  const p = object(packet, ['clock','natural','schedules','settings','solars','scheduledDates'], 'context facts');
+  const p = object(packet, ['clock','natural','schedules','settings','solars','scheduledDates','weekdayConditions'], 'context facts');
   const solars = p.solars === undefined ? [] : bounded(p.solars, 'solars');
-  const scheduledDates = p.scheduledDates === undefined ? null : bounded(p.scheduledDates, 'scheduledDates', 4096);
-  const writer = new Writer(); writer.raw([71,70,83,70]); writer.u16(scheduledDates !== null ? 7 : solars.length ? 6 : 5);
+  const weekdayConditions = p.weekdayConditions === undefined ? null : bounded(p.weekdayConditions, 'weekdayConditions', 128);
+  const scheduledDates = p.scheduledDates === undefined && weekdayConditions === null ? null : bounded(p.scheduledDates ?? [], 'scheduledDates', 4096);
+  const writer = new Writer(); writer.raw([71,70,83,70]); writer.u16(weekdayConditions !== null ? 8 : scheduledDates !== null ? 7 : solars.length ? 6 : 5);
   const c = object(p.clock, ['monotonicMs','bootEpoch','wallMs','uncertaintyMs','trusted','unknownReason','sourceRevision'], 'clock');
   writer.u64(c.monotonicMs, 'clock.monotonicMs'); writer.u64(c.bootEpoch, 'clock.bootEpoch');
   writer.optional(c.wallMs, 'clock.wallMs'); writer.optional(c.uncertaintyMs, 'clock.uncertaintyMs');
@@ -265,6 +266,29 @@ export function encodeContextFacts(packet) {
       writer.str(fact.providerRevision, `${label}.providerRevision`);
       writer.str(fact.contextRevision, `${label}.contextRevision`);
       writer.str(fact.resolverRevision, `${label}.resolverRevision`);
+    }
+  }
+  if (weekdayConditions !== null) {
+    const sites = new Set();
+    const rows = [];
+    for (const [index, value] of weekdayConditions.entries()) {
+        const label = `weekdayConditions[${index}]`;
+        const condition = object(value, ['site','timezone','mask','result','projectionInputs'], label);
+        const site = integer(condition.site, `${label}.site`, 0xffff_ffff);
+        if (!site || sites.has(site)) throw new RangeError('invalid or duplicate weekday condition site');
+        sites.add(site);
+        if (typeof condition.timezone !== 'string' || !condition.timezone) throw new TypeError(`${label}.timezone must be a non-empty string`);
+      if (!c.trusted || c.wallMs == null || c.uncertaintyMs == null) continue;
+      try {
+        const before = localEpochDay(c.wallMs - c.uncertaintyMs, condition.timezone);
+        const after = localEpochDay(c.wallMs + c.uncertaintyMs, condition.timezone);
+        if (before === after) rows.push({ site, timezone: condition.timezone, localDay: before });
+      } catch { /* The host cannot resolve a supported date for this scan. */ }
+    }
+    writer.u16(rows.length);
+    for (const { site, timezone, localDay } of rows) {
+      writer.u32(site); writer.str(timezone, 'weekday timezone');
+      writer.u64(c.wallMs, 'weekday wallMs'); writer.u32(localDay);
     }
   }
   return writer.finish();

@@ -218,6 +218,74 @@ test('edge-triggered waiting stays a finite boundary and Duration settings remai
   }
 });
 
+test('local weekday admits a three-zone button start only on known weekdays', async () => {
+  const source = edgeTriggeredSequence()
+    .replace('let start_edge = start_pressed && !start_held;', [
+      'let weekday = local_day_is(day\x60mon..fri\x60, timezone: "Asia/Seoul");',
+      'let allowed = case weekday { ok(value) => value; fault(_) => false; };',
+      'let start_edge = start_pressed && !start_held;',
+    ].join('\n'))
+    .replace('Idle => if start_edge then First', 'Idle => if start_edge && allowed then First')
+    .replace('output valve_a, valve_b: Bool;', 'output valve_a, valve_b, valve_c, pump: Bool;')
+    .replace("valve_b <- phase' == Second;", "valve_b <- phase' == Second; valve_c <- phase' == Rest; pump <- phase' != Idle;");
+  const artifact = await compileSource(source, { filename: 'weekday-three-zone.ghost.md' });
+  assert.equal(artifact.manifest.format, 'GhostFlow/control-v26');
+  const wasm = readFileSync(new URL('../target/wasm32-unknown-unknown/release/ghostflow_wasm.wasm', import.meta.url));
+  const activation = { bootEpoch: 1, terminalCapacity: 8, bindings: [] };
+  const key = await crypto.subtle.generateKey('Ed25519', true, ['sign', 'verify']);
+  const identity = {
+    compilerRevision: 'weekday-test', runtimeSemantics: 'GhostFlow/runtime-semantics-v1',
+    runtimeAbi: 'GhostFlow/context-scan-abi-v5', bindingRevision: 'weekday-binding',
+    requiredCapabilities: [
+      ...artifact.manifest.inputs.map(({ name }) => ({ kind: 'input', name, type: 'bool' })),
+      ...artifact.manifest.sensors.map(({ name }) => ({ kind: 'sensor', name, type: 'bool' })),
+      ...['valve_a', 'valve_b', 'valve_c', 'pump'].map(name => ({ kind: 'actuator', name, type: 'bool' })),
+    ],
+  };
+  const packageValue = await buildPortablePackage(artifact, identity, {
+    signers: [{ keyId: 'weekday-test', privateKey: key.privateKey }],
+    verifyCompilation: (document, { filename }) => compileSource(document, { filename }),
+    onDiagnostic: () => {},
+  });
+  await verifyPortablePackage(packageValue, {
+    trustedKeys: [{ keyId: 'weekday-test', publicKey: key.publicKey }], revokedKeyIds: [],
+    expectedCompilerRevision: identity.compilerRevision,
+    supportedRuntimeSemantics: [identity.runtimeSemantics], supportedRuntimeAbis: [identity.runtimeAbi],
+    supportedManifestFormats: ['GhostFlow/control-v26'],
+    availableCapabilities: identity.requiredCapabilities, expectedBindingRevision: identity.bindingRevision,
+    async verifyBytecode(bytes, context) {
+      const runtime = await ControlRuntime.instantiateFramed(wasm, { bytes, manifest: context.manifest }, { context: activation });
+      runtime.dispose();
+      return true;
+    },
+  });
+  const replay = async (localTime, trusted = true, uncertaintyMs = 0) => {
+    const runtime = await ControlRuntime.instantiateFramed(wasm, artifact, { context: activation });
+    try {
+      return [0, 1, 10001, 30001, 35001].map((nowMs, i) => {
+        const value = i === 1;
+        const { vm } = runtime.step({ nowMs, samples: {
+          start: { epoch: 1, id: i + 1, timestampMs: nowMs, quality: 'Good', value },
+          stop: { epoch: 1, id: i + 1, timestampMs: nowMs, quality: 'Good', value: false },
+        }, contextFacts: { clock: { monotonicMs: nowMs, bootEpoch: 1,
+          wallMs: trusted ? Date.parse(localTime) + nowMs : null, uncertaintyMs,
+          trusted, unknownReason: trusted ? null : 'ClockUnknown', sourceRevision: 'weekday-test' },
+          natural: [], schedules: [], settings: null } });
+        return ['valve_a', 'valve_b', 'valve_c', 'pump'].map(name => vm.safe[name]);
+      });
+    } finally { runtime.dispose(); }
+  };
+  const off = [false, false, false, false];
+  const inactive = Array(5).fill(off);
+  const active = [off, [true, false, false, true], [false, true, false, true], [false, false, true, true], off];
+  assert.deepEqual(await replay('2026-11-09T00:00:00+09:00'), active);
+  assert.deepEqual(await replay('2026-11-13T08:00:00+09:00'), active);
+  assert.deepEqual(await replay('2026-11-14T00:00:00+09:00'), inactive);
+  assert.deepEqual(await replay('2026-11-15T08:00:00+09:00'), inactive);
+  assert.deepEqual(await replay('2026-11-09T08:00:00+09:00', false), inactive);
+  assert.deepEqual(await replay('2026-11-09T00:00:00+09:00', true, 10), inactive);
+});
+
 test('external stop, held stop, new start and live Duration retain their runtime behavior', async () => {
   const artifact = await compileSource(edgeTriggeredSequence(), { filename: 'finite-runtime.ghost.md' });
   const wasm = readFileSync(new URL('../target/wasm32-unknown-unknown/release/ghostflow_wasm.wasm', import.meta.url));

@@ -637,3 +637,53 @@ test('signed Solar v15 rejects re-signed descriptor and predicate changes before
     assert.equal(called, false);
   }
 });
+
+test('signed calendar Result preserves the Seoul date and rejects rewritten bindings', async () => {
+  const { ControlRuntime } = await import('../runtimes/wasm/control-runtime.mjs');
+  const { createKoreanHolidayCalendar } = await import('../runtimes/node/calendar.mjs');
+  const current = await currentKeyPromise;
+  const source = [
+    '# Calendar decision', '```ghost', 'control HolidayCheck {', ' calendar holidays: HolidayCalendar;',
+    ' let holiday = calendar_is(holidays, day`holiday`, timezone: "Asia/Seoul");',
+    ' output permitted: Bool;', ' permitted <- case holiday { ok(value) => !value; fault(_) => false; };',
+    '}', '```',
+  ].join('\n');
+  const compilation = await compileSource(source, { filename: 'calendar.ghost.md' });
+  const contextIdentity = { ...identity, runtimeAbi: 'GhostFlow/context-scan-abi-v5',
+    requiredCapabilities: [{ kind: 'actuator', name: 'permitted', type: 'bool' }] };
+  const packaged = await buildPortablePackage(compilation, contextIdentity, buildOptions([{ keyId: current.keyId, privateKey: current.privateKey }]));
+  const snapshot = createKoreanHolidayCalendar({ calendarId: 'holidays', nowMs: Date.parse('2026-11-11T00:00:00Z') }).snapshot;
+  const options = { ...verifierOptions(current), supportedRuntimeAbis: [contextIdentity.runtimeAbi],
+    supportedManifestFormats: [compilation.manifest.format], availableCapabilities: contextIdentity.requiredCapabilities };
+  const verified = await verifyPortablePackage(packaged, options);
+  const { site } = verified.manifest.calendarConditions[0];
+  const wasm = fs.readFileSync(wasmPath);
+  const context = { bootEpoch: 1, terminalCapacity: 64, bindings: [{ kind: 'calendar', provider: 'holidays',
+    namespace: 'calendar-replay', station: 'virtual', bindingRevision: 'calendar-v1',
+    location: 'virtual', timezone: 'Asia/Seoul', criteria: 'calendar', maxUncertaintyMs: 0 }] };
+  for (const instantiate of [ControlRuntime.instantiate, ControlRuntime.instantiateFramed]) {
+    const runtime = await instantiate(wasm, { ...compilation, manifest: verified.manifest, bytes: verified.bytecode.copy() }, { context });
+    try {
+      const midnight = Date.parse('2027-01-01T00:00:00+09:00');
+      function step(monotonicMs, wallMs, uncertaintyMs = 0, calendar = snapshot) {
+        return runtime.step({ nowMs: monotonicMs, contextFacts: {
+          clock: { monotonicMs, wallMs, uncertaintyMs, bootEpoch: 1, trusted: true, unknownReason: null, sourceRevision: 'test-clock' },
+          natural: [], schedules: [{ site, coverageStartMs: 0, coverageEndMs: 253402300800000,
+            provider: null, calendar, rows: [] }], settings: null,
+        } }).vm.safe.permitted;
+      }
+      assert.equal(step(0, midnight - 1000), true);
+      assert.equal(step(1, midnight - 1, 2), false, 'uncertainty over midnight cannot permit an output');
+      assert.equal(step(2, midnight), false, 'Seoul New Year starts while UTC is still Dec 31');
+      assert.equal(step(3, midnight + 86_400_000, 0, null), false, 'missing calendar cannot permit an output');
+    } finally { runtime.dispose(); }
+  }
+  const forged = clone(packaged);
+  const manifest = JSON.parse(Buffer.from(forged.payload.manifest.contentBase64, 'base64'));
+  manifest.calendarConditions[0].timezone = 'UTC';
+  const bytes = encoder.encode(canonicalJson(manifest));
+  forged.payload.manifest.contentBase64 = base64(bytes);
+  forged.payload.manifest.sha256 = await digestHex(bytes);
+  await resign(forged, current);
+  await assert.rejects(verifyPortablePackage(forged, options), PortablePackageError);
+});
