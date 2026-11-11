@@ -9,16 +9,18 @@ function milliseconds(value) {
 
 /**
  * Connects a verified installation's one Bool output to an authored rolling
- * policy. The host still owns applying ON/OFF and obtaining their timestamps.
+ * policy. The host supplies one monotonic clock for admission and applies ON/OFF
+ * within the returned deadline using that same clock.
  */
 export class RollingOutputRuntime {
   #wasm;
   #handle;
   #store;
+  #clock;
   #saved;
   #writing = false;
 
-  static async open(wasmBytes, source, { binding, nowMs, store, maxIntervals }) {
+  static async open(wasmBytes, source, { binding, clock, store, maxIntervals }) {
     const { manifest } = await compileSource(source);
     const { resource, output, resourceId } = binding;
     if (!Number.isInteger(resourceId) || resourceId < 1 || resourceId > 0xffff_ffff
@@ -42,6 +44,7 @@ export class RollingOutputRuntime {
     if (typeof store?.read !== 'function' || typeof store?.commit !== 'function') {
       throw new TypeError('rolling output requires a durable checkpoint store');
     }
+    if (typeof clock !== 'function') throw new TypeError('rolling output requires a monotonic clock');
     const { instance: { exports: wasm } } = await WebAssembly.instantiate(wasmBytes);
     // null is an explicit known-empty result from the installation owner.
     // Missing or unreadable existing history must be reported as an error.
@@ -55,12 +58,12 @@ export class RollingOutputRuntime {
     try {
       if (size) new Uint8Array(wasm.memory.buffer, ptr, size).set(saved);
       handle = wasm.gf_rolling_output_open(resourceId, milliseconds(limit.basis.durationMs),
-        milliseconds(limit.boundMs), milliseconds(limit.reserveMs), maxIntervals, milliseconds(nowMs), ptr, size);
+        milliseconds(limit.boundMs), milliseconds(limit.reserveMs), maxIntervals, milliseconds(clock()), ptr, size);
     } finally {
       if (size) wasm.gf_dealloc(ptr, size);
     }
     if (!handle) throw new Error('rolling output checkpoint does not match the installed policy');
-    const runtime = new RollingOutputRuntime(wasm, handle, store, saved, creation);
+    const runtime = new RollingOutputRuntime(wasm, handle, store, clock, saved, creation);
     try {
       if (saved === null) await runtime.#commit();
       return runtime;
@@ -70,11 +73,12 @@ export class RollingOutputRuntime {
     }
   }
 
-  constructor(wasm, handle, store, saved, token) {
+  constructor(wasm, handle, store, clock, saved, token) {
     if (token !== creation) throw new Error('use RollingOutputRuntime.open with a verified installation binding');
     this.#wasm = wasm;
     this.#handle = handle;
     this.#store = store;
+    this.#clock = clock;
     this.#saved = saved?.slice() ?? null;
   }
 
@@ -101,14 +105,23 @@ export class RollingOutputRuntime {
     }
   }
 
-  async requestOn(nowMs) {
+  async requestOn() {
     this.#requireReady();
+    const nowMs = this.#clock();
     const status = this.#wasm.gf_rolling_output_prepare(this.#handle, milliseconds(nowMs));
     if (status === 2) return { status: 'budget-exceeded' };
     if (status === 3) return { status: 'unsettled-output' };
     if (status !== 1) return { status: 'unavailable' };
     const deadline = Number(await this.#commit());
     if (!Number.isSafeInteger(deadline) || deadline <= nowMs) return { status: 'unavailable' };
+    const committedAtMs = this.#clock();
+    milliseconds(committedAtMs);
+    if (committedAtMs < nowMs) return { status: 'unavailable' };
+    if (committedAtMs >= deadline) {
+      // No ON was granted. Release the expired reservation durably.
+      await this.recordOff(null, committedAtMs);
+      return { status: 'deadline-expired' };
+    }
     return { status: 'allowed', deadlineMs: deadline };
   }
 
