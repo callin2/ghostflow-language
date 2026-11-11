@@ -708,8 +708,8 @@ insufficient information gives `Unknown`.
 The following is selected control syntax.
 
 > **Implementation status.** The current compiler accepts typed `match` and `match always`.
-> `where` and presence-only matches omitting type are not yet supported.
-> The `where` example below is design notation.
+> Presence-only matches omitting the type check capability presence at activation.
+> The `where` clause accepts the matched capability’s kind, name and type with constant Boolean comparisons.
 
 ```ghost
 adapt irrigation_policy {

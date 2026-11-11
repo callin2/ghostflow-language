@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+### 2026-11-11 - presence-only capability strategy matching (#156)
+
+Strategy matches may omit the capability type. The compiler resolves the declared
+capability type and emits the same activation-time query used by typed matches.
+Presence is checked against the installation profile, not changing sensor samples.
+The `where` clause compares the matched capability’s kind, name and type at
+activation. These comparisons use the existing native and WASM capability query.
+
 ### 2026-11-11 - Local date for calendar conditions ([API #271](https://github.com/callin2/farm_studio_api/issues/271))
 
 Ordinary calendar conditions can use an explicit IANA timezone. The native and WASM runtime use date evidence tied to the trusted scan clock. A calendar-only GFB18 control can be signed. Its query sites, timezone and types must match the compiled artifact. The Seoul midnight regression uses the reviewed Korean public-holiday snapshot.

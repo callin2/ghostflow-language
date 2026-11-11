@@ -718,8 +718,8 @@ opcional devuelve `Pass | Violation | Unknown(reason)`; la información insufici
 Lo siguiente es sintaxis de control seleccionada.
 
 > **Estado de implementación.** El compilador actual acepta `match` tipado y `match always`.
-> `where` y las coincidencias solo de presencia que omiten el tipo aún no se admiten. La
-> cláusula `where` del ejemplo siguiente es notación de diseño.
+> Las coincidencias que omiten el tipo comprueban la presencia al activar.
+> `where` admite comparaciones booleanas constantes del kind, name y type de la capacidad coincidente.
 
 ```ghost
 adapt irrigation_policy {
