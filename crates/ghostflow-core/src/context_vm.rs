@@ -1087,7 +1087,15 @@ pub(crate) fn load_weekday(reader: &mut Reader<'_>, inputs: &[Field]) -> Result<
             return Err(Error::new("weekday projection binding mismatch"));
         }
     }
-    Ok(WeekdayDescriptor { site, name, timezone, mask, ok_input, value_input, fault_input })
+    Ok(WeekdayDescriptor {
+        site,
+        name,
+        timezone,
+        mask,
+        ok_input,
+        value_input,
+        fault_input,
+    })
 }
 
 pub(crate) fn load_calendar(

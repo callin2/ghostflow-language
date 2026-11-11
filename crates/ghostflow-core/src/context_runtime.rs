@@ -516,7 +516,9 @@ impl ContextRuntime {
                     if d.kind == NaturalKind::Tide { 0 } else { 1 },
                     None,
                 )),
-                PulseDescriptor::Accounting(_) | PulseDescriptor::Config(_) | PulseDescriptor::Weekday(_) => None,
+                PulseDescriptor::Accounting(_)
+                | PulseDescriptor::Config(_)
+                | PulseDescriptor::Weekday(_) => None,
                 PulseDescriptor::Calendar(d) => {
                     Some((d.calendar.as_str(), 2, Some(d.timezone.as_str())))
                 }
@@ -663,7 +665,8 @@ impl ContextRuntime {
                     site: d.site,
                     occurrence_id: format!("{}:weekday", d.site),
                     planned_ms: clock.wall_ms,
-                    decision: value.map_or_else(|| "Fault(ClockUnknown)".into(), |v| format!("Ok({v})")),
+                    decision: value
+                        .map_or_else(|| "Fault(ClockUnknown)".into(), |v| format!("Ok({v})")),
                     provider_revision: String::new(),
                     context_revision: d.timezone.clone(),
                     solar_fallback: None,

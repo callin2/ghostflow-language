@@ -1960,7 +1960,11 @@ fn verify_config_bindings(manifest: &Value, module: &ghostflow_core::Module) -> 
                 {
                     return Err(mismatch("weekday condition differs from bytecode"));
                 }
-                for (suffix, ty) in [("ok", Type::Bool), ("value", Type::Bool), ("fault", Type::Number)] {
+                for (suffix, ty) in [
+                    ("ok", Type::Bool),
+                    ("value", Type::Bool),
+                    ("fault", Type::Number),
+                ] {
                     generated.insert(projection(suffix), ty);
                 }
                 continue;
@@ -2129,9 +2133,10 @@ fn verify_config_bindings(manifest: &Value, module: &ghostflow_core::Module) -> 
     if generated
         .iter()
         .any(|(name, ty)| inputs.get(name.as_str()) != Some(ty))
-        || inputs
-            .iter()
-            .any(|(name, ty)| (name.starts_with("__gf_config_") || name.starts_with("__gf_weekday_")) && generated.get(*name) != Some(ty))
+        || inputs.iter().any(|(name, ty)| {
+            (name.starts_with("__gf_config_") || name.starts_with("__gf_weekday_"))
+                && generated.get(*name) != Some(ty)
+        })
     {
         return Err(mismatch("GFB11 generated input ports differ from bytecode"));
     }

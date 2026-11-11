@@ -423,7 +423,9 @@ pub(crate) fn load_prelude(
             23 if format == 26 => {
                 let descriptor = crate::context_vm::load_weekday(reader, inputs)?;
                 let identity = (descriptor.site, descriptor.name.clone());
-                result.order.push(PreludeEntry::Schedule(result.schedules.len() as u16));
+                result
+                    .order
+                    .push(PreludeEntry::Schedule(result.schedules.len() as u16));
                 result.schedules.push(PulseDescriptor::Weekday(descriptor));
                 identity
             }

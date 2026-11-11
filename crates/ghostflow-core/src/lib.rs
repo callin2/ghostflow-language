@@ -82,7 +82,8 @@ impl Type {
                     | 20
                     | 21
                     | 23
-                    | 24 | 26
+                    | 24
+                    | 26
             ) =>
             {
                 Ok(Self::Int)
@@ -345,7 +346,8 @@ impl Module {
                 | 20
                 | 21
                 | 23
-                | 24 | 26
+                | 24
+                | 26
         ) {
             return Err(Error::new("unsupported GFB format"));
         }
@@ -834,9 +836,17 @@ impl Module {
         if format_version == 26
             && !schedules.as_ref().is_some_and(|requirements| {
                 requirements.strategies.iter().all(|strategy| {
-                    strategy.schedules.iter().any(|d| matches!(d, schedule_vm::PulseDescriptor::Weekday(_)))
-                        && strategy.schedules.iter().all(|d| matches!(d,
-                            schedule_vm::PulseDescriptor::Weekday(_) | schedule_vm::PulseDescriptor::Config(_)))
+                    strategy
+                        .schedules
+                        .iter()
+                        .any(|d| matches!(d, schedule_vm::PulseDescriptor::Weekday(_)))
+                        && strategy.schedules.iter().all(|d| {
+                            matches!(
+                                d,
+                                schedule_vm::PulseDescriptor::Weekday(_)
+                                    | schedule_vm::PulseDescriptor::Config(_)
+                            )
+                        })
                 })
             })
         {
@@ -3106,7 +3116,8 @@ fn verify_expression_with_prelude(
                         | 20
                         | 21
                         | 23
-                        | 24 | 26
+                        | 24
+                        | 26
                 ) {
                     return Err(Error::new("branch opcode requires GFB format 3"));
                 }
@@ -3144,7 +3155,8 @@ fn verify_expression_with_prelude(
                         | 20
                         | 21
                         | 23
-                        | 24 | 26
+                        | 24
+                        | 26
                 ) {
                     return Err(Error::new("compact Number opcode requires GFB format 3"));
                 }
@@ -3171,7 +3183,8 @@ fn verify_expression_with_prelude(
                         | 20
                         | 21
                         | 23
-                        | 24 | 26
+                        | 24
+                        | 26
                 ) {
                     return Err(Error::new("conversion opcode requires GFB format 3"));
                 }
@@ -3206,7 +3219,8 @@ fn verify_expression_with_prelude(
                         | 20
                         | 21
                         | 23
-                        | 24 | 26
+                        | 24
+                        | 26
                 ) {
                     return Err(Error::new("Duration guard requires GFB format 3"));
                 }
@@ -3236,7 +3250,8 @@ fn verify_expression_with_prelude(
                         | 20
                         | 21
                         | 23
-                        | 24 | 26
+                        | 24
+                        | 26
                 ) {
                     return Err(Error::new("DateTime guard requires GFB format 3"));
                 }
@@ -3265,7 +3280,8 @@ fn verify_expression_with_prelude(
                         | 20
                         | 21
                         | 23
-                        | 24 | 26
+                        | 24
+                        | 26
                 ) {
                     return Err(Error::new("Percent guard requires GFB format 3"));
                 }
@@ -3295,7 +3311,8 @@ fn verify_expression_with_prelude(
                         | 20
                         | 21
                         | 23
-                        | 24 | 26
+                        | 24
+                        | 26
                 ) {
                     return Err(Error::new("Result trace requires GFB format 3"));
                 }
@@ -3329,7 +3346,8 @@ fn verify_expression_with_prelude(
                         | 20
                         | 21
                         | 23
-                        | 24 | 26
+                        | 24
+                        | 26
                 ) {
                     return Err(Error::new("temporal projection requires GFB format 4"));
                 }
@@ -3344,7 +3362,23 @@ fn verify_expression_with_prelude(
             58 => {
                 if !matches!(
                     format_version,
-                    5 | 6 | 8 | 9 | 10 | 11 | 12 | 13 | 14 | 15 | 16 | 18 | 19 | 20 | 21 | 23 | 24 | 26
+                    5 | 6
+                        | 8
+                        | 9
+                        | 10
+                        | 11
+                        | 12
+                        | 13
+                        | 14
+                        | 15
+                        | 16
+                        | 18
+                        | 19
+                        | 20
+                        | 21
+                        | 23
+                        | 24
+                        | 26
                 ) {
                     return Err(Error::new("schedule projection requires GFB format 5"));
                 }
