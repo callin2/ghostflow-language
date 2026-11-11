@@ -7,8 +7,8 @@
 Strategy matches may omit the capability type. The compiler resolves the declared
 capability type and emits the same activation-time query used by typed matches.
 Presence is checked against the installation profile, not changing sensor samples.
-Metadata `where` predicates remain explicitly unsupported until their bounded
-grammar and host evaluation contract are implemented.
+The `where` clause compares the matched capability’s kind, name and type at
+activation. These comparisons use the existing native and WASM capability query.
 
 ### 2026-11-09 - shared source changes and update-scope preflight ([API #258](https://github.com/callin2/farm_studio_api/issues/258))
 

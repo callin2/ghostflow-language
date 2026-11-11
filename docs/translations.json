@@ -2458,31 +2458,31 @@
       "files": {
         "en": {
           "path": "docs/reference/04-sensors-constraints-control.en.md",
-          "sha256": "f6ec34054fb5f1e94aed76c154ccdfda5c94ec8ec7b312e04a665532fefbdbbf"
+          "sha256": "d9a20f18f83752b0c447612d4c677a65336cb2a8b2190a979103a6ee8090a25a"
         },
         "ko": {
           "path": "docs/reference/04-sensors-constraints-control.md",
-          "sha256": "42fb9420f1b43827f3f6a5649fdcb785631ea46bdffcfeef6af75ab1446bbee0",
+          "sha256": "09244f4de20d0337b7211ce478718cb9b675c51c3fbd4584789c4cb95814bb1b",
           "from": "en",
-          "sourceSha256": "f6ec34054fb5f1e94aed76c154ccdfda5c94ec8ec7b312e04a665532fefbdbbf"
+          "sourceSha256": "d9a20f18f83752b0c447612d4c677a65336cb2a8b2190a979103a6ee8090a25a"
         },
         "zh": {
           "path": "docs/reference/04-sensors-constraints-control.zh.md",
-          "sha256": "d859bd8ada519ea2b4a63fb5dd509a366a37076c46ca552ce9392492539ae843",
+          "sha256": "dce13760713bb82d6c227c5cf0ecae47c8314724231faa60c1432fe9e2d23798",
           "from": "en",
-          "sourceSha256": "f6ec34054fb5f1e94aed76c154ccdfda5c94ec8ec7b312e04a665532fefbdbbf"
+          "sourceSha256": "d9a20f18f83752b0c447612d4c677a65336cb2a8b2190a979103a6ee8090a25a"
         },
         "es": {
           "path": "docs/reference/04-sensors-constraints-control.es.md",
-          "sha256": "87d558d8e68e698599c6be056eacbc74dea3303600798c038f10b9de317bb0af",
+          "sha256": "39e6c790c3e14de4a869f11d2e86c2bce8447fa60648d3fd95e0698e9a6e8aaf",
           "from": "en",
-          "sourceSha256": "f6ec34054fb5f1e94aed76c154ccdfda5c94ec8ec7b312e04a665532fefbdbbf"
+          "sourceSha256": "d9a20f18f83752b0c447612d4c677a65336cb2a8b2190a979103a6ee8090a25a"
         },
         "ja": {
           "path": "docs/reference/04-sensors-constraints-control.ja.md",
-          "sha256": "557591bd7fe4a61b985ca0788144e7d4130664ef2b415a5cd5ffeb35e1db548f",
+          "sha256": "62bb7d85ba789124734fe45e148ab4ec0b257de7d8410376365bd2dd213f8b56",
           "from": "en",
-          "sourceSha256": "f6ec34054fb5f1e94aed76c154ccdfda5c94ec8ec7b312e04a665532fefbdbbf"
+          "sourceSha256": "d9a20f18f83752b0c447612d4c677a65336cb2a8b2190a979103a6ee8090a25a"
         }
       }
     },
@@ -3508,13 +3508,13 @@
       "files": {
         "en": {
           "path": "CHANGELOG.md",
-          "sha256": "ed614e5c0edd4f15e3456dde969954b5dba22e892d12b70fb48624557354e6f4"
+          "sha256": "35da4f0b381cf717ef6fd90190e5ae8c1dc940e00d40fd1ab28a86ad5a7ab07c"
         },
         "ko": {
           "path": "CHANGELOG.ko.md",
-          "sha256": "fd418d78000b2f9f1fcadc3a386a642880be9c4ab4a7dee70fe278e7c211ec3c",
+          "sha256": "f428bc476bfecbb4eaeeb80f85a7ebb51cc0b09e6fd20c5b8f0e34b14f564e10",
           "from": "en",
-          "sourceSha256": "ed614e5c0edd4f15e3456dde969954b5dba22e892d12b70fb48624557354e6f4"
+          "sourceSha256": "35da4f0b381cf717ef6fd90190e5ae8c1dc940e00d40fd1ab28a86ad5a7ab07c"
         }
       }
     },

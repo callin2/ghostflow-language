@@ -663,8 +663,8 @@ input moisture?: Percent;
 次は選定済みの制御構文です。
 
 > **実装状況。** 現在のコンパイラは、型付きの`match`と`match always`を受け付けます。
-> `where`と、型を省略した存在のみのmatchはまだサポートされていません。以下の例の`where`節は
-> 設計表記です。
+> 型を省略した match は有効化時に能力の存在を確認します。
+> `where` はマッチした能力の kind、name、type を定数の真偽条件で比較できます。
 
 ```ghost
 adapt irrigation_policy {

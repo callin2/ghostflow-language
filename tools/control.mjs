@@ -1275,7 +1275,7 @@ class ControlParser {
       return this.node('list', token, { values });
     }
     if (token.kind === 'number' || token.kind === 'time-literal' || token.kind === 'context-literal' || token.kind === 'string') {
-      return this.node('literal', token, { raw: token.value });
+      return this.node('literal', token, { raw: token.value, ...(token.kind === 'string' ? { stringLiteral: true } : {}) });
     }
     if (token.kind === 'identifier') {
       if (token.value === 'true' || token.value === 'false') return this.node('literal', token, { raw: token.value });
@@ -1759,7 +1759,7 @@ class Lowerer {
     ] : [];
     const strategyForms = this.adaptStrategies.length
       ? this.adaptStrategies.map(strategy => [
-        'strategy', strategy.name, String(strategy.priority), ['device', ['all', ...[
+        'strategy', strategy.name, String(strategy.priority), ['device', strategy.where === false ? 'false' : ['all', ...[
           ...this.manifest.outputs.map(output => ['has', 'actuator', output.name, gfbType(semanticType(output.type))]),
           ...strategy.match.capabilities.map(capability => ['has', capability.kind, capability.role, gfbType(capability.resolvedType)]),
         ]]], ...transitions, ...this.windowForms(), ...this.trueForForms(),
@@ -2472,6 +2472,48 @@ class Lowerer {
     this.manifest.continuousResourcePolicies = this.continuousPolicies.map(({ requests, ceilings, ...policy }) => ({ ...policy,
       requests: requests.map(({ rails, ...entry }) => entry), ceilings: ceilings.map(({ rails, ...entry }) => entry) }));
   }
+  strategyMetadataPredicate(node, capabilities) {
+    const invalid = value => error(value.loc, 'strategy where accepts only matched capability kind, name and type with constant Bool comparisons');
+    const metadata = value => {
+      if (value.kind !== 'member') return null;
+      const matched = capabilities.get(value.base);
+      if (!matched) error(value.loc, `strategy where references unmatched capability ${value.base}`);
+      if (value.member === 'kind') return { field: 'kind', value: matched.kind };
+      if (value.member === 'name') return { field: 'name', value: matched.role };
+      if (value.member === 'type') return { field: 'type', value: typeNameOf(matched.resolvedType) };
+      return invalid(value);
+    };
+    const constant = (value, field) => {
+      if (field === 'type' && value.kind === 'reference') return typeNameOf(this.resolveType({ name: value.name, loc: value.loc }));
+      if (field === 'kind') {
+        const name = value.kind === 'reference' ? value.name : value.kind === 'literal' ? value.raw : null;
+        if (name === 'sensor' || name === 'actuator') return name;
+      }
+      if (field === 'name' && value.stringLiteral) return value.raw;
+      return invalid(value);
+    };
+    const evaluate = value => {
+      if (value.kind === 'literal' && !value.stringLiteral && ['true', 'false'].includes(value.raw)) return value.raw === 'true';
+      if (value.kind === 'unary' && value.op === '!') return !evaluate(value.value);
+      if (value.kind === 'binary' && ['&&', '||'].includes(value.op)) {
+        const left = evaluate(value.left), right = evaluate(value.right);
+        return value.op === '&&' ? left && right : left || right;
+      }
+      if (value.kind === 'binary' && ['==', '!='].includes(value.op)) {
+        const left = metadata(value.left), right = metadata(value.right);
+        if (left && right && left.field !== right.field) return invalid(value);
+        const field = left?.field ?? right?.field;
+        const a = left?.value ?? (field ? constant(value.left, field) : evaluate(value.left));
+        const b = right?.value ?? (field ? constant(value.right, field) : evaluate(value.right));
+        return value.op === '==' ? a === b : a !== b;
+      }
+      return invalid(value);
+    };
+    // The typed HAS query already fixes all three supported fields. Folding
+    // the predicate keeps activation on the existing native/WASM query ABI.
+    return evaluate(node);
+  }
+
   addAdapt(item) {
     const strategyNames = new Set();
     if (!this.outputs.size) error(item.loc, 'adapt policy requires at least one output');
@@ -2479,7 +2521,6 @@ class Lowerer {
       rejectName(strategy.name, strategy.loc, 'strategy');
       if (strategyNames.has(strategy.name)) error(strategy.loc, `duplicate strategy ${strategy.name}`);
       strategyNames.add(strategy.name);
-      if (strategy.where) error(strategy.where.loc, 'strategy where metadata predicates are not yet supported');
       const seenCapabilities = new Set(), matchedSensors = new Set();
       for (const capability of strategy.match.capabilities) {
         const key = `${capability.kind}:${capability.role}`;
@@ -2505,6 +2546,9 @@ class Lowerer {
           } else capability.resolvedType = declared.type;
         } else error(capability.loc, `unsupported strategy capability kind ${capability.kind}`);
       }
+      const where = strategy.where
+        ? this.strategyMetadataPredicate(strategy.where, new Map(strategy.match.capabilities.map(item => [item.role, item])))
+        : undefined;
       const localValues = new Map(), intents = new Map();
       this.currentStrategy = { name: strategy.name, matchedSensors, localValues };
       for (const statement of strategy.body) {
@@ -2529,7 +2573,7 @@ class Lowerer {
         error(strategy.loc, `strategy ${strategy.name} must connect output ${output.name}`);
       }
       this.adaptStrategies.push({
-        name: strategy.name, priority: strategy.priority, match: strategy.match,
+        name: strategy.name, priority: strategy.priority, match: strategy.match, where,
         intents: [...intents.entries()],
       });
       this.manifest.strategies ??= [];
@@ -2538,6 +2582,7 @@ class Lowerer {
         match: strategy.match.always ? 'always' : strategy.match.capabilities.map(capability => ({
           role: capability.role, kind: capability.kind, type: capability.resolvedType.kind,
         })),
+        ...(where === undefined ? {} : { where }),
         outputNames: [...intents.keys()],
       });
       this.currentStrategy = null;

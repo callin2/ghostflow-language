@@ -624,8 +624,8 @@ input moisture?: Percent;
 以下是选定的控制语法。
 
 > **实现状态。** 当前编译器接受带类型的 `match` 和 `match always`。
-> 尚不支持 `where`，也不支持省略类型、仅检查存在性的匹配。下面示例中的 `where`
-> 子句是设计写法。
+> 省略类型的匹配会在激活时检查能力是否存在。
+> `where` 支持对匹配能力的 kind、name、type 进行常量布尔比较。
 
 ```ghost
 adapt irrigation_policy {
