@@ -7,9 +7,12 @@ import { buildPortablePackage, verifyPortablePackage } from '../tools/portable-p
 import { compileSource } from './helpers/literate-compile.mjs';
 import { ControlRuntime } from '../runtimes/wasm/control-runtime.mjs';
 
-const code = ({ duration = '5min', start = '((enabled |> recover(false)) && dawn.due)', comparator = '<', output = "active'" } = {}) => `control DawnDemo {
-  config enabled: Bool = true { access = operator; }
-  schedule dawn: Solar { timezone = "Asia/Seoul"; latitude = 37.5665; longitude = 126.978; at = sun\`rise\`; basis = pulse; when = true; clock = trusted_only; gap = skip_after(60s); recovery = baseline; fallback = skip; }
+const solarSchedule = 'schedule dawn: Solar { timezone = "Asia/Seoul"; latitude = 37.5665; longitude = 126.978; at = sun`rise`;';
+const enableConfig = 'config enabled: Bool = true { access = operator; }';
+const code = ({ duration = '5min', start = '((enabled |> recover(false)) && dawn.due)', comparator = '<', output = "active'",
+  schedule = solarSchedule, config = enableConfig } = {}) => `control DawnDemo {
+  ${config}
+  ${schedule} basis = pulse; when = true; clock = trusted_only; gap = skip_after(60s); recovery = baseline; fallback = skip; }
   state active: Bool = false;
   timer elapsedActive = elapsed(active);
   active' = if active then elapsedActive ${comparator} ${duration} else ${start};
@@ -32,6 +35,47 @@ test('the installed Solar timed latch gets source-derived monitoring metadata wi
   const changed = await compileSource(code({ duration: '7min' }), { filename: 'solar-five-minute.ghost' });
   assert.equal(changed.manifest.monitoring.patterns[0].durationMs, 420_000);
   assert.notEqual(digest(changed.bytes), digest(compiled.bytes));
+});
+
+test('the Periodic and UTC DailySlots monitoring duration matches the actual timed output', async t => {
+  const plannedWallMs = Date.UTC(2026, 9, 1, 6);
+  const bootEpoch = 7;
+  const bounds = { bootEpoch, terminalCapacity: 8 };
+  const forms = [
+    {
+      name: 'Periodic',
+      schedule: 'schedule dawn: Periodic { every = 15min; anchor = instant(datetime`2026-10-01T00:00:00Z`); interval_change = preserve_anchor;',
+      options: { context: { ...bounds, bindings: [] } },
+      facts: (site, clock) => ({ contextFacts: { clock, natural: [], settings: null,
+        schedules: [{ site, coverageStartMs: plannedWallMs - 1, coverageEndMs: plannedWallMs + 600_000,
+          provider: null, calendar: null, rows: [] }] } }),
+    },
+    {
+      name: 'UTC DailySlots',
+      schedule: 'schedule dawn: DailySlots<15min> { timezone = "UTC"; selected = [06:00, 18:45]; dst_missing = skip; dst_repeated = first;',
+      options: { schedule: bounds },
+      facts: (site, clock) => ({ scheduleFacts: { clock,
+        schedules: [{ kind: 'daily-slots', site, coverageFromWallMs: plannedWallMs - 1,
+          coverageToWallMs: plannedWallMs + 600_000, rows: [{ sourceDay: Math.floor(plannedWallMs / 86_400_000),
+            slotKey: 361, minuteOfDay: 360, fold: 0, scheduledWallMs: plannedWallMs, available: true,
+            providerRevision: 'fixture-utc-v1', contextRevision: 'fixture-utc-v1' }] }] } }),
+    },
+  ];
+  const wasm = readFileSync(new URL('../target/wasm32-unknown-unknown/release/ghostflow_wasm.wasm', import.meta.url));
+  for (const form of forms) await t.test(form.name, async t => {
+    const source = code({ start: 'dawn.due', schedule: form.schedule, config: '' });
+    const compiled = await compileSource(source, { filename: 'monitoring-schedule.ghost' });
+    assert.deepEqual(compiled.manifest.monitoring.patterns, [expectedPattern]);
+    const runtime = await ControlRuntime.instantiate(wasm, compiled, form.options);
+    t.after(() => runtime.dispose());
+    const site = compiled.manifest.schedules[0].site;
+    const step = nowMs => runtime.step({ nowMs, ...form.facts(site, {
+      monotonicMs: nowMs, bootEpoch, wallMs: plannedWallMs - 1 + nowMs,
+      trusted: true, uncertaintyMs: 0, unknownReason: null, sourceRevision: 'fixture-clock-v1',
+    }) }).vm.safe.running;
+    const end = 1 + compiled.manifest.monitoring.patterns[0].durationMs;
+    assert.deepEqual([0, 1, end - 1, end].map(step), [false, true, true, false]);
+  });
 });
 
 test('only a positive required schedule conjunction and a direct post-state output are covered', async () => {
