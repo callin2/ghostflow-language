@@ -1385,6 +1385,55 @@ fn weekday_daily_pause_suppresses_crossing_and_keeps_next_day_eligible() {
     );
 }
 
+#[test]
+fn weekday_daily_retention_is_bounded_across_two_hundred_days_and_reboot() {
+    use ghostflow_core::solar_admission::SolarFact;
+    use ghostflow_core::solar_runtime::ScheduleKind;
+    let mut runtime = weekday_daily_runtime(0);
+    let mut last_checkpoint = Vec::new();
+    for day in 4..204 {
+        let planned = day as u64 * 86_400_000 + 1000;
+        let rows = [SolarFact::available(day, planned, "iana-v1", "zone-v1")];
+        daily_tick(
+            &mut runtime,
+            planned - 100,
+            planned - 100,
+            &rows,
+            ScheduleKind::Daily,
+            planned + 1000,
+        )
+        .unwrap();
+        let tick = daily_tick(
+            &mut runtime,
+            planned,
+            planned,
+            &rows,
+            ScheduleKind::Daily,
+            planned + 1000,
+        )
+        .unwrap();
+        let weekday = (day + 4) % 7;
+        assert_eq!(
+            tick.safe_intents["due"],
+            Value::Bool((1..=5).contains(&weekday))
+        );
+        last_checkpoint = runtime.schedule_checkpoint().unwrap();
+        assert_eq!(last_checkpoint.len(), 33, "one terminal day only");
+    }
+    let mut reboot = weekday_daily_runtime(0);
+    reboot
+        .restore_schedule_checkpoint(&last_checkpoint)
+        .unwrap();
+    let old = [SolarFact::available(4, 1000, "iana-v1", "zone-v1")];
+    daily_tick(&mut reboot, 0, 900, &old, ScheduleKind::Daily, 2000).unwrap();
+    assert_eq!(
+        daily_tick(&mut reboot, 100, 1000, &old, ScheduleKind::Daily, 2000)
+            .unwrap()
+            .safe_intents["due"],
+        Value::Bool(false)
+    );
+}
+
 fn daily_slots_entry(slots: &[(u16, u16)], repeated: u8, when: &[u8]) -> Vec<u8> {
     let mut b = vec![4];
     b.extend(7u32.to_le_bytes());

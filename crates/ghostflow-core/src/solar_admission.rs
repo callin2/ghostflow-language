@@ -116,6 +116,7 @@ pub struct SolarPulseEngine {
     clock: ScheduleClockGate,
     terminal_days: Vec<(i32, u16, u8)>,
     terminal_capacity: usize,
+    compact_daily: bool,
     generation: u64,
     owner_id: u32,
 }
@@ -137,6 +138,27 @@ pub struct SolarStage {
 }
 
 impl SolarPulseEngine {
+    pub(crate) fn with_daily_compaction(mut self, enabled: bool) -> Self {
+        self.compact_daily = enabled;
+        self
+    }
+
+    fn is_terminal(&self, id: &(i32, u16, u8)) -> bool {
+        self.terminal_days.contains(id)
+            || (self.compact_daily && self.terminal_days.iter().any(|old| old.0 > id.0))
+    }
+
+    fn compact_terminal_days(&mut self) -> Result<()> {
+        if self.compact_daily {
+            if let Some(latest) = self.terminal_days.iter().map(|id| id.0).max() {
+                self.terminal_days.retain(|id| id.0 == latest);
+            }
+        }
+        if self.terminal_days.len() > self.terminal_capacity {
+            return Err(Error::new("solar terminal ledger capacity exceeded"));
+        }
+        Ok(())
+    }
     pub(crate) fn reset_observation_baseline(&mut self, boot_epoch: u64) -> Result<()> {
         self.clock = ScheduleClockGate::new(self.gap_ms, boot_epoch)?;
         Ok(())
@@ -178,6 +200,7 @@ impl SolarPulseEngine {
             clock: ScheduleClockGate::new(gap_ms, boot_epoch)?,
             terminal_days: Vec::with_capacity(terminal_capacity),
             terminal_capacity,
+            compact_daily: false,
             generation: 0,
             owner_id: NEXT_OWNER.fetch_add(1, Ordering::Relaxed),
         })
@@ -360,7 +383,7 @@ impl SolarPulseEngine {
             let corrections: Vec<&SolarFact> = facts
                 .rows
                 .iter()
-                .filter(|fact| !engine.terminal_days.contains(&identity(fact)))
+                .filter(|fact| !engine.is_terminal(&identity(fact)))
                 .filter(|fact| fact.availability == SolarFactAvailability::Available)
                 .filter(|fact| {
                     fact.scheduled_wall_ms
@@ -405,7 +428,7 @@ impl SolarPulseEngine {
         let crossed: Vec<&SolarFact> = all_crossed
             .iter()
             .copied()
-            .filter(|fact| !engine.terminal_days.contains(&identity(fact)))
+            .filter(|fact| !engine.is_terminal(&identity(fact)))
             .collect();
         if crossed.is_empty() {
             result.decision = SolarDecision::AlreadyTerminal;
@@ -449,7 +472,7 @@ impl SolarPulseEngine {
             });
         }
         let fact = crossed[0];
-        if engine.terminal_days.contains(&identity(fact)) {
+        if engine.is_terminal(&identity(fact)) {
             result.decision = SolarDecision::AlreadyTerminal;
         } else {
             result
@@ -474,6 +497,7 @@ impl SolarPulseEngine {
             clock: self.clock.clone(),
             terminal_days: self.terminal_days.clone(),
             terminal_capacity: self.terminal_capacity,
+            compact_daily: self.compact_daily,
             generation: self.generation,
             owner_id: self.owner_id,
         }
@@ -497,6 +521,7 @@ impl SolarPulseEngine {
             return Err(Error::new("solar admission predicate was not evaluated"));
         }
         let mut next = stage.engine;
+        next.compact_terminal_days()?;
         next.generation = self.generation.saturating_add(1);
         *self = next;
         Ok(stage.result)
@@ -532,7 +557,7 @@ impl SolarStage {
         let pending_index = pending[0];
         let row = &self.result.observations[pending_index];
         let day = (row.source_day, row.slot_key, row.fold);
-        if self.engine.terminal_days.contains(&day) {
+        if self.engine.is_terminal(&day) {
             self.result.decision = SolarDecision::AlreadyTerminal;
             self.result.observations[pending_index].decision = SolarDecision::AlreadyTerminal;
             return Ok(self);
@@ -545,7 +570,9 @@ impl SolarStage {
             self.evaluated = true;
             return Ok(self);
         }
-        if self.engine.terminal_days.len() >= self.engine.terminal_capacity {
+        if !self.engine.compact_daily
+            && self.engine.terminal_days.len() >= self.engine.terminal_capacity
+        {
             return Err(Error::new("solar terminal ledger capacity exceeded"));
         }
         self.engine.terminal_days.push(day);
@@ -594,7 +621,7 @@ fn terminalize_past(
     let past: Vec<&SolarFact> = facts
         .rows
         .iter()
-        .filter(|fact| !engine.terminal_days.contains(&identity(fact)))
+        .filter(|fact| !engine.is_terminal(&identity(fact)))
         .filter(|fact| fact.availability == SolarFactAvailability::Available)
         .filter(|fact| fact.scheduled_wall_ms.is_some_and(|at| at <= current_wall))
         .collect();
@@ -609,7 +636,9 @@ fn terminalize_past(
 }
 
 fn ensure_capacity(engine: &SolarPulseEngine, additions: usize) -> Result<()> {
-    if engine.terminal_days.len().saturating_add(additions) > engine.terminal_capacity {
+    if !engine.compact_daily
+        && engine.terminal_days.len().saturating_add(additions) > engine.terminal_capacity
+    {
         return Err(Error::new("solar terminal ledger capacity exceeded"));
     }
     Ok(())

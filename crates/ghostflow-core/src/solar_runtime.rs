@@ -318,10 +318,12 @@ impl SolarRuntime {
                     },
                 )
                 .map(|engine| {
-                    engine.with_fallback_timezone(match d {
-                        PulseDescriptor::Solar(s) => &s.timezone,
-                        _ => "",
-                    })
+                    engine
+                        .with_daily_compaction(matches!(d, PulseDescriptor::Daily(_)))
+                        .with_fallback_timezone(match d {
+                            PulseDescriptor::Solar(s) => &s.timezone,
+                            _ => "",
+                        })
                 })
             })
             .collect::<Result<_>>()?;
