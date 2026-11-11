@@ -5,9 +5,9 @@
       "id": "PC-01",
       "source": {
         "canonicalPath": "docs/ProgrammingInGhostflow.md",
-        "canonicalSha256": "fd3b902ed09197d9248b1291b86a7e388b99775c1970296fe3f17ac32feb6c1f",
+        "canonicalSha256": "bd577be86b2ba8fa5e1a20b1b37f28d761ea080ef8bbf27edf96f0c78cb66c43",
         "executablePath": "examples/curriculum/generated/pc-01-e01.generated.ghost.md",
-        "executableSha256": "d015f05b9ae21a997846a4eaa8904e089128d4c6090fd4f6a4609040a405f1db"
+        "executableSha256": "e4377d03c919500d969e9919e83d82c70debd3beaa8be0408f6de9db9729a9ef"
       },
       "inputs": [
         "switch_on"

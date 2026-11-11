@@ -268,6 +268,8 @@ GhostFlowは、厳密な個数を符号付き32ビットの`Int`で表します�
 <a id="quantity-type-lookup"></a>
 ### 測定値に合う型を探す
 
+[温室の換気扇の例](#hot-greenhouse-fan)で30°Cを入力してみましょう。
+
 摂氏で測定する場合でも、型名は`Temperature`です。`Celsius`や`Fahrenheit`という名前の型を宣言しないでください。代わりに値に単位を付けます。`input air: Temperature;`と宣言し、しきい値は`30°C`と書きます。`30°C`、`86°F`、`303.15K`は同じ絶対温度を表します。単位の変換と温度制御については[第14章](#ch14)で続けて説明します。
 
 | 測定するもの | 宣言の型 | 値の例 | 入力の宣言 |
@@ -2004,6 +2006,28 @@ control KelvinHeater {
     on_below: 291.15K, off_above: 295.15K, initial: false);
   output heater: Bool;
   heater <- cold |> recover(false);
+}
+```
+
+<a id="hot-greenhouse-fan"></a>
+### E38 — 温室が暑くなったら換気扇を回す
+
+仮想温室の温度を `28°C → 30°C → 28°C → 26°C` に変えます。換気扇は `停止 → 運転 → 運転 → 停止` と変わります。`29°C` を超えると運転し、`27°C` を下回ると停止します。境界値では直前の状態を保ちます。
+
+`cool` は涼しい状態かどうかを記憶します。正常な観測値ではその反対を換気扇に送ります。この例では、新しい観測が3秒間届かず温度が古くなると換気扇を停止します。
+
+```ghost
+// E38
+control GreenhouseVentilation {
+  input air: Temperature {
+    sample = 1s;
+    valid = -40°C .. 50°C;
+    stale_after = 3s;
+  }
+  signal cool = hysteresis(air,
+    on_below: 27°C, off_above: 29°C, initial: true);
+  output fan: Bool;
+  fan <- case cool { ok(value) => !value; fault(_) => false; };
 }
 ```
 

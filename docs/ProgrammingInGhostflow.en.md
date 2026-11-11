@@ -265,6 +265,8 @@ Keep values whose units affect control decisions, such as temperature, flow, and
 <a id="quantity-type-lookup"></a>
 ### Find the type for your measurement
 
+Try a 30°C reading in the [greenhouse fan example](#hot-greenhouse-fan).
+
 Even when you measure in Celsius, the type name is `Temperature`. Do not declare a type named `Celsius` or `Fahrenheit`. Put the unit on the value instead: declare `input air: Temperature;` and write a threshold as `30°C`. `30°C`, `86°F`, and `303.15K` represent the same absolute temperature. [Chapter 14](#ch14) continues with unit conversions and temperature control.
 
 | Measurement | Declaration type | Example value | Input declaration |
@@ -2184,6 +2186,28 @@ control KelvinHeater {
     on_below: 291.15K, off_above: 295.15K, initial: false);
   output heater: Bool;
   heater <- cold |> recover(false);
+}
+```
+
+<a id="hot-greenhouse-fan"></a>
+### E38 — Turn on a fan when the greenhouse gets hot
+
+Set the virtual greenhouse temperature to `28°C → 30°C → 28°C → 26°C`. The fan goes `off → on → on → off`. It turns on above `29°C` and off below `27°C`. At either threshold it keeps its previous state.
+
+`cool` remembers whether the greenhouse is cool. A valid observation sends the opposite value to the fan. In this example the fan turns off when the temperature reading goes stale after three seconds without a new sample.
+
+```ghost
+// E38
+control GreenhouseVentilation {
+  input air: Temperature {
+    sample = 1s;
+    valid = -40°C .. 50°C;
+    stale_after = 3s;
+  }
+  signal cool = hysteresis(air,
+    on_below: 27°C, off_above: 29°C, initial: true);
+  output fan: Bool;
+  fan <- case cool { ok(value) => !value; fault(_) => false; };
 }
 ```
 
