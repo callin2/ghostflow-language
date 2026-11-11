@@ -4,6 +4,10 @@
 //! Persistence writes are owned by the host. The host must persist a snapshot
 //! before treating a mutation as durable or using it to authorize protected work.
 
+#[path = "rolling_output.rs"]
+mod rolling_output;
+pub use rolling_output::{OutputAdmission, OutputLease, RollingOutputOwner, RollingOutputPolicy};
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct AccountingConfig {
     pub max_intervals: usize,
