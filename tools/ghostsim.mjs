@@ -354,7 +354,7 @@ export function loadVerifiedArtifact(artifactPath) {
   const manifest = JSON.parse(fs.readFileSync(`${artifactPath}.manifest.json`, 'utf8'));
   const map = JSON.parse(fs.readFileSync(`${artifactPath}.map.json`, 'utf8'));
   const document = verifyArtifactSourceMap(map, artifactBytes, { manifest });
-  if (!/^GhostFlow\/control-v(?:[1-9]|10|12|13|14|15|18|21)$/u.test(manifest.format)) throw new Error('artifact must be an executable control artifact');
+  if (!/^GhostFlow\/control-v(?:[1-9]|10|12|13|14|15|18|21|26)$/u.test(manifest.format)) throw new Error('artifact must be an executable control artifact');
   if (manifest.bytecodeSha256 !== sha256(artifactBytes)) throw new Error('artifact SHA-256 mismatch');
   return { artifactBytes, manifest, map, document };
 }

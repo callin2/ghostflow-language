@@ -1771,6 +1771,7 @@ after_event は、`executable:false` の時間的ディスクリプタを生成�
 
 | Builtin | シグネチャと目的 | コンテキスト、境界、例 |
 |---|---|---|
+| `local_day_is` | ``local_day_is(day`mon..fri`, timezone: "Asia/Seoul") -> Result<Bool,ClockFault>`` | 信頼できる現在の現地日付の曜日を判定します。新たな開始を許可する条件に使う前に、クロックの障害を明示的に処理します。 [平日の3区画の例](../tests/monitoring-plan.test.mjs). |
 | `calendar_is` | ``calendar_is(calendar, day`workday` or day`offday` or day`holiday`) -> Result<Bool,CalendarFault>`` | GFB18 で明示的な UTC バインディングを持つ、型付きの WorkCalendar または HolidayCalendar。欠落、対象期間外、期限切れ、信頼できないクロックの事実は故障を保持する。成功した Bool を否定する前に、故障を明示的に扱うこと。[実行済みのカレンダー境界](../tests/reference-calendar-boundary.test.mjs)。 |
 | `tide_is` | ``tide_is(provider, tide`spring` or tide`neap`) -> Result<Bool,TemporalContextFault>`` | 宣言済みの TidePredictions プロバイダ。予測やクロックのコンテキストが欠落している、または古い場合は故障となる。[自然条件](../tests/natural-condition-contract.test.mjs)。 |
 | `moon_is` | ``moon_is(provider, moon`phase`) -> Result<Bool,TemporalContextFault>`` | LunarEphemeris プロバイダ。月相は new, waxing_crescent, first_quarter, waxing_gibbous, full, waning_gibbous, last_quarter, waning_crescent。[自然条件](../tests/natural-condition-contract.test.mjs)。 |

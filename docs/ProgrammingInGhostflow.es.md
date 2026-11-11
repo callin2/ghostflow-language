@@ -2053,6 +2053,7 @@ un `Result`.
 
 | Función integrada | Firma y propósito | Contexto, límites y ejemplo |
 |---|---|---|
+| `local_day_is` | ``local_day_is(day`mon..fri`, timezone: "Asia/Seoul") -> Result<Bool,ClockFault>`` | Comprueba el día de la semana de la fecha local fiable actual. Maneje explícitamente los fallos de reloj antes de permitir un nuevo inicio. [Ejemplo de tres zonas](../tests/monitoring-plan.test.mjs). |
 | `calendar_is` | ``calendar_is(calendar, day`workday` or day`offday` or day`holiday`) -> Result<Bool,CalendarFault>`` | WorkCalendar o HolidayCalendar tipado con una vinculación UTC explícita en GFB18. Los hechos ausentes, fuera de cobertura, vencidos o con reloj no fiable conservan un fallo; manéjelo explícitamente antes de negar el Bool correcto. [Límites de calendario ejecutados](../tests/reference-calendar-boundary.test.mjs). |
 | `tide_is` | ``tide_is(provider, tide`spring` or tide`neap`) -> Result<Bool,TemporalContextFault>`` | Proveedor TidePredictions declarado. Una predicción ausente u obsoleta, o un contexto de reloj ausente u obsoleto, es un fallo. [Condiciones naturales](../tests/natural-condition-contract.test.mjs). |
 | `moon_is` | ``moon_is(provider, moon`phase`) -> Result<Bool,TemporalContextFault>`` | Proveedor LunarEphemeris; fases: new, waxing_crescent, first_quarter, waxing_gibbous, full, waning_gibbous, last_quarter, waning_crescent. [Condiciones naturales](../tests/natural-condition-contract.test.mjs). |

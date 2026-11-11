@@ -2283,31 +2283,31 @@
       "files": {
         "en": {
           "path": "docs/ProgrammingInGhostflow.en.md",
-          "sha256": "3bf42f22c8536776b2f0a34170bc5df20b2e8ac57fb7c577d4f054ad559b5b39"
+          "sha256": "1d6bf716aaa6889623c271ce903d6e19c7c7a2d9e058974e02278a5ffc628fbf"
         },
         "ko": {
           "path": "docs/ProgrammingInGhostflow.md",
-          "sha256": "0f1e97e874f694f380702914449cc829126dc6dfe5c10230150b80a8025bd707",
+          "sha256": "fd3b902ed09197d9248b1291b86a7e388b99775c1970296fe3f17ac32feb6c1f",
           "from": "en",
-          "sourceSha256": "3bf42f22c8536776b2f0a34170bc5df20b2e8ac57fb7c577d4f054ad559b5b39"
+          "sourceSha256": "1d6bf716aaa6889623c271ce903d6e19c7c7a2d9e058974e02278a5ffc628fbf"
         },
         "zh": {
           "path": "docs/ProgrammingInGhostflow.zh.md",
-          "sha256": "4e653040c40d5c826ea875704b30737412e6ae9c1377d6a81a2cedfd5e430ecf",
+          "sha256": "7fa1d3f0c6040fa4e21ed511fd71aac64b47541ab1286e7c4af1bafb2d030afb",
           "from": "en",
-          "sourceSha256": "3bf42f22c8536776b2f0a34170bc5df20b2e8ac57fb7c577d4f054ad559b5b39"
+          "sourceSha256": "1d6bf716aaa6889623c271ce903d6e19c7c7a2d9e058974e02278a5ffc628fbf"
         },
         "es": {
           "path": "docs/ProgrammingInGhostflow.es.md",
-          "sha256": "521cb55fb639a05e16f7542eebe9d8300cf55a467a33df73fc1b627a3e26790a",
+          "sha256": "5f2c83b27380c99c9d846d287406d423a03a32fc243809c66c369fb1ebdad2ac",
           "from": "en",
-          "sourceSha256": "3bf42f22c8536776b2f0a34170bc5df20b2e8ac57fb7c577d4f054ad559b5b39"
+          "sourceSha256": "1d6bf716aaa6889623c271ce903d6e19c7c7a2d9e058974e02278a5ffc628fbf"
         },
         "ja": {
           "path": "docs/ProgrammingInGhostflow.ja.md",
-          "sha256": "376a4af5af5ae68a7eddbbca0f124fa6dd804a647feb6cf36edb664072089cd3",
+          "sha256": "40b3550d5c48658cfebd78ebbc01d691962212edd142ee425f3f0b8d32782e42",
           "from": "en",
-          "sourceSha256": "3bf42f22c8536776b2f0a34170bc5df20b2e8ac57fb7c577d4f054ad559b5b39"
+          "sourceSha256": "1d6bf716aaa6889623c271ce903d6e19c7c7a2d9e058974e02278a5ffc628fbf"
         }
       }
     },
