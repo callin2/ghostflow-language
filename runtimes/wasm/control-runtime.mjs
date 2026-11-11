@@ -36,6 +36,7 @@ const CALENDAR_EXECUTION_FORMAT = 'GhostFlow/control-v18';
 const RANGE_LIVE_START_FORMAT = 'GhostFlow/control-v19';
 const TIMESLOTS_RANGE_FORMAT = 'GhostFlow/control-v20';
 const CIVIL_RANGE_FORMAT = 'GhostFlow/control-v21';
+const WEEKDAY_DAILY_FORMAT = 'GhostFlow/control-v27';
 const contextManifest = manifest => manifest?.format === STREAM_CONTEXT_FORMAT
   || manifest?.format === RANGE_LIVE_START_FORMAT
   || manifest?.format === TIMESLOTS_RANGE_FORMAT
@@ -46,6 +47,7 @@ const contextManifest = manifest => manifest?.format === STREAM_CONTEXT_FORMAT
   || manifest?.format === AT_FORMAT
   || manifest?.format === AT_WINDOW_FORMAT
   || manifest?.format === NATURAL_WEEKDAY_FORMAT
+  || manifest?.format === WEEKDAY_DAILY_FORMAT
   || manifest?.format === AVAILABILITY_FORMAT && !manifest.schedules?.some(item => item.kind === 'solar');
 
 /** Select an existing reference entry explicitly; never retry after a dispatch error. */
@@ -271,7 +273,7 @@ function validateContextManifest(input, bytecodeFormat) {
     ['providers','calendars','naturalConditions','calendarConditions','accounting','resources','objectives','adaptSettings','lifecycle','legacyAdmission','requiredRuntimeFeatures','sensorInstances','monitoring'], 'manifest');
   validateRequiredRuntimeFeatures(manifest);
   const lifecycle = validateLifecycleManifest(manifest);
-  if (manifest.format === NATURAL_WEEKDAY_FORMAT ? bytecodeFormat !== 24 : manifest.format === AT_WINDOW_FORMAT ? bytecodeFormat !== 23 : manifest.format === CIVIL_RANGE_FORMAT ? bytecodeFormat !== 21 : manifest.format === TIMESLOTS_RANGE_FORMAT ? bytecodeFormat !== 20 : manifest.format === RANGE_LIVE_START_FORMAT ? bytecodeFormat !== 19 : manifest.format === CALENDAR_EXECUTION_FORMAT ? bytecodeFormat !== 18 : manifest.format === SOLAR_CONTEXT_FORMAT ? bytecodeFormat !== 16 : manifest.format === HOLIDAY_FORMAT ? bytecodeFormat !== 15 : manifest.format === AT_FORMAT ? bytecodeFormat !== 14 : manifest.format === AVAILABILITY_FORMAT ? bytecodeFormat !== 13 : ![11, 12].includes(bytecodeFormat)) throw new Error('context manifest requires its matching GFB format');
+  if (manifest.format === WEEKDAY_DAILY_FORMAT ? bytecodeFormat !== 27 : manifest.format === NATURAL_WEEKDAY_FORMAT ? bytecodeFormat !== 24 : manifest.format === AT_WINDOW_FORMAT ? bytecodeFormat !== 23 : manifest.format === CIVIL_RANGE_FORMAT ? bytecodeFormat !== 21 : manifest.format === TIMESLOTS_RANGE_FORMAT ? bytecodeFormat !== 20 : manifest.format === RANGE_LIVE_START_FORMAT ? bytecodeFormat !== 19 : manifest.format === CALENDAR_EXECUTION_FORMAT ? bytecodeFormat !== 18 : manifest.format === SOLAR_CONTEXT_FORMAT ? bytecodeFormat !== 16 : manifest.format === HOLIDAY_FORMAT ? bytecodeFormat !== 15 : manifest.format === AT_FORMAT ? bytecodeFormat !== 14 : manifest.format === AVAILABILITY_FORMAT ? bytecodeFormat !== 13 : ![11, 12].includes(bytecodeFormat)) throw new Error('context manifest requires its matching GFB format');
   name(manifest.name, 'manifest.name');
   if (!/^[0-9a-f]{64}$/.test(manifest.bytecodeSha256)) throw new Error('invalid bytecode SHA-256');
   const inputs = validateList(manifest.inputs, 'manifest.inputs', ['name','type'], ['canonicalUnit']);
@@ -313,6 +315,10 @@ function validateContextManifest(input, bytecodeFormat) {
     || item.day?.kind !== 'weekday' || !Number.isInteger(item.day.mask) || item.day.mask < 1 || item.day.mask > 127)
     || configs.length || calendars.length || naturals.length || calendarConditions.length || objectives.length
     || resources.length || adaptSettings.length || accounting)) throw new Error('weekday natural profile requires filtered Solar/Tide schedules');
+  if (manifest.format === WEEKDAY_DAILY_FORMAT && (!schedules.length || schedules.some(item => item.kind !== 'daily'
+    || item.day?.kind !== 'weekday' || !Number.isInteger(item.day.mask) || item.day.mask < 1 || item.day.mask > 127)
+    || configs.length || providers.length || calendars.length || naturals.length || calendarConditions.length
+    || objectives.length || resources.length || adaptSettings.length || accounting)) throw new Error('weekday Daily profile requires filtered Daily schedules');
   if (manifest.format === HOLIDAY_FORMAT && (!schedules.some(item => item.kind === 'daily' && item.day?.kind === 'holiday')
     || schedules.some(item => item.kind === 'at'))) throw new Error('Holiday profile requires Holiday Daily and excludes At');
   if ([AT_FORMAT, AT_WINDOW_FORMAT].includes(manifest.format) && (!schedules.length || schedules.some(item => item.kind !== 'at')

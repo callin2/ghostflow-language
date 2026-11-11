@@ -1734,6 +1734,15 @@ class Lowerer {
       }
       this.manifest.format = 'GhostFlow/control-v21';
     }
+    if (this.manifest.schedules.some(schedule => schedule.kind === 'daily' && schedule.day?.kind === 'weekday')) {
+      if (contextForms.some(form => form[0] !== 'daily-pulse')
+        || this.manifest.schedules.some(schedule => schedule.kind !== 'daily' || schedule.day?.kind !== 'weekday')
+        || ['configs','providers','calendars','naturalConditions','calendarConditions','objectives','resources','adaptSettings','signals']
+          .some(key => this.manifest[key]?.length) || this.manifest.accounting) {
+        error(this.ast.loc, 'weekday Daily profile requires filtered Daily schedules only');
+      }
+      this.manifest.format = 'GhostFlow/control-v27';
+    }
     if (this.manifest.schedules.some(schedule => schedule.day?.kind === 'weekday')) {
       if (solarForms.length || contextForms.some(form => !['solar-weekday-pulse', 'tide-weekday-run'].includes(form[0]))
         || this.manifest.schedules.some(schedule => !['solar', 'tide'].includes(schedule.kind) || schedule.day?.kind !== 'weekday')
@@ -2819,7 +2828,10 @@ class Lowerer {
     const match = /^day`([^`]+)`$/.exec(item.on.value);
     if (!match) error(item.on, 'Daily on requires a day tagged literal');
     const kind = match[1];
-    if (!['holiday', 'workday', 'offday'].includes(kind)) error(item.on, 'Daily day rule currently requires holiday, workday or offday');
+    if (['sun','mon','tue','wed','thu','fri','sat'].includes(kind) || kind.includes('..') || kind.includes(',')) {
+      return this.resolveNaturalWeekday(item);
+    }
+    if (!['holiday', 'workday', 'offday'].includes(kind)) error(item.on, 'Daily day rule requires a weekday, holiday, workday or offday');
     if (!item.calendar) error(item.on, `Daily ${kind} rule requires calendar`);
     const calendar = this.calendars.get(item.calendar.value);
     if (!calendar) error(item.calendar, `unknown calendar ${item.calendar.value}`);
@@ -4376,10 +4388,11 @@ class Lowerer {
   solarForms() {
     return this.manifest.schedules.filter(schedule => schedule.kind === 'solar' && !this.configStreams.length && !schedule.day
       || ['daily', 'daily-slots'].includes(schedule.kind) && schedule.policy.basis === 'pulse'
-        && schedule.policy.clock === 'trusted_only' && !schedule.day && !schedule.selectedConfig).map(schedule => schedule.kind === 'daily' ? [
+        && schedule.policy.clock === 'trusted_only' && (!schedule.day || schedule.day.kind === 'weekday') && !schedule.selectedConfig).map(schedule => schedule.kind === 'daily' ? [
       'daily-pulse', String(schedule.site), schedule.name, schedule.timezone, String(schedule.atMs),
       schedule.dstMissing, schedule.dstRepeated, schedule.policy.basis, schedule.policy.clock,
-      String(schedule.policy.gapMs), schedule.policy.recovery, schedule.policy.fallback, schedule.policy.when,
+      String(schedule.policy.gapMs), schedule.policy.recovery, schedule.policy.fallback,
+      ...(schedule.day?.kind === 'weekday' ? [String(schedule.day.mask)] : []), schedule.policy.when,
     ] : schedule.kind === 'daily-slots' ? [
       'daily-slots-pulse', String(schedule.site), schedule.name, schedule.timezone, String(schedule.gridMs),
       schedule.dstMissing, schedule.dstRepeated, schedule.policy.basis, schedule.policy.clock,
@@ -4412,7 +4425,7 @@ class Lowerer {
     const scheduleForms = this.manifest.schedules.filter(schedule => schedule.kind === 'solar' && (this.configStreams.length || schedule.day?.kind === 'weekday')
       || schedule.kind === 'at' || schedule.policy?.basis?.kind === 'range'
       || ['periodic', 'cron', 'tide'].includes(schedule.kind)
-      || schedule.kind === 'daily' && schedule.day?.calendar
+      || schedule.kind === 'daily' && (schedule.day?.calendar || schedule.day?.kind === 'weekday')
       || schedule.kind === 'daily-slots' && schedule.selectedConfig).map(schedule => {
       const base = [String(schedule.site), schedule.name, String(schedule.policy.gapMs)];
       const when = schedule.policy.when, cancel = schedule.policy.cancelWhen ?? 'false';
@@ -4448,7 +4461,7 @@ class Lowerer {
             String(schedule.policy.basis.durationMs), schedule.dstMissing, schedule.dstRepeated, when, cancel];
         }
         const starts = schedule.kind === 'daily' ? [schedule.atMs] : schedule.slots.map(minute => minute * 60_000);
-        if (schedule.day) return ['calendar-range', ...base, 'UTC', String(schedule.policy.basis.durationMs), '0', ['starts', ...starts.map(String)],
+        if (schedule.day?.calendar) return ['calendar-range', ...base, 'UTC', String(schedule.policy.basis.durationMs), '0', ['starts', ...starts.map(String)],
           schedule.day.calendar, schedule.day.kind, when, cancel];
         return ['utc-range', ...base, 'UTC', schedule.policy.basis.durationConfigId ? ['duration-config', String(schedule.policy.basis.durationConfigId)] : String(schedule.policy.basis.durationMs),
           String(schedule.policy.basis.startConfigId ?? 0), ['starts', ...starts.map(String)], when, cancel];
@@ -4469,6 +4482,9 @@ class Lowerer {
       }
       if (schedule.kind === 'daily') {
         if (schedule.policy.basis !== 'pulse') error(this.ast.loc, 'calendar Daily executable slice requires pulse');
+        if (schedule.day.kind === 'weekday') return ['daily-pulse', ...base, schedule.timezone,
+          String(schedule.atMs), schedule.dstMissing, schedule.dstRepeated, 'pulse', 'trusted_only',
+          schedule.gapMs, 'baseline', 'skip', String(schedule.day.mask), when];
         if (schedule.day.kind === 'holiday') return ['holiday-daily-pulse', ...base, schedule.timezone,
           String(schedule.atMs), schedule.day.calendar, schedule.dstMissing, schedule.dstRepeated, when, cancel];
         return ['calendar-daily-pulse', ...base, schedule.timezone, String(schedule.atMs), schedule.day.calendar,

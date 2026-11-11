@@ -404,8 +404,11 @@ function lowerCoreModule(ast) {
       else if(h==='daily-pulse'){
         if(!temporal)throw new CompileError('temporal module requires one temporal-context');
         if(seenExecutable)throw new CompileError('stateful prelude declarations must precede transitions and intents');
-        if(a.length!==12)throw new CompileError('daily-pulse expects 12 arguments');
-        const [siteAtom,scheduleName,timezone,atAtom,missingAtom,repeatedAtom,basisAtom,clockAtom,gapAtom,recoveryAtom,fallbackAtom,whenForm]=a;
+        if(![12,13].includes(a.length))throw new CompileError('daily-pulse expects 12 or 13 arguments');
+        const [siteAtom,scheduleName,timezone,atAtom,missingAtom,repeatedAtom,basisAtom,clockAtom,gapAtom,recoveryAtom,fallbackAtom,...tail]=a;
+        if (tail.length === 2 && format !== 27) throw new CompileError('weekday Daily requires control-v27');
+        const weekdayMask = tail.length === 2 ? Number(unsignedAtom(tail[0],127n,'invalid weekday mask')) : 0;
+        const whenForm = tail.length === 2 ? tail[1] : tail[0];
         const site=Number(unsignedAtom(siteAtom,4294967295n,'invalid schedule site'));
         if(site===0||preludeSites.has(site))throw new CompileError('invalid or duplicate prelude site');preludeSites.add(site);
         assertName(scheduleName,'schedule');if(preludeNames.has(scheduleName))throw new CompileError('duplicate prelude name');preludeNames.add(scheduleName);
@@ -417,7 +420,8 @@ function lowerCoreModule(ast) {
         const gapMs=unsignedAtom(gapAtom,9007199254740991n,'invalid schedule gap');if(gapMs===0n)throw new CompileError('invalid schedule gap');
         const when=checkedExpression(whenForm,{...env,windows,schedules},false);
         if(when.type!==TYPE.bool)throw new CompileError('invalid Daily predicate');
-        const schedule={site,name:scheduleName,timezone,atMs,dstMissing,dstRepeated,gapMs,when};
+        if (tail.length === 2 && !weekdayMask) throw new CompileError('invalid weekday mask');
+        const schedule={site,name:scheduleName,timezone,atMs,dstMissing,dstRepeated,gapMs,when,...(weekdayMask ? { weekdayMask } : {})};
         schedules.push(schedule);preludes.push({kind:'daily',value:schedule});
       }
       else if(h==='daily-slots-pulse'){
@@ -765,7 +769,8 @@ function emitGfb(moduleIr, { onExpressions } = {}) {
   if(civilRange&&(hasPid||[...preludeKinds].some(kind=>!['civil-range','window'].includes(kind))))throw new CompileError('civil Range profile requires immutable civil Range schedules without other schedule/provider/config profiles');
   const weekdayNatural=preludeKinds.has('solar-weekday-pulse')||preludeKinds.has('tide-weekday-run');
   if(weekdayNatural&&(hasPid||[...preludeKinds].some(kind=>!['solar-weekday-pulse','tide-weekday-run'].includes(kind))))throw new CompileError('weekday natural profile requires filtered Solar/Tide schedules only');
-  const format=preludeKinds.has('solar-weekday-pulse')||preludeKinds.has('tide-weekday-run')?24:preludeKinds.has('at-window')?23:civilRange?21:timeSlotsRange?20:liveRangeStart?19:calendarExecution?18:preludeKinds.has('solar-context-pulse')?16:preludeKinds.has('holiday-daily-pulse')?15:preludeKinds.has('at-pulse')?14:extendedNatural?13:preludeKinds.has('utc-range')?12:hasContext?11:hasDailySlots?9:hasDaily?8:hasPid?7:hasTrueFors?6:hasSchedules?5:temporal?4:format3?3:intDeclarations||intExpressions?2:1;
+  const weekdayDaily = strategies.some(strategy => strategy.extensions.preludes.some(prelude => prelude.kind === 'daily' && prelude.value.weekdayMask));
+  const format=weekdayDaily?27:preludeKinds.has('solar-weekday-pulse')||preludeKinds.has('tide-weekday-run')?24:preludeKinds.has('at-window')?23:civilRange?21:timeSlotsRange?20:liveRangeStart?19:calendarExecution?18:preludeKinds.has('solar-context-pulse')?16:preludeKinds.has('holiday-daily-pulse')?15:preludeKinds.has('at-pulse')?14:extendedNatural?13:preludeKinds.has('utc-range')?12:hasContext?11:hasDailySlots?9:hasDaily?8:hasPid?7:hasTrueFors?6:hasSchedules?5:temporal?4:format3?3:intDeclarations||intExpressions?2:1;
   const w=new Writer();w.bytes(UTF8.encode('GFB1'));w.u16(format);w.str(name);w.u32(version);
   const typeCode=type=>TYPE[type.toLowerCase()];
   w.u16(inputs.length);for(const x of inputs){w.str(x.name);w.u8(typeCode(x.type));}
@@ -774,7 +779,7 @@ function emitGfb(moduleIr, { onExpressions } = {}) {
   const missingCode=value=>['skip','next_valid'].indexOf(value),repeatedCode=value=>['first','second','both','skip'].indexOf(value);
   const writeWindow=window=>{w.u32(window.site);w.str(window.name);w.u8(['average','min','max','rate'].indexOf(window.operation));w.u8(typeCode(window.payloadType));w.u64(window.overMs);w.u64(window.maxAgeMs);w.u16(window.rootRefs.length);for(const root of window.rootRefs)w.u16(root);for(const expression of window.source){const bytes=encode(expression).bytes;w.u32(bytes.length);w.bytes(bytes);}};
   const writeSchedule=schedule=>{w.u32(schedule.site);w.str(schedule.name);w.str(schedule.timezone);w.f64(schedule.latitude);w.f64(schedule.longitude);w.u8(schedule.event==='rise'?0:1);w.i64(schedule.offsetMs);w.u8(0);w.u8(0);w.u8(0);w.u8(0);w.u64(schedule.gapMs);const bytes=encode(schedule.when).bytes;w.u32(bytes.length);w.bytes(bytes);if(format===13||format===15){w.u64(schedule.holdMs??0n);w.u64(schedule.fallbackAtMs??86400000n);}};
-  const writeDaily=schedule=>{w.u32(schedule.site);w.str(schedule.name);w.str(schedule.timezone);w.u64(schedule.atMs);w.u8(missingCode(schedule.dstMissing));w.u8(repeatedCode(schedule.dstRepeated));w.u8(0);w.u8(0);w.u8(0);w.u8(0);w.u64(schedule.gapMs);const bytes=encode(schedule.when,'invalid Daily predicate').bytes;w.u32(bytes.length);w.bytes(bytes);};
+  const writeDaily=schedule=>{w.u32(schedule.site);w.str(schedule.name);w.str(schedule.timezone);w.u64(schedule.atMs);w.u8(missingCode(schedule.dstMissing));w.u8(repeatedCode(schedule.dstRepeated));w.u8(format===27?(schedule.weekdayMask??0):0);w.u8(0);w.u8(0);w.u8(0);w.u64(schedule.gapMs);const bytes=encode(schedule.when,'invalid Daily predicate').bytes;w.u32(bytes.length);w.bytes(bytes);};
   const writeDailySlots=schedule=>{w.u32(schedule.site);w.str(schedule.name);w.str(schedule.timezone);w.u64(schedule.gridMs);w.u8(missingCode(schedule.dstMissing));w.u8(repeatedCode(schedule.dstRepeated));w.u8(0);w.u8(0);w.u8(0);w.u8(0);w.u64(schedule.gapMs);w.u16(schedule.slots.length);for(const slot of schedule.slots){w.u16(slot.key);w.u16(slot.minute);}const bytes=encode(schedule.when,'invalid DailySlots predicate').bytes;w.u32(bytes.length);w.bytes(bytes);};
   const writeTrueFor=signal=>{w.u32(signal.site);w.str(signal.name);w.u32(signal.sourceTag);w.str(signal.sourceName);w.u64(signal.durationMs);for(const index of signal.indices)w.u16(index);};
   const writeContext=prelude=>{const x=prelude.value,d=x.detail;w.u32(x.site);w.str(x.name);if(prelude.kind==='config-stream'){
