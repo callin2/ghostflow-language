@@ -476,6 +476,7 @@ export function runScenario(artifactPath, scenarioPath, { format = 'toon' } = {}
         ...(row.trace.scheduleTrace ? { scheduleTrace: row.trace.scheduleTrace } : {}),
         ...(row.trace.contextTrace ? { contextTrace: row.trace.contextTrace } : {}),
         ...(row.settingsState ? { settingsState: row.settingsState } : {}),
+        ...(row.admissions ? { admissions: row.admissions } : {}),
       }));
     } catch (error) {
       return hostError(error);
