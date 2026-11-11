@@ -1112,8 +1112,10 @@ pub(crate) fn load_calendar(
         _ => return Err(Error::new("invalid calendar selector")),
     };
     let timezone = text(reader)?;
-    if timezone != "UTC" {
-        return Err(Error::new("calendar Result requires explicit UTC binding"));
+    if timezone.is_empty() {
+        return Err(Error::new(
+            "calendar Result requires explicit timezone binding",
+        ));
     }
     let ok_input = reader.u16()?;
     let value_input = reader.u16()?;
