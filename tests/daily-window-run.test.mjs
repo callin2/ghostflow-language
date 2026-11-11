@@ -22,7 +22,7 @@ const source = atSource({
   .replace(/at = datetime[^;]+;/, 'timezone = "UTC"; at = time`08:00`; dst_missing = skip; dst_repeated = first;');
 
 async function parity(policy, projection, steps, expected, weekdays = false) {
-  const input = weekdays ? source.replace('dst_missing', 'on day`mon..fri`; dst_missing') : source;
+  const input = weekdays ? source.replace('dst_missing', 'on = day`mon..fri`; dst_missing') : source;
   const artifact = await compileSource(input.replace('basis = pulse;', policy).replace('PROJECTION', projection),
     { filename: 'daily-window-run.ghost.md' });
   assert.equal(artifact.manifest.format, 'GhostFlow/control-v28');
@@ -125,7 +125,7 @@ test('Daily Window cannot admit after a gap or unknown clock in the occurrence',
 });
 
 test('signed GFB28 selects the context ABI and passes source replay', async () => {
-  const artifact = await compileSource(source.replace('dst_missing', 'on day`mon..fri`; dst_missing')
+  const artifact = await compileSource(source.replace('dst_missing', 'on = day`mon..fri`; dst_missing')
     .replace('basis = pulse;', 'basis = window(10ms);')
     .replace('PROJECTION', 'open'), { filename: 'daily-package.ghost.md' });
   const keyId = 'daily-fixture';
