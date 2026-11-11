@@ -3051,6 +3051,7 @@ fn verify_expression_with_prelude(
     let mut len = 0;
     let mut reachable = true;
     let mut joins: BTreeMap<usize, Vec<Option<Type>>> = BTreeMap::new();
+    let control_opcodes = matches!(format_version, 3..=16 | 18..=21 | 23 | 24 | 26 | 27);
     loop {
         if joins
             .first_key_value()
@@ -3162,29 +3163,7 @@ fn verify_expression_with_prelude(
                 type_push(&mut stack, &mut len, Type::Int)?;
             }
             op @ 30..=31 => {
-                if !matches!(
-                    format_version,
-                    3 | 4
-                        | 5
-                        | 6
-                        | 7
-                        | 8
-                        | 9
-                        | 10
-                        | 11
-                        | 12
-                        | 13
-                        | 14
-                        | 15
-                        | 16
-                        | 18
-                        | 19
-                        | 20
-                        | 21
-                        | 23
-                        | 24
-                        | 26
-                ) {
+                if !control_opcodes {
                     return Err(Error::new("branch opcode requires GFB format 3"));
                 }
                 let target = r.jump_target()?;
@@ -3201,57 +3180,13 @@ fn verify_expression_with_prelude(
                 reachable = op == 30;
             }
             32..=47 => {
-                if !matches!(
-                    format_version,
-                    3 | 4
-                        | 5
-                        | 6
-                        | 7
-                        | 8
-                        | 9
-                        | 10
-                        | 11
-                        | 12
-                        | 13
-                        | 14
-                        | 15
-                        | 16
-                        | 18
-                        | 19
-                        | 20
-                        | 21
-                        | 23
-                        | 24
-                        | 26
-                ) {
+                if !control_opcodes {
                     return Err(Error::new("compact Number opcode requires GFB format 3"));
                 }
                 type_push(&mut stack, &mut len, Type::Number)?;
             }
             op @ 48..=53 => {
-                if !matches!(
-                    format_version,
-                    3 | 4
-                        | 5
-                        | 6
-                        | 7
-                        | 8
-                        | 9
-                        | 10
-                        | 11
-                        | 12
-                        | 13
-                        | 14
-                        | 15
-                        | 16
-                        | 18
-                        | 19
-                        | 20
-                        | 21
-                        | 23
-                        | 24
-                        | 26
-                ) {
+                if !control_opcodes {
                     return Err(Error::new("conversion opcode requires GFB format 3"));
                 }
                 let (source, target) = if op == 48 {

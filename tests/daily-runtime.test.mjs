@@ -101,3 +101,37 @@ test('weekday Daily uses the scheduled local date and preserves subsecond precis
     assert.deepEqual(rows.map(row => row.trace?.safe.due), outcomes, date);
   }
 });
+
+test('weekday Daily can start a timed control with branches and stops after its full duration', async () => {
+  const source = [
+    '# Timed weekday irrigation', '', '```ghost', 'control WeekdayIrrigation {',
+    '  schedule watering: Daily { timezone = "Asia/Seoul"; at = time`06:30:15.250`; on = day`mon..fri`;',
+    '    dst_missing = skip; dst_repeated = first; basis = pulse; when = true;',
+    '    clock = trusted_only; gap = skip_after(60s); recovery = baseline; fallback = skip; }',
+    '  state running: Bool = false; timer age = elapsed(running);',
+    "  running' = if running then age < 1min else watering.due;",
+    "  output valve: Bool; valve <- running';",
+    '}', '```', '',
+  ].join('\n');
+  const artifact = await compileSource(source, { filename: 'timed-weekday.ghost.md' });
+  assert.equal(artifact.manifest.format, 'GhostFlow/control-v27');
+  for (const [date, expected] of [
+    ['2026-11-09', [false, true, true, false]],
+    ['2026-11-14', [false, false, false, false]],
+  ]) {
+    const runtime = await ControlRuntime.instantiateFramed(wasm(), artifact, { schedule: { bootEpoch: 7, terminalCapacity: 8 } });
+    const occurrence = Date.parse(date + 'T06:30:15.250+09:00');
+    const sourceDay = Date.parse(date + 'T00:00:00Z') / 86400000;
+    try {
+      const observed = [0, 1, 60000, 60001].map(nowMs => runtime.step({
+        nowMs,
+        scheduleFacts: facts(artifact.manifest.schedules[0].site, nowMs, occurrence - 1 + nowMs, {
+          coverageFromWallMs: occurrence - 1000, coverageToWallMs: occurrence + 61000,
+          rows: [{ sourceDay, fold: 0, available: true, scheduledWallMs: occurrence,
+            providerRevision: 'iana-test', contextRevision: 'seoul' }],
+        }),
+      }).vm.safe.valve);
+      assert.deepEqual(observed, expected, date);
+    } finally { runtime.dispose(); }
+  }
+});
