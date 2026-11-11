@@ -937,9 +937,9 @@ export async function verifyPortablePackage(packageValue, options = {}) {
   for (const [index, schedule] of manifest.schedules.entries()) {
     if (!isPlainObject(schedule)) fail('manifest-mismatch', `manifest.schedules[${index}] must be an object`);
     const name = ghostName(schedule.name, `manifest.schedules[${index}].name`);
-    if (!contextManifest && !civilManifest && !['11', '16'].includes(profileVersion)) {
+    if (!contextManifest && !civilManifest && !['11', '16', '27'].includes(profileVersion)) {
       addGenerated(schedule.dueInput, `__gf_schedule_due_${name}`, `manifest.schedules[${index}].dueInput`);
-    } else if (['11', '16'].includes(profileVersion) && Object.hasOwn(schedule, 'dueInput')) {
+    } else if (['11', '16', '27'].includes(profileVersion) && Object.hasOwn(schedule, 'dueInput')) {
       fail('manifest-mismatch', `manifest.schedules[${index}].dueInput cannot supply a runtime-owned due value`);
     }
   }
