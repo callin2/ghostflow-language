@@ -18,6 +18,30 @@ const good = (nowMs, values) => Object.fromEntries(Object.entries(values).map(([
 
 const wasmPath = new URL('../target/wasm32-unknown-unknown/release/ghostflow_wasm.wasm', import.meta.url);
 const wasmBytes = fs.readFileSync(wasmPath);
+
+test('public control hosts refuse rolling limits without an output admission owner', async () => {
+  for (const configuration of ['config marker: Bool = true;', '']) {
+    const artifact = await compileSource(`control Water {
+      ${configuration}
+      input manual: Bool;
+      resource irrigation: BoolActuator;
+      account applied = on_time(irrigation, stage: applied, persistence: durable);
+      constraints Budget { limit used(applied, rolling(60s)) <= 30s { reserve = 5s; on_unknown = block; } }
+      output valve: Bool;
+      valve <- manual |> recover(false);
+    }`);
+    const view = new DataView(artifact.bytes.buffer, artifact.bytes.byteOffset);
+    assert.equal(view.getUint16(4, true), configuration ? 11 : 3);
+    const options = configuration ? { context: { bootEpoch: 1, terminalCapacity: 8, bindings: [] } } : {};
+    for (const entry of ['instantiate', 'instantiateFramed']) {
+      await assert.rejects(async () => {
+        const runtime = await ControlRuntime[entry](wasmBytes, artifact, options);
+        runtime.dispose();
+      }, /accounting limits require a host that enforces output admission/);
+    }
+  }
+});
+
 const source = `
 control MoistureHost {
   input start: Bool;
