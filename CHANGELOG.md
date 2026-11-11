@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+### 2026-11-12 - Execute UTC Daily Window and Run ([#153](https://github.com/callin2/ghostflow-language/issues/153))
+
+Immutable UTC Daily schedules can use `basis = window(5min)` or `basis = run(5min, on_time)` with an explicit `cancel_when` for Run. These combinations now emit GFB28 and keep one admission per occurrence. Window follows its current predicate. Run measures time from admission and stops on cancellation or expiry. The Daily Window/Run test compares native and WASM scans.
+
 ### 2026-11-12 - Retire GFB10 admission ([#620](https://github.com/callin2/ghostflow-language/issues/620))
 
 The runtime and package verifiers reject bytecode format 10 and its old `control-v9` packages. Recompile the canonical `.ghost.md` with the current compiler. The GFB11 Periodic and DailySlots tests cover the current schedule and settings paths.

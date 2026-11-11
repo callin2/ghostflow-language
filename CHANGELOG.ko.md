@@ -5,6 +5,10 @@
 
 ## 미출시
 
+### 2026-11-12 - UTC Daily Window와 Run 실행 ([#153](https://github.com/callin2/ghostflow-language/issues/153))
+
+고정 UTC Daily 예약에서 `basis = window(5min)`과 `basis = run(5min, on_time)`을 사용할 수 있습니다. Run은 `cancel_when`을 명시합니다. 두 조합을 GFB28로 컴파일하고 각 발생을 한 번만 시작합니다. Window는 현재 조건을 반영합니다. Run은 실제 시작부터 시간을 재고 취소되거나 만료되면 끝납니다. Daily Window/Run 시험은 네이티브와 WASM 스캔을 대조합니다.
+
 ### 2026-11-12 - 구형 GFB10 수용 제거 ([#620](https://github.com/callin2/ghostflow-language/issues/620))
 
 실행기와 패키지 검증기는 바이트코드 형식 10과 그 구형 `control-v9` 패키지를 거절합니다. 현행 컴파일러로 정본 `.ghost.md`를 다시 컴파일하면 됩니다. GFB11 Periodic 및 DailySlots 시험으로 현행 예약과 설정 경로를 확인합니다.

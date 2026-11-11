@@ -345,7 +345,9 @@ cancel_when := Bool                                   // 当前民用 range 必�
 | Tide 回退 | 仅 `fallback = skip`。 |
 | 其他触发器 | 保持仅可信时钟和 skip 回退。 |
 | `At` Window | 有界的可执行 Window 配置档。 |
-| 其他触发器上的 Window；`run(_, on_time)` | 不在当前支持范围内。 |
+| 固定 UTC `Daily` 的 Window 或准点 Run | GFB28，时长为不超过 24 小时的常量，无日期选择器，并采用 trusted-only 和 baseline 策略。 |
+
+在可信观测中，窗口内的 `.open` 跟随当前条件，每个事件只产生一次 `.due`。观测空档或基线扫描可能错过准入。Run 只在观测到越过计划时间时开始，从实际准入时用单调时钟计时，并在取消时结束。检查点保留已处理的事件标识。重启后不会恢复正在运行的 Run。
 | 不可变 UTC Daily 和非空静态 DailySlots Range | 静态证明不重叠；以 GFB12 执行。 |
 | 不可变非 UTC `DailySlots<15min>` Range | GFB21 配置档（见“不可变非 UTC DailySlots Range”）：编译时检查名义时段间距，并由 Rust 校验宿主提供的实际触发实例区间。 |
 | 其他被接受的 Range 循环 | 仍为不可执行的描述符。 |
@@ -557,7 +559,7 @@ missed_alarm <- morning.missed;
 |---|---|
 | `pulse` | 仅当越过的那个 tick 上所有条件都为 true 时才准入。之后才变为 true 仍算错过。 |
 | `window(5min)`（`At` 执行） | 在 `[planned, planned+5min)` 内条件第一次为 true 时准入一次。同一触发实例内反复的 false→true 变化不会重新武装它。其他触发器组合仍处于设计阶段。 |
-| `run(5min, on_time)`（设计） | 只在观测到的越过时准入，并从准入起运行五分钟。 |
+| `run(5min, on_time)` (`Daily`, GFB28) | 只在观测到的越过时准入，并从准入起运行五分钟。 |
 | `run(5min, within(10min))`（Tide） | 允许在 `[planned, planned+10min)` 内首次准入。十分钟是宽限期；运行时长为五分钟。 |
 | `range(10min)`（民用契约） | 若可信的当前时间处于 `[planned, planned+10min)` 内且 `when` 为 true，则即使首次观测较晚、或在启动/恢复之后，也准入一次。结束时间为计划开始时间 + 十分钟。不可变 UTC Daily/DailySlots 使用 GFB12；下文的不可变非 UTC DailySlots 使用 GFB21。 |
 

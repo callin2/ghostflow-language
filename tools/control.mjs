@@ -1766,6 +1766,13 @@ class Lowerer {
       }
       this.manifest.format = 'GhostFlow/control-v26';
     }
+    if (contextForms.some(form => form[0] === 'daily-window' || form[0] === 'daily-run')) {
+      if (solarForms.length || contextForms.some(form => !['daily-window', 'daily-run'].includes(form[0]))
+        || this.manifest.objectives?.length || this.manifest.resources?.length || this.manifest.accounting) {
+        error(this.ast.loc, 'Daily Window and Run require a standalone UTC Daily profile');
+      }
+      this.manifest.format = 'GhostFlow/control-v28';
+    }
     if (this.manifest.schedules.some(schedule => schedule.kind === 'daily' && schedule.day?.kind === 'weekday')) {
       if (contextForms.length
         || this.manifest.schedules.some(schedule => schedule.kind !== 'daily' || schedule.policy.basis !== 'pulse')
@@ -1819,7 +1826,7 @@ class Lowerer {
         String(objective.controller.bias), String(objective.output.max), String(objective.controller.restart.output),
       ])];
     if (!emitBytecode) return { manifest: this.manifest, sourceMap: this.ast.sourceNodes };
-    const policySchedule = this.ast.body.find(item => item.kind === 'schedule' && !isExecutablePulseSchedule(item) && !isExecutableRangeSchedule(item)
+    const policySchedule = this.ast.body.find(item => item.kind === 'schedule' && !isExecutablePulseSchedule(item) && !isExecutableRangeSchedule(item) && !isDailyWindowRun(item)
       && Object.keys(item.policy ?? {}).some(key => key !== 'fallback'));
     if (policySchedule) error(policySchedule.loc,
       `${policySchedule.scheduleType} policy execution requires verified occurrence provider and native admission bindings`);
@@ -3021,6 +3028,15 @@ class Lowerer {
           error(options.basis.loc, 'At Window requires a positive bounded Duration');
         }
         basis = { kind: 'window', durationMs: length.constant };
+      } else if (isDailyWindowRun(item)) {
+        const run = options.basis.name === 'run';
+        if (run !== Boolean(options.cancel_when)) error(item.loc, run ? 'Daily Run requires cancel_when' : 'Daily Window does not use cancel_when');
+        const length = this.expression(options.basis.args[0], new Map(), { allowNext: false }, [], DURATION);
+        if (!sameType(length.type, DURATION) || !Number.isSafeInteger(length.constant)
+          || length.constant <= 0 || length.constant > 86_400_000) {
+          error(options.basis.loc, 'Daily Window and Run require a constant Duration of at most one day');
+        }
+        basis = { kind: options.basis.name, durationMs: length.constant, ...(run ? { admission: 'on_time' } : {}) };
       } else if (options.basis.kind === 'call' && options.basis.name === 'range'
         && options.basis.args.length === 1 && !options.basis.named.length) {
         const rangeArg = options.basis.args[0];
@@ -3099,11 +3115,12 @@ class Lowerer {
       });
       this.schedules.set(item.name, { slot, loc: item.loc });
       this.symbols.get(item.name).type = { kind: 'Schedule' };
-      if (isExecutablePulseSchedule(item) || isExecutableRangeSchedule(item)) {
+      if (isExecutablePulseSchedule(item) || isExecutableRangeSchedule(item) || isDailyWindowRun(item)) {
         if (!this.hasClock) { this.addInput(`${RESERVED_PREFIX}now_ms`, NUMBER, item.loc); this.hasClock = true; }
         if (!this.gfbInputs.some(input => input[1] === `${RESERVED_PREFIX}time_epoch`)) this.addInput(`${RESERVED_PREFIX}time_epoch`, NUMBER, item.loc);
         this.schedules.set(item.name, { slot, loc: item.loc, projections: new Set(
           basis?.kind === 'window' ? ['due', 'missed', 'open']
+            : basis?.kind === 'run' ? ['due', 'active', 'missed']
             : isExecutableRangeSchedule(item) ? ['due', 'active'] : ['due', 'missed']) });
       }
   }
@@ -4531,6 +4548,7 @@ class Lowerer {
     });
     const scheduleForms = this.manifest.schedules.filter(schedule => schedule.kind === 'solar' && (this.configStreams.length || schedule.day?.kind === 'weekday')
       || schedule.kind === 'at' || schedule.policy?.basis?.kind === 'range'
+      || schedule.kind === 'daily' && ['window', 'run'].includes(schedule.policy?.basis?.kind)
       || ['periodic', 'cron', 'tide'].includes(schedule.kind)
       || schedule.kind === 'daily' && schedule.day?.calendar
       || schedule.kind === 'daily-slots' && schedule.selectedConfig).map(schedule => {
@@ -4548,6 +4566,10 @@ class Lowerer {
         return [schedule.day?.kind === 'weekday' ? 'solar-weekday-pulse' : 'solar-context-pulse', ...base, schedule.timezone, String(schedule.latitude), String(schedule.longitude),
           schedule.event, String(schedule.offsetMs), String(schedule.policy.fallback.atMs ?? 86400000),
           ['config-deps', ...deps.map(String)], ...(schedule.day ? [String(schedule.day.mask)] : []), when, cancel, String(schedule.policy.clock.durationMs ?? 0)];
+      }
+      if (schedule.kind === 'daily' && ['window', 'run'].includes(schedule.policy.basis?.kind)) {
+        return [schedule.policy.basis.kind === 'window' ? 'daily-window' : 'daily-run', ...base,
+          String(schedule.atMs), String(schedule.policy.basis.durationMs), schedule.dstMissing, schedule.dstRepeated, when, cancel];
       }
       if (schedule.kind === 'at') return schedule.policy.basis?.kind === 'window'
         ? ['at-window', ...base, String(schedule.atMs), String(schedule.policy.basis.durationMs), when, cancel]
@@ -4943,6 +4965,16 @@ export function compileAccountingControl(source, { filename = '<control>' } = {}
 }
 
 /** Only this bounded civil pulse slice has a VM/provider transport. */
+export function isDailyWindowRun(item) {
+  const basis = item.policy?.basis;
+  return item.scheduleType === 'Daily' && item.timezone === 'UTC' && !item.on && !item.calendar
+    && item.at?.kind === 'literal' && item.at.raw.startsWith('time`')
+    && basis?.kind === 'call' && !basis.named.length
+    && (basis.name === 'window' && basis.args.length === 1
+      || basis.name === 'run' && basis.args.length === 2
+        && basis.args[1].kind === 'reference' && basis.args[1].name === 'on_time');
+}
+
 export function isExecutablePulseSchedule(item) {
   return item.scheduleType === 'Solar' || item.scheduleType === 'At' || (item.scheduleType === 'Daily'
     && (!item.calendar || item.on && ['day`workday`', 'day`offday`', 'day`holiday`'].includes(item.on.value))

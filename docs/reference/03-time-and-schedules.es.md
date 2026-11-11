@@ -348,7 +348,9 @@ Reglas de los campos comunes:
 | Respaldo de Tide | Solo `fallback = skip`. |
 | Otros disparadores | Mantienen el reloj solo de confianza y el respaldo skip. |
 | Window de `At` | El perfil Window ejecutable acotado. |
-| Window en otros disparadores; `run(_, on_time)` | Fuera del soporte actual. |
+| Window o Run puntual de `Daily` fijo en UTC | GFB28, con duración constante de hasta 24 horas, sin selector de día y con política trusted-only y baseline. |
+
+En una observación confiable, `.open` sigue el predicado dentro de la ventana y `.due` solo se emite una vez. Una discontinuidad de observación o una línea base puede perder la admisión. Run solo se admite en el cruce observado, mide el tiempo monotónico desde la admisión y termina al cancelarse. Un punto de control conserva las identidades consumidas. El reinicio no reanuda un Run activo.
 | Range de Daily UTC inmutable y de DailySlots estático no vacío | Se demuestra estáticamente la ausencia de solapamiento; se ejecuta como GFB12. |
 | Range de `DailySlots<15min>` no UTC inmutable | Perfil GFB21 (véase «Range de DailySlots no UTC inmutable»): comprobaciones en tiempo de compilación del espaciado nominal de las franjas, más validación en Rust de los intervalos reales de las ocurrencias que aporta el host. |
 | Otras recurrencias Range aceptadas | Siguen siendo descriptores no ejecutables. |
@@ -560,7 +562,7 @@ El campo `basis` selecciona una de cuatro formas de admisión:
 |---|---|
 | `pulse` | Admite solo si todas las condiciones son verdaderas en el tick del cruce. Pasar a verdadero más tarde sigue significando omitida. |
 | `window(5min)` (ejecución de `At`) | Admite una vez en la primera condición verdadera dentro de `[planned, planned+5min)`. Los cambios false→true repetidos en la misma ocurrencia no la rearman. Las demás combinaciones de disparador siguen en diseño. |
-| `run(5min, on_time)` (diseño) | Admite solo en el cruce observado y funciona cinco minutos desde la admisión. |
+| `run(5min, on_time)` (`Daily`, GFB28) | Admite solo en el cruce observado y funciona cinco minutos desde la admisión. |
 | `run(5min, within(10min))` (Tide) | Permite la primera admisión dentro de `[planned, planned+10min)`. Los diez minutos son de gracia; la duración del run es de cinco minutos. |
 | `range(10min)` (contrato civil) | Si la hora actual de confianza está dentro de `[planned, planned+10min)` y `when` es verdadero, admite una vez incluso tras una primera observación tardía, un arranque o una recuperación. El fin es el inicio planificado + diez minutos. Daily/DailySlots UTC inmutable usa GFB12; el DailySlots no UTC inmutable descrito más abajo usa GFB21. |
 

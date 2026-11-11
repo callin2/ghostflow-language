@@ -385,7 +385,7 @@ function validateGfb1(bytes) {
     fail('invalid-bytecode-format', 'bytecode is not GFB1');
   }
   const version = bytes[4] | (bytes[5] << 8);
-  if (![1, 2, 3, 4, 11, 16, 18, 21, 22, 26, 27].includes(version)) fail('unsupported-bytecode-version', 'unsupported GFB format version');
+  if (![1, 2, 3, 4, 11, 16, 18, 21, 22, 26, 27, 28].includes(version)) fail('unsupported-bytecode-version', 'unsupported GFB format version');
   if (version === 22) {
     if (bytes.byteLength < 16) fail('invalid-bytecode-format', 'truncated GFB22 lifecycle envelope');
     const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
@@ -438,6 +438,20 @@ function validateConfigStreamPackageProfile(manifest, version, runtimeAbi) {
         .some(field => manifest[field] !== undefined && (!Array.isArray(manifest[field]) || manifest[field].length))
       || manifest.accounting !== undefined) {
       fail('unsupported-runtime-abi', 'signed GFB18 requires a calendar Result without schedule or provider profiles');
+    }
+    return;
+  }
+
+  if (version === '28' || manifest.format === 'GhostFlow/control-v28') {
+    if (version !== '28' || manifest.format !== 'GhostFlow/control-v28'
+      || runtimeAbi !== 'GhostFlow/context-scan-abi-v5'
+      || !Array.isArray(manifest.schedules) || !manifest.schedules.length
+      || manifest.schedules.some(schedule => schedule?.kind !== 'daily' || schedule.timezone !== 'UTC'
+        || schedule.day !== undefined || !['window','run'].includes(schedule.policy?.basis?.kind))
+      || ['configs','signals','providers','calendars','naturalConditions','calendarConditions','objectives','adaptSettings','resources']
+        .some(field => manifest[field] !== undefined && (!Array.isArray(manifest[field]) || manifest[field].length))
+      || manifest.accounting !== undefined) {
+      fail('unsupported-runtime-abi', 'signed GFB28 requires UTC Daily Window/Run and context-scan-abi-v5');
     }
     return;
   }
@@ -759,7 +773,7 @@ function validateEmbeddedArtifacts(payload) {
 
   exactObject(payload.bytecode, ['format', 'version', 'sha256', 'contentBase64'], 'payload.bytecode');
   if (payload.bytecode.format !== 'GFB1') fail('invalid-bytecode-format', 'payload bytecode format must be GFB1');
-  if (!['1', '2', '3', '4', '11', '16', '18', '21', '22', '26', '27'].includes(payload.bytecode.version)) fail('unsupported-bytecode-version', 'unsupported payload bytecode version');
+  if (!['1', '2', '3', '4', '11', '16', '18', '21', '22', '26', '27', '28'].includes(payload.bytecode.version)) fail('unsupported-bytecode-version', 'unsupported payload bytecode version');
   digestValue(payload.bytecode.sha256, 'payload.bytecode.sha256');
 
   exactObject(payload.manifest, ['format', 'sha256', 'contentBase64'], 'payload.manifest');
@@ -943,9 +957,9 @@ export async function verifyPortablePackage(packageValue, options = {}) {
   for (const [index, schedule] of manifest.schedules.entries()) {
     if (!isPlainObject(schedule)) fail('manifest-mismatch', `manifest.schedules[${index}] must be an object`);
     const name = ghostName(schedule.name, `manifest.schedules[${index}].name`);
-    if (!civilManifest && !['11', '16', '27'].includes(profileVersion)) {
+    if (!civilManifest && !['11', '16', '27', '28'].includes(profileVersion)) {
       addGenerated(schedule.dueInput, `__gf_schedule_due_${name}`, `manifest.schedules[${index}].dueInput`);
-    } else if (['11', '16', '27'].includes(profileVersion) && Object.hasOwn(schedule, 'dueInput')) {
+    } else if (['11', '16', '27', '28'].includes(profileVersion) && Object.hasOwn(schedule, 'dueInput')) {
       fail('manifest-mismatch', `manifest.schedules[${index}].dueInput cannot supply a runtime-owned due value`);
     }
   }

@@ -346,7 +346,9 @@ cancel_when := Bool                                   // 現在の常用時 rang
 | Tideのフォールバック | `fallback = skip`のみ。 |
 | その他のトリガー | 信頼された時刻のみのクロックとskipフォールバックを維持します。 |
 | `At` Window | 有界な実行可能Windowプロファイル。 |
-| 他のトリガーでのWindow、`run(_, on_time)` | 現在のサポート範囲外。 |
+| 固定 UTC `Daily` の Window または定刻 Run | GFB28。定数の長さは最大24時間で、曜日指定なし、trusted-only と baseline のポリシーを使用します。 |
+
+信頼できる観測では、区間内の `.open` は条件に従い、`.due` は各発生につき一度だけです。観測の空白や基準スキャンでは受け入れを逃すことがあります。Run は予定時刻を通過した観測でのみ開始し、単調時計で実際の開始から計測し、取り消しで終了します。チェックポイントは処理済みの識別子を保持します。再起動時に動作中の Run は再開されません。
 | 不変のUTC Dailyと空でない静的DailySlotsのRange | 静的な非重複が証明され、GFB12として実行されます。 |
 | 不変の非UTC `DailySlots<15min>` Range | GFB21プロファイル（「不変の非UTC DailySlots Range」を参照）：コンパイル時の名目上のスロット間隔の検査と、ホストが与える実際の発生区間に対するRustの検証。 |
 | 受け付けられたその他のRange繰り返し | 実行不可能なディスクリプタのままです。 |
@@ -558,7 +560,7 @@ missed_alarm <- morning.missed;
 |---|---|
 | `pulse` | 通過tickですべての条件がtrueの場合にのみ受け入れます。後でtrueになっても取りこぼしのままです。 |
 | `window(5min)`（`At`で実行） | `[planned, planned+5min)`の中で条件が最初にtrueになったときに1回受け入れます。同じ発生の中でfalse→trueの変化が繰り返されても、再び有効化はされません。その他のトリガーの組み合わせは設計段階のままです。 |
-| `run(5min, on_time)`（設計） | 観測された通過時にのみ受け入れ、受け入れから5分間動作します。 |
+| `run(5min, on_time)` (`Daily`, GFB28) | 観測された通過時にのみ受け入れ、受け入れから5分間動作します。 |
 | `run(5min, within(10min))`（Tide） | `[planned, planned+10min)`の中での最初の受け入れを許可します。10分は猶予で、動作の長さは5分です。 |
 | `range(10min)`（常用時の契約） | 信頼された現在時刻が`[planned, planned+10min)`の中にあり、`when`がtrueなら、最初の観測、起動、recoveryが遅れても1回受け入れます。終了は計画開始＋10分です。不変のUTC Daily/DailySlotsはGFB12を使い、後述の不変の非UTC DailySlotsはGFB21を使います。 |
 

@@ -70,6 +70,7 @@ impl Type {
                     | 7
                     | 8
                     | 27
+                    | 28
                     | 9
                     | 11
                     | 12
@@ -334,6 +335,7 @@ impl Module {
                 | 7
                 | 8
                 | 27
+                | 28
                 | 9
                 | 11
                 | 12
@@ -408,7 +410,25 @@ impl Module {
 
         let mut temporal = if matches!(
             format_version,
-            4 | 5 | 6 | 8 | 9 | 11 | 12 | 13 | 14 | 15 | 16 | 18 | 19 | 20 | 21 | 23 | 24 | 26 | 27
+            4 | 5
+                | 6
+                | 8
+                | 9
+                | 11
+                | 12
+                | 13
+                | 14
+                | 15
+                | 16
+                | 18
+                | 19
+                | 20
+                | 21
+                | 23
+                | 24
+                | 26
+                | 27
+                | 28
         ) {
             Some(temporal_vm::TemporalRequirements::load_header(
                 &mut reader,
@@ -420,7 +440,24 @@ impl Module {
         };
         let mut schedules = matches!(
             format_version,
-            5 | 6 | 8 | 9 | 11 | 12 | 13 | 14 | 15 | 16 | 18 | 19 | 20 | 21 | 23 | 24 | 26 | 27
+            5 | 6
+                | 8
+                | 9
+                | 11
+                | 12
+                | 13
+                | 14
+                | 15
+                | 16
+                | 18
+                | 19
+                | 20
+                | 21
+                | 23
+                | 24
+                | 26
+                | 27
+                | 28
         )
         .then(|| schedule_vm::ScheduleRequirements {
             strategies: Vec::new(),
@@ -446,7 +483,24 @@ impl Module {
 
             let (windows, schedule_count, true_for_count, mut result_trace_bound) = if matches!(
                 format_version,
-                5 | 6 | 8 | 9 | 11 | 12 | 13 | 14 | 15 | 16 | 18 | 19 | 20 | 21 | 23 | 24 | 26 | 27
+                5 | 6
+                    | 8
+                    | 9
+                    | 11
+                    | 12
+                    | 13
+                    | 14
+                    | 15
+                    | 16
+                    | 18
+                    | 19
+                    | 20
+                    | 21
+                    | 23
+                    | 24
+                    | 26
+                    | 27
+                    | 28
             ) {
                 let loaded = schedule_vm::load_prelude(
                     &mut reader,
@@ -798,6 +852,22 @@ impl Module {
                 "GFB format 21 requires immutable civil Range schedules",
             ));
         }
+        if format_version == 28
+            && !schedules.as_ref().is_some_and(|requirements| {
+                let mut descriptors = requirements
+                    .strategies
+                    .iter()
+                    .flat_map(|entry| &entry.schedules);
+                let valid = |entry: &schedule_vm::PulseDescriptor| {
+                    matches!(entry,
+                    schedule_vm::PulseDescriptor::Context(c)
+                        if matches!(c.definition, context_vm::ScheduleDefinition::UtcDaily { .. }))
+                };
+                descriptors.next().is_some_and(valid) && descriptors.all(valid)
+            })
+        {
+            return Err(Error::new("GFB format 28 requires UTC Daily Window or Run"));
+        }
         if format_version == 23
             && !schedules.as_ref().is_some_and(|requirements| {
                 let descriptors: Vec<_> = requirements
@@ -864,13 +934,13 @@ impl Module {
         }
         let objective_count = if matches!(
             format_version,
-            7 | 11 | 12 | 13 | 14 | 15 | 16 | 18 | 19 | 20 | 21 | 23 | 24 | 26
+            7 | 11 | 12 | 13 | 14 | 15 | 16 | 18 | 19 | 20 | 21 | 23 | 24 | 26 | 28
         ) {
             reader.u16()?
         } else {
             0
         };
-        if matches!(format_version, 21 | 23 | 24 | 26) && objective_count != 0 {
+        if matches!(format_version, 21 | 23 | 24 | 26 | 28) && objective_count != 0 {
             return Err(Error::new(if format_version == 21 {
                 "civil Range profile cannot contain PID objectives"
             } else if format_version == 24 {
@@ -894,12 +964,12 @@ impl Module {
                 &strategies,
                 matches!(
                     format_version,
-                    11 | 12 | 13 | 14 | 15 | 16 | 18 | 19 | 20 | 21 | 23 | 24 | 26
+                    11 | 12 | 13 | 14 | 15 | 16 | 18 | 19 | 20 | 21 | 23 | 24 | 26 | 28
                 ),
             )?;
             if matches!(
                 format_version,
-                11 | 12 | 13 | 14 | 15 | 16 | 18 | 19 | 20 | 21 | 23 | 24 | 26
+                11 | 12 | 13 | 14 | 15 | 16 | 18 | 19 | 20 | 21 | 23 | 24 | 26 | 28
             ) && !schedules.as_ref().is_some_and(|requirements| {
                 requirements.strategies.iter().all(|strategy| {
                     strategy.schedules.iter().any(|entry| {
@@ -1464,7 +1534,7 @@ impl Runtime {
             .ok_or_else(|| Error::new("no module installed"))?;
         if !matches!(
             module.format_version,
-            11 | 12 | 13 | 14 | 15 | 16 | 18 | 19 | 20 | 21 | 23 | 24 | 26
+            11 | 12 | 13 | 14 | 15 | 16 | 18 | 19 | 20 | 21 | 23 | 24 | 26 | 28
         ) {
             return Err(Error::new("context activation requires context bytecode"));
         }
@@ -1513,7 +1583,7 @@ impl Runtime {
         if !self.module.as_ref().is_some_and(|m| {
             matches!(
                 m.format_version,
-                11 | 12 | 13 | 14 | 15 | 16 | 18 | 19 | 20 | 21 | 23 | 24 | 26
+                11 | 12 | 13 | 14 | 15 | 16 | 18 | 19 | 20 | 21 | 23 | 24 | 26 | 28
             )
         }) {
             return Err(Error::new("context facts require context bytecode"));
@@ -2006,14 +2076,14 @@ impl Runtime {
             .ok_or_else(|| Error::new(format!("unknown input {name}")))?;
         if matches!(
             m.format_version,
-            11 | 12 | 13 | 14 | 15 | 16 | 18 | 19 | 20 | 21 | 23 | 24 | 26
+            11 | 12 | 13 | 14 | 15 | 16 | 18 | 19 | 20 | 21 | 23 | 24 | 26 | 28
         ) && (name.starts_with("__gf_natural_")
             || name.starts_with("__gf_calendar_")
             || m.format_version == 26 && name.starts_with("__gf_weekday_")
             || name.starts_with("__gf_accounting_")
             || (matches!(
                 m.format_version,
-                11 | 12 | 13 | 14 | 15 | 16 | 18 | 19 | 20 | 21 | 23 | 24 | 26
+                11 | 12 | 13 | 14 | 15 | 16 | 18 | 19 | 20 | 21 | 23 | 24 | 26 | 28
             ) && name.starts_with("__gf_config_")))
         {
             return Err(Error::new(
@@ -2116,14 +2186,14 @@ impl Runtime {
             .map(|(i, v)| {
                 if matches!(
                     m.format_version,
-                    11 | 12 | 13 | 14 | 15 | 16 | 18 | 19 | 20 | 21 | 23 | 24 | 26
+                    11 | 12 | 13 | 14 | 15 | 16 | 18 | 19 | 20 | 21 | 23 | 24 | 26 | 28
                 ) && (m.inputs[i].name.starts_with("__gf_natural_")
                     || m.inputs[i].name.starts_with("__gf_calendar_")
                     || m.format_version == 26 && m.inputs[i].name.starts_with("__gf_weekday_")
                     || m.inputs[i].name.starts_with("__gf_accounting_")
                     || (matches!(
                         m.format_version,
-                        11 | 12 | 13 | 14 | 15 | 16 | 18 | 19 | 20 | 21 | 23 | 24 | 26
+                        11 | 12 | 13 | 14 | 15 | 16 | 18 | 19 | 20 | 21 | 23 | 24 | 26 | 28
                     ) && m.inputs[i].name.starts_with("__gf_config_")))
                 {
                     return Ok(m.inputs[i].default);
@@ -2995,7 +3065,7 @@ fn verify_expression_with_prelude(
     let mut len = 0;
     let mut reachable = true;
     let mut joins: BTreeMap<usize, Vec<Option<Type>>> = BTreeMap::new();
-    let control_opcodes = matches!(format_version, 3..=16 | 18..=21 | 23 | 24 | 26 | 27);
+    let control_opcodes = matches!(format_version, 3..=16 | 18..=21 | 23 | 24 | 26 | 27 | 28);
     loop {
         if joins
             .first_key_value()
@@ -3165,6 +3235,7 @@ fn verify_expression_with_prelude(
                         | 23
                         | 24
                         | 26
+                        | 28
                 ) {
                     return Err(Error::new("Duration guard requires GFB format 3"));
                 }
@@ -3195,6 +3266,7 @@ fn verify_expression_with_prelude(
                         | 23
                         | 24
                         | 26
+                        | 28
                 ) {
                     return Err(Error::new("DateTime guard requires GFB format 3"));
                 }
@@ -3225,6 +3297,7 @@ fn verify_expression_with_prelude(
                         | 23
                         | 24
                         | 26
+                        | 28
                 ) {
                     return Err(Error::new("Percent guard requires GFB format 3"));
                 }
@@ -3255,6 +3328,7 @@ fn verify_expression_with_prelude(
                         | 23
                         | 24
                         | 26
+                        | 28
                 ) {
                     return Err(Error::new("Result trace requires GFB format 3"));
                 }
@@ -3289,6 +3363,7 @@ fn verify_expression_with_prelude(
                         | 23
                         | 24
                         | 26
+                        | 28
                 ) {
                     return Err(Error::new("temporal projection requires GFB format 4"));
                 }
@@ -3320,6 +3395,7 @@ fn verify_expression_with_prelude(
                         | 24
                         | 26
                         | 27
+                        | 28
                 ) {
                     return Err(Error::new("schedule projection requires GFB format 5"));
                 }
