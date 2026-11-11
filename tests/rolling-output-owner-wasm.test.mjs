@@ -103,27 +103,31 @@ test('an authored policy binds to the installed output and cannot authorize ON o
     },
   };
   const binding = { resource: 'irrigation', output: 'valve', resourceId: 7 };
-  const options = { nowMs: 0, binding, maxIntervals: 8, store };
+  let nowMs = 0;
+  const options = { clock: () => nowMs, binding, maxIntervals: 8, store };
   await assert.rejects(RollingOutputRuntime.open(binary, source, {
     ...options, binding: { ...binding, output: 'other' },
   }), /verified Bool resource and output/);
   const runtime = await RollingOutputRuntime.open(binary, source, options);
   try {
     for (let now = 0; now < 30_000; now += 5_000) {
-      assert.deepEqual(await runtime.requestOn(now), { status: 'allowed', deadlineMs: now + 5_000 });
+      nowMs = now;
+      assert.deepEqual(await runtime.requestOn(), { status: 'allowed', deadlineMs: now + 5_000 });
       await runtime.recordOff(now, now + 5_000);
     }
-    assert.deepEqual(await runtime.requestOn(64_999), { status: 'budget-exceeded' });
+    nowMs = 64_999;
+    assert.deepEqual(await runtime.requestOn(), { status: 'budget-exceeded' });
     assert.deepEqual(runtime.explain(64_999), {
       usedMs: 25_001n, reservedMs: 0n, blocked: true, nextReleaseMs: 65_000n,
     });
     let rejectCommit;
     nextCommit = new Promise(resolve => { rejectCommit = resolve; });
-    const pending = runtime.requestOn(65_000);
-    await assert.rejects(runtime.requestOn(65_000), /unavailable while saving/);
+    nowMs = 65_000;
+    const pending = runtime.requestOn();
+    await assert.rejects(runtime.requestOn(), /unavailable while saving/);
     rejectCommit(false);
     await assert.rejects(pending, /not committed/);
-    assert.deepEqual(await runtime.requestOn(65_000), { status: 'unavailable' });
+    assert.deepEqual(await runtime.requestOn(), { status: 'unavailable' });
   } finally {
     runtime.dispose();
   }
@@ -131,10 +135,44 @@ test('an authored policy binds to the installed output and cannot authorize ON o
   const recovered = await RollingOutputRuntime.open(binary, source, options);
   const duplicate = await RollingOutputRuntime.open(binary, source, options);
   try {
-    assert.deepEqual(await recovered.requestOn(65_000), { status: 'allowed', deadlineMs: 70_000 });
-    await assert.rejects(duplicate.requestOn(65_000), /not committed/);
+    assert.deepEqual(await recovered.requestOn(), { status: 'allowed', deadlineMs: 70_000 });
+    await assert.rejects(duplicate.requestOn(), /not committed/);
   } finally {
     recovered.dispose();
     duplicate.dispose();
+  }
+});
+
+
+test('a checkpoint acknowledged at the ON deadline never authorizes an output', async () => {
+  let checkpoint = null;
+  let nowMs = 0;
+  let delayMs = 0;
+  const store = {
+    read: async () => checkpoint,
+    commit: async bytes => {
+      nowMs += delayMs;
+      delayMs = 0;
+      checkpoint = bytes;
+      return true;
+    },
+  };
+  const options = { clock: () => nowMs, maxIntervals: 8, store,
+    binding: { resource: 'irrigation', output: 'valve', resourceId: 7 } };
+  const runtime = await RollingOutputRuntime.open(binary, source, options);
+  try {
+    delayMs = 5_000;
+    assert.deepEqual(await runtime.requestOn(), { status: 'deadline-expired' });
+    assert.deepEqual(runtime.explain(nowMs), {
+      usedMs: 0n, reservedMs: 0n, blocked: false, nextReleaseMs: null,
+    });
+  } finally {
+    runtime.dispose();
+  }
+  const reopened = await RollingOutputRuntime.open(binary, source, options);
+  try {
+    assert.deepEqual(await reopened.requestOn(), { status: 'allowed', deadlineMs: 10_000 });
+  } finally {
+    reopened.dispose();
   }
 });
