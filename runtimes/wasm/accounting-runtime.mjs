@@ -183,22 +183,27 @@ export class AccountingRuntime {
     return this.#query('gf_accounting_used_rolling', [uint32(resourceId, 'resourceId'), unsigned64(nowMs, 'nowMs'), unsigned64(windowMs, 'windowMs')]);
   }
 
-  /** Source-bound, read-only admission explanation. nowMs is the trusted ledger
-   * clock; UI animation is deliberately absent. null means Unknown, not zero. */
-  explainRolling({ nowMs, windowMs, limitMs, reserveMs } = {}) {
+  /** Read-only admission explanation on the trusted ledger clock. Source-bound
+   * callers retain their verified resource and policy. An unbound host supplies
+   * the resource and policy it verified at activation. null means Unknown. */
+  explainRolling({ resourceId = this.binding?.id, nowMs, windowMs, limitMs, reserveMs } = {}) {
     this.#live();
-    if (this.binding?.operation !== 'on_time') throw new TypeError('a source-bound on_time account is required');
+    if (this.binding?.operation === 'count_events' || resourceId === undefined) {
+      throw new TypeError('a source-bound on_time account or explicit resourceId is required');
+    }
+    this.#bound('on_time', resourceId);
+    uint32(resourceId, 'resourceId');
     this.#boundAdmission(windowMs, limitMs, reserveMs);
     const args = [nowMs, windowMs, limitMs, reserveMs].map((value, index) =>
       unsigned64(value, ['nowMs', 'windowMs', 'limitMs', 'reserveMs'][index]));
     const output = this.wasm.gf_alloc(48);
     try {
-      const status = this.wasm.gf_accounting_explain_rolling(this.handle, this.binding.id, ...args, output);
+      const status = this.wasm.gf_accounting_explain_rolling(this.handle, resourceId, ...args, output);
       if (status === 2) return null;
       if (status !== 1) throw new Error('accounting explanation failed');
       const view = new DataView(this.wasm.memory.buffer);
       const word = index => view.getBigUint64(output + index * 8, true);
-      return Object.freeze({ source: this.source, resourceId: this.binding.id, nowMs: args[0],
+      return Object.freeze({ source: this.source, resourceId, nowMs: args[0],
         windowMs: args[1], limitMs: args[2], reserveMs: args[3], usedMs: word(0), reservedMs: word(1),
         blocked: word(2) === 1n, blockReason: word(2) === 1n ? 'rolling-budget' : null,
         nextReleaseMs: word(3) === 1n ? word(4) : null, ledgerRevision: word(5) });

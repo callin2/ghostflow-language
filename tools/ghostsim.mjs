@@ -295,9 +295,10 @@ export function validateScenario(scenario, manifest) {
         if (action.durationMs === 0) throw new Error(`${location}.durationMs: expected positive duration`);
         const descriptor = manifest.accounting?.bindings?.find(item => item.name === action.account);
         if (!descriptor || descriptor.operation !== 'on_time') throw new Error(`${location}: unknown on_time account ${action.account}`);
-        const rollingLimit = manifest.accounting.constraints.flatMap(group => group.limits)
-          .find(limit => limit.account === action.account && limit.basis?.kind === 'rolling');
-        if (!rollingLimit) throw new Error(`${location}: account has no rolling constraint`);
+        const rollingLimits = manifest.accounting.constraints.flatMap(group => group.limits)
+          .filter(limit => limit.account === action.account && limit.basis?.kind === 'rolling');
+        if (rollingLimits.length !== 1) throw new Error(`${location}: output request requires exactly one rolling constraint`);
+        const [rollingLimit] = rollingLimits;
         if (action.durationMs > rollingLimit.reserveMs) {
           throw new Error(`${location}.durationMs: exceeds the compiled rolling reserve`);
         }
@@ -480,6 +481,7 @@ export function runScenario(artifactPath, scenarioPath, { format = 'toon' } = {}
         ...(row.trace.contextTrace ? { contextTrace: row.trace.contextTrace } : {}),
         ...(row.settingsState ? { settingsState: row.settingsState } : {}),
         ...(row.admissions ? { admissions: row.admissions } : {}),
+        ...(row.rollingBudgets ? { rollingBudgets: row.rollingBudgets } : {}),
       }));
     } catch (error) {
       return hostError(error);
