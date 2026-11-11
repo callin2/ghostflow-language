@@ -348,13 +348,13 @@ cancel_when := Bool                                   // 현재 civil range에�
 | 다른 trigger | trusted-only clock과 skip fallback을 유지합니다. |
 | `At` Window | 제한된 실행 가능 Window profile입니다. |
 | 고정 UTC `Daily` Window 또는 정시 Run | 24시간 이하의 상수 길이와 선택적 요일 조건과 trusted-only baseline 정책을 사용하는 GFB28입니다. |
-
-Window의 `.open`에는 신뢰할 수 있는 관측 스캔이 필요합니다. 관측 공백이나 기준선 스캔에서는 계획 구간이 남아 있어도 시작을 놓칠 수 있습니다. 이후 관측 스캔의 `.open`은 현재 조건을 반영하고, 이미 처리한 발생의 `.due`는 다시 켜지지 않습니다. Run은 관측된 시각 통과 때만 실제로 시작하며, 시작 이후 단조 시계로 길이를 재고 취소되면 즉시 끝납니다. 체크포인트는 재부팅 후에도 이미 처리한 발생의 식별자를 보존합니다. 새 부팅에서는 진행 중인 Run이 없습니다.
 | 불변 UTC Daily와 비어 있지 않은 정적 DailySlots Range | 정적 non-overlap을 증명하며 GFB12로 실행합니다. |
 | 불변 비 UTC `DailySlots<15min>` Range | GFB21 profile(“불변 비 UTC DailySlots Range” 참고): 명목상 slot 간격의 컴파일 시점 검사와, 호스트가 공급한 실제 발생 구간의 Rust 검증. |
 | 그 밖에 허용된 Range recurrence | 실행할 수 없는 descriptor로 남습니다. |
 | 운영자 `Duration` config에서 온 Range duration(지원되는 UTC profile) | 초기값으로 non-overlap을 증명할 수 있으면 허용합니다. 승인된 live 설정 event는 고정된 계획 시작점에서 현재 발생을 다시 계산하며, 새 due pulse나 발생 identity를 만들지 않습니다. |
 | Tide `run(_, within(_))` | 지원합니다. |
+
+Window의 `.open`에는 신뢰할 수 있는 관측 스캔이 필요합니다. 관측 공백이나 기준선 스캔에서는 계획 구간이 남아 있어도 시작을 놓칠 수 있습니다. 이후 관측 스캔의 `.open`은 현재 조건을 반영하고, 이미 처리한 발생의 `.due`는 다시 켜지지 않습니다. Run은 관측된 시각 통과 때만 실제로 시작하며, 시작 이후 단조 시계로 길이를 재고 취소되면 즉시 끝납니다. 체크포인트는 재부팅 후에도 마지막 처리 UTC 날짜를 보존하고 이전 날짜도 이미 처리한 것으로 봅니다. 새 부팅에서는 진행 중인 Run이 없습니다.
 
 **자연 사건의 제한된 admission.** 다음 규칙은 예측 부재나 불확실한 시계가 발생을 조용히 만들어 내지 못하게 합니다.
 
@@ -560,7 +560,7 @@ missed_alarm <- morning.missed;
 | basis | admission 의미 |
 |---|---|
 | `pulse` | crossing tick에서 조건이 모두 true일 때만 admit합니다. 나중에 true가 되어도 missed입니다. |
-| `window(5min)` (`At` 실행) | `[planned, planned+5min)` 안에서 조건이 처음 true가 될 때 한 번 admit합니다. 같은 발생에서 false→true가 반복되어도 다시 arm하지 않습니다. 다른 trigger 조합은 설계 단계입니다. |
+| `window(5min)` (`At`, `Daily`) | `[planned, planned+5min)` 안에서 조건이 처음 true가 될 때 한 번 admit합니다. 같은 발생에서 false→true가 반복되어도 다시 arm하지 않습니다. |
 | `run(5min, on_time)` (`Daily`, GFB28) | 관측된 crossing에서만 admit하고, admission부터 5분 동안 운전합니다. |
 | `run(5min, within(10min))` (Tide) | `[planned, planned+10min)` 안에서 첫 admission을 허용합니다. 10분은 유예(grace)이고 운전 길이는 5분입니다. |
 | `range(10min)` (civil 계약) | 신뢰된 현재 시각이 `[planned, planned+10min)` 안이고 `when`이 true이면, 첫 관측·부팅·복구가 늦더라도 한 번 admit합니다. 끝은 계획 시작점 + 10분입니다. 불변 UTC Daily/DailySlots는 GFB12를, 아래의 불변 비 UTC DailySlots는 GFB21을 사용합니다. |

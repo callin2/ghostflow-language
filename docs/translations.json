@@ -2423,31 +2423,31 @@
       "files": {
         "en": {
           "path": "docs/reference/03-time-and-schedules.en.md",
-          "sha256": "b17a2a865d44b6698ea429b44e60833d995418fac5c5bc68a4fa1afdddeac240"
+          "sha256": "2120941d0714a8599b2e0cae88547cd3fdbff723313862f3b679a6f9c192e50d"
         },
         "ko": {
           "path": "docs/reference/03-time-and-schedules.md",
-          "sha256": "bd6ed3d13f80fdbe748c5db54e90e1874da2819f892467ee6c80617689173d30",
+          "sha256": "aaa687cb3c53078fd1fb6efa33e05f9e0b3fcbf35687f8d48820d1638dbe4ae3",
           "from": "en",
-          "sourceSha256": "b17a2a865d44b6698ea429b44e60833d995418fac5c5bc68a4fa1afdddeac240"
+          "sourceSha256": "2120941d0714a8599b2e0cae88547cd3fdbff723313862f3b679a6f9c192e50d"
         },
         "zh": {
           "path": "docs/reference/03-time-and-schedules.zh.md",
-          "sha256": "598404b479623825425b54e70ee2649a41f9a5ccd2f8d19c9584289331df81c9",
+          "sha256": "2ee205c0d828c7171a79f561b4de324aadb8b36b7220c99f787a47f571f90382",
           "from": "en",
-          "sourceSha256": "b17a2a865d44b6698ea429b44e60833d995418fac5c5bc68a4fa1afdddeac240"
+          "sourceSha256": "2120941d0714a8599b2e0cae88547cd3fdbff723313862f3b679a6f9c192e50d"
         },
         "es": {
           "path": "docs/reference/03-time-and-schedules.es.md",
-          "sha256": "3dbd8f7449d962e33b8c66d3e3cb8acbb0c7bcf58fadbd14031eac4e31426b45",
+          "sha256": "50826eff4a0493df9ff468fff8198a79b67f8778fa4df987943847cb0706c5d7",
           "from": "en",
-          "sourceSha256": "b17a2a865d44b6698ea429b44e60833d995418fac5c5bc68a4fa1afdddeac240"
+          "sourceSha256": "2120941d0714a8599b2e0cae88547cd3fdbff723313862f3b679a6f9c192e50d"
         },
         "ja": {
           "path": "docs/reference/03-time-and-schedules.ja.md",
-          "sha256": "349b5cf30c8b398dc46ca2842a4146db0c84780249d4d1798658217b6c6148cf",
+          "sha256": "80b771318ea47bfc615b4b0849450bf71258262287dfb03602a575d097891959",
           "from": "en",
-          "sourceSha256": "b17a2a865d44b6698ea429b44e60833d995418fac5c5bc68a4fa1afdddeac240"
+          "sourceSha256": "2120941d0714a8599b2e0cae88547cd3fdbff723313862f3b679a6f9c192e50d"
         }
       }
     },

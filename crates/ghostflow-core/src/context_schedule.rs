@@ -718,11 +718,13 @@ impl Engine {
         match &desc.definition {
             ScheduleDefinition::UtcDaily { .. } => {
                 let prefix = format!("{}:daily:", desc.site);
-                if restored.terminal.iter().any(|id| {
-                    id.strip_prefix(&prefix)
-                        .and_then(|day| day.parse::<u32>().ok())
-                        .is_none_or(|day| day > 2_932_896 || format!("{prefix}{day}") != *id)
-                }) || restored.interval_ms.is_some()
+                if restored.terminal.len() > 1
+                    || restored.terminal.iter().any(|id| {
+                        id.strip_prefix(&prefix)
+                            .and_then(|day| day.parse::<u32>().ok())
+                            .is_none_or(|day| day > 2_932_896 || format!("{prefix}{day}") != *id)
+                    })
+                    || restored.interval_ms.is_some()
                     || !restored.slots.is_empty()
                     || !restored.added_at_wall.is_empty()
                     || !restored.last_plan.is_empty()
@@ -2515,90 +2517,106 @@ impl Engine {
                 .unwrap_or(0)
                 .min(latest)
         };
-        if latest - earliest >= self.capacity as u64 {
-            return Err(invalid("UTC Daily occurrence batch exceeds capacity"));
+        let eligible = |day: u64| weekday_mask == 0 || weekday_mask & (1 << ((day + 4) % 7)) != 0;
+        // A fixed UTC schedule needs only its newest terminal day. In a gap
+        // the newest eligible occurrence also represents earlier missed days.
+        let newest_eligible = |at: u64| {
+            (0..7)
+                .filter_map(|offset| at.checked_sub(offset))
+                .find(|day| eligible(*day))
+        };
+        let Some(day) = newest_eligible(latest).filter(|day| *day >= earliest) else {
+            return Ok(());
+        };
+        let terminal_day = self.terminal.first().map(|id| {
+            id.rsplit(':')
+                .next()
+                .unwrap()
+                .parse::<u64>()
+                .expect("verified UTC Daily terminal identity")
+        });
+        if terminal_day.is_some_and(|terminal| day < terminal) {
+            return Ok(());
         }
-        for day in earliest..=latest {
-            if weekday_mask != 0 && weekday_mask & (1 << ((day + 4) % 7)) == 0 {
-                continue;
+        let planned = day * DAY + start;
+        let end = planned + duration;
+        let observed = clock.disposition == ClockDisposition::Observed;
+        let high_water = clock.previous_trusted_high_water_ms.unwrap_or(0);
+        let gap = clock.disposition == ClockDisposition::ObservationGap;
+        let crossed = previous < planned && now >= planned && planned > high_water;
+        let outcome = if run {
+            if !crossed && !baseline {
+                return Ok(());
             }
-            let planned = day * DAY + start;
-            let end = planned + duration;
-            let id = format!("{site}:daily:{day}");
-            let observed = clock.disposition == ClockDisposition::Observed;
-            let high_water = clock.previous_trusted_high_water_ms.unwrap_or(0);
-            let gap = clock.disposition == ClockDisposition::ObservationGap;
-            let crossed = previous < planned && now >= planned && planned > high_water;
-            let outcome = if run {
-                if !crossed && !baseline {
-                    continue;
-                }
-                if baseline {
-                    "BaselinePastMissed"
-                } else if gap {
-                    "ObservationGap"
-                } else if earliest != latest {
-                    "MultipleCrossingsMissed"
-                } else if cancel || !when || out.active || !observed {
-                    "ConditionsFalseAtPulse"
-                } else {
-                    "Due"
-                }
+            if baseline {
+                "BaselinePastMissed"
+            } else if gap {
+                "ObservationGap"
+            } else if day
+                .checked_sub(1)
+                .and_then(newest_eligible)
+                .is_some_and(|day| day >= earliest && day * DAY + start > high_water)
+            {
+                "MultipleCrossingsMissed"
+            } else if cancel || !when || out.active || !observed {
+                "ConditionsFalseAtPulse"
             } else {
-                if day == latest {
-                    out.active = when && now < end && observed && now >= high_water;
-                }
-                if baseline {
-                    "BaselinePastMissed"
-                } else if gap && previous < end {
-                    "ObservationGap"
-                } else if now >= end {
-                    "LateStartExpired"
-                } else if !out.active || previous >= end {
-                    continue;
-                } else {
-                    "Due"
-                }
-            };
-            if self.terminal.contains(&id) {
-                continue;
+                "Due"
             }
-            self.terminalize(&id)?;
-            out.due |= outcome == "Due";
-            out.missed |= outcome != "Due";
-            if run && outcome == "Due" {
-                self.active_run = Some(ActiveRun {
-                    id: id.clone(),
-                    end_monotonic_ms: monotonic_ms
-                        .checked_add(duration)
-                        .ok_or_else(|| invalid("Daily Run end overflow"))?,
-                    planned_ms: planned,
-                    provider_revision: String::new(),
-                    context_revision: String::new(),
-                    source_day: Some(day as i32),
-                    scheduled_day: Some(day as i32),
-                    date_resolver_revision: None,
-                });
-                out.active = true;
+        } else {
+            out.active = day == latest && when && now < end && observed && now >= high_water;
+            if baseline {
+                "BaselinePastMissed"
+            } else if gap && previous < end {
+                "ObservationGap"
+            } else if now >= end {
+                "LateStartExpired"
+            } else if !out.active || previous >= end {
+                return Ok(());
+            } else {
+                "Due"
             }
-            out.observations.push(Observation {
-                solar_fallback: None,
+        };
+        if terminal_day == Some(day) {
+            return Ok(());
+        }
+        let id = format!("{site}:daily:{day}");
+        self.terminal.clear();
+        self.terminalize(&id)?;
+        out.due = outcome == "Due";
+        out.missed = !out.due;
+        if run && out.due {
+            self.active_run = Some(ActiveRun {
+                id: id.clone(),
+                end_monotonic_ms: monotonic_ms
+                    .checked_add(duration)
+                    .ok_or_else(|| invalid("Daily Run end overflow"))?,
+                planned_ms: planned,
+                provider_revision: String::new(),
+                context_revision: String::new(),
                 source_day: Some(day as i32),
                 scheduled_day: Some(day as i32),
                 date_resolver_revision: None,
-                solar_unavailable_reason: None,
-                clock_provenance: None,
-                clock_source_revision: clock.source_revision.map(str::to_owned),
-                clock_uncertainty_ms: clock.uncertainty_ms,
-                unknown_reason: None,
-                site,
-                occurrence_id: id,
-                planned_ms: Some(planned),
-                decision: outcome.into(),
-                provider_revision: String::new(),
-                context_revision: String::new(),
             });
+            out.active = true;
         }
+        out.observations.push(Observation {
+            solar_fallback: None,
+            source_day: Some(day as i32),
+            scheduled_day: Some(day as i32),
+            date_resolver_revision: None,
+            solar_unavailable_reason: None,
+            clock_provenance: None,
+            clock_source_revision: clock.source_revision.map(str::to_owned),
+            clock_uncertainty_ms: clock.uncertainty_ms,
+            unknown_reason: None,
+            site,
+            occurrence_id: id,
+            planned_ms: Some(planned),
+            decision: outcome.into(),
+            provider_revision: String::new(),
+            context_revision: String::new(),
+        });
         Ok(())
     }
 
@@ -3445,7 +3463,21 @@ mod tests {
             .unwrap();
         assert!(decision.due && decision.active);
 
-        let checkpoint = admitted.snapshot().unwrap();
+        let mut running = admitted;
+        for day in 1..=100 {
+            let planned = day * 86_400_000 + 1_000;
+            let (baseline, decision) = running
+                .stage(&desc, clock(planned - 1), &evidence, true, false, None, 0)
+                .unwrap();
+            assert!(!decision.due && !decision.active);
+            let (next, decision) = baseline
+                .stage(&desc, clock(planned), &evidence, true, false, None, 0)
+                .unwrap();
+            assert!(decision.due && decision.active);
+            assert_eq!(next.terminal.len(), 1);
+            running = next;
+        }
+        let checkpoint = running.snapshot().unwrap();
         let restored = Engine::restore(&desc, 2, 8, &checkpoint).unwrap();
         let reboot_clock = |wall_ms, monotonic_ms| ClockSnapshot {
             wall_ms: Some(wall_ms),
@@ -3472,7 +3504,7 @@ mod tests {
         let (next_baseline, _) = crossed
             .stage(
                 &desc,
-                reboot_clock(86_400_999, 86_400_000),
+                reboot_clock(101 * 86_400_000 + 999, 86_400_000),
                 &evidence,
                 true,
                 false,
@@ -3483,7 +3515,7 @@ mod tests {
         let (_, decision) = next_baseline
             .stage(
                 &desc,
-                reboot_clock(86_401_000, 86_400_001),
+                reboot_clock(101 * 86_400_000 + 1_000, 86_400_001),
                 &evidence,
                 true,
                 false,

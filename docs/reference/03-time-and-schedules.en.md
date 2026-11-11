@@ -346,13 +346,13 @@ Rules for the common fields:
 | Other triggers | Keep trusted-only clock and skip fallback. |
 | `At` Window | The bounded executable Window profile. |
 | Immutable UTC `Daily` Window or on-time Run | GFB28 with a constant duration of at most 24 hours, an optional weekday selector and the trusted-only baseline policy. |
-
-Window requires a trusted observed scan for `.open`. An observation gap or baseline can miss admission even while the planned interval has time left. Later observed scans can reflect the predicate in `.open`, and `.due` stays false for a consumed occurrence. Run starts only at an observed crossing, counts duration from actual admission on the monotonic clock, and ends immediately when cancelled. The checkpoint preserves consumed identities across reboot. A new boot starts with no active Run.
 | Immutable UTC Daily and nonempty static DailySlots Range | Static non-overlap is proved; executes as GFB12. |
 | Immutable non-UTC `DailySlots<15min>` Range | GFB21 profile (see "Immutable non-UTC DailySlots Range"): compile-time nominal slot-spacing checks plus Rust validation of actual occurrence intervals supplied by the host. |
 | Other accepted Range recurrences | Remain non-executable descriptors. |
 | Range duration from an operator `Duration` config (supported UTC profiles) | Allowed when the initial value proves non-overlap. An accepted live setting event recomputes the current occurrence from its frozen planned start, without a new due pulse or occurrence identity. |
 | Tide `run(_, within(_))` | Supported. |
+
+Window requires a trusted observed scan for `.open`. An observation gap or baseline can miss admission even while the planned interval has time left. Later observed scans can reflect the predicate in `.open`, and `.due` stays false for a consumed occurrence. Run starts only at an observed crossing, counts duration from actual admission on the monotonic clock, and ends immediately when cancelled. The checkpoint retains the latest terminal UTC day across reboot and treats older days as consumed. A new boot starts with no active Run.
 
 **Bounded admission for natural events.** These rules keep missing predictions or an uncertain clock from silently creating occurrences:
 
