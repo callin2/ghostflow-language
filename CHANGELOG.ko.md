@@ -5,6 +5,10 @@
 
 ## 미출시
 
+### 2026-11-11 - 달력 조건에서 현지 날짜 사용 ([API #271](https://github.com/callin2/farm_studio_api/issues/271))
+
+일반 달력 조건에 IANA 시간대를 지정할 수 있다. 네이티브·WASM 실행기는 현재 스캔의 시각과 묶인 현지 날짜를 사용한다. 달력 조건만 사용하는 GFB18 프로그램을 서명할 수 있다. 조건의 위치, 시간대, 타입이 컴파일된 프로그램과 일치해야 한다. 서울 자정 시험은 검토된 한국 공휴일 자료를 사용한다.
+
 ### 2026-11-11 - 제어식에서 현지 요일 판정 ([#155](https://github.com/callin2/ghostflow-language/issues/155))
 
 Reference §3.8의 동작을 복구했다. `local_day_is(day\`mon..fri\`, timezone: "Asia/Seoul")`는 `Result<Bool, ClockFault>`로 컴파일된다. 호스트가 신뢰할 수 있는 시각에서 구한 현지 날짜를 전달하고 실행기가 요일 조건을 판단한다. 날짜가 없거나 모호하면 `ClockUnknown`이다. 기존 예약과 명명된 달력의 동작은 유지한다. 새 `control-v26` / GFB26는 갱신된 context 실행기가 필요하다. `tests/monitoring-plan.test.mjs`에서 평일·주말·시각 미확인의 3구역 버튼 시작을 검증한다.

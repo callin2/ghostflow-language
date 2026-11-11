@@ -620,7 +620,7 @@ function lowerCoreModule(ast) {
         if(!site||preludeSites.has(site))throw new CompileError('invalid or duplicate calendar site');
         preludeSites.add(site);assertName(calendarName,'calendar Result');
         if(preludeNames.has(calendarName))throw new CompileError('duplicate prelude name');preludeNames.add(calendarName);
-        if(!wellFormedShortString(calendar)||!['workday','offday','holiday'].includes(selector)||timezone!=='UTC')throw new CompileError('invalid calendar Result definition');
+        if(!wellFormedShortString(calendar)||!['workday','offday','holiday'].includes(selector)||!wellFormedShortString(timezone))throw new CompileError('invalid calendar Result definition');
         const bindings=[okName,valueName,faultName].map(name=>env.inputs.get(name));
         if(bindings.some((entry,index)=>!entry||entry.type!==[TYPE.bool,TYPE.bool,TYPE.number][index]))throw new CompileError('invalid calendar Result projection');
         if(new Set(bindings.map(entry=>entry.index)).size!==3)throw new CompileError('duplicate calendar Result projection');

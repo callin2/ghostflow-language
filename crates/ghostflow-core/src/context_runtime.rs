@@ -643,6 +643,8 @@ impl ContextRuntime {
             let valid = descriptors.iter().any(|entry| {
                 matches!(entry, PulseDescriptor::Weekday(d)
                     if d.site == fact.site && d.timezone == fact.timezone)
+                    || matches!(entry, PulseDescriptor::Calendar(d)
+                        if d.site == fact.site && d.timezone != "UTC" && d.timezone == fact.timezone)
             });
             if !valid
                 || clock.trust != ClockTrust::Trusted
@@ -1170,8 +1172,15 @@ impl ContextRuntime {
                 .iter()
                 .find(|e| e.site == d.site)
                 .ok_or_else(|| invalid("missing calendar Result evidence"))?;
+            let date = if d.timezone == "UTC" {
+                clock.wall_ms.map(|wall| (wall / 86_400_000) as i32)
+            } else {
+                weekday_facts.get(&d.site).map(|fact| fact.local_day as i32)
+            };
             let (ok, value, fault, decision) =
-                if let (ClockTrust::Trusted, Some(wall)) = (clock.trust, clock.wall_ms) {
+                if let (ClockTrust::Trusted, Some(wall), Some(date)) =
+                    (clock.trust, clock.wall_ms, date)
+                {
                     if wall > 253_402_300_799_999 {
                         return Err(invalid("calendar Result wall time is out of range"));
                     }
@@ -1179,7 +1188,7 @@ impl ContextRuntime {
                         crate::work_calendar::DayQuery {
                             calendar_id: &d.calendar,
                             timezone: &d.timezone,
-                            date: (wall / 86_400_000) as i32,
+                            date,
                             selector: d.selector,
                             now_ms: wall,
                         },

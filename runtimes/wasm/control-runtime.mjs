@@ -452,7 +452,7 @@ function validateContextManifest(input, bytecodeFormat) {
   }
   for (const item of calendarConditions) {
     safeInteger(item.site, 'calendar Result site', 1, 0xffff_ffff);
-    if (item.timezone !== 'UTC' || !['workday','offday','holiday'].includes(item.classification)
+    if (typeof item.timezone !== 'string' || !item.timezone || !['workday','offday','holiday'].includes(item.classification)
       || !calendars.some(calendar => calendar.name === item.calendar && calendar.type === (item.classification === 'holiday' ? 'HolidayCalendar' : 'WorkCalendar'))
       || item.result?.value !== 'Bool' || item.result?.error !== 'CalendarFault') throw new Error('calendar Result definition mismatch');
     keys(record(item.projectionInputs, 'calendar Result projections'), ['ok','value','fault'], [], 'calendar Result projections');
@@ -1520,8 +1520,11 @@ export class ControlRuntime {
       if (this.manifest.format === NATURAL_WEEKDAY_FORMAT && contextFacts.scheduledDates === undefined) {
         contextFacts = { ...contextFacts, scheduledDates: naturalScheduledDateFacts(contextFacts, this.manifest.schedules) };
       }
-      if (this.manifest.format === WEEKDAY_CONDITION_FORMAT) {
-        contextFacts = { ...contextFacts, weekdayConditions: this.manifest.weekdayConditions };
+      const localDateConditions = this.manifest.format === WEEKDAY_CONDITION_FORMAT
+        ? this.manifest.weekdayConditions
+        : this.manifest.calendarConditions?.filter(item => item.timezone !== 'UTC');
+      if (localDateConditions?.length) {
+        contextFacts = { ...contextFacts, weekdayConditions: localDateConditions.map(({ site, timezone }) => ({ site, timezone })) };
       }
       validateContextSolarFacts(contextFacts, this.manifest.schedules);
       encodeContextFacts(contextFacts);

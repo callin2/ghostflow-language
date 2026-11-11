@@ -385,7 +385,7 @@ function validateGfb1(bytes) {
     fail('invalid-bytecode-format', 'bytecode is not GFB1');
   }
   const version = bytes[4] | (bytes[5] << 8);
-  if (![1, 2, 3, 4, 10, 11, 16, 21, 22, 26, 27].includes(version)) fail('unsupported-bytecode-version', 'unsupported GFB format version');
+  if (![1, 2, 3, 4, 10, 11, 16, 18, 21, 22, 26, 27].includes(version)) fail('unsupported-bytecode-version', 'unsupported GFB format version');
   if (version === 22) {
     if (bytes.byteLength < 16) fail('invalid-bytecode-format', 'truncated GFB22 lifecycle envelope');
     const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
@@ -429,6 +429,19 @@ function validateGfbLifecycle(bytes, lifecycle) {
 }
 
 function validateConfigStreamPackageProfile(manifest, version, runtimeAbi) {
+  if (version === '18' || manifest.format === 'GhostFlow/control-v18') {
+    if (version !== '18' || manifest.format !== 'GhostFlow/control-v18'
+      || runtimeAbi !== 'GhostFlow/context-scan-abi-v5'
+      || !Array.isArray(manifest.calendarConditions) || !manifest.calendarConditions.length
+      || !Array.isArray(manifest.calendars) || !manifest.calendars.length
+      || ['schedules','signals','providers','naturalConditions','objectives','adaptSettings','resources']
+        .some(field => manifest[field] !== undefined && (!Array.isArray(manifest[field]) || manifest[field].length))
+      || manifest.accounting !== undefined) {
+      fail('unsupported-runtime-abi', 'signed GFB18 requires a calendar Result without schedule or provider profiles');
+    }
+    return;
+  }
+
   if (version === '27' || manifest.format === 'GhostFlow/control-v27') {
     if (version !== '27' || manifest.format !== 'GhostFlow/control-v27'
       || runtimeAbi !== 'GhostFlow/framed-scan-abi-v1'
@@ -746,7 +759,7 @@ function validateEmbeddedArtifacts(payload) {
 
   exactObject(payload.bytecode, ['format', 'version', 'sha256', 'contentBase64'], 'payload.bytecode');
   if (payload.bytecode.format !== 'GFB1') fail('invalid-bytecode-format', 'payload bytecode format must be GFB1');
-  if (!['1', '2', '3', '4', '10', '11', '16', '21', '22', '26', '27'].includes(payload.bytecode.version)) fail('unsupported-bytecode-version', 'unsupported payload bytecode version');
+  if (!['1', '2', '3', '4', '10', '11', '16', '18', '21', '22', '26', '27'].includes(payload.bytecode.version)) fail('unsupported-bytecode-version', 'unsupported payload bytecode version');
   digestValue(payload.bytecode.sha256, 'payload.bytecode.sha256');
 
   exactObject(payload.manifest, ['format', 'sha256', 'contentBase64'], 'payload.manifest');
@@ -826,6 +839,7 @@ export async function verifyPortablePackage(packageValue, options = {}) {
   if (lifecycle) validateGfbLifecycle(artifacts.bytecode, manifest.lifecycle);
   const contextManifest = profileVersion === '10';
   const civilManifest = profileVersion === '21';
+  const calendarManifest = profileVersion === '18';
   const weekdayManifest = profileVersion === '26';
   const manifestKeys = ['format', 'name', 'inputs', 'outputs', 'sensors', 'schedules', 'timers', 'signals', 'configs', 'bytecodeSha256'];
   if (Object.hasOwn(manifest, 'sensorInstances')) {
@@ -838,7 +852,7 @@ export async function verifyPortablePackage(packageValue, options = {}) {
     // source lowering below; a signature cannot substitute instance provenance.
   }
   if (weekdayManifest) manifestKeys.push('weekdayConditions');
-  if (contextManifest || civilManifest || weekdayManifest) {
+  if (contextManifest || civilManifest || weekdayManifest || calendarManifest) {
     for (const key of ['providers', 'calendars', 'naturalConditions', 'calendarConditions', 'accounting', 'resources', 'objectives', 'adaptSettings']) {
       if (Object.hasOwn(manifest, key)) manifestKeys.push(key);
     }
@@ -1039,7 +1053,7 @@ export async function verifyPortablePackage(packageValue, options = {}) {
         || !equalBytes(artifacts.bytecode,replay.bytes)) throw new Error('adaptive strategy projection does not match canonical source and bytecode');
     }
     if (!equalBytes(replay.bytes, artifacts.bytecode)) throw new Error('canonical source does not reproduce package bytecode');
-    if ((civilManifest || profileVersion === '16') && canonicalJson(manifest) !== canonicalJson(compileSourceSync(sourceText, { filename: mappedDocument.filename }).manifest)) {
+    if ((civilManifest || calendarManifest || profileVersion === '16') && canonicalJson(manifest) !== canonicalJson(compileSourceSync(sourceText, { filename: mappedDocument.filename }).manifest)) {
       throw new Error('context schedule manifest does not match exact owner source lowering');
     }
     if (profileVersion === '11'
