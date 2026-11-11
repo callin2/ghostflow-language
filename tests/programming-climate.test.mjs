@@ -14,6 +14,23 @@ function source(id) {
 const wasm = () => fs.readFileSync(new URL('../target/wasm32-unknown-unknown/release/ghostflow_wasm.wasm', import.meta.url));
 const sample = (id, value) => ({ epoch: 1, id, timestampMs: id, value, quality: 'Good' });
 
+test('PIG E38 turns the fan on at 30°C, keeps the deadband, and turns it off for stale input', async t => {
+  const compiled = compileSourceSync(source('E38'), { filename: 'E38.ghost.md' });
+  const runtime = await ControlRuntime.instantiateFramed(wasm(), compiled);
+  t.after(() => runtime.dispose());
+  const temperatures = [[28, false], [29, false], [30, true], [28, true], [27, true], [26, false], [30, true]];
+  for (const [index, [celsius, on]] of temperatures.entries()) {
+    const nowMs = (index + 1) * 1000;
+    const reading = runtime.step({ nowMs, samples: { air: sample(nowMs, celsius + 273.15) } });
+    assert.equal(reading.vm.safe.fan, on, `fan at ${celsius}°C`);
+  }
+  const stale = runtime.step({ nowMs: 10_001 });
+  assert.equal(stale.sensors.air.quality, 'Stale');
+  assert.equal(stale.vm.safe.fan, false);
+  const recovered = runtime.step({ nowMs: 11_000, samples: { air: sample(11_000, 303.15) } });
+  assert.equal(recovered.vm.safe.fan, true);
+});
+
 test('PIG climate chapter preserves heater unit equivalence and separate VPD domain', () => {
   const heaters = ['E16', 'E17', 'E18'].map(id => compileSourceSync(source(id), { filename: `${id}.ghost.md` }));
   for (const heater of heaters) {

@@ -2283,31 +2283,31 @@
       "files": {
         "en": {
           "path": "docs/ProgrammingInGhostflow.en.md",
-          "sha256": "1d6bf716aaa6889623c271ce903d6e19c7c7a2d9e058974e02278a5ffc628fbf"
+          "sha256": "ceca65a3bb59dba648588fa87ae194409968f32082768fb9bd96e9cd079e1016"
         },
         "ko": {
           "path": "docs/ProgrammingInGhostflow.md",
-          "sha256": "fd3b902ed09197d9248b1291b86a7e388b99775c1970296fe3f17ac32feb6c1f",
+          "sha256": "bd577be86b2ba8fa5e1a20b1b37f28d761ea080ef8bbf27edf96f0c78cb66c43",
           "from": "en",
-          "sourceSha256": "1d6bf716aaa6889623c271ce903d6e19c7c7a2d9e058974e02278a5ffc628fbf"
+          "sourceSha256": "ceca65a3bb59dba648588fa87ae194409968f32082768fb9bd96e9cd079e1016"
         },
         "zh": {
           "path": "docs/ProgrammingInGhostflow.zh.md",
-          "sha256": "7fa1d3f0c6040fa4e21ed511fd71aac64b47541ab1286e7c4af1bafb2d030afb",
+          "sha256": "cebb280d636341af27b0a72e0a30d6017934dc62c0ed9416466e1897e700c1ee",
           "from": "en",
-          "sourceSha256": "1d6bf716aaa6889623c271ce903d6e19c7c7a2d9e058974e02278a5ffc628fbf"
+          "sourceSha256": "ceca65a3bb59dba648588fa87ae194409968f32082768fb9bd96e9cd079e1016"
         },
         "es": {
           "path": "docs/ProgrammingInGhostflow.es.md",
-          "sha256": "5f2c83b27380c99c9d846d287406d423a03a32fc243809c66c369fb1ebdad2ac",
+          "sha256": "10a5464e0ba6e27022433d7db1c9758c0af0f250018ff980da36fbb8bae5542e",
           "from": "en",
-          "sourceSha256": "1d6bf716aaa6889623c271ce903d6e19c7c7a2d9e058974e02278a5ffc628fbf"
+          "sourceSha256": "ceca65a3bb59dba648588fa87ae194409968f32082768fb9bd96e9cd079e1016"
         },
         "ja": {
           "path": "docs/ProgrammingInGhostflow.ja.md",
-          "sha256": "40b3550d5c48658cfebd78ebbc01d691962212edd142ee425f3f0b8d32782e42",
+          "sha256": "b10e56d14e16508760a43f9b6ad7bdf55e8746306247fe66e6b64ffaa8678d02",
           "from": "en",
-          "sourceSha256": "1d6bf716aaa6889623c271ce903d6e19c7c7a2d9e058974e02278a5ffc628fbf"
+          "sourceSha256": "ceca65a3bb59dba648588fa87ae194409968f32082768fb9bd96e9cd079e1016"
         }
       }
     },

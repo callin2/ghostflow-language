@@ -268,6 +268,8 @@ GhostFlow는 정확한 계수를 signed 32-bit `Int`로 표현합니다. 범위�
 <a id="quantity-type-lookup"></a>
 ### 측정하려는 값에서 타입 찾기
 
+[고온 환기 예제](#hot-greenhouse-fan)에서 30°C를 넣고 팬 동작을 확인할 수 있습니다.
+
 섭씨로 측정하더라도 타입 이름은 `Temperature`입니다. `Celsius`나 `Fahrenheit`라는 타입을 선언하지 마세요. 단위는 값에 붙입니다. `input air: Temperature;`로 선언하고 기준값은 `30°C`처럼 씁니다. `30°C`, `86°F`, `303.15K`는 같은 절대 온도를 나타냅니다. [14장](#ch14)에서 단위 변환과 온도 제어를 이어서 다룹니다.
 
 | 측정하는 값 | 선언 타입 | 값 예시 | 입력 선언 |
@@ -2084,6 +2086,28 @@ control KelvinHeater {
     on_below: 291.15K, off_above: 295.15K, initial: false);
   output heater: Bool;
   heater <- cold |> recover(false);
+}
+```
+
+<a id="hot-greenhouse-fan"></a>
+### E38 — 더울 때 환기팬 켜기
+
+가상 온실의 온도를 `28°C → 30°C → 28°C → 26°C`로 바꿔 보세요. 팬은 `꺼짐 → 켜짐 → 켜짐 → 꺼짐` 순서로 움직입니다. `29°C`를 넘으면 켜지고 `27°C`보다 낮아지면 꺼집니다. 두 경계에서는 직전 상태가 유지됩니다.
+
+`cool`은 시원한 상태를 기억합니다. 정상 관측이면 반대값을 팬에 보냅니다. 이 예제에서는 3초 동안 새 온도가 들어오지 않아 값이 오래되면 팬을 끕니다.
+
+```ghost
+// E38
+control GreenhouseVentilation {
+  input air: Temperature {
+    sample = 1s;
+    valid = -40°C .. 50°C;
+    stale_after = 3s;
+  }
+  signal cool = hysteresis(air,
+    on_below: 27°C, off_above: 29°C, initial: true);
+  output fan: Bool;
+  fan <- case cool { ok(value) => !value; fault(_) => false; };
 }
 ```
 
