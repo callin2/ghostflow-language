@@ -586,6 +586,22 @@ impl ContextRuntime {
         })
     }
 
+    pub(crate) fn stage_daily_paused(
+        &self,
+        descriptors: &[PulseDescriptor],
+        clock: ClockSnapshot<'_>,
+    ) -> Result<Self> {
+        let mut staged = self.clone();
+        staged.clock.poll(clock)?;
+        for (descriptor, engine) in descriptors.iter().zip(&mut staged.engines) {
+            let (PulseDescriptor::Context(desc), Some(engine)) = (descriptor, engine) else {
+                return Err(invalid("UTC Daily schedule binding mismatch"));
+            };
+            engine.observe_daily_paused(desc, clock)?;
+        }
+        Ok(staged)
+    }
+
     fn validate_observation(&self, observation: &ProviderObservation) -> Result<()> {
         let binding = self
             .bindings
@@ -685,7 +701,7 @@ impl ContextRuntime {
         }
         let expected = descriptors
             .iter()
-            .filter(|d| matches!(d, PulseDescriptor::Calendar(_)) || matches!(d, PulseDescriptor::Context(c) if !matches!(c.definition, ScheduleDefinition::AtPulse { .. } | ScheduleDefinition::AtWindow { .. } | ScheduleDefinition::SolarContext { .. })))
+            .filter(|d| matches!(d, PulseDescriptor::Calendar(_)) || matches!(d, PulseDescriptor::Context(c) if !matches!(c.definition, ScheduleDefinition::AtPulse { .. } | ScheduleDefinition::AtWindow { .. } | ScheduleDefinition::UtcDaily { .. } | ScheduleDefinition::SolarContext { .. })))
             .count();
         if facts.schedules.len() != expected || facts.natural.len() > self.bindings.len() {
             return Err(invalid("context facts do not match installed requirements"));
@@ -840,8 +856,10 @@ impl ContextRuntime {
                 ScheduleDefinition::SolarContext { .. } => {
                     return Err(invalid("Solar requires Solar facts, not civil evidence"))
                 }
-                ScheduleDefinition::AtPulse { .. } | ScheduleDefinition::AtWindow { .. } => {
-                    return Err(invalid("At occurrences are computed by the core"))
+                ScheduleDefinition::AtPulse { .. }
+                | ScheduleDefinition::AtWindow { .. }
+                | ScheduleDefinition::UtcDaily { .. } => {
+                    return Err(invalid("schedule occurrences are computed by the core"))
                 }
                 ScheduleDefinition::Periodic { .. } | ScheduleDefinition::UtcRange { .. } => {
                     if evidence.provider.is_some()
@@ -1322,6 +1340,7 @@ impl ContextRuntime {
                     d.definition,
                     ScheduleDefinition::AtPulse { .. }
                         | ScheduleDefinition::AtWindow { .. }
+                        | ScheduleDefinition::UtcDaily { .. }
                         | ScheduleDefinition::SolarContext { .. }
                 ) {
                     &at_evidence

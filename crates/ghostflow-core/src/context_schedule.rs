@@ -26,6 +26,7 @@ pub struct Engine {
     next_slot_key: u64,
     added_at_wall: BTreeMap<u64, u64>,
     active_run: Option<ActiveRun>,
+    daily_paused: bool,
     last_plan: BTreeMap<String, u64>,
     pending_grace: BTreeMap<String, (u64, String, String)>,
     range: Option<RangeEngine>,
@@ -716,6 +717,24 @@ impl Engine {
             return Err(invalid("trailing context checkpoint bytes"));
         }
         match &desc.definition {
+            ScheduleDefinition::UtcDaily { .. } => {
+                let prefix = format!("{}:daily:", desc.site);
+                if restored.terminal.len() > 1
+                    || restored.terminal.iter().any(|id| {
+                        id.strip_prefix(&prefix)
+                            .and_then(|day| day.parse::<u32>().ok())
+                            .is_none_or(|day| day > 2_932_896 || format!("{prefix}{day}") != *id)
+                    })
+                    || restored.interval_ms.is_some()
+                    || !restored.slots.is_empty()
+                    || !restored.added_at_wall.is_empty()
+                    || !restored.last_plan.is_empty()
+                    || restored.phase_revision != 0
+                    || restored.next_slot_key != 1
+                {
+                    return Err(invalid("UTC Daily checkpoint identity mismatch"));
+                }
+            }
             ScheduleDefinition::AtPulse { .. } | ScheduleDefinition::AtWindow { .. } => {
                 let identity = format!("{}:at", desc.site);
                 if restored.terminal.iter().any(|id| id != &identity)
@@ -927,6 +946,7 @@ impl Engine {
             next_slot_key,
             added_at_wall: BTreeMap::new(),
             active_run: None,
+            daily_paused: false,
             last_plan: BTreeMap::new(),
             pending_grace: BTreeMap::new(),
             range: if matches!(
@@ -1190,6 +1210,17 @@ impl Engine {
             ScheduleDefinition::AtPulse { at_ms } => {
                 staged.at_pulse(desc.site, *at_ms, &observed, when, &mut decision)?
             }
+            ScheduleDefinition::UtcDaily { .. } => {
+                staged.utc_daily(
+                    desc,
+                    &observed,
+                    clock.monotonic_ms,
+                    when,
+                    cancel,
+                    &mut decision,
+                )?;
+                staged.daily_paused = false;
+            }
             ScheduleDefinition::AtWindow { at_ms, duration_ms } => staged.at_window(
                 desc.site,
                 *at_ms,
@@ -1398,6 +1429,7 @@ impl Engine {
             ScheduleDefinition::UtcRange { .. }
                 | ScheduleDefinition::AtPulse { .. }
                 | ScheduleDefinition::AtWindow { .. }
+                | ScheduleDefinition::UtcDaily { .. }
         ) && (facts.provider.is_some() || facts.calendar.is_some() || !facts.rows.is_empty())
         {
             return Err(invalid("unexpected UTC Range evidence payload"));
@@ -2355,6 +2387,257 @@ impl Engine {
         Ok(())
     }
 
+    fn observe_active_run(
+        &mut self,
+        site: u32,
+        monotonic_ms: u64,
+        cancel: bool,
+        out: &mut Decision,
+    ) {
+        if let Some(active) = self.active_run.clone() {
+            if cancel || monotonic_ms >= active.end_monotonic_ms {
+                self.active_run = None;
+                out.observations.push(Observation {
+                    solar_fallback: None,
+                    source_day: active.source_day,
+                    scheduled_day: active.scheduled_day,
+                    date_resolver_revision: active.date_resolver_revision.clone(),
+                    solar_unavailable_reason: None,
+                    clock_provenance: None,
+                    clock_source_revision: None,
+                    clock_uncertainty_ms: None,
+                    unknown_reason: None,
+                    site,
+                    occurrence_id: active.id,
+                    planned_ms: Some(active.planned_ms),
+                    decision: if cancel {
+                        "Cancelled".into()
+                    } else {
+                        "RunEnded".into()
+                    },
+                    provider_revision: active.provider_revision,
+                    context_revision: active.context_revision,
+                });
+            } else {
+                out.active = true;
+                out.observations.push(Observation {
+                    solar_fallback: None,
+                    source_day: active.source_day,
+                    scheduled_day: active.scheduled_day,
+                    date_resolver_revision: active.date_resolver_revision.clone(),
+                    solar_unavailable_reason: None,
+                    clock_provenance: None,
+                    clock_source_revision: None,
+                    clock_uncertainty_ms: None,
+                    unknown_reason: None,
+                    site,
+                    occurrence_id: active.id,
+                    planned_ms: Some(active.planned_ms),
+                    decision: "Active".into(),
+                    provider_revision: active.provider_revision,
+                    context_revision: active.context_revision,
+                });
+            }
+        }
+    }
+
+    pub(crate) fn observe_daily_paused(
+        &mut self,
+        desc: &ScheduleDescriptor,
+        clock: ClockSnapshot<'_>,
+    ) -> Result<()> {
+        self.daily_paused = true;
+        let observed = self.clock.poll(clock)?;
+        self.utc_daily(
+            desc,
+            &observed,
+            clock.monotonic_ms,
+            false,
+            true,
+            &mut Decision::default(),
+        )
+    }
+
+    fn utc_daily(
+        &mut self,
+        desc: &ScheduleDescriptor,
+        clock: &crate::schedule_clock::ClockObservation<'_>,
+        monotonic_ms: u64,
+        when: bool,
+        cancel: bool,
+        out: &mut Decision,
+    ) -> Result<()> {
+        let ScheduleDefinition::UtcDaily {
+            at_ms: start,
+            duration_ms: duration,
+            run,
+            weekday_mask,
+            ..
+        } = desc.definition
+        else {
+            return Err(invalid("UTC Daily schedule required"));
+        };
+        let site = desc.site;
+        const DAY: u64 = 86_400_000;
+        const MAX_WALL: u64 = 253_402_300_799_999;
+        if run {
+            self.observe_active_run(site, monotonic_ms, cancel, out);
+        }
+        let Some(now) = clock.current_effective_wall_ms else {
+            out.observations.push(Observation {
+                solar_fallback: None,
+                source_day: None,
+                scheduled_day: None,
+                date_resolver_revision: None,
+                solar_unavailable_reason: None,
+                clock_provenance: None,
+                clock_source_revision: clock.source_revision.map(str::to_owned),
+                clock_uncertainty_ms: clock.uncertainty_ms,
+                unknown_reason: clock.unknown_reason.map(str::to_owned),
+                site,
+                occurrence_id: String::new(),
+                planned_ms: None,
+                decision: "Unknown(ClockUnknown)".into(),
+                provider_revision: String::new(),
+                context_revision: String::new(),
+            });
+            return Ok(());
+        };
+        if now > MAX_WALL {
+            return Err(invalid("UTC Daily wall time is out of range"));
+        }
+        let occurrence_at = |wall: u64| {
+            let day = wall / DAY;
+            if wall % DAY >= start {
+                Some(day)
+            } else {
+                day.checked_sub(1)
+            }
+        };
+        let Some(latest) = occurrence_at(now) else {
+            return Ok(());
+        };
+        let baseline = matches!(
+            clock.disposition,
+            ClockDisposition::BootBaseline | ClockDisposition::RecoveryBaseline
+        );
+        if baseline && now / DAY != latest && (run || now >= latest * DAY + start + duration) {
+            return Ok(());
+        }
+        let previous = clock.previous_effective_wall_ms.unwrap_or(now);
+        let earliest = if baseline {
+            latest
+        } else if run {
+            ((previous / DAY) + u64::from(previous % DAY >= start)).min(latest)
+        } else {
+            occurrence_at(previous)
+                .map(|day| day + u64::from(day * DAY + start + duration <= previous))
+                .unwrap_or(0)
+                .min(latest)
+        };
+        let eligible = |day: u64| weekday_mask == 0 || weekday_mask & (1 << ((day + 4) % 7)) != 0;
+        // A fixed UTC schedule needs only its newest terminal day. In a gap
+        // the newest eligible occurrence also represents earlier missed days.
+        let newest_eligible = |at: u64| {
+            (0..7)
+                .filter_map(|offset| at.checked_sub(offset))
+                .find(|day| eligible(*day))
+        };
+        let Some(day) = newest_eligible(latest).filter(|day| *day >= earliest) else {
+            return Ok(());
+        };
+        let terminal_day = self.terminal.first().map(|id| {
+            id.rsplit(':')
+                .next()
+                .unwrap()
+                .parse::<u64>()
+                .expect("verified UTC Daily terminal identity")
+        });
+        if terminal_day.is_some_and(|terminal| day < terminal) {
+            return Ok(());
+        }
+        let planned = day * DAY + start;
+        let end = planned + duration;
+        let observed = clock.disposition == ClockDisposition::Observed && !self.daily_paused;
+        let high_water = clock.previous_trusted_high_water_ms.unwrap_or(0);
+        let gap = clock.disposition == ClockDisposition::ObservationGap || self.daily_paused;
+        let crossed = previous < planned && now >= planned && planned > high_water;
+        let outcome = if run {
+            if !crossed && !baseline {
+                return Ok(());
+            }
+            if baseline {
+                "BaselinePastMissed"
+            } else if gap {
+                "ObservationGap"
+            } else if day
+                .checked_sub(1)
+                .and_then(newest_eligible)
+                .is_some_and(|day| day >= earliest && day * DAY + start > high_water)
+            {
+                "MultipleCrossingsMissed"
+            } else if cancel || !when || out.active || !observed {
+                "ConditionsFalseAtPulse"
+            } else {
+                "Due"
+            }
+        } else {
+            out.active = day == latest && when && now < end && observed && now >= high_water;
+            if baseline {
+                "BaselinePastMissed"
+            } else if gap && previous < end {
+                "ObservationGap"
+            } else if now >= end {
+                "LateStartExpired"
+            } else if !out.active || previous >= end {
+                return Ok(());
+            } else {
+                "Due"
+            }
+        };
+        if terminal_day == Some(day) {
+            return Ok(());
+        }
+        let id = format!("{site}:daily:{day}");
+        self.terminal.clear();
+        self.terminalize(&id)?;
+        out.due = outcome == "Due";
+        out.missed = !out.due;
+        if run && out.due {
+            self.active_run = Some(ActiveRun {
+                id: id.clone(),
+                end_monotonic_ms: monotonic_ms
+                    .checked_add(duration)
+                    .ok_or_else(|| invalid("Daily Run end overflow"))?,
+                planned_ms: planned,
+                provider_revision: String::new(),
+                context_revision: String::new(),
+                source_day: Some(day as i32),
+                scheduled_day: Some(day as i32),
+                date_resolver_revision: None,
+            });
+            out.active = true;
+        }
+        out.observations.push(Observation {
+            solar_fallback: None,
+            source_day: Some(day as i32),
+            scheduled_day: Some(day as i32),
+            date_resolver_revision: None,
+            solar_unavailable_reason: None,
+            clock_provenance: None,
+            clock_source_revision: clock.source_revision.map(str::to_owned),
+            clock_uncertainty_ms: clock.uncertainty_ms,
+            unknown_reason: None,
+            site,
+            occurrence_id: id,
+            planned_ms: Some(planned),
+            decision: outcome.into(),
+            provider_revision: String::new(),
+            context_revision: String::new(),
+        });
+        Ok(())
+    }
+
     fn at_window(
         &mut self,
         site: u32,
@@ -2703,51 +2986,7 @@ impl Engine {
                 out,
             )?;
         }
-        if let Some(active) = self.active_run.clone() {
-            if cancel || monotonic >= active.end_monotonic_ms {
-                self.active_run = None;
-                out.observations.push(Observation {
-                    solar_fallback: None,
-                    source_day: active.source_day,
-                    scheduled_day: active.scheduled_day,
-                    date_resolver_revision: active.date_resolver_revision.clone(),
-                    solar_unavailable_reason: None,
-                    clock_provenance: None,
-                    clock_source_revision: None,
-                    clock_uncertainty_ms: None,
-                    unknown_reason: None,
-                    site,
-                    occurrence_id: active.id,
-                    planned_ms: Some(active.planned_ms),
-                    decision: if cancel {
-                        "Cancelled".into()
-                    } else {
-                        "RunEnded".into()
-                    },
-                    provider_revision: active.provider_revision,
-                    context_revision: active.context_revision,
-                });
-            } else {
-                out.active = true;
-                out.observations.push(Observation {
-                    solar_fallback: None,
-                    source_day: active.source_day,
-                    scheduled_day: active.scheduled_day,
-                    date_resolver_revision: active.date_resolver_revision.clone(),
-                    solar_unavailable_reason: None,
-                    clock_provenance: None,
-                    clock_source_revision: None,
-                    clock_uncertainty_ms: None,
-                    unknown_reason: None,
-                    site,
-                    occurrence_id: active.id,
-                    planned_ms: Some(active.planned_ms),
-                    decision: "Active".into(),
-                    provider_revision: active.provider_revision,
-                    context_revision: active.context_revision,
-                });
-            }
-        }
+        self.observe_active_run(site, monotonic, cancel, out);
         let Some(now) = clock.current_effective_wall_ms else {
             return Ok(());
         };
@@ -3213,6 +3452,97 @@ mod tests {
     use super::*;
     use crate::context_vm::{DurationSetting, Occurrence, ProviderBinding, ProviderObservation};
     use crate::schedule_clock::ClockTrust;
+
+    #[test]
+    fn utc_daily_checkpoint_preserves_admission_without_resuming_run() {
+        let desc = ScheduleDescriptor {
+            site: 7,
+            name: "morning".into(),
+            gap_ms: 100,
+            clock_hold_ms: None,
+            definition: ScheduleDefinition::UtcDaily {
+                at_ms: 1_000,
+                duration_ms: 100,
+                run: true,
+                dst_missing: 0,
+                dst_repeated: 0,
+                weekday_mask: 0,
+            },
+            when: vec![],
+            cancel: vec![],
+        };
+        let evidence = facts(7);
+        let initial = Engine::new(&desc, 1, 8).unwrap();
+        let (baseline, _) = initial
+            .stage(&desc, clock(999), &evidence, true, false, None, 0)
+            .unwrap();
+        let (admitted, decision) = baseline
+            .stage(&desc, clock(1_000), &evidence, true, false, None, 0)
+            .unwrap();
+        assert!(decision.due && decision.active);
+
+        let mut running = admitted;
+        for day in 1..=100 {
+            let planned = day * 86_400_000 + 1_000;
+            let (baseline, decision) = running
+                .stage(&desc, clock(planned - 1), &evidence, true, false, None, 0)
+                .unwrap();
+            assert!(!decision.due && !decision.active);
+            let (next, decision) = baseline
+                .stage(&desc, clock(planned), &evidence, true, false, None, 0)
+                .unwrap();
+            assert!(decision.due && decision.active);
+            assert_eq!(next.terminal.len(), 1);
+            running = next;
+        }
+        let checkpoint = running.snapshot().unwrap();
+        let restored = Engine::restore(&desc, 2, 8, &checkpoint).unwrap();
+        let reboot_clock = |wall_ms, monotonic_ms| ClockSnapshot {
+            wall_ms: Some(wall_ms),
+            monotonic_ms,
+            boot_epoch: 2,
+            ..clock(0)
+        };
+        let (baseline, decision) = restored
+            .stage(&desc, reboot_clock(999, 0), &evidence, true, false, None, 0)
+            .unwrap();
+        assert!(!decision.due && !decision.active);
+        let (crossed, decision) = baseline
+            .stage(
+                &desc,
+                reboot_clock(1_000, 1),
+                &evidence,
+                true,
+                false,
+                None,
+                0,
+            )
+            .unwrap();
+        assert!(!decision.due && !decision.active);
+        let (next_baseline, _) = crossed
+            .stage(
+                &desc,
+                reboot_clock(101 * 86_400_000 + 999, 86_400_000),
+                &evidence,
+                true,
+                false,
+                None,
+                0,
+            )
+            .unwrap();
+        let (_, decision) = next_baseline
+            .stage(
+                &desc,
+                reboot_clock(101 * 86_400_000 + 1_000, 86_400_001),
+                &evidence,
+                true,
+                false,
+                None,
+                0,
+            )
+            .unwrap();
+        assert!(decision.due && decision.active);
+    }
 
     fn range_desc(starts: Vec<u64>, duration: u64) -> ScheduleDescriptor {
         ScheduleDescriptor {

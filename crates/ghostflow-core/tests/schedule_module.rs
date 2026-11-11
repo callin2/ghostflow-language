@@ -160,7 +160,7 @@ impl Fixture {
             blob(&mut b, if empty { &[1, 0] } else { &self.output });
         }
         b.extend([0, 0]);
-        if matches!(self.version, 7 | 11 | 12 | 21) {
+        if matches!(self.version, 7 | 11 | 12 | 21 | 28) {
             b.extend([0, 0]); // objective count
         }
         b
@@ -1261,6 +1261,179 @@ fn daily_fixture() -> Fixture {
     }
 }
 
+fn weekday_daily_runtime(repeated: u8) -> Runtime {
+    let mut entry = daily_entry(repeated, &[1, 1]);
+    let mask_offset = 1 + 4 + 2 + "morning".len() + 2 + "Asia/Seoul".len() + 8 + 2;
+    entry[mask_offset] = 0b0111110;
+    let fixture = Fixture {
+        version: 27,
+        entries: vec![entry],
+        ..Fixture::default()
+    };
+    let mut runtime = Runtime::new(8);
+    runtime.install(Module::load(&fixture.bytes()).unwrap(), false);
+    runtime
+        .activate_with_schedules(&solar_activation())
+        .unwrap();
+    runtime
+}
+
+#[test]
+fn weekday_daily_checkpoint_keeps_fold_identity_and_rejects_corruption_atomically() {
+    use ghostflow_core::solar_admission::SolarFact;
+    use ghostflow_core::solar_runtime::ScheduleKind;
+    let mut runtime = weekday_daily_runtime(2);
+    let mut first = SolarFact::available(4, 1000, "iana-v1", "zone-v1");
+    first.fold = 1;
+    let rows = [first.clone()];
+    daily_tick(&mut runtime, 0, 900, &rows, ScheduleKind::Daily, 3000).unwrap();
+    assert_eq!(
+        daily_tick(&mut runtime, 100, 1000, &rows, ScheduleKind::Daily, 3000)
+            .unwrap()
+            .safe_intents["due"],
+        Value::Bool(true)
+    );
+    let checkpoint = runtime.schedule_checkpoint().unwrap();
+    assert!(runtime.restore_schedule_checkpoint(&checkpoint).is_err());
+    let mut reboot = weekday_daily_runtime(2);
+    reboot.restore_schedule_checkpoint(&checkpoint).unwrap();
+    let mut corrupt = checkpoint.clone();
+    corrupt[16] ^= 1;
+    assert!(reboot.restore_schedule_checkpoint(&corrupt).is_err());
+    assert_eq!(reboot.schedule_checkpoint().unwrap(), checkpoint);
+    daily_tick(&mut reboot, 0, 900, &rows, ScheduleKind::Daily, 3000).unwrap();
+    assert_eq!(
+        daily_tick(&mut reboot, 100, 1000, &rows, ScheduleKind::Daily, 3000)
+            .unwrap()
+            .safe_intents["due"],
+        Value::Bool(false)
+    );
+    let mut second = first;
+    second.fold = 2;
+    second.scheduled_wall_ms = Some(2000);
+    assert_eq!(
+        daily_tick(
+            &mut reboot,
+            1100,
+            2000,
+            &[second],
+            ScheduleKind::Daily,
+            3000
+        )
+        .unwrap()
+        .safe_intents["due"],
+        Value::Bool(true)
+    );
+    assert!(weekday_daily_runtime(0)
+        .restore_schedule_checkpoint(&checkpoint)
+        .is_err());
+}
+
+#[test]
+fn weekday_daily_pause_suppresses_crossing_and_keeps_next_day_eligible() {
+    use ghostflow_core::schedule_clock::{ClockSnapshot, ClockTrust};
+    use ghostflow_core::solar_admission::{SolarFact, SolarFacts};
+    use ghostflow_core::solar_runtime::{ScheduleInput, ScheduleKind};
+    let mut runtime = weekday_daily_runtime(0);
+    let rows = [SolarFact::available(4, 1000, "iana-v1", "zone-v1")];
+    for (mono, wall) in [(0, 900), (100, 1000)] {
+        runtime
+            .observe_schedules_paused(
+                ClockSnapshot {
+                    monotonic_ms: mono,
+                    boot_epoch: 3,
+                    wall_ms: Some(wall),
+                    trust: ClockTrust::Trusted,
+                    uncertainty_ms: Some(0),
+                    source_revision: Some("clock-v1"),
+                },
+                &[ScheduleInput {
+                    site: 7,
+                    kind: ScheduleKind::Daily,
+                    facts: SolarFacts {
+                        coverage_from_wall_ms: 0,
+                        coverage_to_wall_ms: 3000,
+                        rows: &rows,
+                    },
+                }],
+            )
+            .unwrap();
+    }
+    let checkpoint = runtime.schedule_checkpoint().unwrap();
+    let mut reboot = weekday_daily_runtime(0);
+    reboot.restore_schedule_checkpoint(&checkpoint).unwrap();
+    daily_tick(&mut reboot, 0, 900, &rows, ScheduleKind::Daily, 3000).unwrap();
+    assert_eq!(
+        daily_tick(&mut reboot, 100, 1000, &rows, ScheduleKind::Daily, 3000)
+            .unwrap()
+            .safe_intents["due"],
+        Value::Bool(false)
+    );
+    let next_day = [SolarFact::available(5, 2000, "iana-v1", "zone-v1")];
+    assert_eq!(
+        daily_tick(
+            &mut reboot,
+            1100,
+            2000,
+            &next_day,
+            ScheduleKind::Daily,
+            3000
+        )
+        .unwrap()
+        .safe_intents["due"],
+        Value::Bool(true)
+    );
+}
+
+#[test]
+fn weekday_daily_retention_is_bounded_across_two_hundred_days_and_reboot() {
+    use ghostflow_core::solar_admission::SolarFact;
+    use ghostflow_core::solar_runtime::ScheduleKind;
+    let mut runtime = weekday_daily_runtime(0);
+    let mut last_checkpoint = Vec::new();
+    for day in 4..204 {
+        let planned = day as u64 * 86_400_000 + 1000;
+        let rows = [SolarFact::available(day, planned, "iana-v1", "zone-v1")];
+        daily_tick(
+            &mut runtime,
+            planned - 100,
+            planned - 100,
+            &rows,
+            ScheduleKind::Daily,
+            planned + 1000,
+        )
+        .unwrap();
+        let tick = daily_tick(
+            &mut runtime,
+            planned,
+            planned,
+            &rows,
+            ScheduleKind::Daily,
+            planned + 1000,
+        )
+        .unwrap();
+        let weekday = (day + 4) % 7;
+        assert_eq!(
+            tick.safe_intents["due"],
+            Value::Bool((1..=5).contains(&weekday))
+        );
+        last_checkpoint = runtime.schedule_checkpoint().unwrap();
+        assert_eq!(last_checkpoint.len(), 33, "one terminal day only");
+    }
+    let mut reboot = weekday_daily_runtime(0);
+    reboot
+        .restore_schedule_checkpoint(&last_checkpoint)
+        .unwrap();
+    let old = [SolarFact::available(4, 1000, "iana-v1", "zone-v1")];
+    daily_tick(&mut reboot, 0, 900, &old, ScheduleKind::Daily, 2000).unwrap();
+    assert_eq!(
+        daily_tick(&mut reboot, 100, 1000, &old, ScheduleKind::Daily, 2000)
+            .unwrap()
+            .safe_intents["due"],
+        Value::Bool(false)
+    );
+}
+
 fn daily_slots_entry(slots: &[(u16, u16)], repeated: u8, when: &[u8]) -> Vec<u8> {
     let mut b = vec![4];
     b.extend(7u32.to_le_bytes());
@@ -2042,4 +2215,152 @@ fn solar_predicates_can_read_preceding_schedule_projections() {
         assert_eq!(tick.safe_intents["due"], Value::Bool(due));
         assert_eq!(tick.schedule_trace.len(), 2);
     }
+}
+
+fn utc_daily_driver(
+    run: bool,
+    projection: u8,
+    boot_epoch: u64,
+) -> ghostflow_core::scan::ScanDriver {
+    let mut schedule = vec![if run { 25 } else { 24 }];
+    schedule.extend(7u32.to_le_bytes());
+    string(&mut schedule, "morning");
+    schedule.extend(60_000u64.to_le_bytes());
+    schedule.extend(1_000u64.to_le_bytes());
+    schedule.extend(100u64.to_le_bytes());
+    schedule.extend([0, 0, 0]);
+    blob(&mut schedule, &[1, 1]);
+    blob(&mut schedule, &[1, 0]);
+    let fixture = Fixture {
+        version: 28,
+        states: 1,
+        entries: vec![schedule],
+        transition: Some(vec![4, 0, 0, 10]),
+        output: vec![58, 0, 0, projection],
+        ..Fixture::default()
+    };
+    let mut runtime = Runtime::new(8);
+    runtime.install(Module::load(&fixture.bytes()).unwrap(), false);
+    runtime
+        .activate_with_context(&ghostflow_core::context_runtime::Activation {
+            boot_epoch,
+            terminal_capacity: 8,
+            bindings: Vec::new(),
+        })
+        .unwrap();
+    runtime.into_scan_driver()
+}
+
+fn utc_daily_clock(
+    boot_epoch: u64,
+    monotonic_ms: u64,
+    wall_ms: Option<u64>,
+) -> ghostflow_core::schedule_clock::ClockSnapshot<'static> {
+    use ghostflow_core::schedule_clock::{ClockSnapshot, ClockTrust};
+    ClockSnapshot {
+        boot_epoch,
+        monotonic_ms,
+        wall_ms,
+        trust: if wall_ms.is_some() {
+            ClockTrust::Trusted
+        } else {
+            ClockTrust::Unknown("RTC unavailable")
+        },
+        uncertainty_ms: None,
+        source_revision: Some("UTC"),
+    }
+}
+
+fn utc_daily_scan(
+    driver: &mut ghostflow_core::scan::ScanDriver,
+    clock: ghostflow_core::schedule_clock::ClockSnapshot<'_>,
+) -> ghostflow_core::scan::ScanOutcomeV1 {
+    driver
+        .scan_with_context(
+            ghostflow_core::scan::ScanFrameV1 {
+                scan_id: driver.next_scan_id().unwrap(),
+                logical_time_ms: clock.monotonic_ms,
+                inputs: Vec::new(),
+            },
+            clock,
+            &ghostflow_core::context_runtime::Facts::default(),
+        )
+        .unwrap()
+}
+
+#[test]
+fn utc_daily_pause_consumes_crossing_without_a_control_scan() {
+    const DAY: u64 = 86_400_000;
+    for run in [false, true] {
+        // Both a witnessed paused crossing and a crossing first seen on
+        // resume are missed, even though the pause is shorter than skip_after.
+        for observe_crossing in [false, true] {
+            let mut driver = utc_daily_driver(run, 0, 1);
+            driver
+                .observe_daily_context_paused(utc_daily_clock(1, 0, Some(999)))
+                .unwrap();
+            if observe_crossing {
+                driver
+                    .observe_daily_context_paused(utc_daily_clock(1, 0, Some(1_000)))
+                    .unwrap();
+            }
+            assert_eq!(driver.runtime().state("s0"), Some(Value::Bool(false)));
+            assert_eq!(driver.runtime().intent("due"), None);
+            assert!(driver.runtime().journal().is_empty());
+            assert_eq!(driver.next_scan_id(), Some(0));
+            assert_eq!(driver.scan_last_time_ms(), None);
+            let paused = driver.runtime().context_checkpoint().unwrap();
+            assert!(driver
+                .observe_daily_context_paused(utc_daily_clock(2, 0, Some(1_000)))
+                .is_err());
+            assert_eq!(driver.runtime().context_checkpoint().unwrap(), paused);
+
+            let resumed = utc_daily_scan(&mut driver, utc_daily_clock(1, 1, Some(1_001)));
+            assert_eq!(resumed.trace.safe_intents["due"], Value::Bool(false));
+            assert_eq!(driver.runtime().state("s0"), Some(Value::Bool(true)));
+            let checkpoint = driver.runtime().context_checkpoint().unwrap();
+            let mut rebooted = utc_daily_driver(run, 0, 3);
+            rebooted.restore_context_checkpoint(&checkpoint).unwrap();
+            utc_daily_scan(&mut rebooted, utc_daily_clock(3, 0, Some(999)));
+            let rewound = utc_daily_scan(&mut rebooted, utc_daily_clock(3, 1, Some(1_000)));
+            assert_eq!(rewound.trace.safe_intents["due"], Value::Bool(false));
+            utc_daily_scan(&mut rebooted, utc_daily_clock(3, DAY, Some(DAY + 999)));
+            let next = utc_daily_scan(
+                &mut rebooted,
+                utc_daily_clock(3, DAY + 1, Some(DAY + 1_000)),
+            );
+            assert_eq!(next.trace.safe_intents["due"], Value::Bool(true));
+        }
+    }
+}
+
+#[test]
+fn utc_daily_pause_cancels_an_active_run_even_without_a_trusted_clock() {
+    let mut driver = utc_daily_driver(true, 2, 1);
+    utc_daily_scan(&mut driver, utc_daily_clock(1, 0, Some(999)));
+    let admitted = utc_daily_scan(&mut driver, utc_daily_clock(1, 1, Some(1_000)));
+    assert_eq!(admitted.trace.safe_intents["due"], Value::Bool(true));
+    assert!(driver
+        .observe_daily_context_paused(utc_daily_clock(2, 1, None))
+        .is_err());
+    assert_eq!(driver.next_scan_id(), Some(2));
+    driver
+        .observe_daily_context_paused(utc_daily_clock(1, 1, None))
+        .unwrap();
+    assert_eq!(driver.next_scan_id(), Some(2));
+    assert_eq!(driver.runtime().journal().len(), 2);
+    let resumed = utc_daily_scan(&mut driver, utc_daily_clock(1, 2, Some(1_001)));
+    assert_eq!(resumed.trace.safe_intents["due"], Value::Bool(false));
+}
+
+#[test]
+fn utc_daily_window_resume_requires_a_new_observed_scan_for_open() {
+    let mut driver = utc_daily_driver(false, 2, 1);
+    driver
+        .observe_daily_context_paused(utc_daily_clock(1, 0, Some(999)))
+        .unwrap();
+    let resumed = utc_daily_scan(&mut driver, utc_daily_clock(1, 1, Some(1_001)));
+    assert_eq!(resumed.trace.safe_intents["due"], Value::Bool(false));
+    let observed = utc_daily_scan(&mut driver, utc_daily_clock(1, 2, Some(1_002)));
+    assert_eq!(observed.trace.safe_intents["due"], Value::Bool(true));
 }

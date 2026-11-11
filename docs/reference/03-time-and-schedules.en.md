@@ -345,12 +345,14 @@ Rules for the common fields:
 | Tide fallback | Only `fallback = skip`. |
 | Other triggers | Keep trusted-only clock and skip fallback. |
 | `At` Window | The bounded executable Window profile. |
-| Window on other triggers; `run(_, on_time)` | Outside current support. |
+| Immutable UTC `Daily` Window or on-time Run | GFB28 with a constant duration of at most 24 hours, an optional weekday selector and the trusted-only baseline policy. |
 | Immutable UTC Daily and nonempty static DailySlots Range | Static non-overlap is proved; executes as GFB12. |
 | Immutable non-UTC `DailySlots<15min>` Range | GFB21 profile (see "Immutable non-UTC DailySlots Range"): compile-time nominal slot-spacing checks plus Rust validation of actual occurrence intervals supplied by the host. |
 | Other accepted Range recurrences | Remain non-executable descriptors. |
 | Range duration from an operator `Duration` config (supported UTC profiles) | Allowed when the initial value proves non-overlap. An accepted live setting event recomputes the current occurrence from its frozen planned start, without a new due pulse or occurrence identity. |
 | Tide `run(_, within(_))` | Supported. |
+
+Window requires a trusted observed scan for `.open`. An observation gap or baseline can miss admission even while the planned interval has time left. Later observed scans can reflect the predicate in `.open`, and `.due` stays false for a consumed occurrence. Run starts only at an observed crossing, counts duration from actual admission on the monotonic clock, and ends immediately when cancelled. The checkpoint retains the latest terminal UTC day across reboot and treats older days as consumed. A new boot starts with no active Run. Paused host observation consumes missed crossings and ends an active Run without evaluating the control. The first resumed scan does not admit a crossing through the pause.
 
 **Bounded admission for natural events.** These rules keep missing predictions or an uncertain clock from silently creating occurrences:
 
@@ -556,8 +558,8 @@ The `basis` field selects one of four admission shapes:
 | basis | Admission semantics |
 |---|---|
 | `pulse` | Admit only if all conditions are true on the crossing tick. Becoming true later still means missed. |
-| `window(5min)` (`At` execution) | Admit once at the first true condition within `[planned, planned+5min)`. Repeated false→true changes in the same occurrence do not rearm it. Other trigger combinations remain design. |
-| `run(5min, on_time)` (design) | Admit only at observed crossing and run for five minutes from admission. |
+| `window(5min)` (`At`, `Daily`) | Admit once at the first true condition within `[planned, planned+5min)`. Repeated false→true changes in the same occurrence do not rearm it. |
+| `run(5min, on_time)` (`Daily`, GFB28) | Admit only at observed crossing and run for five minutes from admission. |
 | `run(5min, within(10min))` (Tide) | Allow first admission within `[planned, planned+10min)`. Ten minutes are grace; run length is five minutes. |
 | `range(10min)` (civil contract) | If trusted current time is within `[planned, planned+10min)` and `when` is true, admit once even after late first observation, boot or recovery. End is planned start + ten minutes. Immutable UTC Daily/DailySlots uses GFB12; immutable non-UTC DailySlots below uses GFB21. |
 

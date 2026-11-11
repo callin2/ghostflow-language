@@ -660,7 +660,7 @@ fn validate_gfb1(bytes: &[u8]) -> Result<u16> {
         return fail(ErrorCode::InvalidBytecodeFormat, "bytecode is not GFB1");
     }
     let version = u16::from_le_bytes([bytes[4], bytes[5]]);
-    if !matches!(version, 1..=4 | 11 | 16 | 18 | 21 | 22 | 26 | 27) {
+    if !matches!(version, 1..=4 | 11 | 16 | 18 | 21 | 22 | 26 | 27 | 28) {
         return fail(
             ErrorCode::UnsupportedBytecodeVersion,
             "unsupported GFB format version",
@@ -2715,6 +2715,144 @@ fn verify_solar_bindings(manifest: &Value, module: &ghostflow_core::Module) -> R
     Ok(())
 }
 
+fn verify_daily_window_run_bindings(
+    manifest: &Value,
+    module: &ghostflow_core::Module,
+) -> Result<()> {
+    use ghostflow_core::{context_vm::ScheduleDefinition, schedule_vm::PulseDescriptor};
+    let mismatch = |message: &str| PortablePackageError {
+        code: ErrorCode::ManifestMismatch,
+        message: message.into(),
+    };
+    for field in [
+        "configs",
+        "signals",
+        "providers",
+        "calendars",
+        "naturalConditions",
+        "calendarConditions",
+        "objectives",
+        "adaptSettings",
+        "resources",
+    ] {
+        if manifest
+            .get(field)
+            .is_some_and(|value| !value.as_array().is_some_and(Vec::is_empty))
+        {
+            return Err(mismatch("signed GFB28 requires a standalone Daily profile"));
+        }
+    }
+    if manifest.get("accounting").is_some() {
+        return Err(mismatch("signed GFB28 does not admit accounting"));
+    }
+    let schedules = manifest["schedules"]
+        .as_array()
+        .ok_or_else(|| mismatch("UTC Daily schedules must be an array"))?;
+    let requirements = module
+        .schedule_requirements()
+        .ok_or_else(|| mismatch("UTC Daily descriptors missing"))?;
+    for strategy in &requirements.strategies {
+        if strategy.schedules.len() != schedules.len() {
+            return Err(mismatch("UTC Daily schedule count differs from bytecode"));
+        }
+        for (entry, actual) in schedules.iter().zip(&strategy.schedules) {
+            let PulseDescriptor::Context(actual) = actual else {
+                return Err(mismatch("UTC Daily requires a context descriptor"));
+            };
+            let ScheduleDefinition::UtcDaily {
+                at_ms,
+                duration_ms,
+                run,
+                dst_missing,
+                dst_repeated,
+                weekday_mask,
+            } = actual.definition
+            else {
+                return Err(mismatch("UTC Daily basis differs from bytecode"));
+            };
+            let mut keys = vec![
+                "kind",
+                "site",
+                "name",
+                "timezone",
+                "atMs",
+                "dstMissing",
+                "dstRepeated",
+                "policy",
+            ];
+            if weekday_mask != 0 {
+                keys.push("day");
+                let day = value_object(&entry["day"], "Daily weekday rule")?;
+                exact_keys(
+                    day,
+                    &["kind", "mask"],
+                    "Daily weekday rule",
+                    ErrorCode::ManifestMismatch,
+                )?;
+                if entry["day"]["kind"] != "weekday"
+                    || entry["day"]["mask"].as_u64() != Some(u64::from(weekday_mask))
+                {
+                    return Err(mismatch("Daily weekday mask differs from bytecode"));
+                }
+            }
+            exact_keys(
+                value_object(entry, "UTC Daily")?,
+                &keys,
+                "UTC Daily",
+                ErrorCode::ManifestMismatch,
+            )?;
+            let policy = &entry["policy"];
+            let mut policy_keys = vec!["basis", "when", "clock", "gapMs", "recovery", "fallback"];
+            let mut basis_keys = vec!["kind", "durationMs"];
+            if run {
+                policy_keys.push("cancelWhen");
+                basis_keys.push("admission");
+            }
+            exact_keys(
+                value_object(policy, "UTC Daily policy")?,
+                &policy_keys,
+                "UTC Daily policy",
+                ErrorCode::ManifestMismatch,
+            )?;
+            exact_keys(
+                value_object(&policy["basis"], "UTC Daily basis")?,
+                &basis_keys,
+                "UTC Daily basis",
+                ErrorCode::ManifestMismatch,
+            )?;
+            let basis = &policy["basis"];
+            if entry["kind"] != "daily"
+                || entry["timezone"] != "UTC"
+                || entry["site"].as_u64() != Some(u64::from(actual.site))
+                || entry["name"] != actual.name.as_str()
+                || entry["atMs"].as_u64() != Some(at_ms)
+                || entry["dstMissing"] != ["skip", "next_valid"][usize::from(dst_missing)]
+                || entry["dstRepeated"]
+                    != ["first", "second", "both", "skip"][usize::from(dst_repeated)]
+                || predicate_projection::encode(&policy["when"], module).as_deref()
+                    != Some(actual.when.as_slice())
+                || run
+                    && predicate_projection::encode(&policy["cancelWhen"], module).as_deref()
+                        != Some(actual.cancel.as_slice())
+                || policy["gapMs"].as_u64() != Some(actual.gap_ms)
+                || policy["clock"] != "trusted_only"
+                || policy["recovery"] != "baseline"
+                || policy["fallback"] != "skip"
+                || basis["durationMs"].as_u64() != Some(duration_ms)
+                || (run
+                    && (basis["kind"] != "run"
+                        || basis["admission"] != "on_time"
+                        || policy.get("cancelWhen").is_none()))
+                || (!run && (basis["kind"] != "window" || policy.get("cancelWhen").is_some()))
+                || entry.get("dueInput").is_some()
+            {
+                return Err(mismatch("UTC Daily manifest differs from bytecode"));
+            }
+        }
+    }
+    Ok(())
+}
+
 fn verify_weekday_daily_bindings(manifest: &Value, module: &ghostflow_core::Module) -> Result<()> {
     use ghostflow_core::schedule_vm::PulseDescriptor;
 
@@ -3747,7 +3885,7 @@ pub fn verify_portable_package_with_signature_policy(
     }
     if !matches!(
         payload.bytecode.version.as_str(),
-        "1" | "2" | "3" | "4" | "11" | "16" | "18" | "21" | "22" | "26" | "27"
+        "1" | "2" | "3" | "4" | "11" | "16" | "18" | "21" | "22" | "26" | "27" | "28"
     ) {
         return fail(
             ErrorCode::UnsupportedBytecodeVersion,
@@ -3823,7 +3961,7 @@ pub fn verify_portable_package_with_signature_policy(
         message: format!("native artifact validation failed: {error}"),
     })?;
     let profile_version = module.bytecode_format_version();
-    if !matches!(profile_version, 1..=4 | 11 | 16 | 18 | 21 | 26 | 27)
+    if !matches!(profile_version, 1..=4 | 11 | 16 | 18 | 21 | 26 | 27 | 28)
         || (profile_version == 16 && bytecode_version == 22)
     {
         return fail(
@@ -3836,7 +3974,8 @@ pub fn verify_portable_package_with_signature_policy(
         || (profile_version == 18) != (payload.manifest.format == "GhostFlow/control-v18")
         || (profile_version == 26) != (payload.manifest.format == "GhostFlow/control-v26")
         || (profile_version == 27) != (payload.manifest.format == "GhostFlow/control-v27")
-        || matches!(profile_version, 11 | 16 | 18 | 21 | 26)
+        || (profile_version == 28) != (payload.manifest.format == "GhostFlow/control-v28")
+        || matches!(profile_version, 11 | 16 | 18 | 21 | 26 | 28)
             != (identity.runtime_abi == "GhostFlow/context-scan-abi-v5")
     {
         return fail(
@@ -3894,6 +4033,9 @@ pub fn verify_portable_package_with_signature_policy(
     }
     if profile_version == 27 {
         verify_weekday_daily_bindings(&manifest, &module)?;
+    }
+    if profile_version == 28 {
+        verify_daily_window_run_bindings(&manifest, &module)?;
     }
     verify_adapt_bindings(&manifest, &bytecode)?;
     verify_debounce_bindings(&manifest, &bytecode)?;

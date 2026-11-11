@@ -3,7 +3,17 @@
 
 # 변경 기록
 
+## 민간시각 예약 체크포인트와 호스트 정지 — 2026-11-12
+
+Daily 예약은 마지막으로 처리한 날짜와 그날의 중복 시각만 보관합니다. 시계를 되돌리거나 재부팅해도 이전 날짜는 이미 처리된 것으로 유지합니다. 매일 운전할 때 기록 개수 한도 때문에 멈추지 않도록 했으며, 200일 네이티브 시험으로 일정한 저장량과 재실행 차단을 확인합니다.
+
+Daily와 DailySlots 실행기는 `schedule_checkpoint`와 `restore_schedule_checkpoint`로 같은 프로그램의 처리된 예약을 저장하고 복원할 수 있습니다. 날짜·슬롯 키·서머타임 중복 시각을 함께 보존하며, 손상되거나 다른 프로그램의 기록은 실행 상태를 일부만 바꾸지 않고 거부합니다. `observe_schedules_paused`는 호스트가 제어를 정지한 동안 지나간 예약을 기록하되 사용자 제어 로직은 실행하지 않습니다. 재부팅 후 시계 기준은 새로 잡고 제어 상태는 복원하지 않습니다. [#155](https://github.com/callin2/ghostflow-language/issues/155)의 GFB27 장치 실행 경로 누락을 보완하며 GFB 바이트 형식은 바뀌지 않습니다. 네이티브 회귀 시험은 평일 예약 중복 차단, 중복 시각별 실행, 정지·재개와 오류 시 원자적 거부를 확인합니다.
+
 ## 미출시
+
+### 2026-11-12 - UTC Daily Window와 Run 실행 ([#153](https://github.com/callin2/ghostflow-language/issues/153))
+
+요일을 선택할 수 있는 고정 UTC Daily 예약에서 `basis = window(5min)`과 `basis = run(5min, on_time)`을 사용할 수 있습니다. Run은 `cancel_when`을 명시합니다. 두 조합을 GFB28로 컴파일하고 각 발생을 한 번만 시작합니다. Window는 현재 조건을 반영합니다. Run은 실제 시작부터 시간을 재고 취소되거나 만료되면 끝납니다. Daily Window/Run 시험은 네이티브와 WASM 스캔을 대조합니다. 호스트가 일시 정지 중에도 제어 실행 없이 예약 시각을 관측할 수 있으며, 진행 중인 Run은 일시 정지에서 끝납니다.
 
 ### 2026-11-12 - 구형 GFB10 수용 제거 ([#620](https://github.com/callin2/ghostflow-language/issues/620))
 

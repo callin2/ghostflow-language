@@ -31,6 +31,14 @@ pub enum ScheduleDefinition {
     AtPulse {
         at_ms: u64,
     },
+    UtcDaily {
+        at_ms: u64,
+        duration_ms: u64,
+        run: bool,
+        dst_missing: u8,
+        dst_repeated: u8,
+        weekday_mask: u8,
+    },
     AtWindow {
         at_ms: u64,
         duration_ms: u64,
@@ -837,6 +845,29 @@ pub(crate) fn load_schedule(
                 at
             },
         },
+        24 | 25 if format == 28 => {
+            let at_ms = exact(reader)?;
+            let duration_ms = exact(reader)?;
+            let dst_missing = reader.u8()?;
+            let dst_repeated = reader.u8()?;
+            let weekday_mask = reader.u8()?;
+            if at_ms >= 86_400_000
+                || !(1..=86_400_000).contains(&duration_ms)
+                || dst_missing > 1
+                || dst_repeated > 3
+                || weekday_mask > 127
+            {
+                return Err(Error::new("invalid UTC Daily basis bounds"));
+            }
+            ScheduleDefinition::UtcDaily {
+                at_ms,
+                duration_ms,
+                run: kind == 25,
+                dst_missing,
+                dst_repeated,
+                weekday_mask,
+            }
+        }
         20 if format == 23 => {
             let at_ms = exact(reader)?;
             let duration_ms = exact(reader)?;
@@ -854,6 +885,9 @@ pub(crate) fn load_schedule(
     };
     let when = reader.blob()?;
     let cancel = reader.blob()?;
+    if matches!(definition, ScheduleDefinition::UtcDaily { run: false, .. }) && cancel != [1, 0] {
+        return Err(Error::new("Daily Window cannot encode cancellation"));
+    }
     if let ScheduleDefinition::SolarContext { config_ids, .. } = &definition {
         if *config_ids != config_dependencies(&when, prior)? {
             return Err(Error::new(

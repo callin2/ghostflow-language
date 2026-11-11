@@ -227,6 +227,7 @@ export const LANGUAGE_TESTS = Object.freeze([
     'tests/range-retime-atomic-rejection.test.mjs',
   'tests/at-contract.test.mjs',
   'tests/at-runtime.test.mjs',
+  'tests/daily-window-run.test.mjs',
   'tests/at-package.test.mjs',
   'tests/curriculum-replay.test.mjs',
   'tests/core-irrigation-proof.test.mjs',

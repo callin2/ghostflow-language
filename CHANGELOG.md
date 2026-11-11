@@ -1,6 +1,16 @@
 # Changelog
 
+## Civil schedule checkpoint and host pause — 2026-11-12
+
+Daily occurrence retention stores only the latest terminal civil day and its folds. Earlier days remain consumed across a wall-clock rewind or reboot. This prevents normal daily operation from exhausting a lifetime-sized ledger; the 200-day native regression checks bounded storage and replay suppression.
+
+Daily and DailySlots runtimes can now export and restore exact-Program terminal occurrence identities with `schedule_checkpoint` and `restore_schedule_checkpoint`. The checkpoint preserves civil date, slot key and DST fold; malformed or mismatched data is rejected without partially changing the runtime. `observe_schedules_paused` records missed crossings while the host pauses controls, without running user logic. A new boot keeps fresh clock baselines and does not restore scalar control state. This corrects the missing GFB27 device lifecycle path in [#155](https://github.com/callin2/ghostflow-language/issues/155); the GFB bytecode layout is unchanged. Native regressions cover weekday replay suppression, distinct repeated-time folds, pause/resume and atomic rejection.
+
 ## Unreleased
+
+### 2026-11-12 - Execute UTC Daily Window and Run ([#153](https://github.com/callin2/ghostflow-language/issues/153))
+
+Immutable UTC Daily schedules with an optional weekday selector can use `basis = window(5min)` or `basis = run(5min, on_time)` with an explicit `cancel_when` for Run. These combinations now emit GFB28 and keep one admission per occurrence. Window follows its current predicate. Run measures time from admission and stops on cancellation or expiry. The Daily Window/Run test compares native and WASM scans. A paused host can advance schedule evidence without evaluating control, and an active Run ends at pause.
 
 ### 2026-11-12 - Retire GFB10 admission ([#620](https://github.com/callin2/ghostflow-language/issues/620))
 

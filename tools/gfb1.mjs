@@ -253,7 +253,7 @@ function lowerCoreModule(ast) {
   for(const c of constraints){if(c.names.length>32||new Set(c.names).size!==c.names.length)throw new CompileError('invalid constraint names or arity');for(const n of c.names)assertName(n,'constraint');}
   const env={inputs:new Map(inputs.map((x,i)=>[x.name,{...x,index:i}])),states:new Map(states.map((x,i)=>[x.name,{...x,index:i}]))};
   const rawWindowCount=strategies.reduce((total,{raw})=>total+raw.slice(3).filter(form=>Array.isArray(form)&&form[0]==='window').length,0);
-  const contextHeads=['at-pulse','at-window','periodic-pulse','cron-pulse','calendar-daily-pulse','holiday-daily-pulse','solar-context-pulse','solar-weekday-pulse','tide-run','tide-weekday-run','config-daily-slots-pulse','utc-range','calendar-range','civil-range'];
+  const contextHeads=['daily-window','daily-run','at-pulse','at-window','periodic-pulse','cron-pulse','calendar-daily-pulse','holiday-daily-pulse','solar-context-pulse','solar-weekday-pulse','tide-run','tide-weekday-run','config-daily-slots-pulse','utc-range','calendar-range','civil-range'];
   const rawScheduleCount=strategies.reduce((total,{raw})=>total+raw.slice(3).filter(form=>Array.isArray(form)&&['solar-pulse','daily-pulse','daily-slots-pulse','config-stream',...contextHeads].includes(form[0])).length,0);
   const resultHeads=['natural-result','accounting-result','calendar-result','weekday-result'];
   const hasContext=strategies.some(({raw})=>raw.slice(3).some(form=>Array.isArray(form)&&['config-stream',...contextHeads,...resultHeads].includes(form[0])));
@@ -497,7 +497,7 @@ function lowerCoreModule(ast) {
         if(preludeNames.has(scheduleName))throw new CompileError('duplicate prelude name');preludeNames.add(scheduleName);
         const gapMs=unsignedAtom(gapAtom,9007199254740991n,'invalid schedule gap');
         if(!gapMs)throw new CompileError('invalid schedule gap');
-        const expected={ 'at-pulse':3,'at-window':4,'solar-context-pulse':9,'solar-weekday-pulse':10,'cron-pulse':10,'calendar-daily-pulse':8,'holiday-daily-pulse':7,'tide-run':8,'tide-weekday-run':9,'config-daily-slots-pulse':6,'utc-range':6,'calendar-range':8,'civil-range':7 }[h];
+        const expected={ 'daily-window':7,'daily-run':7,'at-pulse':3,'at-window':4,'solar-context-pulse':9,'solar-weekday-pulse':10,'cron-pulse':10,'calendar-daily-pulse':8,'holiday-daily-pulse':7,'tide-run':8,'tide-weekday-run':9,'config-daily-slots-pulse':6,'utc-range':6,'calendar-range':8,'civil-range':7 }[h];
         if(h==='periodic-pulse'?![5,6].includes(payload.length):h==='config-daily-slots-pulse'?![6,7].includes(payload.length):payload.length!==expected)throw new CompileError(`${h} has invalid arity`);
         const [whenForm,cancelForm]=payload.slice(-2);
         const when=checkedExpression(whenForm,contextEnv(),false),cancel=checkedExpression(cancelForm,contextEnv(),false);
@@ -507,7 +507,13 @@ function lowerCoreModule(ast) {
         const dst=value=>{const index=['skip','next_valid'].indexOf(value);if(index<0)throw new CompileError('invalid DST missing policy');return index;};
         const repeated=value=>{const index=['first','second','both','skip'].indexOf(value);if(index<0)throw new CompileError('invalid DST repeated policy');return index;};
         let detail;
-        if(h==='solar-context-pulse'||h==='solar-weekday-pulse'){
+        if(h==='daily-window'||h==='daily-run'){
+          const at=unsignedAtom(data[0],86_399_999n,'invalid Daily start');
+          const duration=unsignedAtom(data[1],86_400_000n,'invalid Daily duration');
+          if(!duration||h==='daily-window'&&cancelForm!=='false')throw new CompileError('invalid Daily basis policy');
+          const weekdayMask=Number(unsignedAtom(data[4],127n,'invalid UTC Daily weekday mask'));
+          detail={at,duration,missing:dst(data[2]),repeated:repeated(data[3]),weekdayMask};
+        }else if(h==='solar-context-pulse'||h==='solar-weekday-pulse'){
           const [timezone,latitude,longitude,event,offset,fallback,dependencies,weekdayMask]=data;
           if(!['rise','set'].includes(event))throw new CompileError('invalid Solar event');
           if(!Array.isArray(dependencies)||dependencies[0]!=='config-deps'||dependencies.length>129)throw new CompileError('invalid Solar config dependencies');
@@ -744,7 +750,7 @@ function lowerCoreModule(ast) {
 function emitGfb(moduleIr, { onExpressions } = {}) {
   const {name,version,inputs,states,strategies,constraints,temporal,objectives:compiledObjectives}=moduleIr;
   const preludeKinds=new Set(strategies.flatMap(strategy=>strategy.extensions.preludes.map(prelude=>prelude.kind)));
-  const hasContext=['config-stream','periodic-pulse','cron-pulse','calendar-daily-pulse','holiday-daily-pulse','solar-context-pulse','solar-weekday-pulse','tide-run','tide-weekday-run',
+  const hasContext=['daily-window','daily-run','config-stream','periodic-pulse','cron-pulse','calendar-daily-pulse','holiday-daily-pulse','solar-context-pulse','solar-weekday-pulse','tide-run','tide-weekday-run',
     'config-daily-slots-pulse','natural-result','accounting-result','utc-range','at-pulse','at-window','calendar-range','calendar-result','weekday-result','civil-range'].some(kind=>preludeKinds.has(kind));
   const hasDailySlots=preludeKinds.has('daily-slots'),hasDaily=preludeKinds.has('daily');
   const hasTrueFors=preludeKinds.has('true-for');
@@ -788,7 +794,9 @@ function emitGfb(moduleIr, { onExpressions } = {}) {
   if(weekdayConditions&&(hasPid||[...preludeKinds].some(kind=>!['weekday-result','config-stream','window','true-for'].includes(kind))))throw new CompileError('local_day_is profile only supports weekday conditions with config streams and temporal state');
   const weekdayDaily = strategies.some(strategy => strategy.extensions.preludes.some(prelude => prelude.kind === 'daily' && prelude.value.weekdayMask));
   if (weekdayDaily && (hasPid || strategies.some(strategy => strategy.extensions.preludes.some(prelude => prelude.kind !== 'daily')))) throw new CompileError('weekday Daily requires only Daily pulse preludes');
-  const format=weekdayDaily?27:weekdayConditions?26:preludeKinds.has('solar-weekday-pulse')||preludeKinds.has('tide-weekday-run')?24:preludeKinds.has('at-window')?23:civilRange?21:timeSlotsRange?20:liveRangeStart?19:calendarExecution?18:preludeKinds.has('solar-context-pulse')?16:preludeKinds.has('holiday-daily-pulse')?15:preludeKinds.has('at-pulse')?14:extendedNatural?13:preludeKinds.has('utc-range')?12:hasContext?11:hasDailySlots?9:hasDaily?8:hasPid?7:hasTrueFors?6:hasSchedules?5:temporal?4:format3?3:intDeclarations||intExpressions?2:1;
+  const dailyWindowRun=preludeKinds.has('daily-window')||preludeKinds.has('daily-run');
+  if(dailyWindowRun&&(hasPid||[...preludeKinds].some(kind=>!['daily-window','daily-run','window','true-for'].includes(kind))))throw new CompileError('invalid Daily Window/Run profile');
+  const format=dailyWindowRun?28:weekdayDaily?27:weekdayConditions?26:preludeKinds.has('solar-weekday-pulse')||preludeKinds.has('tide-weekday-run')?24:preludeKinds.has('at-window')?23:civilRange?21:timeSlotsRange?20:liveRangeStart?19:calendarExecution?18:preludeKinds.has('solar-context-pulse')?16:preludeKinds.has('holiday-daily-pulse')?15:preludeKinds.has('at-pulse')?14:extendedNatural?13:preludeKinds.has('utc-range')?12:hasContext?11:hasDailySlots?9:hasDaily?8:hasPid?7:hasTrueFors?6:hasSchedules?5:temporal?4:format3?3:intDeclarations||intExpressions?2:1;
   const w=new Writer();w.bytes(UTF8.encode('GFB1'));w.u16(format);w.str(name);w.u32(version);
   const typeCode=type=>TYPE[type.toLowerCase()];
   w.u16(inputs.length);for(const x of inputs){w.str(x.name);w.u8(typeCode(x.type));}
@@ -817,6 +825,7 @@ function emitGfb(moduleIr, { onExpressions } = {}) {
     if(prelude.kind==='solar-context-pulse'||prelude.kind==='solar-weekday-pulse'){w.str(d.timezone);w.f64(d.latitude);w.f64(d.longitude);w.u8(d.event==='rise'?0:1);w.i64(d.offset);w.u64(d.fallbackAt);w.u16(d.configIds.length);for(const id of d.configIds)w.u32(id);if(prelude.kind==='solar-weekday-pulse')w.u8(d.weekdayMask);}
     else if(prelude.kind==='at-pulse'){w.u64(d.at);}
     else if(prelude.kind==='at-window'){w.u64(d.at);w.u64(d.duration);}
+    else if(['daily-window','daily-run'].includes(prelude.kind)){w.u64(d.at);w.u64(d.duration);w.u8(d.missing);w.u8(d.repeated);w.u8(d.weekdayMask);}
     else if(prelude.kind==='civil-range'){w.str(d.timezone);w.u64(d.duration);w.u16(d.starts.length);for(const start of d.starts)w.u64(start);w.u8(missingCode(d.missing));w.u8(repeatedCode(d.repeated));}
     else if(prelude.kind==='utc-range'||prelude.kind==='calendar-range'){w.str(d.timezone);if(Array.isArray(d.duration)&&d.duration[0]==='duration-config'){w.u64(0n);w.u32(Number(d.duration[1]));}else w.u64(d.duration);if(format>=19)w.u32(d.startConfigId??0);w.u16(d.starts.length);for(const start of d.starts)w.u64(start);if(prelude.kind==='calendar-range'){w.str(d.calendar);w.u8(d.selector==='offday'?1:0);}}
     else if(prelude.kind==='periodic-pulse'){w.str(d.epoch);w.u64(d.anchor);w.u32(d.configId);if(d.configId===0)w.u64(d.literal);}
@@ -835,7 +844,7 @@ function emitGfb(moduleIr, { onExpressions } = {}) {
       if(taggedPreludes){
         w.u16(s.preludes.length);
         for(const prelude of s.preludes){
-          const tag={'window':0,'schedule':1,'true-for':2,'daily':3,'daily-slots':4,'periodic-pulse':5,
+          const tag={'daily-window':24,'daily-run':25,'window':0,'schedule':1,'true-for':2,'daily':3,'daily-slots':4,'periodic-pulse':5,
             'cron-pulse':6,'calendar-daily-pulse':7,'tide-run':8,'config-daily-slots-pulse':9,
             'natural-result':10,'accounting-result':11,'config-stream':12,'utc-range':13,
             'at-pulse':14,'holiday-daily-pulse':15,'solar-context-pulse':16,'calendar-range':17,

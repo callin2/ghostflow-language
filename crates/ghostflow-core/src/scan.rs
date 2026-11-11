@@ -221,12 +221,29 @@ impl ScanDriver {
         self.runtime
     }
 
+    /// Observe the paused UTC Daily clock without changing the scan ID or scalar frame.
+    pub fn observe_daily_context_paused(&mut self, clock: ClockSnapshot<'_>) -> Result<()> {
+        self.runtime.observe_daily_context_paused(clock)
+    }
+
     pub fn restore_context_checkpoint(&mut self, bytes: &[u8]) -> Result<()> {
         self.runtime.restore_context_checkpoint(bytes)
     }
 
     pub fn restore_solar_checkpoint(&mut self, bytes: &[u8]) -> Result<()> {
         self.runtime.restore_solar_checkpoint(bytes)
+    }
+
+    pub fn restore_schedule_checkpoint(&mut self, bytes: &[u8]) -> Result<()> {
+        self.runtime.restore_schedule_checkpoint(bytes)
+    }
+
+    pub fn observe_schedules_paused(
+        &mut self,
+        clock: ClockSnapshot<'_>,
+        facts: &[crate::solar_runtime::ScheduleInput<'_>],
+    ) -> Result<()> {
+        self.runtime.observe_schedules_paused(clock, facts)
     }
 
     /// Advance only Solar admission while host execution is explicitly paused.
@@ -438,7 +455,7 @@ impl ScanDriver {
                     && self.runtime.module.as_ref().is_some_and(|m| {
                         matches!(
                             m.format_version,
-                            11 | 12 | 13 | 14 | 15 | 16 | 18 | 19 | 20 | 21 | 23 | 24 | 26
+                            11 | 12 | 13 | 14 | 15 | 16 | 18 | 19 | 20 | 21 | 23 | 24 | 26 | 28
                         )
                     }))
                     || [
@@ -499,7 +516,7 @@ impl ScanDriver {
             let derive_epoch = runtime.module.as_ref().is_some_and(|m| {
                 matches!(
                     m.format_version,
-                    11 | 12 | 13 | 14 | 15 | 16 | 18 | 19 | 20 | 21 | 23 | 24 | 26
+                    11 | 12 | 13 | 14 | 15 | 16 | 18 | 19 | 20 | 21 | 23 | 24 | 26 | 28
                 )
             });
             let result = if let Some((clock, facts)) = context {

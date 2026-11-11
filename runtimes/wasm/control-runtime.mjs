@@ -37,6 +37,7 @@ const CALENDAR_EXECUTION_FORMAT = 'GhostFlow/control-v18';
 const RANGE_LIVE_START_FORMAT = 'GhostFlow/control-v19';
 const TIMESLOTS_RANGE_FORMAT = 'GhostFlow/control-v20';
 const CIVIL_RANGE_FORMAT = 'GhostFlow/control-v21';
+const DAILY_WINDOW_RUN_FORMAT = 'GhostFlow/control-v28';
 const WEEKDAY_DAILY_FORMAT = 'GhostFlow/control-v27';
 const contextManifest = manifest => manifest?.format === STREAM_CONTEXT_FORMAT
   || manifest?.format === RANGE_LIVE_START_FORMAT
@@ -47,6 +48,7 @@ const contextManifest = manifest => manifest?.format === STREAM_CONTEXT_FORMAT
   || manifest?.format === HOLIDAY_FORMAT
   || manifest?.format === AT_FORMAT
   || manifest?.format === AT_WINDOW_FORMAT
+  || manifest?.format === DAILY_WINDOW_RUN_FORMAT
   || manifest?.format === NATURAL_WEEKDAY_FORMAT
   || manifest?.format === WEEKDAY_CONDITION_FORMAT
   || manifest?.format === AVAILABILITY_FORMAT && !manifest.schedules?.some(item => item.kind === 'solar');
@@ -274,7 +276,7 @@ function validateContextManifest(input, bytecodeFormat) {
     ['providers','calendars','naturalConditions','calendarConditions','weekdayConditions','accounting','resources','objectives','adaptSettings','lifecycle','legacyAdmission','requiredRuntimeFeatures','sensorInstances','monitoring'], 'manifest');
   validateRequiredRuntimeFeatures(manifest);
   const lifecycle = validateLifecycleManifest(manifest);
-  if (manifest.format === WEEKDAY_CONDITION_FORMAT ? bytecodeFormat !== 26 : manifest.format === NATURAL_WEEKDAY_FORMAT ? bytecodeFormat !== 24 : manifest.format === AT_WINDOW_FORMAT ? bytecodeFormat !== 23 : manifest.format === CIVIL_RANGE_FORMAT ? bytecodeFormat !== 21 : manifest.format === TIMESLOTS_RANGE_FORMAT ? bytecodeFormat !== 20 : manifest.format === RANGE_LIVE_START_FORMAT ? bytecodeFormat !== 19 : manifest.format === CALENDAR_EXECUTION_FORMAT ? bytecodeFormat !== 18 : manifest.format === SOLAR_CONTEXT_FORMAT ? bytecodeFormat !== 16 : manifest.format === HOLIDAY_FORMAT ? bytecodeFormat !== 15 : manifest.format === AT_FORMAT ? bytecodeFormat !== 14 : manifest.format === AVAILABILITY_FORMAT ? bytecodeFormat !== 13 : ![11, 12].includes(bytecodeFormat)) throw new Error('context manifest requires its matching GFB format');
+  if (manifest.format === DAILY_WINDOW_RUN_FORMAT ? bytecodeFormat !== 28 : manifest.format === WEEKDAY_CONDITION_FORMAT ? bytecodeFormat !== 26 : manifest.format === NATURAL_WEEKDAY_FORMAT ? bytecodeFormat !== 24 : manifest.format === AT_WINDOW_FORMAT ? bytecodeFormat !== 23 : manifest.format === CIVIL_RANGE_FORMAT ? bytecodeFormat !== 21 : manifest.format === TIMESLOTS_RANGE_FORMAT ? bytecodeFormat !== 20 : manifest.format === RANGE_LIVE_START_FORMAT ? bytecodeFormat !== 19 : manifest.format === CALENDAR_EXECUTION_FORMAT ? bytecodeFormat !== 18 : manifest.format === SOLAR_CONTEXT_FORMAT ? bytecodeFormat !== 16 : manifest.format === HOLIDAY_FORMAT ? bytecodeFormat !== 15 : manifest.format === AT_FORMAT ? bytecodeFormat !== 14 : manifest.format === AVAILABILITY_FORMAT ? bytecodeFormat !== 13 : ![11, 12].includes(bytecodeFormat)) throw new Error('context manifest requires its matching GFB format');
   name(manifest.name, 'manifest.name');
   if (!/^[0-9a-f]{64}$/.test(manifest.bytecodeSha256)) throw new Error('invalid bytecode SHA-256');
   const inputs = validateList(manifest.inputs, 'manifest.inputs', ['name','type'], ['canonicalUnit']);
@@ -328,6 +330,10 @@ function validateContextManifest(input, bytecodeFormat) {
     || [configs,objectives,resources,adaptSettings,providers,calendars,naturals].some(list => list.length) || accounting)) {
     throw new Error('At profile requires At-only execution');
   }
+  if (manifest.format === DAILY_WINDOW_RUN_FORMAT && (!schedules.length
+    || schedules.some(item => item.kind !== 'daily')
+    || [configs,objectives,resources,adaptSettings,providers,calendars,naturals].some(list => list.length)
+    || accounting)) throw new Error('Daily Window and Run require a standalone profile');
   if (manifest.signals.length) throw new Error('context signal mixing is not supported');
   const timers = validateTimers(manifest.timers);
   for (const item of timers) {
@@ -339,6 +345,29 @@ function validateContextManifest(input, bytecodeFormat) {
   for (const item of outputs) { portName(item.name, 'output.name'); type(item.type, `output ${item.name}.type`); validateCanonicalUnit(item, `output ${item.name}`); }
   for (const item of schedules) {
     name(item.name, 'schedule.name'); safeInteger(item.site, 'schedule.site', 1, 0xffff_ffff);
+    if (manifest.format === DAILY_WINDOW_RUN_FORMAT) {
+      keys(item, ['kind','site','name','timezone','dstMissing','dstRepeated','policy','atMs'], ['day'], 'UTC Daily');
+      const policy = record(item.policy, 'UTC Daily policy');
+      const basis = record(policy.basis, 'UTC Daily basis');
+      const run = basis.kind === 'run';
+      keys(policy, ['basis','when','clock','gapMs','recovery','fallback', ...(run ? ['cancelWhen'] : [])], [], 'UTC Daily policy');
+      keys(basis, ['kind','durationMs', ...(run ? ['admission'] : [])], [], 'UTC Daily basis');
+      if (item.timezone !== 'UTC' || !['skip','next_valid'].includes(item.dstMissing)
+        || !['first','second','both','skip'].includes(item.dstRepeated)
+        || (run ? basis.admission !== 'on_time' : basis.kind !== 'window')
+        || policy.clock !== 'trusted_only' || policy.recovery !== 'baseline' || policy.fallback !== 'skip') {
+        throw new Error('unsupported UTC Daily policy');
+      }
+      if (item.day !== undefined) {
+        keys(record(item.day, 'Daily weekday rule'), ['kind','mask'], [], 'Daily weekday rule');
+        if (item.day.kind !== 'weekday') throw new Error('invalid UTC Daily weekday rule');
+        safeInteger(item.day.mask, 'Daily weekday mask', 1, 127);
+      }
+      safeInteger(item.atMs, 'Daily atMs', 0, 86_399_999);
+      safeInteger(basis.durationMs, 'Daily durationMs', 1, 86_400_000);
+      safeInteger(policy.gapMs, 'Daily gapMs', 1);
+      continue;
+    }
     if (item.kind === 'at') {
       if (![AT_FORMAT, AT_WINDOW_FORMAT].includes(manifest.format)) throw new Error('At requires its matching control and GFB profile');
       keys(item, ['kind','site','name','policy','atMs'], [], 'At schedule');

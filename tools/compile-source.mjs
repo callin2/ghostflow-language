@@ -1,7 +1,7 @@
 import { attachIntentMetadata, remapSourceTrace } from './source-trace.mjs';
 import { emitInteractionSchema } from './interaction-schema.mjs';
 import { extractLiterate, mapSourcePosition } from './literate.mjs';
-import { compileAccountingControl, compileControl, compileControlPolicyDescriptorArtifact, compileResourcePolicyArtifact, compileScheduleDescriptorArtifact, compileTemporalDescriptorArtifact, hasTemporalDescriptorCalls, isExecutablePulseSchedule, isExecutableRangeSchedule, parseControl } from './control.mjs';
+import { compileAccountingControl, compileControl, compileControlPolicyDescriptorArtifact, compileResourcePolicyArtifact, compileScheduleDescriptorArtifact, compileTemporalDescriptorArtifact, hasTemporalDescriptorCalls, isDailyWindowRun, isExecutablePulseSchedule, isExecutableRangeSchedule, parseControl } from './control.mjs';
 import { equalBytes, isWellFormedUnicode, sha256Hex, utf8ByteLength } from './sha256.mjs';
 import { compileComposition, resolveDocument } from './composition.mjs';
 import { emitExplanationArtifact } from './explanation.mjs';
@@ -155,7 +155,7 @@ function compileLiterateCore({ source, filename, interactionSourceIdentity, lega
         ? compileControlPolicyDescriptorArtifact(extraction.code, { filename })
       : ast.body.some(item => item.kind === 'account' || item.kind === 'account-constraints')
         ? compileAccountingControl(extraction.code, { filename })
-      : ast.body.some(item => item.kind === 'schedule' && !isExecutablePulseSchedule(item) && !isExecutableRangeSchedule(item)
+      : ast.body.some(item => item.kind === 'schedule' && !isExecutablePulseSchedule(item) && !isExecutableRangeSchedule(item) && !isDailyWindowRun(item)
         && Object.keys(item.policy ?? {}).some(key => key !== 'fallback'))
         ? compileScheduleDescriptorArtifact(extraction.code, { filename })
         : hasTemporalDescriptorCalls(ast)
