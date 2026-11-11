@@ -66,6 +66,7 @@ pub enum PulseDescriptor {
     Context(crate::context_vm::ScheduleDescriptor),
     Natural(crate::context_vm::NaturalDescriptor),
     Calendar(crate::context_vm::CalendarDescriptor),
+    Weekday(crate::context_vm::WeekdayDescriptor),
     Accounting(crate::context_vm::AccountingDescriptor),
     Config(crate::settings_stream::ConfigDescriptor),
 }
@@ -78,6 +79,7 @@ impl PulseDescriptor {
             Self::Context(d) => d.site,
             Self::Natural(d) => d.site,
             Self::Calendar(d) => d.site,
+            Self::Weekday(d) => d.site,
             Self::Accounting(d) => d.site,
             Self::Config(d) => d.id,
         }
@@ -90,6 +92,7 @@ impl PulseDescriptor {
             Self::Context(d) => d.gap_ms,
             Self::Natural(_) => 1,
             Self::Calendar(_) => 1,
+            Self::Weekday(_) => 1,
             Self::Accounting(_) => 1,
             Self::Config(_) => 1,
         }
@@ -102,6 +105,7 @@ impl PulseDescriptor {
             Self::Context(d) => &d.when,
             Self::Natural(_) => &[],
             Self::Calendar(_) => &[],
+            Self::Weekday(_) => &[],
             Self::Accounting(_) => &[],
             Self::Config(_) => &[],
         }
@@ -416,6 +420,13 @@ pub(crate) fn load_prelude(
                 result.schedules.push(PulseDescriptor::Context(descriptor));
                 identity
             }
+            23 if format == 26 => {
+                let descriptor = crate::context_vm::load_weekday(reader, inputs)?;
+                let identity = (descriptor.site, descriptor.name.clone());
+                result.order.push(PreludeEntry::Schedule(result.schedules.len() as u16));
+                result.schedules.push(PulseDescriptor::Weekday(descriptor));
+                identity
+            }
             18 if format == 18 => {
                 let descriptor = crate::context_vm::load_calendar(reader, inputs)?;
                 let identity = (descriptor.site, descriptor.name.clone());
@@ -445,7 +456,7 @@ pub(crate) fn load_prelude(
                     .push(PulseDescriptor::Accounting(descriptor));
                 identity
             }
-            12 if matches!(format, 11 | 12 | 13 | 14 | 15 | 16 | 19 | 20) => {
+            12 if matches!(format, 11 | 12 | 13 | 14 | 15 | 16 | 19 | 20 | 26) => {
                 let descriptor = crate::settings_stream::load(reader, inputs)?;
                 let identity = (descriptor.id, descriptor.name.clone());
                 result
@@ -487,7 +498,7 @@ pub(crate) fn projection_type(
     if field
         > if matches!(
             format,
-            10 | 11 | 12 | 13 | 14 | 15 | 16 | 18 | 19 | 20 | 21 | 23 | 24
+            10 | 11 | 12 | 13 | 14 | 15 | 16 | 18 | 19 | 20 | 21 | 23 | 24 | 26
         ) {
             2
         } else {

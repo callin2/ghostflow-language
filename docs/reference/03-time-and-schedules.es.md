@@ -1063,6 +1063,7 @@ La etiqueta de día no decide a qué fecha laboral pertenece un turno nocturno. 
 
 ```ghost
 let weekday = local_day_is(day`mon..fri`, timezone: "Asia/Seoul");
+let weekday_start = case weekday { ok(value) => value; fault(_) => false; };
 let working = calendar_is(workers, day`workday`);
 let can_start = case working { ok(value) => value; fault(_) => false; };
 ```

@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+### 2026-11-11 - local weekday conditions in control expressions ([#155](https://github.com/callin2/ghostflow-language/issues/155))
+
+Bug fix for Reference §3.8. `local_day_is(day\`mon..fri\`, timezone: "Asia/Seoul")` now compiles to `Result<Bool, ClockFault>`. The trusted host clock supplies the local date for the scan and the runtime evaluates the weekday mask. Missing or ambiguous dates yield `ClockUnknown`. Existing schedules and named calendars retain their semantics. The new `control-v26` / GFB26 profile requires an updated context runtime. The three-zone regression in `tests/monitoring-plan.test.mjs` checks weekday, weekend and unknown-clock button starts.
+
 ### 2026-11-09 - shared source changes and update-scope preflight ([API #258](https://github.com/callin2/farm_studio_api/issues/258))
 
 Browser and Node now share structural comparison for config defaults, config

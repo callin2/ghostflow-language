@@ -1298,7 +1298,7 @@ class ControlParser {
       return this.node('list', token, { values });
     }
     if (token.kind === 'number' || token.kind === 'time-literal' || token.kind === 'context-literal' || token.kind === 'string') {
-      return this.node('literal', token, { raw: token.value });
+      return this.node('literal', token, { raw: token.value, ...(token.kind === 'string' ? { quoted: true } : {}) });
     }
     if (token.kind === 'identifier') {
       if (token.value === 'true' || token.value === 'false') return this.node('literal', token, { raw: token.value });
@@ -1764,7 +1764,7 @@ class Lowerer {
         || this.manifest.naturalConditions?.length || this.manifest.calendarConditions?.length || this.accountingExecution) {
         error(this.ast.loc, 'local_day_is profile only supports weekday conditions with config streams and temporal state');
       }
-      this.manifest.format = 'GhostFlow/control-v25';
+      this.manifest.format = 'GhostFlow/control-v26';
     }
     if (this.manifest.schedules.some(schedule => schedule.day?.kind === 'weekday')) {
       if (solarForms.length || contextForms.some(form => !['solar-weekday-pulse', 'tide-weekday-run'].includes(form[0]))
@@ -4213,8 +4213,8 @@ class Lowerer {
       }
       const mask = weekdayMaskLiteral(node.args[0], 'local_day_is');
       const timezoneNode = node.named[0].value;
-      if (timezoneNode.kind !== 'string') error(timezoneNode.loc, 'local_day_is timezone must be a string');
-      const timezone = timezoneNode.value;
+      if (timezoneNode.kind !== 'literal' || !timezoneNode.quoted) error(timezoneNode.loc, 'local_day_is timezone must be a string');
+      const timezone = timezoneNode.raw;
       if (!timezone.trim()) error(timezoneNode.loc, 'local_day_is timezone must be non-empty');
       try { new Intl.DateTimeFormat('en-US', { timeZone: timezone }); }
       catch { error(timezoneNode.loc, 'local_day_is timezone must be a supported IANA timezone'); }

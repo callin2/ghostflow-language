@@ -1060,6 +1060,7 @@ The day tag does not decide which business date owns an overnight shift. Until t
 
 ```ghost
 let weekday = local_day_is(day`mon..fri`, timezone: "Asia/Seoul");
+let weekday_start = case weekday { ok(value) => value; fault(_) => false; };
 let working = calendar_is(workers, day`workday`);
 let can_start = case working { ok(value) => value; fault(_) => false; };
 ```

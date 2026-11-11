@@ -30,6 +30,7 @@ const AVAILABILITY_FORMAT = 'GhostFlow/control-v12';
 const AT_FORMAT = 'GhostFlow/control-v13';
 const AT_WINDOW_FORMAT = 'GhostFlow/control-v23';
 const NATURAL_WEEKDAY_FORMAT = 'GhostFlow/control-v24';
+const WEEKDAY_CONDITION_FORMAT = 'GhostFlow/control-v26';
 const HOLIDAY_FORMAT = 'GhostFlow/control-v14';
 const SOLAR_CONTEXT_FORMAT = 'GhostFlow/control-v15';
 const CALENDAR_EXECUTION_FORMAT = 'GhostFlow/control-v18';
@@ -46,6 +47,7 @@ const contextManifest = manifest => manifest?.format === STREAM_CONTEXT_FORMAT
   || manifest?.format === AT_FORMAT
   || manifest?.format === AT_WINDOW_FORMAT
   || manifest?.format === NATURAL_WEEKDAY_FORMAT
+  || manifest?.format === WEEKDAY_CONDITION_FORMAT
   || manifest?.format === AVAILABILITY_FORMAT && !manifest.schedules?.some(item => item.kind === 'solar');
 
 /** Select an existing reference entry explicitly; never retry after a dispatch error. */
@@ -268,10 +270,10 @@ function validateCanonicalUnit(item, label) {
 function validateContextManifest(input, bytecodeFormat) {
   const manifest = record(input, 'manifest');
   keys(manifest, ['format','name','inputs','outputs','sensors','schedules','timers','signals','configs','bytecodeSha256'],
-    ['providers','calendars','naturalConditions','calendarConditions','accounting','resources','objectives','adaptSettings','lifecycle','legacyAdmission','requiredRuntimeFeatures','sensorInstances','monitoring'], 'manifest');
+    ['providers','calendars','naturalConditions','calendarConditions','weekdayConditions','accounting','resources','objectives','adaptSettings','lifecycle','legacyAdmission','requiredRuntimeFeatures','sensorInstances','monitoring'], 'manifest');
   validateRequiredRuntimeFeatures(manifest);
   const lifecycle = validateLifecycleManifest(manifest);
-  if (manifest.format === NATURAL_WEEKDAY_FORMAT ? bytecodeFormat !== 24 : manifest.format === AT_WINDOW_FORMAT ? bytecodeFormat !== 23 : manifest.format === CIVIL_RANGE_FORMAT ? bytecodeFormat !== 21 : manifest.format === TIMESLOTS_RANGE_FORMAT ? bytecodeFormat !== 20 : manifest.format === RANGE_LIVE_START_FORMAT ? bytecodeFormat !== 19 : manifest.format === CALENDAR_EXECUTION_FORMAT ? bytecodeFormat !== 18 : manifest.format === SOLAR_CONTEXT_FORMAT ? bytecodeFormat !== 16 : manifest.format === HOLIDAY_FORMAT ? bytecodeFormat !== 15 : manifest.format === AT_FORMAT ? bytecodeFormat !== 14 : manifest.format === AVAILABILITY_FORMAT ? bytecodeFormat !== 13 : ![11, 12].includes(bytecodeFormat)) throw new Error('context manifest requires its matching GFB format');
+  if (manifest.format === WEEKDAY_CONDITION_FORMAT ? bytecodeFormat !== 26 : manifest.format === NATURAL_WEEKDAY_FORMAT ? bytecodeFormat !== 24 : manifest.format === AT_WINDOW_FORMAT ? bytecodeFormat !== 23 : manifest.format === CIVIL_RANGE_FORMAT ? bytecodeFormat !== 21 : manifest.format === TIMESLOTS_RANGE_FORMAT ? bytecodeFormat !== 20 : manifest.format === RANGE_LIVE_START_FORMAT ? bytecodeFormat !== 19 : manifest.format === CALENDAR_EXECUTION_FORMAT ? bytecodeFormat !== 18 : manifest.format === SOLAR_CONTEXT_FORMAT ? bytecodeFormat !== 16 : manifest.format === HOLIDAY_FORMAT ? bytecodeFormat !== 15 : manifest.format === AT_FORMAT ? bytecodeFormat !== 14 : manifest.format === AVAILABILITY_FORMAT ? bytecodeFormat !== 13 : ![11, 12].includes(bytecodeFormat)) throw new Error('context manifest requires its matching GFB format');
   name(manifest.name, 'manifest.name');
   if (!/^[0-9a-f]{64}$/.test(manifest.bytecodeSha256)) throw new Error('invalid bytecode SHA-256');
   const inputs = validateList(manifest.inputs, 'manifest.inputs', ['name','type'], ['canonicalUnit']);
@@ -305,8 +307,14 @@ function validateContextManifest(input, bytecodeFormat) {
     ['site','operation','provider','classification','result','projectionInputs']);
   const calendarConditions = validateList(manifest.calendarConditions ?? [], 'manifest.calendarConditions',
     ['site','calendar','classification','timezone','result','projectionInputs']);
+  const weekdayConditions = validateList(manifest.weekdayConditions ?? [], 'manifest.weekdayConditions',
+    ['site','timezone','mask','result','projectionInputs']);
   if (manifest.format === CALENDAR_EXECUTION_FORMAT && !calendarConditions.length && !schedules.some(item => item.day && item.policy?.basis?.kind === 'range')) throw new Error('calendar execution profile requires a calendar Result or Range');
   if (manifest.format !== CALENDAR_EXECUTION_FORMAT && calendarConditions.length) throw new Error('calendar Result requires control-v18');
+  if (manifest.format !== WEEKDAY_CONDITION_FORMAT && weekdayConditions.length) throw new Error('weekday Conditions require control-v26');
+  if (manifest.format === WEEKDAY_CONDITION_FORMAT && (!weekdayConditions.length || weekdayConditions.some(item =>
+    !Number.isSafeInteger(item.site) || item.site <= 0 || typeof item.timezone !== 'string' || !item.timezone ||
+    !Number.isSafeInteger(item.mask) || item.mask < 1 || item.mask > 127))) throw new Error('weekday condition profile requires typed weekday conditions');
   const accounting = manifest.accounting === undefined ? null : copy(record(manifest.accounting, 'manifest.accounting'));
   if (manifest.format === SOLAR_CONTEXT_FORMAT && !schedules.some(item => item.kind === 'solar')) throw new Error('Solar context profile requires Solar');
   if (manifest.format === NATURAL_WEEKDAY_FORMAT && (!schedules.length || schedules.some(item => !['solar', 'tide'].includes(item.kind)
@@ -467,7 +475,7 @@ function validateContextManifest(input, bytecodeFormat) {
   }
   unique(configs.map(item => item.id), 'config id');
   unique([...inputs,...outputs,...schedules,...configs,...providers,...calendars,...timers,...sensors,...sensorInstances,...objectives,...adaptSettings].map(item => item.name), 'context name');
-  unique([...schedules,...naturals,...calendarConditions].map(item => item.site), 'context site');
+  unique([...schedules,...naturals,...calendarConditions,...weekdayConditions].map(item => item.site), 'context site');
   for (const sensor of [...sensors, ...sensorInstances]) {
     name(sensor.name, 'sensor.name');
     if (objectives.some(objective => objective.measure === sensor.name) && (sensor.type !== 'Temperature' || sensor.canonicalUnit !== 'K')) throw new Error('context PID sensor must be canonical Temperature');
@@ -1500,6 +1508,9 @@ export class ControlRuntime {
     if (this.#hasContext) {
       if (this.manifest.format === NATURAL_WEEKDAY_FORMAT && contextFacts.scheduledDates === undefined) {
         contextFacts = { ...contextFacts, scheduledDates: naturalScheduledDateFacts(contextFacts, this.manifest.schedules) };
+      }
+      if (this.manifest.format === WEEKDAY_CONDITION_FORMAT) {
+        contextFacts = { ...contextFacts, weekdayConditions: this.manifest.weekdayConditions };
       }
       validateContextSolarFacts(contextFacts, this.manifest.schedules);
       encodeContextFacts(contextFacts);
