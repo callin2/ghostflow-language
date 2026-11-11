@@ -174,7 +174,7 @@ control MetadataSelection {
   adapt policy {
     strategy Disabled priority 20 match (moisture: sensor) where moisture.type == Bool { pump <- false; }
     strategy Allowed priority 10 match (moisture: sensor)
-      where moisture.type == Percent && moisture.kind == sensor && moisture.name == "moisture" { pump <- true; }
+      where moisture.type == Percent && !(moisture.kind != sensor) && (moisture.name == "moisture" || false) { pump <- true; }
     strategy Baseline priority 0 match always { pump <- false; }
   }
 }

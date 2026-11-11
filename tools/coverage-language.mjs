@@ -10,7 +10,7 @@ const root = fileURLToPath(new URL('../', import.meta.url));
 const TESTS = Object.freeze([
   'tests/boundary-conformance.test.mjs',
   'tests/runtime-conformance.test.mjs',
-  'tests/compiler.test.mjs', 'tests/constraints.test.mjs', 'tests/coverage-edges.test.mjs', 'tests/control-host.test.mjs',
+  'tests/compiler.test.mjs', 'tests/constraints.test.mjs', 'tests/coverage-edges.test.mjs', 'tests/control-host.test.mjs', 'tests/adapt-control-host.test.mjs',
   'tests/control.test.mjs', 'tests/integration-contract.test.mjs', 'tests/ledger.test.mjs',
   'tests/installed-control-host.test.mjs', 'tests/program-replacement-host.test.mjs',
   'tests/installed-composition.test.mjs',
