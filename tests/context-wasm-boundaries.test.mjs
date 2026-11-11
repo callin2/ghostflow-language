@@ -8,6 +8,8 @@ import { fileURLToPath } from 'node:url';
 import { GhostFlowRuntime } from '../runtimes/wasm/ghostflow-runtime.mjs';
 import { ControlRuntime } from '../runtimes/wasm/control-runtime.mjs';
 import { compileSource } from '../tools/compile-source.mjs';
+import { canonicalJson } from '../tools/canonical-json.mjs';
+import { sha256Hex } from '../tools/sha256.mjs';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const wasmPath = resolve(root, 'target/wasm32-unknown-unknown/release/ghostflow_wasm.wasm');
@@ -20,6 +22,21 @@ async function artifact(id) {
   const fixture = cases.find(entry => entry.id === id);
   return compileSource(fixture.source, { filename: fixture.filename });
 }
+
+test('source-bound replay verifies the fixed hardware profiles used to compile the program', async () => {
+  const fixture = cases.find(entry => entry.id === 'REF-03-057');
+  const source = `---\nprofile: test-board@1\nbindings:\n  due: board.RO1\n---\n${fixture.source}`;
+  const definition = { kind: 'board', connections: {}, defaults: {}, channels: { RO1: { role: 'output', type: 'Bool' } } };
+  const hardwareProfiles = [{ ref: 'test-board@1', definition, sha256: sha256Hex(canonicalJson(definition)) }];
+  const compiled = await compileSource(source, { filename: fixture.filename, hardwareProfiles });
+  const context = { bootEpoch: 7, terminalCapacity: 8, bindings: [] };
+  await assert.rejects(ControlRuntime.instantiateFramed(wasmBytes, compiled, { context }), /supply hardwareProfiles/);
+  await assert.rejects(ControlRuntime.instantiateFramed(wasmBytes, compiled, {
+    context, hardwareProfiles: [{ ...hardwareProfiles[0], sha256: '0'.repeat(64) }],
+  }), /profile digest mismatch/);
+  const runtime = await ControlRuntime.instantiateFramed(wasmBytes, compiled, { context, hardwareProfiles });
+  runtime.dispose();
+});
 
 async function runtimeFor(compiled) {
   const runtime = await GhostFlowRuntime.instantiate(wasmBytes);

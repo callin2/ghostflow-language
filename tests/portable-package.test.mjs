@@ -643,26 +643,40 @@ test('signed calendar Result preserves the Seoul date and rejects rewritten bind
   const { createKoreanHolidayCalendar } = await import('../runtimes/node/calendar.mjs');
   const current = await currentKeyPromise;
   const source = [
+    '---', 'profile: test-board@1', 'bindings:', '  permitted: board.RO1', '---',
     '# Calendar decision', '```ghost', 'control HolidayCheck {', ' calendar holidays: HolidayCalendar;',
     ' let holiday = calendar_is(holidays, day`holiday`, timezone: "Asia/Seoul");',
     ' output permitted: Bool;', ' permitted <- case holiday { ok(value) => !value; fault(_) => false; };',
     '}', '```',
   ].join('\n');
-  const compilation = await compileSource(source, { filename: 'calendar.ghost.md' });
+  const definition = { kind: 'board', connections: {}, defaults: {}, channels: { RO1: { role: 'output', type: 'Bool' } } };
+  const hardwareProfiles = [{ ref: 'test-board@1', definition, sha256: await digestHex(encoder.encode(canonicalJson(definition))) }];
+  const compilation = await compileSource(source, { filename: 'calendar.ghost.md', hardwareProfiles });
   const contextIdentity = { ...identity, runtimeAbi: 'GhostFlow/context-scan-abi-v5',
     requiredCapabilities: [{ kind: 'actuator', name: 'permitted', type: 'bool' }] };
-  const packaged = await buildPortablePackage(compilation, contextIdentity, buildOptions([{ keyId: current.keyId, privateKey: current.privateKey }]));
+  const packaged = await buildPortablePackage(compilation, contextIdentity, {
+    signers: [{ keyId: current.keyId, privateKey: current.privateKey }],
+    verifyCompilation: (text, { filename }) => compileSource(text, { filename, hardwareProfiles }),
+  });
   const snapshot = createKoreanHolidayCalendar({ calendarId: 'holidays', nowMs: Date.parse('2026-11-11T00:00:00Z') }).snapshot;
   const options = { ...verifierOptions(current), supportedRuntimeAbis: [contextIdentity.runtimeAbi],
     supportedManifestFormats: [compilation.manifest.format], availableCapabilities: contextIdentity.requiredCapabilities };
-  const verified = await verifyPortablePackage(packaged, options);
+  const rejectBeforeLoad = { ...options, verifyBytecode: () => assert.fail('invalid profile reached the bytecode loader') };
+  await assert.rejects(verifyPortablePackage(packaged, rejectBeforeLoad),
+    error => error.code === 'source-map-mismatch' && /supply hardwareProfiles/.test(error.cause?.message));
+  await assert.rejects(verifyPortablePackage(packaged, {
+    ...rejectBeforeLoad,
+    hardwareProfiles: [{ ...hardwareProfiles[0], sha256: '0'.repeat(64) }],
+  }), error => error.code === 'source-map-mismatch' && /digest|SHA-256/.test(error.cause?.message));
+  const pinnedOptions = { ...options, hardwareProfiles };
+  const verified = await verifyPortablePackage(packaged, pinnedOptions);
   const { site } = verified.manifest.calendarConditions[0];
   const wasm = fs.readFileSync(wasmPath);
   const context = { bootEpoch: 1, terminalCapacity: 64, bindings: [{ kind: 'calendar', provider: 'holidays',
     namespace: 'calendar-replay', station: 'virtual', bindingRevision: 'calendar-v1',
     location: 'virtual', timezone: 'Asia/Seoul', criteria: 'calendar', maxUncertaintyMs: 0 }] };
   for (const instantiate of [ControlRuntime.instantiate, ControlRuntime.instantiateFramed]) {
-    const runtime = await instantiate(wasm, { ...compilation, manifest: verified.manifest, bytes: verified.bytecode.copy() }, { context });
+    const runtime = await instantiate(wasm, { ...compilation, manifest: verified.manifest, bytes: verified.bytecode.copy() }, { context, hardwareProfiles });
     try {
       const midnight = Date.parse('2027-01-01T00:00:00+09:00');
       function step(monotonicMs, wallMs, uncertaintyMs = 0, calendar = snapshot) {
@@ -685,5 +699,6 @@ test('signed calendar Result preserves the Seoul date and rejects rewritten bind
   forged.payload.manifest.contentBase64 = base64(bytes);
   forged.payload.manifest.sha256 = await digestHex(bytes);
   await resign(forged, current);
-  await assert.rejects(verifyPortablePackage(forged, options), PortablePackageError);
+  await assert.rejects(verifyPortablePackage(forged, pinnedOptions),
+    error => error.code === 'source-map-mismatch' && /context schedule manifest/.test(error.cause?.message));
 });
