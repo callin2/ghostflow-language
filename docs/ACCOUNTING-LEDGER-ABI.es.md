@@ -95,7 +95,7 @@ REF-03-021, una solicitud bloqueada de 20 s produce solicitado 20000ms, seguro
 y la durabilidad del almacenamiento son evidencia de aceptación aparte.
 
 Esta ABI expone a un host el ledger de contabilización de uso de Rust a través
-de WebAssembly. Los Results de conteo de GFB10 se ejecutan dentro de la VM de
+de WebAssembly. Los Results de conteo de GFB11 se ejecutan dentro de la VM de
 control portable usando el ledger emparejado. La admisión de reservas móviles
 vinculada a la fuente es una operación explícita del host de referencia; la ABI
 no vincula automáticamente las salidas de control a los recursos.

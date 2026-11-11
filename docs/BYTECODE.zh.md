@@ -219,14 +219,14 @@ node --test tests/continuous-resource-control.test.mjs
 - 未被选中分支中的转换不会执行。
 - 常量转换保留编译期诊断和字面量降级；其直线型程序仍可选择格式 1 或 2。
 
-**Percent 守卫（60）与 `percent-range-v1`。** 动态 Percent 算术在接受现有时间守卫的 profile 中使用新增的操作码 `60`，历史版本 GFB10 除外。模块布局和格式选择不变。
+**Percent 守卫（60）与 `percent-range-v1`。** 动态 Percent 算术在接受现有时间守卫的 profile 中使用新增的操作码 `60`。模块布局和格式选择不变。
 
 - 编译器清单声明 `requiredRuntimeFeatures: ["percent-range-v1"]`。宿主会验证该要求，但对于实际指令集，可执行加载器仍具有最终权威。
 - 较旧的核心会在加载期间、激活之前拒绝该未知操作码。仅凭 GFB 格式编号匹配并不能证明支持此指令。
 - 不含该守卫的现有程序保持其字节，并省略该要求。
 - 在安装带守卫的程序之前，消费方必须使用包含 Percent 守卫的核心修订版。此变更不会发布或更新 Device 固件。
 
-包验证器要求目标显式允许 `percent-range-v1`。JS 选项为 `supportedRuntimeFeatures`；Rust 验证 profile 使用 `supported_runtime_features`。声明必须与编译后的程序相符。参考宿主会在激活之前检查已加载的模块。历史版本 GFB10 不能声明或包含这条新指令；当前源会编译为当前的 profile。现有 GFB10 程序无需新的功能声明，仍可加载。
+包验证器要求目标显式允许 `percent-range-v1`。JS 选项为 `supportedRuntimeFeatures`；Rust 验证 profile 使用 `supported_runtime_features`。声明必须与编译后的程序相符。参考宿主会在激活之前检查已加载的模块。运行时和包验证器拒绝历史 GFB10（`control-v9`）。重新编译规范源文件可生成当前格式的产物。
 
 **范围守卫（54、55、60）。** 每个守卫让有效的 Number 保持不变，否则拒绝该 tick：
 

@@ -80,7 +80,7 @@ run ID를 가진 새 소유자가 필요합니다. 복원은 과거 질의를 �
 전체를 비교합니다. REF-03-021에서 차단된 20초 요청은 requested 20000ms, safe 0ms, applied
 Unknown, confirmed Unknown을 만듭니다. 물리 Driver 동작과 저장소 영속성은 별도의 인수 증거입니다.
 
-이 ABI는 WebAssembly를 통해 Rust accounting ledger를 호스트에 노출합니다. GFB10 count
+이 ABI는 WebAssembly를 통해 Rust accounting ledger를 호스트에 노출합니다. GFB11 count
 Result는 짝지어진 ledger를 사용해 이식 가능한 제어 VM 안에서 실행됩니다. 소스에 묶인 rolling
 예약 admission은 명시적인 참조 호스트 연산이며, ABI가 제어 출력을 자원에 자동으로 바인딩하지는
 않습니다.

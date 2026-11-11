@@ -498,31 +498,31 @@
       "files": {
         "en": {
           "path": "docs/GHOST-TIMELINE.md",
-          "sha256": "030ce34e7cf895ff892070da67d0da115211473a4cf133c78367c0826836212f"
+          "sha256": "c2a2e8b9908717e5431d148652a2e292e838d4a623bbf2c728ad9f24239ef458"
         },
         "ko": {
           "path": "docs/GHOST-TIMELINE.ko.md",
-          "sha256": "f2323b4e01b427fe147017147a4a5575c5b6b34370efd6afe6606160eb488f5f",
+          "sha256": "74922a9fcbe1cd0bc850c97d38661ab91f616e453027f36421a91e4e47569966",
           "from": "en",
-          "sourceSha256": "030ce34e7cf895ff892070da67d0da115211473a4cf133c78367c0826836212f"
+          "sourceSha256": "c2a2e8b9908717e5431d148652a2e292e838d4a623bbf2c728ad9f24239ef458"
         },
         "zh": {
           "path": "docs/GHOST-TIMELINE.zh.md",
-          "sha256": "a122aac80451b99f750bb972564065a0f357b721bd5ab08f861281fd5f8e177e",
+          "sha256": "59e2cc63daf205c30818bbfe7a5ac4488ccd5008c757cbc63dbd405f8de44c13",
           "from": "en",
-          "sourceSha256": "030ce34e7cf895ff892070da67d0da115211473a4cf133c78367c0826836212f"
+          "sourceSha256": "c2a2e8b9908717e5431d148652a2e292e838d4a623bbf2c728ad9f24239ef458"
         },
         "es": {
           "path": "docs/GHOST-TIMELINE.es.md",
-          "sha256": "d61fa2e6e9b953f3e6f219ba563804eabd74cd2e680ceef10da1bf9096c7bc52",
+          "sha256": "3958ee80302669aa93ab63824970ef4893cc289cd4ccecfb6d842c714c88dd2a",
           "from": "en",
-          "sourceSha256": "030ce34e7cf895ff892070da67d0da115211473a4cf133c78367c0826836212f"
+          "sourceSha256": "c2a2e8b9908717e5431d148652a2e292e838d4a623bbf2c728ad9f24239ef458"
         },
         "ja": {
           "path": "docs/GHOST-TIMELINE.ja.md",
-          "sha256": "df3e057cc7d969807e7dd9b52f1e2bcb432b8c625290c0c311cb3c7f291d4183",
+          "sha256": "5e5f1a750264c14ae86ddef29c12ebaaf6ac0cc6ab3aa09ed1f9733072ba1622",
           "from": "en",
-          "sourceSha256": "030ce34e7cf895ff892070da67d0da115211473a4cf133c78367c0826836212f"
+          "sourceSha256": "c2a2e8b9908717e5431d148652a2e292e838d4a623bbf2c728ad9f24239ef458"
         }
       }
     },
@@ -1198,31 +1198,31 @@
       "files": {
         "en": {
           "path": "docs/ACCOUNTING-LEDGER-ABI.md",
-          "sha256": "2f0ab26227f9bc85d051c2ce414764b7465f9bba2a02e794d93631a382e2a52a"
+          "sha256": "80556efe0f7f7d4b3b034d7a14991a276359fd1a4c64585cdf226b8340087e4b"
         },
         "ko": {
           "path": "docs/ACCOUNTING-LEDGER-ABI.ko.md",
-          "sha256": "dfa6a3df136020ab038971e7a178d943b9c813598a1caad28c86693cc731ecc4",
+          "sha256": "c48acce8e10a4c7dbb5003feda067b74e7e24f10ad04a0359f7094ea143ba806",
           "from": "en",
-          "sourceSha256": "2f0ab26227f9bc85d051c2ce414764b7465f9bba2a02e794d93631a382e2a52a"
+          "sourceSha256": "80556efe0f7f7d4b3b034d7a14991a276359fd1a4c64585cdf226b8340087e4b"
         },
         "zh": {
           "path": "docs/ACCOUNTING-LEDGER-ABI.zh.md",
-          "sha256": "74900580874b4d8f0f0222ec1af98171d31cbb46fda1fdc532b8cd04b9f82b08",
+          "sha256": "9a60be5dca5bbf075e757723326bb7c7fc339d8d21aa257dd82aed64d9da58ca",
           "from": "en",
-          "sourceSha256": "2f0ab26227f9bc85d051c2ce414764b7465f9bba2a02e794d93631a382e2a52a"
+          "sourceSha256": "80556efe0f7f7d4b3b034d7a14991a276359fd1a4c64585cdf226b8340087e4b"
         },
         "es": {
           "path": "docs/ACCOUNTING-LEDGER-ABI.es.md",
-          "sha256": "a91ca5507c77651a06e7aa03a7e301d65efeeb55fc6e37ab9f8711ba6c247d0f",
+          "sha256": "3225c09abb02163b936f2acd982c34c8aeea930ff8064ba3f36c1988cb2ee8aa",
           "from": "en",
-          "sourceSha256": "2f0ab26227f9bc85d051c2ce414764b7465f9bba2a02e794d93631a382e2a52a"
+          "sourceSha256": "80556efe0f7f7d4b3b034d7a14991a276359fd1a4c64585cdf226b8340087e4b"
         },
         "ja": {
           "path": "docs/ACCOUNTING-LEDGER-ABI.ja.md",
-          "sha256": "18597beee4aba330855478cfcc8b9740b157e2bffc9f24a03be4d1938742523a",
+          "sha256": "152a756d75493f44607d4b1a58039d691febca9885754181543f98cbf5b5e54a",
           "from": "en",
-          "sourceSha256": "2f0ab26227f9bc85d051c2ce414764b7465f9bba2a02e794d93631a382e2a52a"
+          "sourceSha256": "80556efe0f7f7d4b3b034d7a14991a276359fd1a4c64585cdf226b8340087e4b"
         }
       }
     },
@@ -1303,31 +1303,31 @@
       "files": {
         "en": {
           "path": "docs/BYTECODE.md",
-          "sha256": "f6f9f0c6ee035980f21cd6b0521cb47601df7c089380a25539800ead92592e99"
+          "sha256": "b16bdcb87244f545a88d1b4258944f065587071ea21809a65517b00b3bbe5462"
         },
         "ko": {
           "path": "docs/BYTECODE.ko.md",
-          "sha256": "c6c287b4709610cdc216867d5276134f428652be1d949f4892c9cf2106b01624",
+          "sha256": "53f9a47c1fa0ee27ff828beea680974302e0cb8bf0ed2f5c4c612e188d5b7143",
           "from": "en",
-          "sourceSha256": "f6f9f0c6ee035980f21cd6b0521cb47601df7c089380a25539800ead92592e99"
+          "sourceSha256": "b16bdcb87244f545a88d1b4258944f065587071ea21809a65517b00b3bbe5462"
         },
         "zh": {
           "path": "docs/BYTECODE.zh.md",
-          "sha256": "df5dccb550c193eeafcab30a6a1e77e08e9d052d397e90455c80ab573b2f2f82",
+          "sha256": "3ff692559cab65772a3c69686e4b166c911a9cbd5f498276c1f1f8ce3eb3bab2",
           "from": "en",
-          "sourceSha256": "f6f9f0c6ee035980f21cd6b0521cb47601df7c089380a25539800ead92592e99"
+          "sourceSha256": "b16bdcb87244f545a88d1b4258944f065587071ea21809a65517b00b3bbe5462"
         },
         "es": {
           "path": "docs/BYTECODE.es.md",
-          "sha256": "8ed257051f90af06339c17c2dbc4939130eea85f891bbb52401cb7509d5629ee",
+          "sha256": "6d0ccff8d7c8d5bde5146784e206692409e63f5e970d98e20f29de50921840e4",
           "from": "en",
-          "sourceSha256": "f6f9f0c6ee035980f21cd6b0521cb47601df7c089380a25539800ead92592e99"
+          "sourceSha256": "b16bdcb87244f545a88d1b4258944f065587071ea21809a65517b00b3bbe5462"
         },
         "ja": {
           "path": "docs/BYTECODE.ja.md",
-          "sha256": "f46976c6c3f44b88f74968e525b71aac1941a359d14486493d58b65e726ec307",
+          "sha256": "abba97537b92a35371134a8d580fb294da32e3d84edaeabe6f98cf79b9d276c3",
           "from": "en",
-          "sourceSha256": "f6f9f0c6ee035980f21cd6b0521cb47601df7c089380a25539800ead92592e99"
+          "sourceSha256": "b16bdcb87244f545a88d1b4258944f065587071ea21809a65517b00b3bbe5462"
         }
       }
     },
@@ -1408,31 +1408,31 @@
       "files": {
         "en": {
           "path": "docs/CONTEXT-EXECUTION-ABI.md",
-          "sha256": "30ae85bcdacb86b3167794e298ffd5d1a0de41b41feb6a157cdc1c37bb4fd6f8"
+          "sha256": "c91eb396f0620b3bd19283ebf760910a95d028e7b29e082ddc48f60277ee1de9"
         },
         "ko": {
           "path": "docs/CONTEXT-EXECUTION-ABI.ko.md",
-          "sha256": "a8473d4bac711b34cade2b9873295619c7d2af2f3d017f6f2e1ccb5df2a8aaa8",
+          "sha256": "c095f752e509db97b5c12f95d814582f255aa9050fa8e64601cadd10da966818",
           "from": "en",
-          "sourceSha256": "30ae85bcdacb86b3167794e298ffd5d1a0de41b41feb6a157cdc1c37bb4fd6f8"
+          "sourceSha256": "c91eb396f0620b3bd19283ebf760910a95d028e7b29e082ddc48f60277ee1de9"
         },
         "zh": {
           "path": "docs/CONTEXT-EXECUTION-ABI.zh.md",
-          "sha256": "4b7ce6b52c935ae107a94ae12eb9ff1faab8b22c9fd3ded59ef6de85b3d0307c",
+          "sha256": "f62869b15ef7b5f9b59bf69e3740ee7b76767b8faf87f8a111597cdf69d3f537",
           "from": "en",
-          "sourceSha256": "30ae85bcdacb86b3167794e298ffd5d1a0de41b41feb6a157cdc1c37bb4fd6f8"
+          "sourceSha256": "c91eb396f0620b3bd19283ebf760910a95d028e7b29e082ddc48f60277ee1de9"
         },
         "es": {
           "path": "docs/CONTEXT-EXECUTION-ABI.es.md",
-          "sha256": "1369ca19acfde74e01762f49489a5d834c5bc924db2dd97e9d9b8996e86721ce",
+          "sha256": "55794b4c3465e4e8826717b278d9ece01c14113b479288c2cbcdb42849be707a",
           "from": "en",
-          "sourceSha256": "30ae85bcdacb86b3167794e298ffd5d1a0de41b41feb6a157cdc1c37bb4fd6f8"
+          "sourceSha256": "c91eb396f0620b3bd19283ebf760910a95d028e7b29e082ddc48f60277ee1de9"
         },
         "ja": {
           "path": "docs/CONTEXT-EXECUTION-ABI.ja.md",
-          "sha256": "48d6e7f63ae73e77e066de392839fd22d69c40ec8f4670903ed5f59b9ac25add",
+          "sha256": "4f54d193a7228c63c5029501ef3cddb2c04107725d2c7f351c625cff269a5e91",
           "from": "en",
-          "sourceSha256": "30ae85bcdacb86b3167794e298ffd5d1a0de41b41feb6a157cdc1c37bb4fd6f8"
+          "sourceSha256": "c91eb396f0620b3bd19283ebf760910a95d028e7b29e082ddc48f60277ee1de9"
         }
       }
     },
@@ -3508,13 +3508,13 @@
       "files": {
         "en": {
           "path": "CHANGELOG.md",
-          "sha256": "bd465d1da5122765789775f1a420ffc2ababc692e0c9fce1510fc74773d5a376"
+          "sha256": "ecb468d41aee4635299fdb162b8aebb63302bbab0db96c3a8ec48d9d5ccd3c3b"
         },
         "ko": {
           "path": "CHANGELOG.ko.md",
-          "sha256": "3e3fb8f95b06117733ac1b6aa485ad75785ca1ee085c3b648ca59d6fbe92532b",
+          "sha256": "455a1e22ab520cf6d40dae892f613abac09c1b8dbea55cf977bc4bad6d426d8b",
           "from": "en",
-          "sourceSha256": "bd465d1da5122765789775f1a420ffc2ababc692e0c9fce1510fc74773d5a376"
+          "sourceSha256": "ecb468d41aee4635299fdb162b8aebb63302bbab0db96c3a8ec48d9d5ccd3c3b"
         }
       }
     },

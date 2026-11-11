@@ -71,7 +71,6 @@ impl Type {
                     | 8
                     | 27
                     | 9
-                    | 10
                     | 11
                     | 12
                     | 13
@@ -336,7 +335,6 @@ impl Module {
                 | 8
                 | 27
                 | 9
-                | 10
                 | 11
                 | 12
                 | 13
@@ -410,25 +408,7 @@ impl Module {
 
         let mut temporal = if matches!(
             format_version,
-            4 | 5
-                | 6
-                | 8
-                | 9
-                | 10
-                | 11
-                | 12
-                | 13
-                | 14
-                | 15
-                | 16
-                | 18
-                | 19
-                | 20
-                | 21
-                | 23
-                | 24
-                | 26
-                | 27
+            4 | 5 | 6 | 8 | 9 | 11 | 12 | 13 | 14 | 15 | 16 | 18 | 19 | 20 | 21 | 23 | 24 | 26 | 27
         ) {
             Some(temporal_vm::TemporalRequirements::load_header(
                 &mut reader,
@@ -440,24 +420,7 @@ impl Module {
         };
         let mut schedules = matches!(
             format_version,
-            5 | 6
-                | 8
-                | 9
-                | 10
-                | 11
-                | 12
-                | 13
-                | 14
-                | 15
-                | 16
-                | 18
-                | 19
-                | 20
-                | 21
-                | 23
-                | 24
-                | 26
-                | 27
+            5 | 6 | 8 | 9 | 11 | 12 | 13 | 14 | 15 | 16 | 18 | 19 | 20 | 21 | 23 | 24 | 26 | 27
         )
         .then(|| schedule_vm::ScheduleRequirements {
             strategies: Vec::new(),
@@ -483,24 +446,7 @@ impl Module {
 
             let (windows, schedule_count, true_for_count, mut result_trace_bound) = if matches!(
                 format_version,
-                5 | 6
-                    | 8
-                    | 9
-                    | 10
-                    | 11
-                    | 12
-                    | 13
-                    | 14
-                    | 15
-                    | 16
-                    | 18
-                    | 19
-                    | 20
-                    | 21
-                    | 23
-                    | 24
-                    | 26
-                    | 27
+                5 | 6 | 8 | 9 | 11 | 12 | 13 | 14 | 15 | 16 | 18 | 19 | 20 | 21 | 23 | 24 | 26 | 27
             ) {
                 let loaded = schedule_vm::load_prelude(
                     &mut reader,
@@ -1518,11 +1464,9 @@ impl Runtime {
             .ok_or_else(|| Error::new("no module installed"))?;
         if !matches!(
             module.format_version,
-            10 | 11 | 12 | 13 | 14 | 15 | 16 | 18 | 19 | 20 | 21 | 23 | 24 | 26
+            11 | 12 | 13 | 14 | 15 | 16 | 18 | 19 | 20 | 21 | 23 | 24 | 26
         ) {
-            return Err(Error::new(
-                "context activation requires GFB10, GFB11 or GFB12",
-            ));
+            return Err(Error::new("context activation requires context bytecode"));
         }
         if module
             .temporal
@@ -1569,10 +1513,10 @@ impl Runtime {
         if !self.module.as_ref().is_some_and(|m| {
             matches!(
                 m.format_version,
-                10 | 11 | 12 | 13 | 14 | 15 | 16 | 18 | 19 | 20 | 21 | 23 | 24 | 26
+                11 | 12 | 13 | 14 | 15 | 16 | 18 | 19 | 20 | 21 | 23 | 24 | 26
             )
         }) {
-            return Err(Error::new("context facts require GFB10, GFB11 or GFB12"));
+            return Err(Error::new("context facts require context bytecode"));
         }
         self.tick_inner(None, Some((clock, facts)), None)
     }
@@ -2062,7 +2006,7 @@ impl Runtime {
             .ok_or_else(|| Error::new(format!("unknown input {name}")))?;
         if matches!(
             m.format_version,
-            10 | 11 | 12 | 13 | 14 | 15 | 16 | 18 | 19 | 20 | 21 | 23 | 24 | 26
+            11 | 12 | 13 | 14 | 15 | 16 | 18 | 19 | 20 | 21 | 23 | 24 | 26
         ) && (name.starts_with("__gf_natural_")
             || name.starts_with("__gf_calendar_")
             || m.format_version == 26 && name.starts_with("__gf_weekday_")
@@ -2172,7 +2116,7 @@ impl Runtime {
             .map(|(i, v)| {
                 if matches!(
                     m.format_version,
-                    10 | 11 | 12 | 13 | 14 | 15 | 16 | 18 | 19 | 20 | 21 | 23 | 24 | 26
+                    11 | 12 | 13 | 14 | 15 | 16 | 18 | 19 | 20 | 21 | 23 | 24 | 26
                 ) && (m.inputs[i].name.starts_with("__gf_natural_")
                     || m.inputs[i].name.starts_with("__gf_calendar_")
                     || m.format_version == 26 && m.inputs[i].name.starts_with("__gf_weekday_")
@@ -3208,7 +3152,6 @@ fn verify_expression_with_prelude(
                         | 7
                         | 8
                         | 9
-                        | 10
                         | 11
                         | 12
                         | 13
@@ -3239,7 +3182,6 @@ fn verify_expression_with_prelude(
                         | 7
                         | 8
                         | 9
-                        | 10
                         | 11
                         | 12
                         | 13
@@ -3300,7 +3242,6 @@ fn verify_expression_with_prelude(
                         | 7
                         | 8
                         | 9
-                        | 10
                         | 11
                         | 12
                         | 13
@@ -3335,7 +3276,6 @@ fn verify_expression_with_prelude(
                         | 6
                         | 8
                         | 9
-                        | 10
                         | 11
                         | 12
                         | 13
@@ -3366,7 +3306,6 @@ fn verify_expression_with_prelude(
                     5 | 6
                         | 8
                         | 9
-                        | 10
                         | 11
                         | 12
                         | 13

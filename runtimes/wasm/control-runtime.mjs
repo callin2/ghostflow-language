@@ -1520,7 +1520,7 @@ export class ControlRuntime {
       if (clock.bootEpoch !== this.#temporalEpoch) throw new Error('schedule facts clock.bootEpoch must match activation');
     }
     if (this.#hasContext && contextFacts === undefined) throw new Error('context facts are required');
-    if (!this.#hasContext && contextFacts !== undefined) throw new Error('context facts require a GFB10 control');
+    if (!this.#hasContext && contextFacts !== undefined) throw new Error('context facts require context bytecode');
     if (this.#hasContext) {
       if (this.manifest.format === NATURAL_WEEKDAY_FORMAT && contextFacts.scheduledDates === undefined) {
         contextFacts = { ...contextFacts, scheduledDates: naturalScheduledDateFacts(contextFacts, this.manifest.schedules) };

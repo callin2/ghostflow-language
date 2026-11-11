@@ -11,7 +11,7 @@ REF-06-018의 비간섭 경계를 구현합니다. 쉽게 말해, live timeline�
 이것은 실제 Rust 판단, 발생(occurrence), accounting(사용량 집계) 소유자를 사용하는 데스크톱
 reference host입니다. 하드웨어를 조작하지 않으며, 렌더러 receipt의 진위를 입증하지도 않습니다.
 
-**지원 프로필.** 선택된 프로필은 다음을 갖춘 독립적인 정본 `.ghost.md` GFB10 `control`입니다.
+**지원 프로필.** 선택된 프로필은 다음을 갖춘 독립적인 정본 `.ghost.md` GFB11 `control`입니다.
 
 - Periodic 예약
 - 선택적인 기존 설정

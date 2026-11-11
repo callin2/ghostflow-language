@@ -293,8 +293,7 @@ produces one typed result.
   straight-line programs can still select format 1 or 2.
 
 **The Percent guard (60) and `percent-range-v1`.** Dynamic Percent arithmetic uses
-the additive opcode `60` in the profiles that admit the existing time guards,
-except historical GFB10. Module layouts and format selection are unchanged.
+the additive opcode `60` in the profiles that admit the existing time guards. Module layouts and format selection are unchanged.
 
 - The compiler manifest declares `requiredRuntimeFeatures: ["percent-range-v1"]`.
   Hosts validate that requirement, but the executable loader remains
@@ -310,10 +309,7 @@ except historical GFB10. Module layouts and format selection are unchanged.
 Package verifiers require the target to explicitly allow `percent-range-v1`. The
 JS option is `supportedRuntimeFeatures`; the Rust verification profile uses
 `supported_runtime_features`. The declaration must match the compiled program.
-The reference host checks the loaded module before activation. Historical GFB10
-cannot declare or contain the new instruction; current source compiles to current
-profiles. Existing GFB10 programs remain loadable without a new feature
-declaration.
+The reference host checks the loaded module before activation. The runtime and package verifiers reject historical GFB10 (`control-v9`). Recompile its canonical source to produce a current artifact.
 
 **Range guards (54, 55, 60).** Each guard leaves a valid Number unchanged and
 rejects the tick otherwise:

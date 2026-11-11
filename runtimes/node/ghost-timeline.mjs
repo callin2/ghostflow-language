@@ -61,7 +61,7 @@ export async function createGhostTimeline({ wasmBytes, document, filename, sourc
   if (manifest.format !== 'GhostFlow/control-v10' || !manifest.schedules?.length
       || manifest.schedules.some(schedule => schedule.kind !== 'periodic')
       || ['signals', 'controllers', 'objectives', 'afterEvents'].some(name => manifest[name]?.length)
-      || manifest.contexts?.length) throw new Error('timeline profile requires a GFB10 Periodic control without external contexts, signals, controllers, objectives or after-event adapters');
+      || manifest.contexts?.length) throw new Error('timeline profile requires a GFB11 Periodic control without external contexts, signals, controllers, objectives or after-event adapters');
   if (manifest.accounting?.constraints?.length
       || manifest.accounting?.bindings?.some(binding => binding.operation !== 'on_time')) {
     throw new Error('timeline profile does not support accounting-dependent decisions or event-count bindings');

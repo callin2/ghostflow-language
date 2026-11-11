@@ -87,7 +87,7 @@ Physical Driver behavior and storage durability are separate acceptance
 evidence.
 
 This ABI exposes the Rust accounting ledger to a host through WebAssembly.
-GFB10 count Results execute inside the portable control VM using the paired
+GFB11 count Results execute inside the portable control VM using the paired
 ledger. Source-bound rolling reservation admission is an explicit reference-host
 operation; the ABI does not automatically bind control outputs to resources.
 

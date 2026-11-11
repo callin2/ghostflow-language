@@ -53,22 +53,6 @@ test('canonical dynamic Percent overflow faults in actual WASM execution', async
   assert.equal(native(t, artifact.bytes, [{ ignored: false }], artifact)[0].error, 'percent-out-of-range');
 });
 
-test('GFB10 rejects a Percent guard instruction while accepting the historical module', async () => {
-  const fixture = JSON.parse(fs.readFileSync(new URL('./fixtures/gfb10-periodic-package-payload.json', import.meta.url)));
-  const historical = Buffer.from(fixture.payload.bytecode.contentBase64, 'base64');
-  assert.equal(historical.readUInt16LE(4), 10);
-  assert.equal(historical[231], 58);
-  const runtime = await GhostFlowRuntime.instantiate(fs.readFileSync(wasmPath));
-  try {
-    runtime.load(historical);
-    const malformed = Buffer.from(historical);
-    malformed[231] = 60;
-    assert.throws(() => runtime.load(malformed), /Percent guard requires GFB format 3/);
-  } finally {
-    runtime.dispose();
-  }
-});
-
 test('canonical Percent boundaries, fractional results and failed-tick retry agree in native and WASM', async t => {
   const artifact = canonical(`fn add_percent(value: Percent, increment: Percent) -> Percent { value + increment }
 control PercentRetry {
