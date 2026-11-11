@@ -268,6 +268,8 @@ Mantenga los valores cuyas unidades afectan a las decisiones de control, como la
 <a id="quantity-type-lookup"></a>
 ### Encuentre el tipo para su medición
 
+Prueba una lectura de 30°C en el [ejemplo del ventilador](#hot-greenhouse-fan).
+
 Aunque mida en grados Celsius, el nombre del tipo es `Temperature`. No declare un tipo llamado `Celsius` ni `Fahrenheit`. Ponga la unidad en el valor: declare `input air: Temperature;` y escriba un umbral como `30°C`. `30°C`, `86°F` y `303.15K` representan la misma temperatura absoluta. El [Capítulo 14](#ch14) continúa con las conversiones de unidades y el control de temperatura.
 
 | Medición | Tipo de la declaración | Valor de ejemplo | Declaración de entrada |
@@ -2053,6 +2055,7 @@ un `Result`.
 
 | Función integrada | Firma y propósito | Contexto, límites y ejemplo |
 |---|---|---|
+| `local_day_is` | ``local_day_is(day`mon..fri`, timezone: "Asia/Seoul") -> Result<Bool,ClockFault>`` | Comprueba el día de la semana de la fecha local fiable actual. Maneje explícitamente los fallos de reloj antes de permitir un nuevo inicio. [Ejemplo de tres zonas](../tests/monitoring-plan.test.mjs). |
 | `calendar_is` | ``calendar_is(calendar, day`workday` or day`offday` or day`holiday`) -> Result<Bool,CalendarFault>`` | WorkCalendar o HolidayCalendar tipado con una vinculación UTC explícita en GFB18. Los hechos ausentes, fuera de cobertura, vencidos o con reloj no fiable conservan un fallo; manéjelo explícitamente antes de negar el Bool correcto. [Límites de calendario ejecutados](../tests/reference-calendar-boundary.test.mjs). |
 | `tide_is` | ``tide_is(provider, tide`spring` or tide`neap`) -> Result<Bool,TemporalContextFault>`` | Proveedor TidePredictions declarado. Una predicción ausente u obsoleta, o un contexto de reloj ausente u obsoleto, es un fallo. [Condiciones naturales](../tests/natural-condition-contract.test.mjs). |
 | `moon_is` | ``moon_is(provider, moon`phase`) -> Result<Bool,TemporalContextFault>`` | Proveedor LunarEphemeris; fases: new, waxing_crescent, first_quarter, waxing_gibbous, full, waning_gibbous, last_quarter, waning_crescent. [Condiciones naturales](../tests/natural-condition-contract.test.mjs). |
@@ -2295,6 +2298,28 @@ control KelvinHeater {
     on_below: 291.15K, off_above: 295.15K, initial: false);
   output heater: Bool;
   heater <- cold |> recover(false);
+}
+```
+
+<a id="hot-greenhouse-fan"></a>
+### E38 — Encender el ventilador cuando sube la temperatura
+
+Cambia la temperatura del invernadero virtual a `28°C → 30°C → 28°C → 26°C`. El ventilador pasa de `apagado → encendido → encendido → apagado`. Se enciende por encima de `29°C` y se apaga por debajo de `27°C`. En los dos umbrales mantiene el estado anterior.
+
+`cool` conserva el estado de frío. Si la lectura es válida, el ventilador usa el valor inverso. En este ejemplo, el ventilador se apaga cuando la lectura caduca tras tres segundos sin una muestra nueva.
+
+```ghost
+// E38
+control GreenhouseVentilation {
+  input air: Temperature {
+    sample = 1s;
+    valid = -40°C .. 50°C;
+    stale_after = 3s;
+  }
+  signal cool = hysteresis(air,
+    on_below: 27°C, off_above: 29°C, initial: true);
+  output fan: Bool;
+  fan <- case cool { ok(value) => !value; fault(_) => false; };
 }
 ```
 

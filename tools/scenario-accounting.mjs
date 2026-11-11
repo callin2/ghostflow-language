@@ -17,6 +17,11 @@ const accounting = new AccountingRuntime(instance.exports, {
 });
 const bindingByStream = new Map(scenario.accounting.bindings.map(item => [item.evidenceStream, item]));
 const resultBindings = manifest.accounting.bindings.filter(item => item.resultInputs);
+const appliedAccounts = new Set(manifest.accounting.bindings
+  .filter(binding => binding.operation === 'on_time' && binding.evidenceBinding.stage === 'applied')
+  .map(binding => binding.name));
+const rollingLimits = manifest.accounting.constraints.flatMap(group => group.limits)
+  .filter(limit => limit.basis?.kind === 'rolling' && appliedAccounts.has(limit.account));
 
 try {
   if (resultBindings.length !== 1) throw new Error('accounting scenario requires exactly one projected Result');
@@ -35,6 +40,7 @@ try {
 }
 
 let scanId = 0;
+const pendingAdmissions = new Map();
 try {
   for (const [index, action] of scenario.actions.entries()) {
     try {
@@ -45,6 +51,34 @@ try {
           eventType: binding.eventType,
           localDay: action.localDay,
         }, async () => true);
+      } else if (action.kind === 'outputRequest') {
+        const limit = rollingLimits.find(item => item.account === action.account);
+        if (!limit) throw new Error(`no rolling constraint for ${action.account}`);
+        const binding = scenario.accounting.bindings.find(item => item.account === action.account);
+        if (binding.resourceId !== action.resourceId) throw new Error('output request does not match its account resource');
+        const previous = pendingAdmissions.get(action.reservationId);
+        if (previous && previous.account !== action.account) throw new Error('output reservation already belongs to another account');
+        const reservationId = Uint8Array.from(Buffer.from(action.reservationId, 'hex'));
+        const status = await accounting.reserveRolling({ reservationId, resourceId: action.resourceId,
+          admittedAtMs: BigInt(action.atMs), windowMs: BigInt(limit.basis.durationMs),
+          limitMs: BigInt(limit.boundMs), reserveMs: BigInt(limit.reserveMs) }, async () => true);
+        if (status !== 'Duplicate') {
+          pendingAdmissions.set(action.reservationId, { status, account: action.account, resourceId: action.resourceId,
+            requestedMs: action.durationMs, atMs: action.atMs });
+        }
+      } else if (action.kind === 'outputApplied') {
+        const pending = pendingAdmissions.get(action.reservationId);
+        if (!pending) throw new Error(`unknown output reservation ${action.reservationId}`);
+        if (pending.account !== action.account || pending.resourceId !== action.resourceId) {
+          throw new Error('applied output does not match its reservation account and resource');
+        }
+        if (pending.status !== 'Inserted') throw new Error(`output reservation was not admitted: ${pending.status}`);
+        const reservationId = Uint8Array.from(Buffer.from(action.reservationId, 'hex'));
+        const receiptId = Uint8Array.from(Buffer.from(action.receiptId, 'hex'));
+        await accounting.recordReservedAppliedSegment({ reservationId, receiptId, resourceId: action.resourceId,
+          startMs: BigInt(action.startMs), endMs: BigInt(action.endMs), localDay: action.localDay }, async () => true);
+        await accounting.settleRolling({ reservationId, appliedReceiptId: receiptId }, async () => true);
+        pendingAdmissions.delete(action.reservationId);
       } else if (action.kind === 'scan') {
         const descriptor = resultBindings[0];
         const binding = scenario.accounting.bindings.find(item => item.account === descriptor.name);
@@ -60,7 +94,24 @@ try {
           wallMs: BigInt(action.accountingFacts.wallMs),
           clockTrusted: action.accountingFacts.clockTrusted,
         });
-        console.log(JSON.stringify({ scanId: scanId++, logicalTimeMs: action.atMs, trace }));
+        const rollingBudgets = rollingLimits.map(limit => {
+          const { resourceId } = scenario.accounting.bindings.find(item => item.account === limit.account);
+          const windowMs = limit.basis.durationMs;
+          const evidence = action.accountingFacts.clockTrusted ? accounting.explainRolling({
+            resourceId, nowMs: action.atMs, windowMs, limitMs: limit.boundMs, reserveMs: limit.reserveMs,
+          }) : null;
+          return { account: limit.account, resourceId, stage: 'applied', windowMs,
+            limitMs: limit.boundMs, reserveMs: limit.reserveMs, evidence: evidence && {
+              usedMs: String(evidence.usedMs), reservedMs: String(evidence.reservedMs),
+              blocked: evidence.blocked, blockReason: evidence.blockReason,
+              nextReleaseMs: evidence.nextReleaseMs === null ? null : String(evidence.nextReleaseMs),
+              ledgerRevision: String(evidence.ledgerRevision),
+            } };
+        });
+        console.log(JSON.stringify({ scanId: scanId++, logicalTimeMs: action.atMs, trace,
+          ...(rollingBudgets.length ? { rollingBudgets } : {}),
+          admissions: [...pendingAdmissions.values()].map(({ status, account, resourceId, requestedMs, atMs }) =>
+            ({ status, account, resourceId, requestedMs, admittedAtMs: atMs })) }));
       }
     } catch (error) {
       console.error(`action[${index}]: ${error.message}`);

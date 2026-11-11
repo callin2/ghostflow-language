@@ -268,6 +268,8 @@ GhostFlow는 정확한 계수를 signed 32-bit `Int`로 표현합니다. 범위�
 <a id="quantity-type-lookup"></a>
 ### 측정하려는 값에서 타입 찾기
 
+[고온 환기 예제](#hot-greenhouse-fan)에서 30°C를 넣고 팬 동작을 확인할 수 있습니다.
+
 섭씨로 측정하더라도 타입 이름은 `Temperature`입니다. `Celsius`나 `Fahrenheit`라는 타입을 선언하지 마세요. 단위는 값에 붙입니다. `input air: Temperature;`로 선언하고 기준값은 `30°C`처럼 씁니다. `30°C`, `86°F`, `303.15K`는 같은 절대 온도를 나타냅니다. [14장](#ch14)에서 단위 변환과 온도 제어를 이어서 다룹니다.
 
 | 측정하는 값 | 선언 타입 | 값 예시 | 입력 선언 |
@@ -1852,6 +1854,7 @@ provider는 관측이나 예측을 공급하고, 프로그램은 그것이 무�
 
 | 내장 이름 | 시그니처와 목적 | 문맥, 경계와 예제 |
 |---|---|---|
+| `local_day_is` | ``local_day_is(day`mon..fri`, timezone: "Asia/Seoul") -> Result<Bool,ClockFault>`` | 신뢰할 수 있는 현재 현지 날짜의 요일을 확인합니다. 새 동작의 시작 조건으로 쓰기 전에 시계 오류를 명시적으로 처리합니다. [평일 세 구역 예제](../tests/monitoring-plan.test.mjs). |
 | `calendar_is` | ``calendar_is(calendar, day`workday` or day`offday` or day`holiday`) -> Result<Bool,CalendarFault>`` | GFB18의 명시적 UTC binding을 쓰는 typed WorkCalendar 또는 HolidayCalendar. 누락, coverage 밖, 만료, 신뢰할 수 없는 시계의 사실은 fault를 보존합니다. 성공한 Bool을 부정하기 전에 fault를 명시적으로 처리합니다. [실행된 달력 경계](../tests/reference-calendar-boundary.test.mjs). |
 | `tide_is` | ``tide_is(provider, tide`spring` or tide`neap`) -> Result<Bool,TemporalContextFault>`` | 선언된 TidePredictions provider. 예측이 없거나 오래되었거나 시계 문맥이 없으면 fault입니다. [자연 조건](../tests/natural-condition-contract.test.mjs). |
 | `moon_is` | ``moon_is(provider, moon`phase`) -> Result<Bool,TemporalContextFault>`` | LunarEphemeris provider; 위상: new, waxing_crescent, first_quarter, waxing_gibbous, full, waning_gibbous, last_quarter, waning_crescent. [자연 조건](../tests/natural-condition-contract.test.mjs). |
@@ -2083,6 +2086,28 @@ control KelvinHeater {
     on_below: 291.15K, off_above: 295.15K, initial: false);
   output heater: Bool;
   heater <- cold |> recover(false);
+}
+```
+
+<a id="hot-greenhouse-fan"></a>
+### E38 — 더울 때 환기팬 켜기
+
+가상 온실의 온도를 `28°C → 30°C → 28°C → 26°C`로 바꿔 보세요. 팬은 `꺼짐 → 켜짐 → 켜짐 → 꺼짐` 순서로 움직입니다. `29°C`를 넘으면 켜지고 `27°C`보다 낮아지면 꺼집니다. 두 경계에서는 직전 상태가 유지됩니다.
+
+`cool`은 시원한 상태를 기억합니다. 정상 관측이면 반대값을 팬에 보냅니다. 이 예제에서는 3초 동안 새 온도가 들어오지 않아 값이 오래되면 팬을 끕니다.
+
+```ghost
+// E38
+control GreenhouseVentilation {
+  input air: Temperature {
+    sample = 1s;
+    valid = -40°C .. 50°C;
+    stale_after = 3s;
+  }
+  signal cool = hysteresis(air,
+    on_below: 27°C, off_above: 29°C, initial: true);
+  output fan: Bool;
+  fan <- case cool { ok(value) => !value; fault(_) => false; };
 }
 ```
 

@@ -1,13 +1,18 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { createHash } from 'node:crypto';
+import { readFileSync } from 'node:fs';
 import { canonicalJson } from '../tools/canonical-json.mjs';
 import { buildPortablePackage, verifyPortablePackage } from '../tools/portable-package.mjs';
 import { compileSource } from './helpers/literate-compile.mjs';
+import { ControlRuntime } from '../runtimes/wasm/control-runtime.mjs';
 
-const code = ({ duration = '5min', start = '((enabled |> recover(false)) && dawn.due)', comparator = '<', output = "active'" } = {}) => `control DawnDemo {
-  config enabled: Bool = true { access = operator; }
-  schedule dawn: Solar { timezone = "Asia/Seoul"; latitude = 37.5665; longitude = 126.978; at = sun\`rise\`; basis = pulse; when = true; clock = trusted_only; gap = skip_after(60s); recovery = baseline; fallback = skip; }
+const solarSchedule = 'schedule dawn: Solar { timezone = "Asia/Seoul"; latitude = 37.5665; longitude = 126.978; at = sun`rise`;';
+const enableConfig = 'config enabled: Bool = true { access = operator; }';
+const code = ({ duration = '5min', start = '((enabled |> recover(false)) && dawn.due)', comparator = '<', output = "active'",
+  schedule = solarSchedule, config = enableConfig } = {}) => `control DawnDemo {
+  ${config}
+  ${schedule} basis = pulse; when = true; clock = trusted_only; gap = skip_after(60s); recovery = baseline; fallback = skip; }
   state active: Bool = false;
   timer elapsedActive = elapsed(active);
   active' = if active then elapsedActive ${comparator} ${duration} else ${start};
@@ -30,6 +35,47 @@ test('the installed Solar timed latch gets source-derived monitoring metadata wi
   const changed = await compileSource(code({ duration: '7min' }), { filename: 'solar-five-minute.ghost' });
   assert.equal(changed.manifest.monitoring.patterns[0].durationMs, 420_000);
   assert.notEqual(digest(changed.bytes), digest(compiled.bytes));
+});
+
+test('the Periodic and UTC DailySlots monitoring duration matches the actual timed output', async t => {
+  const plannedWallMs = Date.UTC(2026, 9, 1, 6);
+  const bootEpoch = 7;
+  const bounds = { bootEpoch, terminalCapacity: 8 };
+  const forms = [
+    {
+      name: 'Periodic',
+      schedule: 'schedule dawn: Periodic { every = 15min; anchor = instant(datetime`2026-10-01T00:00:00Z`); interval_change = preserve_anchor;',
+      options: { context: { ...bounds, bindings: [] } },
+      facts: (site, clock) => ({ contextFacts: { clock, natural: [], settings: null,
+        schedules: [{ site, coverageStartMs: plannedWallMs - 1, coverageEndMs: plannedWallMs + 600_000,
+          provider: null, calendar: null, rows: [] }] } }),
+    },
+    {
+      name: 'UTC DailySlots',
+      schedule: 'schedule dawn: DailySlots<15min> { timezone = "UTC"; selected = [06:00, 18:45]; dst_missing = skip; dst_repeated = first;',
+      options: { schedule: bounds },
+      facts: (site, clock) => ({ scheduleFacts: { clock,
+        schedules: [{ kind: 'daily-slots', site, coverageFromWallMs: plannedWallMs - 1,
+          coverageToWallMs: plannedWallMs + 600_000, rows: [{ sourceDay: Math.floor(plannedWallMs / 86_400_000),
+            slotKey: 361, minuteOfDay: 360, fold: 0, scheduledWallMs: plannedWallMs, available: true,
+            providerRevision: 'fixture-utc-v1', contextRevision: 'fixture-utc-v1' }] }] } }),
+    },
+  ];
+  const wasm = readFileSync(new URL('../target/wasm32-unknown-unknown/release/ghostflow_wasm.wasm', import.meta.url));
+  for (const form of forms) await t.test(form.name, async t => {
+    const source = code({ start: 'dawn.due', schedule: form.schedule, config: '' });
+    const compiled = await compileSource(source, { filename: 'monitoring-schedule.ghost' });
+    assert.deepEqual(compiled.manifest.monitoring.patterns, [expectedPattern]);
+    const runtime = await ControlRuntime.instantiate(wasm, compiled, form.options);
+    t.after(() => runtime.dispose());
+    const site = compiled.manifest.schedules[0].site;
+    const step = nowMs => runtime.step({ nowMs, ...form.facts(site, {
+      monotonicMs: nowMs, bootEpoch, wallMs: plannedWallMs - 1 + nowMs,
+      trusted: true, uncertaintyMs: 0, unknownReason: null, sourceRevision: 'fixture-clock-v1',
+    }) }).vm.safe.running;
+    const end = 1 + compiled.manifest.monitoring.patterns[0].durationMs;
+    assert.deepEqual([0, 1, end - 1, end].map(step), [false, true, true, false]);
+  });
 });
 
 test('only a positive required schedule conjunction and a direct post-state output are covered', async () => {
@@ -102,4 +148,261 @@ test('configured timed outputs expose the direct Duration setting and enum order
   const earlyPatterns = (await compileSource(wrongDirection, { filename: 'early-transition.ghost' })).manifest.monitoring.patterns;
   assert.deepEqual(earlyPatterns.map(pattern => pattern.outputName), ['valve_b']);
   assert.equal(earlyPatterns[0].cycle, undefined);
+});
+
+const finiteSequence = `\`\`\`ghost
+  control Finite {
+    config first_time: Duration = 10s { min = 1s; max = 60s; step = 1s; access = operator; }
+    config second_time: Duration = 20s { min = 1s; max = 60s; step = 1s; access = operator; }
+    config rest_time: Duration = 5s { min = 1s; max = 60s; step = 1s; access = operator; }
+    type Phase = Idle | First | Second | Rest;
+    state phase: Phase = Idle;
+    timer age = elapsed(phase);
+    let first = first_time |> recover(0ms); let second = second_time |> recover(0ms); let rest = rest_time |> recover(0ms);
+    input start: Bool;
+    phase' = case phase { Idle => if (start |> recover(false)) then First else Idle; First => if age >= first then Second else First; Second => if age >= second then Rest else Second; Rest => if age >= rest then Idle else Rest; };
+    output valve_a, valve_b: Bool;
+    valve_a <- phase' == First; valve_b <- phase' == Second;
+  }
+  \`\`\``;
+
+function externallyCancelledSequence(guard = '(stop |> recover(false))', reset = 'Idle') {
+  return finiteSequence.replace('input start: Bool;', 'input start, stop: Bool;')
+    .replace("phase' = case phase", `phase' = if ${guard} then ${reset} else case phase`);
+}
+
+function edgeTriggeredSequence() {
+  return externallyCancelledSequence().replace('input start, stop: Bool;', `input start, stop: Bool;
+    state start_held: Bool = false;
+    let start_pressed = start |> recover(false);
+    let start_edge = start_pressed && !start_held;
+    start_held' = start_pressed;`)
+    .replace('Idle => if (start |> recover(false))', 'Idle => if start_edge');
+}
+
+test('finite timed sequences expose all stages while repeating cycles stay cycles', async () => {
+  const finite = finiteSequence;
+  const patterns = (await compileSource(finite, { filename: 'finite.ghost.md' })).manifest.monitoring.patterns;
+  const sequence = [{ value: 1, configName: 'first_time' }, { value: 2, configName: 'second_time' }, { value: 3, configName: 'rest_time' }];
+  assert.deepEqual(patterns.map(pattern => pattern.sequence), [sequence, sequence]);
+  assert.equal(patterns[0].cycle, undefined);
+
+  const repeating = finite.replace('Rest => if age >= rest then Idle', 'Rest => if age >= rest then First');
+  const repeatingPatterns = (await compileSource(repeating, { filename: 'repeating.ghost.md' })).manifest.monitoring.patterns;
+  assert.equal(repeatingPatterns[0].sequence, undefined);
+  assert.equal(repeatingPatterns[0].cycle, undefined);
+});
+
+test('external cancellation to the waiting boundary preserves finite sequence metadata and execution bytes', async () => {
+  const compiled = await compileSource(externallyCancelledSequence(), { filename: 'cancelled-finite.ghost.md' });
+  assert.equal(digest(compiled.bytes), 'aca7fd957e636b3d280a759b3def62d91c3723db1cc9b02d2c7e32c039d60c9e');
+  const sequence = [{ value: 1, configName: 'first_time' }, { value: 2, configName: 'second_time' }, { value: 3, configName: 'rest_time' }];
+  assert.deepEqual(compiled.manifest.monitoring.patterns.map(pattern => pattern.sequence), [sequence, sequence]);
+  assert.ok(compiled.manifest.monitoring.patterns.every(pattern => pattern.kind === 'configured-timed-output' && !pattern.cycle));
+});
+
+test('immutable external Bool aliases and pure Bool composition retain a finite plan', async () => {
+  const guards = [
+    'external_stop', '!(!external_stop)', 'external_stop || external_stop',
+    'external_stop && true', 'external_stop == true', 'external_stop != false',
+    'if external_stop then true else false', 'raw_stop |> recover(false)',
+  ];
+  for (const guard of guards) {
+    const source = externallyCancelledSequence(guard).replace('input start, stop: Bool;',
+      'input start, stop: Bool; let raw_stop = stop; let external_stop = raw_stop |> recover(false);');
+    const patterns = (await compileSource(source, { filename: 'external-alias.ghost.md' })).manifest.monitoring.patterns;
+    assert.equal(patterns.length, 2, guard);
+    assert.ok(patterns.every(pattern => pattern.sequence.length === 3 && !pattern.cycle), guard);
+  }
+});
+
+test('a three-state finite sequence and positive Duration output gates retain the same contract', async () => {
+  const source = externallyCancelledSequence().replace('Idle | First | Second | Rest', 'Idle | First | Second')
+    .replace('Second => if age >= second then Rest else Second; Rest => if age >= rest then Idle else Rest;',
+      'Second => if age >= second then Idle else Second;')
+    .replace("valve_a <- phase' == First;", "valve_a <- (first > 0ms) && (phase' == First);");
+  const patterns = (await compileSource(source, { filename: 'finite-three-state.ghost.md' })).manifest.monitoring.patterns;
+  assert.deepEqual(patterns.map(pattern => pattern.sequence), Array(2).fill([
+    { value: 1, configName: 'first_time' }, { value: 2, configName: 'second_time' },
+  ]));
+});
+
+test('state, time, settings and unproven cancellation paths never acquire guarded finite metadata', async () => {
+  const guards = [
+    ['true', ''],
+    ['age >= 1s', ''],
+    ['internal_stop', 'state internal_stop: Bool = false;'],
+    ['hidden_stop', 'let hidden_stop = phase == First;'],
+    ['(stop |> recover(false)) || hidden_stop', 'let hidden_stop = age >= 1s;'],
+    ['stop |> recover(internal_stop)', 'state internal_stop: Bool = false;'],
+    ['setting_stop |> recover(false)', 'config setting_stop: Bool = false { access = operator; }'],
+    ['threshold_stop', 'let threshold_stop = age >= (first_time |> recover(0ms));'],
+  ];
+  for (const [guard, declaration] of guards) {
+    const source = externallyCancelledSequence(guard).replace('input start, stop: Bool;', `input start, stop: Bool; ${declaration}`);
+    const compiled = await compileSource(source, { filename: 'unsupported-cancel.ghost.md' });
+    assert.deepEqual(compiled.manifest.monitoring?.patterns ?? [], [], guard);
+  }
+  for (const source of [
+    externallyCancelledSequence('(stop |> recover(false))', 'First'),
+    externallyCancelledSequence('(stop |> recover(false))', 'Rest'),
+    externallyCancelledSequence().replace('Rest => if age >= rest then Idle', 'Rest => if age >= rest then First'),
+    externallyCancelledSequence().replace('Rest => if age >= rest then Idle', 'Rest => if (start |> recover(false)) then Idle'),
+  ]) {
+    assert.deepEqual((await compileSource(source, { filename: 'unproven-boundary.ghost.md' })).manifest.monitoring?.patterns ?? [], []);
+  }
+});
+
+test('edge-triggered waiting stays a finite boundary and Duration settings remain live references', async () => {
+  const source = edgeTriggeredSequence();
+  for (const candidate of [source, source.replace('first_time: Duration = 10s', 'first_time: Duration = 15s')]) {
+    const compiled = await compileSource(candidate, { filename: 'finite-edge.ghost.md' });
+    assert.ok(compiled.manifest.monitoring.patterns.every(pattern => !pattern.cycle && pattern.sequence.length === 3));
+    assert.deepEqual(compiled.manifest.monitoring.patterns[0].sequence.map(stage => stage.configName), ['first_time', 'second_time', 'rest_time']);
+  }
+});
+
+test('local weekday admits a three-zone button start only on known weekdays', async () => {
+  const source = edgeTriggeredSequence()
+    .replace('let start_edge = start_pressed && !start_held;', [
+      'let weekday = local_day_is(day\x60mon..fri\x60, timezone: "Asia/Seoul");',
+      'let allowed = case weekday { ok(value) => value; fault(_) => false; };',
+      'let start_edge = start_pressed && !start_held;',
+    ].join('\n'))
+    .replace('Idle => if start_edge then First', 'Idle => if start_edge && allowed then First')
+    .replace('output valve_a, valve_b: Bool;', 'output valve_a, valve_b, valve_c, pump: Bool;')
+    .replace("valve_b <- phase' == Second;", "valve_b <- phase' == Second; valve_c <- phase' == Rest; pump <- phase' != Idle;");
+  const artifact = await compileSource(source, { filename: 'weekday-three-zone.ghost.md' });
+  assert.equal(artifact.manifest.format, 'GhostFlow/control-v26');
+  const wasm = readFileSync(new URL('../target/wasm32-unknown-unknown/release/ghostflow_wasm.wasm', import.meta.url));
+  const activation = { bootEpoch: 1, terminalCapacity: 8, bindings: [] };
+  const key = await crypto.subtle.generateKey('Ed25519', true, ['sign', 'verify']);
+  const identity = {
+    compilerRevision: 'weekday-test', runtimeSemantics: 'GhostFlow/runtime-semantics-v1',
+    runtimeAbi: 'GhostFlow/context-scan-abi-v5', bindingRevision: 'weekday-binding',
+    requiredCapabilities: [
+      ...artifact.manifest.inputs.map(({ name }) => ({ kind: 'input', name, type: 'bool' })),
+      ...artifact.manifest.sensors.map(({ name }) => ({ kind: 'sensor', name, type: 'bool' })),
+      ...['valve_a', 'valve_b', 'valve_c', 'pump'].map(name => ({ kind: 'actuator', name, type: 'bool' })),
+    ],
+  };
+  const packageValue = await buildPortablePackage(artifact, identity, {
+    signers: [{ keyId: 'weekday-test', privateKey: key.privateKey }],
+    verifyCompilation: (document, { filename }) => compileSource(document, { filename }),
+    onDiagnostic: () => {},
+  });
+  await verifyPortablePackage(packageValue, {
+    trustedKeys: [{ keyId: 'weekday-test', publicKey: key.publicKey }], revokedKeyIds: [],
+    expectedCompilerRevision: identity.compilerRevision,
+    supportedRuntimeSemantics: [identity.runtimeSemantics], supportedRuntimeAbis: [identity.runtimeAbi],
+    supportedManifestFormats: ['GhostFlow/control-v26'],
+    availableCapabilities: identity.requiredCapabilities, expectedBindingRevision: identity.bindingRevision,
+    async verifyBytecode(bytes, context) {
+      const runtime = await ControlRuntime.instantiateFramed(wasm, { bytes, manifest: context.manifest }, { context: activation });
+      runtime.dispose();
+      return true;
+    },
+  });
+  const replay = async (localTime, trusted = true, uncertaintyMs = 0) => {
+    const runtime = await ControlRuntime.instantiateFramed(wasm, artifact, { context: activation });
+    try {
+      return [0, 1, 10001, 30001, 35001].map((nowMs, i) => {
+        const value = i === 1;
+        const { vm } = runtime.step({ nowMs, samples: {
+          start: { epoch: 1, id: i + 1, timestampMs: nowMs, quality: 'Good', value },
+          stop: { epoch: 1, id: i + 1, timestampMs: nowMs, quality: 'Good', value: false },
+        }, contextFacts: { clock: { monotonicMs: nowMs, bootEpoch: 1,
+          wallMs: trusted ? Date.parse(localTime) + nowMs : null, uncertaintyMs,
+          trusted, unknownReason: trusted ? null : 'ClockUnknown', sourceRevision: 'weekday-test' },
+          natural: [], schedules: [], settings: null } });
+        return ['valve_a', 'valve_b', 'valve_c', 'pump'].map(name => vm.safe[name]);
+      });
+    } finally { runtime.dispose(); }
+  };
+  const off = [false, false, false, false];
+  const inactive = Array(5).fill(off);
+  const active = [off, [true, false, false, true], [false, true, false, true], [false, false, true, true], off];
+  assert.deepEqual(await replay('2026-11-09T00:00:00+09:00'), active);
+  assert.deepEqual(await replay('2026-11-13T08:00:00+09:00'), active);
+  assert.deepEqual(await replay('2026-11-14T00:00:00+09:00'), inactive);
+  assert.deepEqual(await replay('2026-11-15T08:00:00+09:00'), inactive);
+  assert.deepEqual(await replay('2026-11-09T08:00:00+09:00', false), inactive);
+  assert.deepEqual(await replay('2026-11-09T00:00:00+09:00', true, 10), inactive);
+});
+
+test('external stop, held stop, new start and live Duration retain their runtime behavior', async () => {
+  const artifact = await compileSource(edgeTriggeredSequence(), { filename: 'finite-runtime.ghost.md' });
+  const wasm = readFileSync(new URL('../target/wasm32-unknown-unknown/release/ghostflow_wasm.wasm', import.meta.url));
+  const runtime = await ControlRuntime.instantiate(wasm, artifact, { context: { bootEpoch: 1, terminalCapacity: 8, bindings: [] } });
+  let sampleId = 0;
+  const step = (nowMs, start, stop, settings = null) => {
+    sampleId++;
+    const result = runtime.step({ nowMs,
+      samples: Object.fromEntries(Object.entries({ start, stop }).map(([name, value]) => [name,
+        { epoch: 1, id: sampleId, timestampMs: nowMs, quality: 'Good', value }])),
+      contextFacts: { clock: { monotonicMs: nowMs, bootEpoch: 1, wallMs: nowMs, uncertaintyMs: 0,
+        trusted: true, unknownReason: null, sourceRevision: 'finite-test' }, natural: [], schedules: [], settings },
+    });
+    return [result.vm.safe.valve_a, result.vm.safe.valve_b];
+  };
+  try {
+    assert.deepEqual(step(0, false, false), [false, false]);
+    assert.deepEqual(step(1, true, false), [true, false]);
+    assert.deepEqual(step(1001, true, true), [false, false]);
+    assert.deepEqual(step(2001, true, true), [false, false]);
+    assert.deepEqual(step(3001, true, false), [false, false]);
+    assert.deepEqual(step(4001, false, false), [false, false]);
+    assert.deepEqual(step(5001, true, false), [true, false]);
+    const initial = runtime.contextSnapshot().state;
+    assert.deepEqual(step(6001, true, false, {
+      programFingerprint: initial.programFingerprint, eventId: 'shorten-first', baseRevision: 0,
+      position: sampleId + 1, origin: 'operatorEdit', changes: [{ configId: artifact.manifest.configs[0].id,
+        result: { ok: true, type: 'Duration', value: 2000 } }],
+    }), [true, false]);
+    assert.deepEqual(step(7001, true, false), [false, true]);
+    assert.deepEqual(step(27001, true, false), [false, false]);
+    assert.deepEqual(step(32001, true, false), [false, false]);
+    assert.deepEqual(step(33001, true, false), [false, false]);
+    assert.equal(runtime.contextSnapshot().state.settingsRevision, 1);
+  } finally { runtime.dispose(); }
+});
+
+test('portable replay verifies a guarded finite sequence and rejects a resigned stage substitution', async () => {
+  const compiled = await compileSource(externallyCancelledSequence(), { filename: 'portable-finite.ghost.md' });
+  const key = await crypto.subtle.generateKey('Ed25519', true, ['sign', 'verify']);
+  const identity = {
+    compilerRevision: 'guarded-finite-test', runtimeSemantics: 'GhostFlow/runtime-semantics-v1',
+    runtimeAbi: 'GhostFlow/context-scan-abi-v5', bindingRevision: 'finite-binding',
+    requiredCapabilities: [
+      ...['valve_a', 'valve_b'].map(name => ({ kind: 'actuator', name, type: 'bool' })),
+      ...['start', 'stop'].map(name => ({ kind: 'sensor', name, type: 'bool' })),
+    ],
+  };
+  const artifact = await buildPortablePackage(compiled, identity, {
+    signers: [{ keyId: 'finite-test', privateKey: key.privateKey }],
+    verifyCompilation: (source, { filename }) => compileSource(source, { filename }), onDiagnostic: () => {},
+  });
+  const options = {
+    trustedKeys: [{ keyId: 'finite-test', publicKey: key.publicKey }], revokedKeyIds: [],
+    expectedCompilerRevision: identity.compilerRevision,
+    supportedRuntimeSemantics: [identity.runtimeSemantics], supportedRuntimeAbis: [identity.runtimeAbi],
+    supportedManifestFormats: [compiled.manifest.format],
+    availableCapabilities: identity.requiredCapabilities, expectedBindingRevision: identity.bindingRevision,
+    verifyBytecode: () => true,
+  };
+  assert.deepEqual((await verifyPortablePackage(artifact, options)).manifest.monitoring, compiled.manifest.monitoring);
+  const changed = structuredClone(artifact);
+  const manifest = JSON.parse(Buffer.from(changed.payload.manifest.contentBase64, 'base64').toString('utf8'));
+  manifest.monitoring.patterns[0].sequence.reverse();
+  const bytes = Buffer.from(canonicalJson(manifest));
+  changed.payload.manifest.contentBase64 = bytes.toString('base64');
+  changed.payload.manifest.sha256 = digest(bytes);
+  const payload = Buffer.from(canonicalJson(changed.payload));
+  changed.payloadSha256 = digest(payload);
+  changed.signatures[0].signatureBase64 = Buffer.from(await crypto.subtle.sign('Ed25519', key.privateKey, payload)).toString('base64');
+  await assert.rejects(verifyPortablePackage(changed, options), error => {
+    assert.equal(error.code, 'source-map-mismatch');
+    assert.equal(error.cause?.message, 'monitoring plan does not match canonical source lowering');
+    return true;
+  });
 });

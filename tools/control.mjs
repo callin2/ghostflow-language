@@ -143,6 +143,29 @@ function numberAtom(value) {
   if (point >= digits.length) return `${sign}${digits}${'0'.repeat(point - digits.length)}`;
   return `${sign}${digits.slice(0, point)}.${digits.slice(point)}`;
 }
+function weekdayMaskLiteral(node, label = 'weekday') {
+  const raw = node?.kind === 'literal' ? node.raw : node?.kind === 'context-literal' ? node.value : null;
+  const match = raw && /^day`([^`]+)`$/.exec(raw);
+  if (!match) error(node?.loc, `${label} requires a weekday day literal`);
+  const names = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'];
+  let mask = 0;
+  for (const part of match[1].split(',')) {
+    const range = /^([a-z]{3})\.\.([a-z]{3})$/.exec(part);
+    if (range) {
+      const from = names.indexOf(range[1]), to = names.indexOf(range[2]);
+      if (from < 0 || to < from) error(node.loc, 'weekday range must ascend from sun through sat');
+      for (let day = from; day <= to; day++) mask |= 1 << day;
+    } else {
+      const index = names.indexOf(part);
+      if (index < 0) error(node.loc, `${label} supports weekday names only`);
+      const bit = 1 << index;
+      if (mask & bit) error(node.loc, 'duplicate weekday in day filter');
+      mask |= bit;
+    }
+  }
+  if (!mask) error(node.loc, `${label} must select at least one weekday`);
+  return mask;
+}
 function gfbDefault(type, value) { return type.kind === 'Bool' ? (value ? 'true' : 'false') : numberAtom(value); }
 function defaultLowered(type) {
   if (type.kind === 'Result') return {
@@ -1275,7 +1298,7 @@ class ControlParser {
       return this.node('list', token, { values });
     }
     if (token.kind === 'number' || token.kind === 'time-literal' || token.kind === 'context-literal' || token.kind === 'string') {
-      return this.node('literal', token, { raw: token.value });
+      return this.node('literal', token, { raw: token.value, ...(token.kind === 'string' ? { quoted: true } : {}) });
     }
     if (token.kind === 'identifier') {
       if (token.value === 'true' || token.value === 'false') return this.node('literal', token, { raw: token.value });
@@ -1734,7 +1757,25 @@ class Lowerer {
       }
       this.manifest.format = 'GhostFlow/control-v21';
     }
-    if (this.manifest.schedules.some(schedule => schedule.day?.kind === 'weekday')) {
+    if (this.manifest.weekdayConditions?.length) {
+      const allowed = new Set(['config-stream', 'weekday-result', 'window', 'true-for']);
+      if (solarForms.length || contextForms.some(form => !allowed.has(form[0]))
+        || this.manifest.schedules.length || this.manifest.calendars?.length || this.manifest.providers?.length
+        || this.manifest.naturalConditions?.length || this.manifest.calendarConditions?.length || this.accountingExecution) {
+        error(this.ast.loc, 'local_day_is profile only supports weekday conditions with config streams and temporal state');
+      }
+      this.manifest.format = 'GhostFlow/control-v26';
+    }
+    if (this.manifest.schedules.some(schedule => schedule.kind === 'daily' && schedule.day?.kind === 'weekday')) {
+      if (contextForms.length
+        || this.manifest.schedules.some(schedule => schedule.kind !== 'daily' || schedule.policy.basis !== 'pulse')
+        || ['configs','providers','calendars','naturalConditions','calendarConditions','objectives','resources','adaptSettings','signals']
+          .some(key => this.manifest[key]?.length) || this.manifest.accounting) {
+        error(this.ast.loc, 'weekday Daily profile requires Daily pulse schedules only');
+      }
+      this.manifest.format = 'GhostFlow/control-v27';
+    }
+    if (this.manifest.schedules.some(schedule => schedule.kind !== 'daily' && schedule.day?.kind === 'weekday')) {
       if (solarForms.length || contextForms.some(form => !['solar-weekday-pulse', 'tide-weekday-run'].includes(form[0]))
         || this.manifest.schedules.some(schedule => !['solar', 'tide'].includes(schedule.kind) || schedule.day?.kind !== 'weekday')
         || ['configs', 'calendars', 'naturalConditions', 'calendarConditions', 'objectives', 'resources', 'adaptSettings', 'signals']
@@ -1759,7 +1800,7 @@ class Lowerer {
     ] : [];
     const strategyForms = this.adaptStrategies.length
       ? this.adaptStrategies.map(strategy => [
-        'strategy', strategy.name, String(strategy.priority), ['device', ['all', ...[
+        'strategy', strategy.name, String(strategy.priority), ['device', strategy.where === false ? 'false' : ['all', ...[
           ...this.manifest.outputs.map(output => ['has', 'actuator', output.name, gfbType(semanticType(output.type))]),
           ...strategy.match.capabilities.map(capability => ['has', capability.kind, capability.role, gfbType(capability.resolvedType)]),
         ]]], ...transitions, ...this.windowForms(), ...this.trueForForms(),
@@ -2285,6 +2326,72 @@ class Lowerer {
       }
       return current === first && stages.length === edges.size ? { timerId, stages } : null;
     };
+    // A finite sequence has one non-timed waiting state which enters a
+    // bounded linear chain of timed states.  Unlike a cycle, the last timed
+    // state returns to that waiting state and never wraps to the first stage.
+    const timedSequence = (next, state, enumValues) => {
+      const expression = next.value;
+      if (!enumValues || enumValues.size < 3 || enumValues.size > 8 || expression.kind !== 'case'
+        || !referenceIs(expression.value, next.name)) return null;
+      const timed = new Map(), waits = [];
+      for (const name of enumValues.keys()) {
+        const branch = expression.branches.find(entry => entry.name === name)?.body;
+        if (branch?.kind !== 'if' || !referenceIs(branch.no, name)
+          || branch.yes?.kind !== 'reference' || !enumValues.has(branch.yes.name)) return null;
+        const time = timedGuard(branch.test, '>=');
+        if (time) timed.set(name, { ...time, next: branch.yes.name });
+        else waits.push({ name, next: branch.yes.name });
+      }
+      if (waits.length !== 1 || timed.size < 2) return null;
+      const wait = waits[0];
+      const first = wait.next;
+      const timerId = timed.get(first)?.timerId;
+      if (!timerId) return null;
+      const stages = [], seen = new Set();
+      let current = first;
+      while (current !== wait.name && !seen.has(current)) {
+        const edge = timed.get(current);
+        if (!edge || edge.timerId !== timerId) return null;
+        seen.add(current);
+        stages.push({ value: this.enumMembers.get(current).value, configName: edge.configName });
+        current = edge.next;
+      }
+      return current === wait.name && seen.size === timed.size && stages.length >= 2 && stages.length <= 8
+        ? { timerId, stages, waitingMember: wait.name } : null;
+    };
+    // Only external Bool cancellation can be ignored by a conditional forecast.
+    // In particular, a timer/state/config guard may become true before its end.
+    // null = unsupported dependency, false = constant Bool, true = input-derived.
+    const externalBoolean = (node, seen = new Set()) => {
+      if (node?.kind === 'literal' && ['true', 'false'].includes(node.raw)) return false;
+      if (node?.kind === 'reference') {
+        const symbol = this.symbols.get(node.name);
+        if (symbol?.category === 'input' && symbol.type.kind === 'Bool'
+          || this.sensors.get(node.name)?.type.kind === 'Bool') return true;
+        if (symbol?.category === 'let' && !seen.has(node.name)) {
+          return externalBoolean(this.lets.get(node.name)?.value, new Set([...seen, node.name]));
+        }
+        return null;
+      }
+      if (node?.kind === 'unary' && node.op === '!') return externalBoolean(node.value, seen);
+      let terms;
+      if (node?.kind === 'binary' && ['&&', '||', '==', '!='].includes(node.op)) terms = [node.left, node.right];
+      else if (node?.kind === 'binary' && node.op === '|>' && node.right?.kind === 'call'
+        && node.right.name === 'recover' && node.right.args.length === 1 && node.right.named.length === 0) {
+        terms = [node.left, node.right.args[0]];
+      } else if (node?.kind === 'if') terms = [node.test, node.yes, node.no];
+      else return null;
+      const dependencies = terms.map(term => externalBoolean(term, seen));
+      return dependencies.includes(null) ? null : dependencies.some(Boolean);
+    };
+    const externallyCancelledSequence = (next, state, enumValues) => {
+      const expression = next.value;
+      if (expression.kind !== 'if' || expression.yes.kind !== 'reference'
+        || externalBoolean(expression.test) !== true) return null;
+      const inner = { ...next, value: expression.no };
+      const sequence = timedSequence(inner, state, enumValues);
+      return sequence?.waitingMember === expression.yes.name ? { inner, sequence } : null;
+    };
     const cycleGateIsStable = node => node.kind === 'binary' && node.op === '&&'
       ? cycleGateIsStable(node.left) && cycleGateIsStable(node.right)
       : node.kind !== 'binary' || node.op !== '>' || positiveConfigGate(node);
@@ -2343,9 +2450,11 @@ class Lowerer {
       if (!state) continue;
       const enumValues = this.types.get(state.type.kind);
       const cycle = timedCycle(nextNode, state, enumValues);
+      const cancelledSequence = externallyCancelledSequence(nextNode, state, enumValues);
+      const sequence = cancelledSequence?.sequence ?? timedSequence(nextNode, state, enumValues);
       const targets = state.type.kind === 'Bool' ? [null] : [...(enumValues?.keys() ?? [])];
       for (const memberName of targets) {
-        const comparison = transitionForTarget(nextNode, memberName, enumValues);
+        const comparison = transitionForTarget(cancelledSequence?.inner ?? nextNode, memberName, enumValues);
         if (!comparison) continue;
         const activeValue = memberName === null ? true : this.enumMembers.get(memberName)?.value;
         if (activeValue === undefined) continue;
@@ -2356,7 +2465,8 @@ class Lowerer {
           if (timer.state !== nextNode.name || patterns.some(item => item.outputName === connection.name)) continue;
           patterns.push({ kind: 'configured-timed-output', outputName: connection.name, stateName: nextNode.name,
             timerId: comparison.timerId, configName: comparison.configName, activeValue,
-            ...(cycle?.timerId === comparison.timerId && cycleGateIsStable(connection.value) ? { cycle: cycle.stages } : {}) });
+            ...(cycle?.timerId === comparison.timerId && cycleGateIsStable(connection.value) ? { cycle: cycle.stages } : {}),
+            ...(sequence?.timerId === comparison.timerId && cycleGateIsStable(connection.value) ? { sequence: sequence.stages } : {}) });
         }
       }
     }
@@ -2403,6 +2513,48 @@ class Lowerer {
     this.manifest.continuousResourcePolicies = this.continuousPolicies.map(({ requests, ceilings, ...policy }) => ({ ...policy,
       requests: requests.map(({ rails, ...entry }) => entry), ceilings: ceilings.map(({ rails, ...entry }) => entry) }));
   }
+  strategyMetadataPredicate(node, capabilities) {
+    const invalid = value => error(value.loc, 'strategy where accepts only matched capability kind, name and type with constant Bool comparisons');
+    const metadata = value => {
+      if (value.kind !== 'member') return null;
+      const matched = capabilities.get(value.base);
+      if (!matched) error(value.loc, `strategy where references unmatched capability ${value.base}`);
+      if (value.member === 'kind') return { field: 'kind', value: matched.kind };
+      if (value.member === 'name') return { field: 'name', value: matched.role };
+      if (value.member === 'type') return { field: 'type', value: typeNameOf(matched.resolvedType) };
+      return invalid(value);
+    };
+    const constant = (value, field) => {
+      if (field === 'type' && value.kind === 'reference') return typeNameOf(this.resolveType({ name: value.name, loc: value.loc }));
+      if (field === 'kind') {
+        const name = value.kind === 'reference' ? value.name : value.kind === 'literal' ? value.raw : null;
+        if (name === 'sensor' || name === 'actuator') return name;
+      }
+      if (field === 'name' && value.quoted) return value.raw;
+      return invalid(value);
+    };
+    const evaluate = value => {
+      if (value.kind === 'literal' && !value.quoted && ['true', 'false'].includes(value.raw)) return value.raw === 'true';
+      if (value.kind === 'unary' && value.op === '!') return !evaluate(value.value);
+      if (value.kind === 'binary' && ['&&', '||'].includes(value.op)) {
+        const left = evaluate(value.left), right = evaluate(value.right);
+        return value.op === '&&' ? left && right : left || right;
+      }
+      if (value.kind === 'binary' && ['==', '!='].includes(value.op)) {
+        const left = metadata(value.left), right = metadata(value.right);
+        if (left && right && left.field !== right.field) return invalid(value);
+        const field = left?.field ?? right?.field;
+        const a = left?.value ?? (field ? constant(value.left, field) : evaluate(value.left));
+        const b = right?.value ?? (field ? constant(value.right, field) : evaluate(value.right));
+        return value.op === '==' ? a === b : a !== b;
+      }
+      return invalid(value);
+    };
+    // The typed HAS query already fixes all three supported fields. Folding
+    // the predicate keeps activation on the existing native/WASM query ABI.
+    return evaluate(node);
+  }
+
   addAdapt(item) {
     const strategyNames = new Set();
     if (!this.outputs.size) error(item.loc, 'adapt policy requires at least one output');
@@ -2410,13 +2562,11 @@ class Lowerer {
       rejectName(strategy.name, strategy.loc, 'strategy');
       if (strategyNames.has(strategy.name)) error(strategy.loc, `duplicate strategy ${strategy.name}`);
       strategyNames.add(strategy.name);
-      if (strategy.where) error(strategy.where.loc, 'strategy where metadata predicates are not yet supported');
       const seenCapabilities = new Set(), matchedSensors = new Set();
       for (const capability of strategy.match.capabilities) {
         const key = `${capability.kind}:${capability.role}`;
         if (seenCapabilities.has(key)) error(capability.loc, `duplicate strategy capability ${key}`);
         seenCapabilities.add(key);
-        if (!capability.type) error(capability.loc, 'presence-only strategy match requires host capability selection and is not yet supported');
         let declared;
         if (capability.kind === 'sensor') {
           declared = this.sensors.get(capability.role);
@@ -2437,6 +2587,9 @@ class Lowerer {
           } else capability.resolvedType = declared.type;
         } else error(capability.loc, `unsupported strategy capability kind ${capability.kind}`);
       }
+      const where = strategy.where
+        ? this.strategyMetadataPredicate(strategy.where, new Map(strategy.match.capabilities.map(item => [item.role, item])))
+        : undefined;
       const localValues = new Map(), intents = new Map();
       this.currentStrategy = { name: strategy.name, matchedSensors, localValues };
       for (const statement of strategy.body) {
@@ -2461,7 +2614,7 @@ class Lowerer {
         error(strategy.loc, `strategy ${strategy.name} must connect output ${output.name}`);
       }
       this.adaptStrategies.push({
-        name: strategy.name, priority: strategy.priority, match: strategy.match,
+        name: strategy.name, priority: strategy.priority, match: strategy.match, where,
         intents: [...intents.entries()],
       });
       this.manifest.strategies ??= [];
@@ -2470,6 +2623,7 @@ class Lowerer {
         match: strategy.match.always ? 'always' : strategy.match.capabilities.map(capability => ({
           role: capability.role, kind: capability.kind, type: capability.resolvedType.kind,
         })),
+        ...(where === undefined ? {} : { where }),
         outputNames: [...intents.keys()],
       });
       this.currentStrategy = null;
@@ -2750,7 +2904,11 @@ class Lowerer {
     const match = /^day`([^`]+)`$/.exec(item.on.value);
     if (!match) error(item.on, 'Daily on requires a day tagged literal');
     const kind = match[1];
-    if (!['holiday', 'workday', 'offday'].includes(kind)) error(item.on, 'Daily day rule currently requires holiday, workday or offday');
+    if (['sun','mon','tue','wed','thu','fri','sat'].includes(kind) || kind.includes('..') || kind.includes(',')) {
+      if (item.calendar) error(item.calendar, 'Daily weekday selector does not use a calendar');
+      return this.resolveNaturalWeekday(item);
+    }
+    if (!['holiday', 'workday', 'offday'].includes(kind)) error(item.on, 'Daily day rule requires a weekday, holiday, workday or offday');
     if (!item.calendar) error(item.on, `Daily ${kind} rule requires calendar`);
     const calendar = this.calendars.get(item.calendar.value);
     if (!calendar) error(item.calendar, `unknown calendar ${item.calendar.value}`);
@@ -4106,8 +4264,38 @@ class Lowerer {
       error(node.loc, 'removed alias ifthenelse; use if condition then value else value');
     }
     if (node.name === 'elapsed' || node.name === 'hysteresis' || node.name === 'median') error(node.loc, `${node.name} is only valid in its declaration`);
+    if (node.name === 'local_day_is') {
+      if (node.args.length !== 1 || node.named.length !== 1 || node.named[0].name !== 'timezone') {
+        error(node.loc, 'local_day_is expects a weekday and timezone: "Area/City"');
+      }
+      const mask = weekdayMaskLiteral(node.args[0], 'local_day_is');
+      const timezoneNode = node.named[0].value;
+      if (timezoneNode.kind !== 'literal' || !timezoneNode.quoted) error(timezoneNode.loc, 'local_day_is timezone must be a string');
+      const timezone = timezoneNode.raw;
+      if (!timezone.trim()) error(timezoneNode.loc, 'local_day_is timezone must be non-empty');
+      try { new Intl.DateTimeFormat('en-US', { timeZone: timezone }); }
+      catch { error(timezoneNode.loc, 'local_day_is timezone must be a supported IANA timezone'); }
+      const projectionInputs = Object.fromEntries(['ok', 'value', 'fault'].map(role => [role, this.generatedName(`weekday_${node.id}`, role)]));
+      for (const role of ['ok', 'value', 'fault']) this.addInput(projectionInputs[role], role === 'fault' ? NUMBER : BOOL, node.loc);
+      if (!this.hasClock) { this.addInput(`${RESERVED_PREFIX}now_ms`, NUMBER, node.loc); this.hasClock = true; }
+      if (!this.gfbInputs.some(input => input[1] === `${RESERVED_PREFIX}time_epoch`)) this.addInput(`${RESERVED_PREFIX}time_epoch`, NUMBER, node.loc);
+      (this.manifest.weekdayConditions ??= []).push({ site: node.id, timezone, mask,
+        result: { value: 'Bool', error: 'ClockFault' }, projectionInputs });
+      return { type: resultType(BOOL, semanticType('ClockFault')), ok: `input.${projectionInputs.ok}`, value: `input.${projectionInputs.value}`,
+        faultCode: `input.${projectionInputs.fault}`, originTag: numberAtom(node.id),
+        origins: [{ tag: node.id, nodeId: node.id, kind: 'weekday-condition', name: 'local_day_is' }], sample: scanSample() };
+    }
     if (node.name === 'calendar_is') {
-      if (node.args.length !== 2 || node.named.length) error(node.loc, 'calendar_is expects a calendar and one day classification');
+      if (node.args.length !== 2 || node.named.length > 1 || node.named.some(arg => arg.name !== 'timezone')) {
+        error(node.loc, 'calendar_is expects a calendar, day classification and optional timezone');
+      }
+      const timezoneNode = node.named[0]?.value;
+      const timezone = timezoneNode?.raw ?? 'UTC';
+      if (timezoneNode) {
+        if (timezoneNode.kind !== 'literal' || !timezoneNode.quoted || !timezone.trim()) error(timezoneNode.loc, 'calendar_is timezone must be an IANA timezone string');
+        try { new Intl.DateTimeFormat('en-US', { timeZone: timezone }); }
+        catch { error(timezoneNode.loc, 'calendar_is timezone must be an IANA timezone string'); }
+      }
       const calendarRef = node.args[0];
       const calendar = calendarRef.kind === 'reference' ? this.calendars.get(calendarRef.name) : null;
       if (!calendar) error(calendarRef.loc, 'calendar_is first argument must name a typed calendar');
@@ -4120,7 +4308,7 @@ class Lowerer {
       for (const role of ['ok', 'value', 'fault']) this.addInput(projectionInputs[role], role === 'fault' ? NUMBER : BOOL, node.loc);
       if (!this.hasClock) { this.addInput(`${RESERVED_PREFIX}now_ms`, NUMBER, node.loc); this.hasClock = true; }
       if (!this.gfbInputs.some(input => input[1] === `${RESERVED_PREFIX}time_epoch`)) this.addInput(`${RESERVED_PREFIX}time_epoch`, NUMBER, node.loc);
-      (this.manifest.calendarConditions ??= []).push({ site: node.id, calendar: calendar.name, classification: match[1], timezone: 'UTC',
+      (this.manifest.calendarConditions ??= []).push({ site: node.id, calendar: calendar.name, classification: match[1], timezone,
         result: { value: 'Bool', error: 'CalendarFault' }, projectionInputs });
       return { type: resultType(BOOL, semanticType('CalendarFault')), ok: `input.${projectionInputs.ok}`, value: `input.${projectionInputs.value}`,
         faultCode: `input.${projectionInputs.fault}`, originTag: numberAtom(node.id),
@@ -4307,10 +4495,11 @@ class Lowerer {
   solarForms() {
     return this.manifest.schedules.filter(schedule => schedule.kind === 'solar' && !this.configStreams.length && !schedule.day
       || ['daily', 'daily-slots'].includes(schedule.kind) && schedule.policy.basis === 'pulse'
-        && schedule.policy.clock === 'trusted_only' && !schedule.day && !schedule.selectedConfig).map(schedule => schedule.kind === 'daily' ? [
+        && schedule.policy.clock === 'trusted_only' && (!schedule.day || schedule.day.kind === 'weekday') && !schedule.selectedConfig).map(schedule => schedule.kind === 'daily' ? [
       'daily-pulse', String(schedule.site), schedule.name, schedule.timezone, String(schedule.atMs),
       schedule.dstMissing, schedule.dstRepeated, schedule.policy.basis, schedule.policy.clock,
-      String(schedule.policy.gapMs), schedule.policy.recovery, schedule.policy.fallback, schedule.policy.when,
+      String(schedule.policy.gapMs), schedule.policy.recovery, schedule.policy.fallback,
+      ...(schedule.day?.kind === 'weekday' ? [String(schedule.day.mask)] : []), schedule.policy.when,
     ] : schedule.kind === 'daily-slots' ? [
       'daily-slots-pulse', String(schedule.site), schedule.name, schedule.timezone, String(schedule.gridMs),
       schedule.dstMissing, schedule.dstRepeated, schedule.policy.basis, schedule.policy.clock,
@@ -4430,7 +4619,9 @@ class Lowerer {
     const calendarForms = (this.manifest.calendarConditions ?? []).map(condition => ['calendar-result', String(condition.site), `calendar_${condition.site}`,
       condition.calendar, condition.classification, condition.timezone,
       ...['ok','value','fault'].map(role => condition.projectionInputs[role])]);
-    return [...configForms, ...scheduleForms, ...naturalForms, ...accountingForms, ...calendarForms];
+    const weekdayForms = (this.manifest.weekdayConditions ?? []).map(condition => ['weekday-result', String(condition.site), `weekday_${condition.site}`,
+      condition.timezone, String(condition.mask), ...['ok','value','fault'].map(role => condition.projectionInputs[role])]);
+    return [...configForms, ...scheduleForms, ...naturalForms, ...accountingForms, ...calendarForms, ...weekdayForms];
   }
   windowForms() {
     return this.windows.map(({ descriptor, source, sample, outputType }) => [
@@ -4754,7 +4945,7 @@ export function compileAccountingControl(source, { filename = '<control>' } = {}
 /** Only this bounded civil pulse slice has a VM/provider transport. */
 export function isExecutablePulseSchedule(item) {
   return item.scheduleType === 'Solar' || item.scheduleType === 'At' || (item.scheduleType === 'Daily'
-    && (!item.on && !item.calendar || item.on && item.calendar && ['day`workday`', 'day`offday`', 'day`holiday`'].includes(item.on.value))
+    && (!item.calendar || item.on && ['day`workday`', 'day`offday`', 'day`holiday`'].includes(item.on.value))
     && item.at?.kind === 'literal' && item.at.raw.startsWith('time`')
     && item.policy?.basis?.name === 'pulse' && item.policy?.clock?.name === 'trusted_only')
     || (item.scheduleType === 'DailySlots' && item.selected

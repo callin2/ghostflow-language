@@ -10,6 +10,8 @@ import { equalBytes, isWellFormedUnicode, sha256Hex, utf8ByteLength } from './sh
 import { inspectLegacyAdmissionSource, validateLegacyAdmission } from './legacy-admission.mjs';
 
 export { emitInteractionSchema };
+export { inspectSourceChanges, sourceChangeInventory } from './source-changes.mjs';
+export { planSourceUpdate, verifySourceUpdate } from './update-request.mjs';
 export { previewLegacyScalarMigration, inspectLegacyAdmissionSource, assertLegacyAdmissionTarget, validateLegacyAdmission, preflightLegacyAdmission, LegacyAdmissionError } from './legacy-admission.mjs';
 export { prepareOutputExplanation, joinOutputExplanation, EXPLANATION_LIMITS } from './explanation.mjs';
 export { intentInterpretationDigest, intentConditionDigest, INTENT_EVIDENCE_LIMITS } from './intent-evidence.mjs';

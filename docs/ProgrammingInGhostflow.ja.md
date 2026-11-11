@@ -268,6 +268,8 @@ GhostFlowは、厳密な個数を符号付き32ビットの`Int`で表します�
 <a id="quantity-type-lookup"></a>
 ### 測定値に合う型を探す
 
+[温室の換気扇の例](#hot-greenhouse-fan)で30°Cを入力してみましょう。
+
 摂氏で測定する場合でも、型名は`Temperature`です。`Celsius`や`Fahrenheit`という名前の型を宣言しないでください。代わりに値に単位を付けます。`input air: Temperature;`と宣言し、しきい値は`30°C`と書きます。`30°C`、`86°F`、`303.15K`は同じ絶対温度を表します。単位の変換と温度制御については[第14章](#ch14)で続けて説明します。
 
 | 測定するもの | 宣言の型 | 値の例 | 入力の宣言 |
@@ -1771,6 +1773,7 @@ after_event は、`executable:false` の時間的ディスクリプタを生成�
 
 | Builtin | シグネチャと目的 | コンテキスト、境界、例 |
 |---|---|---|
+| `local_day_is` | ``local_day_is(day`mon..fri`, timezone: "Asia/Seoul") -> Result<Bool,ClockFault>`` | 信頼できる現在の現地日付の曜日を判定します。新たな開始を許可する条件に使う前に、クロックの障害を明示的に処理します。 [平日の3区画の例](../tests/monitoring-plan.test.mjs). |
 | `calendar_is` | ``calendar_is(calendar, day`workday` or day`offday` or day`holiday`) -> Result<Bool,CalendarFault>`` | GFB18 で明示的な UTC バインディングを持つ、型付きの WorkCalendar または HolidayCalendar。欠落、対象期間外、期限切れ、信頼できないクロックの事実は故障を保持する。成功した Bool を否定する前に、故障を明示的に扱うこと。[実行済みのカレンダー境界](../tests/reference-calendar-boundary.test.mjs)。 |
 | `tide_is` | ``tide_is(provider, tide`spring` or tide`neap`) -> Result<Bool,TemporalContextFault>`` | 宣言済みの TidePredictions プロバイダ。予測やクロックのコンテキストが欠落している、または古い場合は故障となる。[自然条件](../tests/natural-condition-contract.test.mjs)。 |
 | `moon_is` | ``moon_is(provider, moon`phase`) -> Result<Bool,TemporalContextFault>`` | LunarEphemeris プロバイダ。月相は new, waxing_crescent, first_quarter, waxing_gibbous, full, waning_gibbous, last_quarter, waning_crescent。[自然条件](../tests/natural-condition-contract.test.mjs)。 |
@@ -2003,6 +2006,28 @@ control KelvinHeater {
     on_below: 291.15K, off_above: 295.15K, initial: false);
   output heater: Bool;
   heater <- cold |> recover(false);
+}
+```
+
+<a id="hot-greenhouse-fan"></a>
+### E38 — 温室が暑くなったら換気扇を回す
+
+仮想温室の温度を `28°C → 30°C → 28°C → 26°C` に変えます。換気扇は `停止 → 運転 → 運転 → 停止` と変わります。`29°C` を超えると運転し、`27°C` を下回ると停止します。境界値では直前の状態を保ちます。
+
+`cool` は涼しい状態かどうかを記憶します。正常な観測値ではその反対を換気扇に送ります。この例では、新しい観測が3秒間届かず温度が古くなると換気扇を停止します。
+
+```ghost
+// E38
+control GreenhouseVentilation {
+  input air: Temperature {
+    sample = 1s;
+    valid = -40°C .. 50°C;
+    stale_after = 3s;
+  }
+  signal cool = hysteresis(air,
+    on_below: 27°C, off_above: 29°C, initial: true);
+  output fan: Bool;
+  fan <- case cool { ok(value) => !value; fault(_) => false; };
 }
 ```
 

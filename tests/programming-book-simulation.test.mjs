@@ -612,7 +612,9 @@ test('Programming inventory assigns every fence and numbered example to executab
   const naturalTests = fs.readFileSync(path.join(root, 'tests/programming-natural-examples.test.mjs'), 'utf8');
   const naturalRuntimeIds = [...naturalTests.matchAll(/test\('Programming (E\d+) /g)].map(match => match[1]);
   assert.ok(naturalRuntimeIds.length > 0, 'natural-time examples have runtime test registrations');
-  const runtimeIds = [...bookRuntimeIds, ...naturalRuntimeIds];
+  const climateTests = fs.readFileSync(path.join(root, 'tests/programming-climate.test.mjs'), 'utf8');
+  const climateRuntimeIds = [...climateTests.matchAll(/test\('PIG (E\d+) /g)].map(match => match[1]);
+  const runtimeIds = [...bookRuntimeIds, ...naturalRuntimeIds, ...climateRuntimeIds];
   assert.equal(new Set(runtimeIds).size, runtimeIds.length, 'runtime example registrations are unique');
   const numbered = [...book.matchAll(/^### (E\d+) —/gm)].map(match => match[1]).sort();
   assert.deepEqual(numbered, [...runtimeIds, ...compileOnlyExamples, ...errorExamples.map(([id]) => id), 'E11'].sort());

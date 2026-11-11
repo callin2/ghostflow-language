@@ -1034,8 +1034,8 @@ Un tipo de calendario incompatible o una vinculación ausente es un error de act
 
 - `holiday` significa pertenencia a la lista de fechas de días festivos oficiales.
 - Una excepción `work` para la misma fecha conserva el hecho de día festivo. El patrón semanal y la política de trabajo en festivos no lo afectan.
-- Los pulsos Daily para `holiday`, `workday` y `offday` usan calendarios tipados y políticas comunes/de DST explícitas. Las etiquetas de día de la semana para pulsos Daily siguen fuera de este alcance de ejecución.
-- `calendar_is` ordinario con un selector `workday`, `offday` o `holiday` devuelve el Result tipado que se muestra más abajo. Su perfil ejecutable acotado requiere una vinculación explícita de calendario UTC. Los perfiles de otras zonas horarias se rechazan en la activación, y el host no aporta un valor de elegibilidad precalculado.
+- Los pulsos Daily para `holiday`, `workday` y `offday` usan calendarios tipados y políticas comunes/de DST explícitas. Un pulso Daily con ``on = day`mon..fri` `` usa la fecha local programada y no necesita calendario. El filtro mantiene la precisión de la hora y la política de DST declaradas.
+- Una condición `calendar_is` admite el argumento opcional `timezone: "Area/City"` y usa UTC por defecto. El calendario vinculado debe usar la misma zona. El host resuelve la fecha civil desde un reloj fiable. Si la incertidumbre abarca la medianoche, el resultado es `ClockUnknown`. El runtime clasifica la fecha con la instantánea del calendario.
 
 **Composición y versionado de calendarios.**
 
@@ -1063,6 +1063,7 @@ La etiqueta de día no decide a qué fecha laboral pertenece un turno nocturno. 
 
 ```ghost
 let weekday = local_day_is(day`mon..fri`, timezone: "Asia/Seoul");
+let weekday_start = case weekday { ok(value) => value; fault(_) => false; };
 let working = calendar_is(workers, day`workday`);
 let can_start = case working { ok(value) => value; fault(_) => false; };
 ```

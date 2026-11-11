@@ -5,6 +5,65 @@
 
 ## 미출시
 
+### 2026-11-12 - 원문 재검증에 같은 하드웨어 프로필 사용 ([#626](https://github.com/callin2/ghostflow-language/pull/626))
+
+패키지 검증과 원문에 연결된 WASM 활성화는 원문을 다시 컴파일할 때 호스트가 제공한 고정 하드웨어 프로필을 전달합니다. 생성된 바이트코드와 필요한 원문·매니페스트 근거는 기존대로 대조합니다.
+
+### 2026-11-12 - 한도를 지킬 수 없는 실행기에서 프로그램 거부 ([#96](https://github.com/callin2/ghostflow-language/issues/96))
+
+공개 WASM 실행 경로 두 곳은 누적 한도가 선언된 프로그램을 불러오기 전에 거부합니다. 한도를 검사할 수 있는 실행기가 출력을 켜기 전에 한도를 확인해야 합니다. 전용 회계 재생 경로는 기존대로 기록한 예약을 적용합니다.
+
+### 2026-11-11 - type을 생략한 capability 전략 선택 (#156)
+
+strategy match에서 capability 타입을 생략할 수 있습니다. 컴파일러는 선언된
+capability 타입을 확인해 타입을 명시한 match와 같은 활성화 시 질의를 만듭니다.
+존재 여부는 설치 프로파일에서 확인합니다. `where`는 매치된 장비의 종류, 이름,
+타입을 비교하며 기존 네이티브와 WASM의 장비 질의를 사용합니다.
+
+### 2026-11-11 - 달력 조건에서 현지 날짜 사용 ([API #271](https://github.com/callin2/farm_studio_api/issues/271))
+
+일반 달력 조건에 IANA 시간대를 지정할 수 있다. 네이티브·WASM 실행기는 현재 스캔의 시각과 묶인 현지 날짜를 사용한다. 달력 조건만 사용하는 GFB18 프로그램을 서명할 수 있다. 조건의 위치, 시간대, 타입이 컴파일된 프로그램과 일치해야 한다. 서울 자정 시험은 검토된 한국 공휴일 자료를 사용한다.
+
+### 2026-11-11 - 제어식에서 현지 요일 판정 ([#155](https://github.com/callin2/ghostflow-language/issues/155))
+
+Reference §3.8의 동작을 복구했다. `local_day_is(day\`mon..fri\`, timezone: "Asia/Seoul")`는 `Result<Bool, ClockFault>`로 컴파일된다. 호스트가 신뢰할 수 있는 시각에서 구한 현지 날짜를 전달하고 실행기가 요일 조건을 판단한다. 날짜가 없거나 모호하면 `ClockUnknown`이다. 기존 예약과 명명된 달력의 동작은 유지한다. 새 `control-v26` / GFB26는 갱신된 context 실행기가 필요하다. `tests/monitoring-plan.test.mjs`에서 평일·주말·시각 미확인의 3구역 버튼 시작을 검증한다.
+
+### 2026-11-11 - Daily 펄스 요일 필터 ([#155](https://github.com/callin2/ghostflow-language/issues/155))
+
+Reference §3.8의 Daily 펄스에 ``on = day`mon..fri```를 쓰면 달력 연결 없이 실행된다. 예약의 현지 날짜가 실행 요일을 결정한다. 선언한 초·밀리초와 DST 정책은 그대로 적용한다. `control-v27`과 GFB27은 기존 Daily 발생 자료를 사용한다. `tests/daily-runtime.test.mjs`와 `tests/ghostsim-daily.test.mjs`에서 검증한다.
+
+### 2026-11-09 - 공용 원문 비교와 변경 범위 사전 검사 ([API #258](https://github.com/callin2/farm_studio_api/issues/258))
+
+브라우저와 Node가 설정 기본값·설정 정의·제어 규칙·논리 입출력·하드웨어 선언을
+같은 모듈로 구조 비교한다. `ghostdiff.mjs`는 이 모듈을 쓰는 읽기 전용 CLI다.
+형식화된 범위 요청은 원문 작성 전에 허용 항목과 의존 보류 항목을 나누고,
+작성된 후보가 승인한 대상을 벗어나지 않았는지 검사한다. 컴파일·import 해석·
+호스트 메타데이터 확인·설치를 대신하지 않는다. 런타임 의미·GFB·ABI는 그대로다.
+회귀 검증은 `source-changes`, `update-request`, `ghostdiff`, browser-toolchain의
+공용 export 및 브라우저 의존성 검사에 포함한다.
+
+### 2026-11-07 - 외부 취소 조건이 있는 유한 모니터링 계획 ([#622](https://github.com/callin2/ghostflow-language/issues/622), [Device #329](https://github.com/callin2/farm-device/issues/329))
+
+버그 수정: 외부 정지 조건으로 감싼 경우 이미 인식할 수 있는 유한 타이머 순서도
+생략되던 문제를 고쳤습니다. `phase' = if stop_pressed then Idle else case phase { ... }`는
+취소 조건이 Bool 입력·복구·불변 별칭·순수 Bool 식으로만 구성되고 순서의 유일한
+대기 경계로 복귀하면 `configured-timed-output`과 `sequence` 메타데이터를 유지합니다.
+state·시간·설정에 의존하거나 복귀 경계를 증명하지 못한 조건은 계속 지원하지 않습니다.
+대기 상태와 계속 누른 시작 입력을 반복 cycle 예측으로 바꾸지 않으며 Duration 단계는
+실시간 설정 이름을 유지합니다. Reference §2.8의 상태·타이머 규칙과 GFB 바이트·실행·ABI는
+바뀌지 않고 재컴파일하면 설명용 manifest 메타데이터만 추가됩니다.
+동일한 bytecode와 portable replay를 포함한 회귀 근거는 `tests/monitoring-plan.test.mjs`입니다.
+
+### 2026-11-05 - 유한 타이머 순서 예측 ([#622](https://github.com/callin2/ghostflow-language/issues/622))
+
+모니터링 계획이 Duration 설정으로 제어하는 반복하지 않는 유한 enum 순서를
+설명합니다. 예를 들어 `Idle -> First -> Second -> Rest -> Idle`은 시간이 정해진
+세 단계를 `sequence`로 제공하며 기존 설정 기반 타이머 출력과 반복 `cycle`
+메타데이터의 의미는 유지합니다. 지원하지 않는 전이는 순서 정보를 생략합니다.
+JavaScript와 native 패키지 검증은 선언된 제한된 단계만 허용하고 `cycle`과
+`sequence`가 함께 있는 패턴을 거절합니다. GFB와 실행 의미는 바뀌지 않습니다.
+근거는 `tests/monitoring-plan.test.mjs`입니다.
+
 ### 2026-11-04 - 표시용 모니터링 계획 ([#622](https://github.com/callin2/ghostflow-language/issues/622))
 
 컴파일러가 일정 due를 필수 AND 조건으로 시작하고, 고정 elapsed 타이머 시간에

@@ -9,7 +9,10 @@ export const historicalReferenceFiles = Object.freeze([
   'tests/reference/cases-input-v1/03-settings-boundaries.json',
 ]);
 const additiveFiles = ['tests/reference/cases-civil-range-v1/02-time-control.json'];
-const revisionFiles = ['tests/reference/revisions/settings-result-v1.json'];
+const revisionFiles = [
+  'tests/reference/revisions/settings-result-v1.json',
+  'tests/reference/revisions/periodic-settings-result-v1.json',
+];
 export const referenceCaseDigest = entry => createHash('sha256').update(JSON.stringify(entry)).digest('hex');
 
 export function applyReferenceRevision(cases, revision) {

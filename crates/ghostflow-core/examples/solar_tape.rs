@@ -2,7 +2,7 @@
 use ghostflow_core::{
     schedule_clock::{ClockSnapshot, ClockTrust},
     solar_admission::{SolarFact, SolarFactAvailability, SolarFacts},
-    solar_runtime::{SolarActivation, SolarInput},
+    solar_runtime::{ScheduleInput, ScheduleKind, SolarActivation, SolarInput},
     Capability, Module, Runtime, Value,
 };
 use serde_json::{json, Value as Json};
@@ -45,6 +45,7 @@ fn main() -> Result<()> {
         return Err("usage: solar_tape MODULE TAPE".into());
     }
     let module = Module::load(&read(&args[0])?)?;
+    let weekday_daily = module.bytecode_format_version() == 27;
     let fields: Vec<_> = module
         .input_fields()
         .map(|(n, t)| (n.to_owned(), t))
@@ -60,10 +61,15 @@ fn main() -> Result<()> {
     for cap in caps {
         runtime.add_capability(cap)?;
     }
-    runtime.activate_with_solar(&SolarActivation {
+    let activation = SolarActivation {
         boot_epoch: boot,
         terminal_capacity: usize::try_from(integer(&tape["terminalCapacity"])?)?,
-    })?;
+    };
+    if weekday_daily {
+        runtime.activate_with_schedules(&activation)?;
+    } else {
+        runtime.activate_with_solar(&activation)?;
+    }
     for scan in array(&tape["scans"], 4096)? {
         let packet = &scan["solarFacts"];
         let c = &packet["clock"];
@@ -77,7 +83,11 @@ fn main() -> Result<()> {
                             source_day: i32::try_from(integer(&r["sourceDay"])?)?,
                             slot_key: 0,
                             minute_of_day: 0,
-                            fold: 0,
+                            fold: if weekday_daily {
+                                u8::try_from(integer(&r["fold"])?)?
+                            } else {
+                                0
+                            },
                             scheduled_wall_ms: optional(&r["scheduledWallMs"])?,
                             fallback_wall_ms: optional(&r["fallbackWallMs"])?,
                             unavailable_reason: optional(&r["unavailableReason"])?
@@ -147,7 +157,20 @@ fn main() -> Result<()> {
             uncertainty_ms: optional(&c["uncertaintyMs"])?,
             source_revision: c["sourceRevision"].as_str(),
         };
-        match runtime.tick_with_solar(clock, &facts) {
+        let result = if weekday_daily {
+            let civil_facts: Vec<_> = facts
+                .iter()
+                .map(|input| ScheduleInput {
+                    site: input.site,
+                    kind: ScheduleKind::Daily,
+                    facts: input.facts,
+                })
+                .collect();
+            runtime.tick_with_schedules(clock, &civil_facts)
+        } else {
+            runtime.tick_with_solar(clock, &facts)
+        };
+        match result {
             Ok(record) => println!(
                 "{}",
                 json!({"accepted":true,"trace":serde_json::from_str::<Json>(&record.to_json())?})

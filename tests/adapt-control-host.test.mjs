@@ -2,8 +2,12 @@ import { softwareQualityAbi, softwareQualityObservations } from './helpers/softw
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import { createHash } from 'node:crypto';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import test from 'node:test';
-import { compileSource } from '../tools/toolchain.mjs';
+import { encode } from '@toon-format/toon';
+import { compileSource, writeArtifact } from '../tools/toolchain.mjs';
+import { runScenario } from '../tools/ghostsim.mjs';
 import { ControlRuntime } from '../runtimes/wasm/control-runtime.mjs';
 import { GhostFlowRuntime } from '../runtimes/wasm/ghostflow-runtime.mjs';
 import { FramedGhostFlowRuntime } from '../runtimes/wasm/framed-runtime.mjs';
@@ -132,6 +136,27 @@ control ProfileAND {
   assert.deepEqual(captures[0], captures[1], 'plain and framed Rust owners agree on captured profile admission and execution');
 });
 
+test('presence-only capability matches compile to a typed activation query', async () => {
+  const source = `# Presence only
+
+\`\`\`ghost
+control PresenceOnly {
+  input scheduled: Bool;
+  input moisture?: Percent;
+  output pump: Bool;
+  adapt policy {
+    strategy WithMoisture priority 10 match (moisture: sensor) { pump <- scheduled |> recover(false); }
+    strategy Baseline priority 0 match always { pump <- false; }
+  }
+}
+\`\`\`
+`;
+  const artifact = await compileSource(source, { filename: 'presence-only.ghost.md' });
+  const strategy = artifact.manifest.strategies.find(item => item.name === 'WithMoisture');
+  assert.deepEqual(strategy.match, [{ role: 'moisture', kind: 'sensor', type: 'Percent' }]);
+  assert.equal(strategy.outputNames[0], 'pump');
+});
+
 test('REF-04-035 explicit absent sensor selects Baseline', async () => {
   const host = await ControlRuntime.instantiateFramed(wasm, artifact, { capabilities: [] });
   softwareQualityObservations(host);
@@ -142,6 +167,56 @@ test('REF-04-035 explicit absent sensor selects Baseline', async () => {
 });
 
 const moisture = { kind: 'sensor', name: 'moisture', type: 'Percent' };
+
+test('strategy where checks matched metadata in both hosts and rejects runtime inputs', async () => {
+  const source = `# Metadata selection
+
+\`\`\`ghost
+control MetadataSelection {
+  input moisture?: Percent;
+  output pump: Bool;
+  adapt policy {
+    strategy Disabled priority 20 match (moisture: sensor) where moisture.type == Bool { pump <- false; }
+    strategy Allowed priority 10 match (moisture: sensor)
+      where moisture.type == Percent && !(moisture.kind != sensor) && (moisture.name == "moisture" || false) { pump <- true; }
+    strategy Baseline priority 0 match always { pump <- false; }
+  }
+}
+\`\`\`
+`;
+  const compiled = await compileSource(source, { filename: 'metadata-selection.ghost.md' });
+  assert.deepEqual(compiled.manifest.strategies.map(item => item.where), [false, true, undefined]);
+  for (const instantiate of [ControlRuntime.instantiate, ControlRuntime.instantiateFramed]) {
+    for (const capabilities of [[], [moisture]]) {
+      const host = await instantiate(wasm, compiled, { capabilities });
+      softwareQualityObservations(host);
+      try {
+        assert.equal(host.step({ nowMs: 0, inputs: {} }).vm.requested.pump, capabilities.length > 0);
+      } finally { host.dispose(); }
+    }
+  }
+  const directory = fs.mkdtempSync(join(tmpdir(), 'ghostflow-metadata-selection-'));
+  try {
+    const artifactPath = join(directory, 'metadata.gfb');
+    const scenarioPath = join(directory, 'metadata.toon');
+    writeArtifact(compiled, artifactPath);
+    for (const capabilities of [[], [moisture]]) {
+      fs.writeFileSync(scenarioPath, encode({
+        format: 'GhostFlow/scenario-v1', id: 'metadata-selection',
+        initialInputs: [], keyBindings: [], capabilities, actions: [{ kind: 'scan', atMs: 0 }],
+      }));
+      const result = runScenario(artifactPath, scenarioPath, { format: 'json' });
+      assert.equal(result.success, true, result.encoded);
+      assert.equal(JSON.parse(result.encoded).scans[0].requestedVirtualIntent.pump, capabilities.length > 0);
+    }
+  } finally {
+    fs.rmSync(directory, { recursive: true, force: true });
+  }
+  await assert.rejects(compileSource(source.replace('moisture.type == Bool', 'moisture > 30%')), /strategy where accepts only/);
+  await assert.rejects(compileSource(source.replace('moisture.type == Bool', 'unknown.type == Bool')), /strategy where references unmatched capability unknown/);
+  await assert.rejects(compileSource(source.replace('moisture.type == Bool', '"true"')), /strategy where accepts only/);
+});
+
 const sample = (id, quality, value) => ({ epoch: 1, id, timestampMs: id, quality, value });
 
 test('REF-04-035 present sensor uses moisture strategy and faults never select Baseline', async () => {

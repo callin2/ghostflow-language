@@ -30,12 +30,14 @@ const AVAILABILITY_FORMAT = 'GhostFlow/control-v12';
 const AT_FORMAT = 'GhostFlow/control-v13';
 const AT_WINDOW_FORMAT = 'GhostFlow/control-v23';
 const NATURAL_WEEKDAY_FORMAT = 'GhostFlow/control-v24';
+const WEEKDAY_CONDITION_FORMAT = 'GhostFlow/control-v26';
 const HOLIDAY_FORMAT = 'GhostFlow/control-v14';
 const SOLAR_CONTEXT_FORMAT = 'GhostFlow/control-v15';
 const CALENDAR_EXECUTION_FORMAT = 'GhostFlow/control-v18';
 const RANGE_LIVE_START_FORMAT = 'GhostFlow/control-v19';
 const TIMESLOTS_RANGE_FORMAT = 'GhostFlow/control-v20';
 const CIVIL_RANGE_FORMAT = 'GhostFlow/control-v21';
+const WEEKDAY_DAILY_FORMAT = 'GhostFlow/control-v27';
 const contextManifest = manifest => manifest?.format === STREAM_CONTEXT_FORMAT
   || manifest?.format === RANGE_LIVE_START_FORMAT
   || manifest?.format === TIMESLOTS_RANGE_FORMAT
@@ -46,6 +48,7 @@ const contextManifest = manifest => manifest?.format === STREAM_CONTEXT_FORMAT
   || manifest?.format === AT_FORMAT
   || manifest?.format === AT_WINDOW_FORMAT
   || manifest?.format === NATURAL_WEEKDAY_FORMAT
+  || manifest?.format === WEEKDAY_CONDITION_FORMAT
   || manifest?.format === AVAILABILITY_FORMAT && !manifest.schedules?.some(item => item.kind === 'solar');
 
 /** Select an existing reference entry explicitly; never retry after a dispatch error. */
@@ -268,10 +271,10 @@ function validateCanonicalUnit(item, label) {
 function validateContextManifest(input, bytecodeFormat) {
   const manifest = record(input, 'manifest');
   keys(manifest, ['format','name','inputs','outputs','sensors','schedules','timers','signals','configs','bytecodeSha256'],
-    ['providers','calendars','naturalConditions','calendarConditions','accounting','resources','objectives','adaptSettings','lifecycle','legacyAdmission','requiredRuntimeFeatures','sensorInstances','monitoring'], 'manifest');
+    ['providers','calendars','naturalConditions','calendarConditions','weekdayConditions','accounting','resources','objectives','adaptSettings','lifecycle','legacyAdmission','requiredRuntimeFeatures','sensorInstances','monitoring'], 'manifest');
   validateRequiredRuntimeFeatures(manifest);
   const lifecycle = validateLifecycleManifest(manifest);
-  if (manifest.format === NATURAL_WEEKDAY_FORMAT ? bytecodeFormat !== 24 : manifest.format === AT_WINDOW_FORMAT ? bytecodeFormat !== 23 : manifest.format === CIVIL_RANGE_FORMAT ? bytecodeFormat !== 21 : manifest.format === TIMESLOTS_RANGE_FORMAT ? bytecodeFormat !== 20 : manifest.format === RANGE_LIVE_START_FORMAT ? bytecodeFormat !== 19 : manifest.format === CALENDAR_EXECUTION_FORMAT ? bytecodeFormat !== 18 : manifest.format === SOLAR_CONTEXT_FORMAT ? bytecodeFormat !== 16 : manifest.format === HOLIDAY_FORMAT ? bytecodeFormat !== 15 : manifest.format === AT_FORMAT ? bytecodeFormat !== 14 : manifest.format === AVAILABILITY_FORMAT ? bytecodeFormat !== 13 : ![11, 12].includes(bytecodeFormat)) throw new Error('context manifest requires its matching GFB format');
+  if (manifest.format === WEEKDAY_CONDITION_FORMAT ? bytecodeFormat !== 26 : manifest.format === NATURAL_WEEKDAY_FORMAT ? bytecodeFormat !== 24 : manifest.format === AT_WINDOW_FORMAT ? bytecodeFormat !== 23 : manifest.format === CIVIL_RANGE_FORMAT ? bytecodeFormat !== 21 : manifest.format === TIMESLOTS_RANGE_FORMAT ? bytecodeFormat !== 20 : manifest.format === RANGE_LIVE_START_FORMAT ? bytecodeFormat !== 19 : manifest.format === CALENDAR_EXECUTION_FORMAT ? bytecodeFormat !== 18 : manifest.format === SOLAR_CONTEXT_FORMAT ? bytecodeFormat !== 16 : manifest.format === HOLIDAY_FORMAT ? bytecodeFormat !== 15 : manifest.format === AT_FORMAT ? bytecodeFormat !== 14 : manifest.format === AVAILABILITY_FORMAT ? bytecodeFormat !== 13 : ![11, 12].includes(bytecodeFormat)) throw new Error('context manifest requires its matching GFB format');
   name(manifest.name, 'manifest.name');
   if (!/^[0-9a-f]{64}$/.test(manifest.bytecodeSha256)) throw new Error('invalid bytecode SHA-256');
   const inputs = validateList(manifest.inputs, 'manifest.inputs', ['name','type'], ['canonicalUnit']);
@@ -305,8 +308,14 @@ function validateContextManifest(input, bytecodeFormat) {
     ['site','operation','provider','classification','result','projectionInputs']);
   const calendarConditions = validateList(manifest.calendarConditions ?? [], 'manifest.calendarConditions',
     ['site','calendar','classification','timezone','result','projectionInputs']);
+  const weekdayConditions = validateList(manifest.weekdayConditions ?? [], 'manifest.weekdayConditions',
+    ['site','timezone','mask','result','projectionInputs']);
   if (manifest.format === CALENDAR_EXECUTION_FORMAT && !calendarConditions.length && !schedules.some(item => item.day && item.policy?.basis?.kind === 'range')) throw new Error('calendar execution profile requires a calendar Result or Range');
   if (manifest.format !== CALENDAR_EXECUTION_FORMAT && calendarConditions.length) throw new Error('calendar Result requires control-v18');
+  if (manifest.format !== WEEKDAY_CONDITION_FORMAT && weekdayConditions.length) throw new Error('weekday Conditions require control-v26');
+  if (manifest.format === WEEKDAY_CONDITION_FORMAT && (!weekdayConditions.length || weekdayConditions.some(item =>
+    !Number.isSafeInteger(item.site) || item.site <= 0 || typeof item.timezone !== 'string' || !item.timezone ||
+    !Number.isSafeInteger(item.mask) || item.mask < 1 || item.mask > 127))) throw new Error('weekday condition profile requires typed weekday conditions');
   const accounting = manifest.accounting === undefined ? null : copy(record(manifest.accounting, 'manifest.accounting'));
   if (manifest.format === SOLAR_CONTEXT_FORMAT && !schedules.some(item => item.kind === 'solar')) throw new Error('Solar context profile requires Solar');
   if (manifest.format === NATURAL_WEEKDAY_FORMAT && (!schedules.length || schedules.some(item => !['solar', 'tide'].includes(item.kind)
@@ -443,7 +452,7 @@ function validateContextManifest(input, bytecodeFormat) {
   }
   for (const item of calendarConditions) {
     safeInteger(item.site, 'calendar Result site', 1, 0xffff_ffff);
-    if (item.timezone !== 'UTC' || !['workday','offday','holiday'].includes(item.classification)
+    if (typeof item.timezone !== 'string' || !item.timezone || !['workday','offday','holiday'].includes(item.classification)
       || !calendars.some(calendar => calendar.name === item.calendar && calendar.type === (item.classification === 'holiday' ? 'HolidayCalendar' : 'WorkCalendar'))
       || item.result?.value !== 'Bool' || item.result?.error !== 'CalendarFault') throw new Error('calendar Result definition mismatch');
     keys(record(item.projectionInputs, 'calendar Result projections'), ['ok','value','fault'], [], 'calendar Result projections');
@@ -467,7 +476,7 @@ function validateContextManifest(input, bytecodeFormat) {
   }
   unique(configs.map(item => item.id), 'config id');
   unique([...inputs,...outputs,...schedules,...configs,...providers,...calendars,...timers,...sensors,...sensorInstances,...objectives,...adaptSettings].map(item => item.name), 'context name');
-  unique([...schedules,...naturals,...calendarConditions].map(item => item.site), 'context site');
+  unique([...schedules,...naturals,...calendarConditions,...weekdayConditions].map(item => item.site), 'context site');
   for (const sensor of [...sensors, ...sensorInstances]) {
     name(sensor.name, 'sensor.name');
     if (objectives.some(objective => objective.measure === sensor.name) && (sensor.type !== 'Temperature' || sensor.canonicalUnit !== 'K')) throw new Error('context PID sensor must be canonical Temperature');
@@ -598,7 +607,7 @@ function validateManifest(input, { acceptSettings = false, bytecodeFormat = null
   validateRequiredRuntimeFeatures(manifest);
   const outputObservations = validateOutputObservationsManifest(manifest, bytecodeFormat);
   const lifecycle = validateLifecycleManifest(manifest);
-  if (manifest.format !== OUTPUT_OBSERVATION_FORMAT && manifest.format !== FORMAT && manifest.format !== INTEGER_FORMAT && !(manifest.format === SETTINGS_FORMAT && acceptSettings) && manifest.format !== SOLAR_FORMAT && manifest.format !== SCHEDULE_FORMAT && manifest.format !== SCHEDULE_SLOTS_FORMAT && manifest.format !== AVAILABILITY_FORMAT && manifest.format !== RANGE_LIVE_START_FORMAT && manifest.format !== TIMESLOTS_RANGE_FORMAT) throw new Error(`unsupported manifest format ${String(manifest.format)}`);
+  if (manifest.format !== OUTPUT_OBSERVATION_FORMAT && manifest.format !== FORMAT && manifest.format !== INTEGER_FORMAT && !(manifest.format === SETTINGS_FORMAT && acceptSettings) && manifest.format !== SOLAR_FORMAT && manifest.format !== SCHEDULE_FORMAT && manifest.format !== WEEKDAY_DAILY_FORMAT && manifest.format !== SCHEDULE_SLOTS_FORMAT && manifest.format !== AVAILABILITY_FORMAT && manifest.format !== RANGE_LIVE_START_FORMAT && manifest.format !== TIMESLOTS_RANGE_FORMAT) throw new Error(`unsupported manifest format ${String(manifest.format)}`);
   const settingsManifest = manifest.format === SETTINGS_FORMAT || manifest.format === INTEGER_FORMAT || manifest.format === AVAILABILITY_FORMAT;
   const solarManifest = manifest.format === SOLAR_FORMAT || manifest.format === INTEGER_FORMAT || manifest.format === AVAILABILITY_FORMAT;
   name(manifest.name, 'manifest.name');
@@ -612,13 +621,14 @@ function validateManifest(input, { acceptSettings = false, bytecodeFormat = null
   if (!Array.isArray(manifest.schedules) || manifest.schedules.length > MAX_LIST) throw new TypeError('manifest.schedules must be a bounded array');
   const schedules = manifest.schedules.map((schedule, index) => {
     const solar = (solarManifest || manifest.format === SCHEDULE_SLOTS_FORMAT) && schedule?.kind === 'solar';
-    const daily = [SCHEDULE_FORMAT, SCHEDULE_SLOTS_FORMAT].includes(manifest.format) && schedule?.kind === 'daily';
+    const daily = [SCHEDULE_FORMAT, SCHEDULE_SLOTS_FORMAT, WEEKDAY_DAILY_FORMAT].includes(manifest.format) && schedule?.kind === 'daily';
     const dailySlots = manifest.format === SCHEDULE_SLOTS_FORMAT && schedule?.kind === 'daily-slots';
     const fields = solar ? ['kind', 'site', 'name', 'timezone', 'latitude', 'longitude', 'event', 'offsetMs', 'policy']
       : daily ? ['kind', 'atMs', 'site', 'name', 'timezone', 'dstMissing', 'dstRepeated', 'policy']
         : dailySlots ? ['kind', 'gridMs', 'slots', 'site', 'name', 'timezone', 'dstMissing', 'dstRepeated', 'policy']
           : ['name', 'timezone', 'slots', 'dueInput'];
-    const optional = solar || daily || dailySlots ? [] : ['gridMs', 'selectedConfig', 'policy'];
+    const optional = daily && manifest.format === WEEKDAY_DAILY_FORMAT ? ['day']
+      : solar || daily || dailySlots ? [] : ['gridMs', 'selectedConfig', 'policy'];
     const item = record(schedule, `manifest.schedules[${index}]`);
     keys(item, fields, optional, `manifest.schedules[${index}]`);
     if (solar || daily || dailySlots) {
@@ -628,7 +638,14 @@ function validateManifest(input, { acceptSettings = false, bytecodeFormat = null
         if (typeof item.timezone !== 'string' || !item.timezone) throw new TypeError(`schedule ${item.name}.timezone must be nonempty text`);
         try { new Intl.DateTimeFormat('en-US', { timeZone: item.timezone }); }
         catch { throw new Error(`schedule ${item.name}.timezone must be a supported IANA timezone`); }
-        if (daily) safeInteger(item.atMs, `schedule ${item.name}.atMs`, 0, 86_399_999);
+        if (daily) {
+          safeInteger(item.atMs, `schedule ${item.name}.atMs`, 0, 86_399_999);
+          if (manifest.format === WEEKDAY_DAILY_FORMAT && item.day !== undefined) {
+            keys(record(item.day, 'weekday selector'), ['kind','mask'], [], 'weekday selector');
+            if (item.day.kind !== 'weekday') throw new Error('weekday Daily profile requires a weekday selector');
+            safeInteger(item.day.mask, 'weekday selector mask', 1, 127);
+          }
+        }
         else {
           if (item.gridMs !== 900_000) throw new Error(`schedule ${item.name}.gridMs is unsupported`);
           if (!Array.isArray(item.slots) || !item.slots.length || item.slots.length > MAX_SCHEDULE_SLOTS) throw new Error(`schedule ${item.name}.slots is invalid`);
@@ -655,6 +672,8 @@ function validateManifest(input, { acceptSettings = false, bytecodeFormat = null
   if (manifest.format === AVAILABILITY_FORMAT && (bytecodeFormat !== 13 || !schedules.length || schedules.some(item => item.kind !== 'solar'))) throw new Error('v12 Solar manifest requires GFB13 Solar schedules');
   if (schedules.some(item => item.kind === 'solar') && !(manifest.format === AVAILABILITY_FORMAT ? bytecodeFormat === 13 : [5, 9].includes(bytecodeFormat))) throw new Error('Solar manifest requires matching GFB format');
   if (manifest.format === SCHEDULE_FORMAT && (bytecodeFormat !== 8 || !schedules.length || schedules.some(item => item.kind !== 'daily'))) throw new Error('v7 manifest requires GFB format 8 Daily schedules');
+  if (manifest.format === WEEKDAY_DAILY_FORMAT && (bytecodeFormat !== 27 || !schedules.some(item => item.day)
+    || schedules.some(item => item.kind !== 'daily'))) throw new Error('v27 manifest requires GFB format 27 weekday Daily schedules');
   if (manifest.format === SCHEDULE_SLOTS_FORMAT && (bytecodeFormat !== 9 || !schedules.length || schedules.some(item => item.kind !== 'daily-slots'))) throw new Error('v8 manifest requires GFB format 9 DailySlots schedules');
   const timers = validateTimers(manifest.timers);
   if (!Array.isArray(manifest.signals) || manifest.signals.length > MAX_LIST) throw new TypeError('manifest.signals must be a bounded array');
@@ -1124,6 +1143,10 @@ async function instantiateControlRuntime(wasmBytes, artifact = {}, options, inst
   if (options.instructionWitnesses !== undefined && typeof options.instructionWitnesses !== 'boolean') throw new Error('instructionWitnesses must be Boolean');
   if (options.instructionWitnesses && instantiateRuntime !== FramedGhostFlowRuntime.instantiate) throw new Error('instruction witnesses require a framed host');
   const { bytes: bytecode, manifest } = artifact;
+  const accountingConstraints = manifest?.accounting?.constraints;
+  if (accountingConstraints !== undefined && (!Array.isArray(accountingConstraints) || accountingConstraints.length !== 0)) {
+    throw new Error('accounting limits require a host that enforces output admission');
+  }
   const wasm = new Uint8Array(bytes(wasmBytes, 'wasmBytes'));
   // Copy caller-owned bytecode before awaiting digest verification (TOCTOU-safe).
   const compiledBytes = new Uint8Array(bytes(bytecode, 'bytes'));
@@ -1501,6 +1524,12 @@ export class ControlRuntime {
     if (this.#hasContext) {
       if (this.manifest.format === NATURAL_WEEKDAY_FORMAT && contextFacts.scheduledDates === undefined) {
         contextFacts = { ...contextFacts, scheduledDates: naturalScheduledDateFacts(contextFacts, this.manifest.schedules) };
+      }
+      const localDateConditions = this.manifest.format === WEEKDAY_CONDITION_FORMAT
+        ? this.manifest.weekdayConditions
+        : this.manifest.calendarConditions?.filter(item => item.timezone !== 'UTC');
+      if (localDateConditions?.length) {
+        contextFacts = { ...contextFacts, weekdayConditions: localDateConditions.map(({ site, timezone }) => ({ site, timezone })) };
       }
       validateContextSolarFacts(contextFacts, this.manifest.schedules);
       encodeContextFacts(contextFacts);

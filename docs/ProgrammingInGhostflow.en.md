@@ -265,6 +265,8 @@ Keep values whose units affect control decisions, such as temperature, flow, and
 <a id="quantity-type-lookup"></a>
 ### Find the type for your measurement
 
+Try a 30°C reading in the [greenhouse fan example](#hot-greenhouse-fan).
+
 Even when you measure in Celsius, the type name is `Temperature`. Do not declare a type named `Celsius` or `Fahrenheit`. Put the unit on the value instead: declare `input air: Temperature;` and write a threshold as `30°C`. `30°C`, `86°F`, and `303.15K` represent the same absolute temperature. [Chapter 14](#ch14) continues with unit conversions and temperature control.
 
 | Measurement | Declaration type | Example value | Input declaration |
@@ -1948,6 +1950,7 @@ permit. The following three ordinary calls return their uncertainty explicitly a
 
 | Builtin | Signature and purpose | Context, boundaries and example |
 |---|---|---|
+| `local_day_is` | ``local_day_is(day`mon..fri`, timezone: "Asia/Seoul") -> Result<Bool,ClockFault>`` | Checks the current trusted local date against named weekdays. Handle a clock fault explicitly before using the Bool to admit a new start. [Three-zone weekday example](../tests/monitoring-plan.test.mjs). |
 | `calendar_is` | ``calendar_is(calendar, day`workday` or day`offday` or day`holiday`) -> Result<Bool,CalendarFault>`` | Typed WorkCalendar or HolidayCalendar with an explicit UTC binding in GFB18. Missing, outside-coverage, expired or untrusted-clock facts preserve a fault; handle it explicitly before negating the successful Bool. [Executed calendar boundaries](../tests/reference-calendar-boundary.test.mjs). |
 | `tide_is` | ``tide_is(provider, tide`spring` or tide`neap`) -> Result<Bool,TemporalContextFault>`` | Declared TidePredictions provider. Missing/stale prediction or clock context is a fault. [Natural conditions](../tests/natural-condition-contract.test.mjs). |
 | `moon_is` | ``moon_is(provider, moon`phase`) -> Result<Bool,TemporalContextFault>`` | LunarEphemeris provider; phases: new, waxing_crescent, first_quarter, waxing_gibbous, full, waning_gibbous, last_quarter, waning_crescent. [Natural conditions](../tests/natural-condition-contract.test.mjs). |
@@ -2183,6 +2186,28 @@ control KelvinHeater {
     on_below: 291.15K, off_above: 295.15K, initial: false);
   output heater: Bool;
   heater <- cold |> recover(false);
+}
+```
+
+<a id="hot-greenhouse-fan"></a>
+### E38 — Turn on a fan when the greenhouse gets hot
+
+Set the virtual greenhouse temperature to `28°C → 30°C → 28°C → 26°C`. The fan goes `off → on → on → off`. It turns on above `29°C` and off below `27°C`. At either threshold it keeps its previous state.
+
+`cool` remembers whether the greenhouse is cool. A valid observation sends the opposite value to the fan. In this example the fan turns off when the temperature reading goes stale after three seconds without a new sample.
+
+```ghost
+// E38
+control GreenhouseVentilation {
+  input air: Temperature {
+    sample = 1s;
+    valid = -40°C .. 50°C;
+    stale_after = 3s;
+  }
+  signal cool = hysteresis(air,
+    on_below: 27°C, off_above: 29°C, initial: true);
+  output fan: Bool;
+  fan <- case cool { ok(value) => !value; fault(_) => false; };
 }
 ```
 

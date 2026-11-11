@@ -31,6 +31,9 @@ test('source-bound replay verifies the fixed hardware profiles used to compile t
   const compiled = await compileSource(source, { filename: fixture.filename, hardwareProfiles });
   const context = { bootEpoch: 7, terminalCapacity: 8, bindings: [] };
   await assert.rejects(ControlRuntime.instantiateFramed(wasmBytes, compiled, { context }), /supply hardwareProfiles/);
+  await assert.rejects(ControlRuntime.instantiateFramed(wasmBytes, compiled, {
+    context, hardwareProfiles: [{ ...hardwareProfiles[0], sha256: '0'.repeat(64) }],
+  }), /profile digest mismatch/);
   const runtime = await ControlRuntime.instantiateFramed(wasmBytes, compiled, { context, hardwareProfiles });
   runtime.dispose();
 });

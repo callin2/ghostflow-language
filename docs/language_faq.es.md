@@ -61,7 +61,7 @@ Una pregunta sin etiqueta tampoco se ha verificado todavía frente a un disposit
 18. [¿Se admite la autorretención?](#q18)
 19. [¿Puedo mover un dispositivo concreto cuando el usuario cancela a mitad de camino?](#q19)
 20. [¿Cómo programo una operación al amanecer?](#q20)
-21. [¿Puedo programar operaciones por día de la semana? [Parcialmente no admitido]](#q21)
+21. [¿Puedo programar operaciones por día de la semana?](#q21)
 22. [¿Puedo controlar un dispositivo según su tiempo de operación acumulado? [Parcialmente no admitido]](#q22)
 23. [¿Puedo ejecutar la limpieza según el número de operaciones diarias, sin importar el modo automático o manual?](#q23)
 24. [¿Puedo cambiar más adelante solo el tiempo de operación sin actualizar el firmware? [Modificado]](#q24)
@@ -1155,13 +1155,12 @@ lo que preserva el límite entre la evaluación de la programación horaria y el
 - `fallback = skip` y recuperación: [Referencia §3.9 Respaldo y recuperación para referencias naturales](reference/03-time-and-schedules.es.md)
 
 <a id="q21"></a>
-## 21. ¿Puedo programar operaciones por día de la semana? [Parcialmente no admitido]
+## 21. ¿Puedo programar operaciones por día de la semana?
 
-> **Estado actual en dev:** El filtro de rango de días de la semana ``day`mon..fri` `` no se admite. La alternativa de abajo —``day`workday` ``/``day`offday` `` con un calendario de la instalación— sí se admite. [Contrato actual](reference/03-time-and-schedules.es.md).
+Un rango como ``day`mon..fri` `` filtra un pulso `Daily` en su zona horaria declarada. El calendario de la instalación sigue definiendo `workday` y `offday`. [Contrato actual](reference/03-time-and-schedules.es.md).
 
 Exprese una condición de día de la semana en el campo `on` de la programación horaria. Por ejemplo, para arrancar a las 6:00 de lunes a viernes,
 combine la condición horaria con la condición de día de la semana de abajo.
-Este fragmento usa una sintaxis seleccionada en la Referencia, pero el filtro de rango de días de la semana del compilador actual todavía no la admite.
 Para una programación horaria que compile y se ejecute con el compilador actual, use ``day`workday` `` o ``day`offday` `` con un calendario de la instalación.
 
 ```ghost

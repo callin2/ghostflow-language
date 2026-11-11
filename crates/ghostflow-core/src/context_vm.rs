@@ -143,6 +143,25 @@ pub struct AccountingDescriptor {
 }
 
 #[derive(Clone, Debug, PartialEq)]
+pub struct WeekdayDescriptor {
+    pub site: u32,
+    pub name: String,
+    pub timezone: String,
+    pub mask: u8,
+    pub ok_input: u16,
+    pub value_input: u16,
+    pub fault_input: u16,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct LocalWeekdayFact {
+    pub site: u32,
+    pub timezone: String,
+    pub wall_ms: u64,
+    pub local_day: u32,
+}
+
+#[derive(Clone, Debug, PartialEq)]
 pub struct CalendarDescriptor {
     pub site: u32,
     pub name: String,
@@ -1045,6 +1064,40 @@ mod calendar18_loader_tests {
     }
 }
 
+pub(crate) fn load_weekday(reader: &mut Reader<'_>, inputs: &[Field]) -> Result<WeekdayDescriptor> {
+    let site = reader.u32()?;
+    let name = text(reader)?;
+    let timezone = text(reader)?;
+    let mask = reader.u8()?;
+    if !(1..=127).contains(&mask) {
+        return Err(Error::new("invalid weekday mask"));
+    }
+    let ok_input = reader.u16()?;
+    let value_input = reader.u16()?;
+    let fault_input = reader.u16()?;
+    for (index, suffix, ty) in [
+        (ok_input, "ok", Type::Bool),
+        (value_input, "value", Type::Bool),
+        (fault_input, "fault", Type::Number),
+    ] {
+        let field = inputs
+            .get(usize::from(index))
+            .ok_or_else(|| Error::new("weekday projection index"))?;
+        if field.name != format!("__gf_weekday_{site}_{suffix}") || field.value_type != ty {
+            return Err(Error::new("weekday projection binding mismatch"));
+        }
+    }
+    Ok(WeekdayDescriptor {
+        site,
+        name,
+        timezone,
+        mask,
+        ok_input,
+        value_input,
+        fault_input,
+    })
+}
+
 pub(crate) fn load_calendar(
     reader: &mut Reader<'_>,
     inputs: &[Field],
@@ -1059,8 +1112,10 @@ pub(crate) fn load_calendar(
         _ => return Err(Error::new("invalid calendar selector")),
     };
     let timezone = text(reader)?;
-    if timezone != "UTC" {
-        return Err(Error::new("calendar Result requires explicit UTC binding"));
+    if timezone.is_empty() {
+        return Err(Error::new(
+            "calendar Result requires explicit timezone binding",
+        ));
     }
     let ok_input = reader.u16()?;
     let value_input = reader.u16()?;

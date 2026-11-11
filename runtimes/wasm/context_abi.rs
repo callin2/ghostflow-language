@@ -1,4 +1,4 @@
-//! GFSF5/6/7 facts and GFCA1 activation. Only typed evidence crosses the host boundary.
+//! GFSF5 through GFSF8 facts and GFCA1 activation.
 use ghostflow_core::{
     context_runtime::{Activation, Facts},
     context_vm::*,
@@ -470,7 +470,7 @@ fn decode_facts(bytes: &[u8]) -> Result<Packet, String> {
         return Err("invalid context facts header".into());
     }
     let version = r.u16()?;
-    if !matches!(version, 5 | 6 | 7) {
+    if !matches!(version, 5..=8) {
         return Err("invalid context facts header".into());
     }
     let monotonic_ms = r.exact()?;
@@ -501,10 +501,21 @@ fn decode_facts(bytes: &[u8]) -> Result<Packet, String> {
             facts.solars.push(solar(&mut r)?);
         }
     }
-    if version == 7 {
+    if version >= 7 {
         let count = r.count(4096)?;
         for _ in 0..count {
             facts.scheduled_dates.push(scheduled_date(&mut r)?);
+        }
+    }
+    if version == 8 {
+        let count = r.count(128)?;
+        for _ in 0..count {
+            facts.local_weekdays.push(LocalWeekdayFact {
+                site: r.u32()?,
+                timezone: r.text(false)?,
+                wall_ms: r.exact()?,
+                local_day: r.u32()?,
+            });
         }
     }
     r.finish()?;

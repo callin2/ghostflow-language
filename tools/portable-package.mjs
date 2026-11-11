@@ -85,7 +85,7 @@ function validateMonitoringPlanManifest(manifest) {
   for (const [index, pattern] of monitoring.patterns.entries()) {
     const path = `manifest.monitoring.patterns[${index}]`;
     const keys = pattern.kind === 'configured-timed-output'
-      ? ['kind', 'outputName', 'stateName', 'timerId', 'configName', 'activeValue', ...('cycle' in pattern ? ['cycle'] : [])]
+      ? ['kind', 'outputName', 'stateName', 'timerId', 'configName', 'activeValue', ...('cycle' in pattern ? ['cycle'] : []), ...('sequence' in pattern ? ['sequence'] : [])]
       : ['kind', 'outputName', 'stateName', 'timerId', 'durationMs', 'scheduleId'];
     exactObject(pattern, keys, path);
     if (!['scheduled-timed-latch', 'configured-timed-output'].includes(pattern.kind)) fail('manifest-mismatch', `${path}.kind is unsupported`);
@@ -101,6 +101,7 @@ function validateMonitoringPlanManifest(manifest) {
         fail('manifest-mismatch', `${path} does not match declared output, Duration config and elapsed timer`);
       }
       if ('cycle' in pattern) {
+        if ('sequence' in pattern) fail('manifest-mismatch', `${path} cannot contain both cycle and sequence`);
         const { cycle, activeValue } = pattern;
         if (!Array.isArray(cycle) || cycle.length < 2 || cycle.length > 8) fail('manifest-mismatch', `${path}.cycle length is unsupported`);
         const values = new Set();
@@ -114,6 +115,21 @@ function validateMonitoringPlanManifest(manifest) {
           values.add(stage.value);
         }
         if (!cycle.some(stage => stage.value === activeValue && stage.configName === pattern.configName)) fail('manifest-mismatch', `${path}.cycle does not include the active stage`);
+      }
+      if ('sequence' in pattern) {
+        const { sequence, activeValue } = pattern;
+        if (!Array.isArray(sequence) || sequence.length < 2 || sequence.length > 8) fail('manifest-mismatch', `${path}.sequence length is unsupported`);
+        const values = new Set();
+        for (const stage of sequence) {
+          exactObject(stage, ['value', 'configName'], `${path}.sequence stage`);
+          if (!(typeof activeValue === 'boolean' ? typeof stage.value === 'boolean'
+            : Number.isInteger(stage.value) && stage.value >= 0 && stage.value <= 0xffff_ffff)
+            || values.has(stage.value) || !manifest.configs.some(config => config.name === stage.configName && config.type === 'Duration')) {
+            fail('manifest-mismatch', `${path}.sequence has an invalid stage`);
+          }
+          values.add(stage.value);
+        }
+        if (!sequence.some(stage => stage.value === activeValue && stage.configName === pattern.configName)) fail('manifest-mismatch', `${path}.sequence does not include the active stage`);
       }
       seenOutputs.add(pattern.outputName);
       continue;
@@ -369,14 +385,14 @@ function validateGfb1(bytes) {
     fail('invalid-bytecode-format', 'bytecode is not GFB1');
   }
   const version = bytes[4] | (bytes[5] << 8);
-  if (![1, 2, 3, 4, 10, 11, 16, 21, 22].includes(version)) fail('unsupported-bytecode-version', 'supported GFB format versions are 1, 2, 3, 4, 10, 11, 16, 21 and 22');
+  if (![1, 2, 3, 4, 10, 11, 16, 18, 21, 22, 26, 27].includes(version)) fail('unsupported-bytecode-version', 'unsupported GFB format version');
   if (version === 22) {
     if (bytes.byteLength < 16) fail('invalid-bytecode-format', 'truncated GFB22 lifecycle envelope');
     const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
     const innerLength = view.getUint32(6, true);
     if (innerLength < 6 || innerLength > bytes.byteLength - 10) fail('invalid-bytecode-format', 'invalid GFB22 base payload length');
     const innerVersion = view.getUint16(14, true);
-    if (![1, 2, 3, 4, 10, 11, 21].includes(innerVersion)) fail('unsupported-bytecode-version', 'unsupported GFB22 base profile');
+    if (![1, 2, 3, 4, 10, 11, 21, 26].includes(innerVersion)) fail('unsupported-bytecode-version', 'unsupported GFB22 base profile');
   }
   return String(version);
 }
@@ -413,6 +429,45 @@ function validateGfbLifecycle(bytes, lifecycle) {
 }
 
 function validateConfigStreamPackageProfile(manifest, version, runtimeAbi) {
+  if (version === '18' || manifest.format === 'GhostFlow/control-v18') {
+    if (version !== '18' || manifest.format !== 'GhostFlow/control-v18'
+      || runtimeAbi !== 'GhostFlow/context-scan-abi-v5'
+      || !Array.isArray(manifest.calendarConditions) || !manifest.calendarConditions.length
+      || !Array.isArray(manifest.calendars) || !manifest.calendars.length
+      || ['schedules','signals','providers','naturalConditions','objectives','adaptSettings','resources']
+        .some(field => manifest[field] !== undefined && (!Array.isArray(manifest[field]) || manifest[field].length))
+      || manifest.accounting !== undefined) {
+      fail('unsupported-runtime-abi', 'signed GFB18 requires a calendar Result without schedule or provider profiles');
+    }
+    return;
+  }
+
+  if (version === '27' || manifest.format === 'GhostFlow/control-v27') {
+    if (version !== '27' || manifest.format !== 'GhostFlow/control-v27'
+      || runtimeAbi !== 'GhostFlow/framed-scan-abi-v1'
+      || !Array.isArray(manifest.schedules) || !manifest.schedules.some(schedule => schedule?.day?.kind === 'weekday')
+      || manifest.schedules.some(schedule => schedule?.kind !== 'daily' || schedule.policy?.basis !== 'pulse'
+        || (schedule.day !== undefined && (schedule.day?.kind !== 'weekday' || !Number.isInteger(schedule.day.mask)
+          || schedule.day.mask < 1 || schedule.day.mask > 127)))
+      || ['configs','signals','providers','calendars','naturalConditions','calendarConditions','objectives','adaptSettings','resources']
+        .some(field => manifest[field] !== undefined && (!Array.isArray(manifest[field]) || manifest[field].length))
+      || manifest.accounting !== undefined) {
+      fail('unsupported-runtime-abi', 'signed GFB27 requires weekday Daily pulses and framed-scan-abi-v1');
+    }
+    return;
+  }
+  if (version === '26' || manifest.format === 'GhostFlow/control-v26') {
+    if (version !== '26' || manifest.format !== 'GhostFlow/control-v26'
+      || runtimeAbi !== 'GhostFlow/context-scan-abi-v5'
+      || !Array.isArray(manifest.weekdayConditions) || !manifest.weekdayConditions.length
+      || !Array.isArray(manifest.configs) || !Array.isArray(manifest.schedules) || manifest.schedules.length
+      || ['signals','providers','calendars','naturalConditions','calendarConditions','objectives','adaptSettings','resources']
+        .some(field => manifest[field] !== undefined && (!Array.isArray(manifest[field]) || manifest[field].length))
+      || manifest.accounting !== undefined) {
+      fail('unsupported-runtime-abi', 'signed GFB26 requires local weekday conditions, control-v26 and context-scan-abi-v5');
+    }
+    return;
+  }
   const stream = version === '11';
   if (version === '16' || manifest.format === 'GhostFlow/control-v15') {
     if (version !== '16' || manifest.format !== 'GhostFlow/control-v15'
@@ -704,7 +759,7 @@ function validateEmbeddedArtifacts(payload) {
 
   exactObject(payload.bytecode, ['format', 'version', 'sha256', 'contentBase64'], 'payload.bytecode');
   if (payload.bytecode.format !== 'GFB1') fail('invalid-bytecode-format', 'payload bytecode format must be GFB1');
-  if (!['1', '2', '3', '4', '10', '11', '16', '21', '22'].includes(payload.bytecode.version)) fail('unsupported-bytecode-version', 'payload bytecode version must be 1, 2, 3, 4, 10, 11, 16, 21 or 22');
+  if (!['1', '2', '3', '4', '10', '11', '16', '18', '21', '22', '26', '27'].includes(payload.bytecode.version)) fail('unsupported-bytecode-version', 'unsupported payload bytecode version');
   digestValue(payload.bytecode.sha256, 'payload.bytecode.sha256');
 
   exactObject(payload.manifest, ['format', 'sha256', 'contentBase64'], 'payload.manifest');
@@ -784,6 +839,8 @@ export async function verifyPortablePackage(packageValue, options = {}) {
   if (lifecycle) validateGfbLifecycle(artifacts.bytecode, manifest.lifecycle);
   const contextManifest = profileVersion === '10';
   const civilManifest = profileVersion === '21';
+  const calendarManifest = profileVersion === '18';
+  const weekdayManifest = profileVersion === '26';
   const manifestKeys = ['format', 'name', 'inputs', 'outputs', 'sensors', 'schedules', 'timers', 'signals', 'configs', 'bytecodeSha256'];
   if (Object.hasOwn(manifest, 'sensorInstances')) {
     if (contextManifest && !sourceMap.sourceClosure) {
@@ -794,7 +851,8 @@ export async function verifyPortablePackage(packageValue, options = {}) {
     // These compiler-derived descriptors are compared in full with canonical
     // source lowering below; a signature cannot substitute instance provenance.
   }
-  if (contextManifest || civilManifest) {
+  if (weekdayManifest) manifestKeys.push('weekdayConditions');
+  if (contextManifest || civilManifest || weekdayManifest || calendarManifest) {
     for (const key of ['providers', 'calendars', 'naturalConditions', 'calendarConditions', 'accounting', 'resources', 'objectives', 'adaptSettings']) {
       if (Object.hasOwn(manifest, key)) manifestKeys.push(key);
     }
@@ -893,9 +951,9 @@ export async function verifyPortablePackage(packageValue, options = {}) {
   for (const [index, schedule] of manifest.schedules.entries()) {
     if (!isPlainObject(schedule)) fail('manifest-mismatch', `manifest.schedules[${index}] must be an object`);
     const name = ghostName(schedule.name, `manifest.schedules[${index}].name`);
-    if (!contextManifest && !civilManifest && !['11', '16'].includes(profileVersion)) {
+    if (!contextManifest && !civilManifest && !['11', '16', '27'].includes(profileVersion)) {
       addGenerated(schedule.dueInput, `__gf_schedule_due_${name}`, `manifest.schedules[${index}].dueInput`);
-    } else if (['11', '16'].includes(profileVersion) && Object.hasOwn(schedule, 'dueInput')) {
+    } else if (['11', '16', '27'].includes(profileVersion) && Object.hasOwn(schedule, 'dueInput')) {
       fail('manifest-mismatch', `manifest.schedules[${index}].dueInput cannot supply a runtime-owned due value`);
     }
   }
@@ -996,7 +1054,8 @@ export async function verifyPortablePackage(packageValue, options = {}) {
         || !equalBytes(artifacts.bytecode,replay.bytes)) throw new Error('adaptive strategy projection does not match canonical source and bytecode');
     }
     if (!equalBytes(replay.bytes, artifacts.bytecode)) throw new Error('canonical source does not reproduce package bytecode');
-    if ((civilManifest || profileVersion === '16') && canonicalJson(manifest) !== canonicalJson(compileSourceSync(sourceText, replayOptions).manifest)) {
+    if ((civilManifest || calendarManifest || profileVersion === '16')
+      && canonicalJson(manifest) !== canonicalJson((guarded ? replay : compileSourceSync(sourceText, replayOptions)).manifest)) {
       throw new Error('context schedule manifest does not match exact owner source lowering');
     }
     if (profileVersion === '11'

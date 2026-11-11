@@ -268,6 +268,8 @@ GhostFlow 用有符号 32 位 `Int` 表示精确计数。超出范围的值和�
 <a id="quantity-type-lookup"></a>
 ### 为你的测量找到类型
 
+在[温室风扇示例](#hot-greenhouse-fan)中试用 30°C 的读数。
+
 即使用摄氏度测量，类型名也是 `Temperature`。不要声明名为 `Celsius` 或 `Fahrenheit` 的类型，而是把单位写在值上：声明 `input air: Temperature;`，并把阈值写成 `30°C`。`30°C`、`86°F` 和 `303.15K` 表示同一个绝对温度。[第 14 章](#ch14)将继续介绍单位转换和温度控制。
 
 | 测量 | 声明类型 | 示例值 | 输入声明 |
@@ -1631,6 +1633,7 @@ node tools/ghostc.mjs follow-switch.ghost.md build/follow-switch.gfb
 
 | 内置函数 | 签名与用途 | 上下文、边界与示例 |
 |---|---|---|
+| `local_day_is` | ``local_day_is(day`mon..fri`, timezone: "Asia/Seoul") -> Result<Bool,ClockFault>`` | 根据可信的当前本地日期检查星期。在用布尔值允许新启动前，必须显式处理时钟故障。 [三个分区的工作日示例](../tests/monitoring-plan.test.mjs). |
 | `calendar_is` | ``calendar_is(calendar, day`workday` or day`offday` or day`holiday`) -> Result<Bool,CalendarFault>`` | 带类型的 WorkCalendar 或 HolidayCalendar，在 GFB18 中需要显式的 UTC 绑定。缺失、超出覆盖范围、已过期或时钟不可信的事实会保留故障；在对成功的 Bool 取反之前，必须先显式处理故障。[已执行的日历边界](../tests/reference-calendar-boundary.test.mjs)。 |
 | `tide_is` | ``tide_is(provider, tide`spring` or tide`neap`) -> Result<Bool,TemporalContextFault>`` | 已声明的 TidePredictions 提供者。预测或时钟上下文缺失/陈旧时为故障。[自然条件](../tests/natural-condition-contract.test.mjs)。 |
 | `moon_is` | ``moon_is(provider, moon`phase`) -> Result<Bool,TemporalContextFault>`` | LunarEphemeris 提供者；月相：new、waxing_crescent、first_quarter、waxing_gibbous、full、waning_gibbous、last_quarter、waning_crescent。[自然条件](../tests/natural-condition-contract.test.mjs)。 |
@@ -1840,6 +1843,28 @@ control KelvinHeater {
     on_below: 291.15K, off_above: 295.15K, initial: false);
   output heater: Bool;
   heater <- cold |> recover(false);
+}
+```
+
+<a id="hot-greenhouse-fan"></a>
+### E38 — 温室过热时打开风扇
+
+将虚拟温室的温度设为 `28°C → 30°C → 28°C → 26°C`。风扇依次为 `关 → 开 → 开 → 关`。高于 `29°C` 时开启，低于 `27°C` 时关闭。等于任一阈值时保留上一状态。
+
+`cool` 记住温室是否凉爽。观测值有效时，风扇使用相反的值。在本例中，三秒内没有新样本，温度读数过期时，风扇关闭。
+
+```ghost
+// E38
+control GreenhouseVentilation {
+  input air: Temperature {
+    sample = 1s;
+    valid = -40°C .. 50°C;
+    stale_after = 3s;
+  }
+  signal cool = hysteresis(air,
+    on_below: 27°C, off_above: 29°C, initial: true);
+  output fan: Bool;
+  fan <- case cool { ok(value) => !value; fault(_) => false; };
 }
 ```
 

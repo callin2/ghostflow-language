@@ -600,19 +600,21 @@ test('GF-TEST-portable-package-browser: signed package verification does not req
 
 test('GF-TEST-portable-package-adapt: canonical Bool strategy package retains optional presence and rejects resigned descriptor changes',async()=>{
  const current=await currentKeyPromise;
- const source='# Explicit feedback\n```ghost\ncontrol Feedback { input door?: Bool; output pump: Bool; adapt policy { strategy WithDoor priority 100 match (door: sensor<Bool>) { pump <- case door { ok(value) => value; fault(_) => false; }; } strategy Baseline priority 0 match always { pump <- false; } } }\n```';
+ const source='# Explicit feedback\n```ghost\ncontrol Feedback { input door?: Bool; output pump: Bool; adapt policy { strategy WithDoor priority 100 match (door: sensor) where door.type == Bool { pump <- case door { ok(value) => value; fault(_) => false; }; } strategy Baseline priority 0 match always { pump <- false; } } }\n```';
  await assert.rejects(compileSource(source.replace('strategy WithDoor','strategy control'),{filename:'feedback.ghost.md'}),/strategy name control is reserved/);
  const compilation=await compileSource(source,{filename:'feedback.ghost.md'});const required=[{kind:'actuator',name:'pump',type:'bool'}];
  const packaged=await buildPortablePackage(compilation,{...identity,requiredCapabilities:required},buildOptions([{keyId:current.keyId,privateKey:current.privateKey}]));
  const options={...verifierOptions(current),supportedManifestFormats:[compilation.manifest.format],availableCapabilities:required};
- const verified=await verifyPortablePackage(packaged,options);assert.equal(verified.manifest.sensors[0].optional,true);assert.equal(verified.manifest.strategies.length,2);
- for(const mutate of [m=>m.strategies[0].priority++,m=>m.strategies[0].name='Forged',m=>m.strategies[0].match[0].role='other',m=>m.strategies[0].outputNames[0]='other',m=>m.adaptPolicy.selection='first',m=>{delete m.strategies;}]){
+ const verified=await verifyPortablePackage(packaged,options);assert.equal(verified.manifest.sensors[0].optional,true);assert.equal(verified.manifest.strategies.length,2);assert.equal(verified.manifest.strategies[0].where,true);
+ const verifiedWithOptional=await verifyPortablePackage(packaged,{...options,availableCapabilities:[...required,{kind:'sensor',name:'door',type:'bool'}]});
+ assert.equal(verifiedWithOptional.manifest.sensors[0].name,'door');
+ for(const mutate of [m=>m.strategies[0].where=false,m=>m.strategies[0].priority++,m=>m.strategies[0].name='Forged',m=>m.strategies[0].match[0].role='other',m=>m.strategies[0].outputNames[0]='other',m=>m.adaptPolicy.selection='first',m=>{delete m.strategies;}]){
   const changed=clone(packaged);const manifest=JSON.parse(Buffer.from(changed.payload.manifest.contentBase64,'base64'));mutate(manifest);const bytes=encoder.encode(canonicalJson(manifest));changed.payload.manifest.contentBase64=base64(bytes);changed.payload.manifest.sha256=await digestHex(bytes);await resign(changed,current);
   await assert.rejects(verifyPortablePackage(changed,{...options,verifyBytecode:()=>assert.fail('tamper must reject before loader')}),PortablePackageError);
  }
  const wasm=fs.readFileSync(wasmPath);
  for(const present of [false,true]){
-  const runtime=await GhostFlowRuntime.instantiate(wasm);try{runtime.load(verified.bytecode.copy());runtime.addCapability('actuator','pump','bool');if(present)runtime.addCapability('sensor','door','bool');runtime.activate();const sensor=verified.manifest.sensors[0];runtime.setBool(sensor.valueInput,true);runtime.setBool(sensor.okInput,true);runtime.setNumber(sensor.faultInput,0);runtime.tick();assert.equal(runtime.trace.requested.pump,present);}finally{runtime.dispose();}
+  const runtime=await GhostFlowRuntime.instantiate(wasm);try{runtime.load(present ? verifiedWithOptional.bytecode.copy() : verified.bytecode.copy());runtime.addCapability('actuator','pump','bool');if(present)runtime.addCapability('sensor','door','bool');runtime.activate();const sensor=verified.manifest.sensors[0];runtime.setBool(sensor.valueInput,true);runtime.setBool(sensor.okInput,true);runtime.setNumber(sensor.faultInput,0);runtime.tick();assert.equal(runtime.trace.requested.pump,present);}finally{runtime.dispose();}
  }
 });
 
@@ -634,4 +636,69 @@ test('signed Solar v15 rejects re-signed descriptor and predicate changes before
     await assert.rejects(verifyPortablePackage(fixture(scenario), options), error => error.code === 'source-map-mismatch' && /context schedule manifest/.test(error.cause?.message));
     assert.equal(called, false);
   }
+});
+
+test('signed calendar Result preserves the Seoul date and rejects rewritten bindings', async () => {
+  const { ControlRuntime } = await import('../runtimes/wasm/control-runtime.mjs');
+  const { createKoreanHolidayCalendar } = await import('../runtimes/node/calendar.mjs');
+  const current = await currentKeyPromise;
+  const source = [
+    '---', 'profile: test-board@1', 'bindings:', '  permitted: board.RO1', '---',
+    '# Calendar decision', '```ghost', 'control HolidayCheck {', ' calendar holidays: HolidayCalendar;',
+    ' let holiday = calendar_is(holidays, day`holiday`, timezone: "Asia/Seoul");',
+    ' output permitted: Bool;', ' permitted <- case holiday { ok(value) => !value; fault(_) => false; };',
+    '}', '```',
+  ].join('\n');
+  const definition = { kind: 'board', connections: {}, defaults: {}, channels: { RO1: { role: 'output', type: 'Bool' } } };
+  const hardwareProfiles = [{ ref: 'test-board@1', definition, sha256: await digestHex(encoder.encode(canonicalJson(definition))) }];
+  const compilation = await compileSource(source, { filename: 'calendar.ghost.md', hardwareProfiles });
+  const contextIdentity = { ...identity, runtimeAbi: 'GhostFlow/context-scan-abi-v5',
+    requiredCapabilities: [{ kind: 'actuator', name: 'permitted', type: 'bool' }] };
+  const packaged = await buildPortablePackage(compilation, contextIdentity, {
+    signers: [{ keyId: current.keyId, privateKey: current.privateKey }],
+    verifyCompilation: (text, { filename }) => compileSource(text, { filename, hardwareProfiles }),
+  });
+  const snapshot = createKoreanHolidayCalendar({ calendarId: 'holidays', nowMs: Date.parse('2026-11-11T00:00:00Z') }).snapshot;
+  const options = { ...verifierOptions(current), supportedRuntimeAbis: [contextIdentity.runtimeAbi],
+    supportedManifestFormats: [compilation.manifest.format], availableCapabilities: contextIdentity.requiredCapabilities };
+  const rejectBeforeLoad = { ...options, verifyBytecode: () => assert.fail('invalid profile reached the bytecode loader') };
+  await assert.rejects(verifyPortablePackage(packaged, rejectBeforeLoad),
+    error => error.code === 'source-map-mismatch' && /supply hardwareProfiles/.test(error.cause?.message));
+  await assert.rejects(verifyPortablePackage(packaged, {
+    ...rejectBeforeLoad,
+    hardwareProfiles: [{ ...hardwareProfiles[0], sha256: '0'.repeat(64) }],
+  }), error => error.code === 'source-map-mismatch' && /digest|SHA-256/.test(error.cause?.message));
+  const pinnedOptions = { ...options, hardwareProfiles };
+  const verified = await verifyPortablePackage(packaged, pinnedOptions);
+  const { site } = verified.manifest.calendarConditions[0];
+  const wasm = fs.readFileSync(wasmPath);
+  const context = { bootEpoch: 1, terminalCapacity: 64, bindings: [{ kind: 'calendar', provider: 'holidays',
+    namespace: 'calendar-replay', station: 'virtual', bindingRevision: 'calendar-v1',
+    location: 'virtual', timezone: 'Asia/Seoul', criteria: 'calendar', maxUncertaintyMs: 0 }] };
+  for (const instantiate of [ControlRuntime.instantiate, ControlRuntime.instantiateFramed]) {
+    const runtime = await instantiate(wasm, { ...compilation, manifest: verified.manifest, bytes: verified.bytecode.copy() }, { context, hardwareProfiles });
+    try {
+      const midnight = Date.parse('2027-01-01T00:00:00+09:00');
+      function step(monotonicMs, wallMs, uncertaintyMs = 0, calendar = snapshot) {
+        return runtime.step({ nowMs: monotonicMs, contextFacts: {
+          clock: { monotonicMs, wallMs, uncertaintyMs, bootEpoch: 1, trusted: true, unknownReason: null, sourceRevision: 'test-clock' },
+          natural: [], schedules: [{ site, coverageStartMs: 0, coverageEndMs: 253402300800000,
+            provider: null, calendar, rows: [] }], settings: null,
+        } }).vm.safe.permitted;
+      }
+      assert.equal(step(0, midnight - 1000), true);
+      assert.equal(step(1, midnight - 1, 2), false, 'uncertainty over midnight cannot permit an output');
+      assert.equal(step(2, midnight), false, 'Seoul New Year starts while UTC is still Dec 31');
+      assert.equal(step(3, midnight + 86_400_000, 0, null), false, 'missing calendar cannot permit an output');
+    } finally { runtime.dispose(); }
+  }
+  const forged = clone(packaged);
+  const manifest = JSON.parse(Buffer.from(forged.payload.manifest.contentBase64, 'base64'));
+  manifest.calendarConditions[0].timezone = 'UTC';
+  const bytes = encoder.encode(canonicalJson(manifest));
+  forged.payload.manifest.contentBase64 = base64(bytes);
+  forged.payload.manifest.sha256 = await digestHex(bytes);
+  await resign(forged, current);
+  await assert.rejects(verifyPortablePackage(forged, pinnedOptions),
+    error => error.code === 'source-map-mismatch' && /context schedule manifest/.test(error.cause?.message));
 });
