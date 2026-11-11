@@ -385,7 +385,7 @@ function validateGfb1(bytes) {
     fail('invalid-bytecode-format', 'bytecode is not GFB1');
   }
   const version = bytes[4] | (bytes[5] << 8);
-  if (![1, 2, 3, 4, 10, 11, 16, 21, 22, 26].includes(version)) fail('unsupported-bytecode-version', 'unsupported GFB format version');
+  if (![1, 2, 3, 4, 10, 11, 16, 21, 22, 26, 27].includes(version)) fail('unsupported-bytecode-version', 'unsupported GFB format version');
   if (version === 22) {
     if (bytes.byteLength < 16) fail('invalid-bytecode-format', 'truncated GFB22 lifecycle envelope');
     const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
@@ -429,6 +429,20 @@ function validateGfbLifecycle(bytes, lifecycle) {
 }
 
 function validateConfigStreamPackageProfile(manifest, version, runtimeAbi) {
+  if (version === '27' || manifest.format === 'GhostFlow/control-v27') {
+    if (version !== '27' || manifest.format !== 'GhostFlow/control-v27'
+      || runtimeAbi !== 'GhostFlow/framed-scan-abi-v1'
+      || !Array.isArray(manifest.schedules) || !manifest.schedules.some(schedule => schedule?.day?.kind === 'weekday')
+      || manifest.schedules.some(schedule => schedule?.kind !== 'daily' || schedule.policy?.basis !== 'pulse'
+        || (schedule.day !== undefined && (schedule.day?.kind !== 'weekday' || !Number.isInteger(schedule.day.mask)
+          || schedule.day.mask < 1 || schedule.day.mask > 127)))
+      || ['configs','signals','providers','calendars','naturalConditions','calendarConditions','objectives','adaptSettings','resources']
+        .some(field => manifest[field] !== undefined && (!Array.isArray(manifest[field]) || manifest[field].length))
+      || manifest.accounting !== undefined) {
+      fail('unsupported-runtime-abi', 'signed GFB27 requires weekday Daily pulses and framed-scan-abi-v1');
+    }
+    return;
+  }
   if (version === '26' || manifest.format === 'GhostFlow/control-v26') {
     if (version !== '26' || manifest.format !== 'GhostFlow/control-v26'
       || runtimeAbi !== 'GhostFlow/context-scan-abi-v5'
@@ -732,7 +746,7 @@ function validateEmbeddedArtifacts(payload) {
 
   exactObject(payload.bytecode, ['format', 'version', 'sha256', 'contentBase64'], 'payload.bytecode');
   if (payload.bytecode.format !== 'GFB1') fail('invalid-bytecode-format', 'payload bytecode format must be GFB1');
-  if (!['1', '2', '3', '4', '10', '11', '16', '21', '22', '26'].includes(payload.bytecode.version)) fail('unsupported-bytecode-version', 'unsupported payload bytecode version');
+  if (!['1', '2', '3', '4', '10', '11', '16', '21', '22', '26', '27'].includes(payload.bytecode.version)) fail('unsupported-bytecode-version', 'unsupported payload bytecode version');
   digestValue(payload.bytecode.sha256, 'payload.bytecode.sha256');
 
   exactObject(payload.manifest, ['format', 'sha256', 'contentBase64'], 'payload.manifest');

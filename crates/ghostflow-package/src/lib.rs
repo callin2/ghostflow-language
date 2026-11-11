@@ -660,7 +660,7 @@ fn validate_gfb1(bytes: &[u8]) -> Result<u16> {
         return fail(ErrorCode::InvalidBytecodeFormat, "bytecode is not GFB1");
     }
     let version = u16::from_le_bytes([bytes[4], bytes[5]]);
-    if !matches!(version, 1..=4 | 10 | 11 | 16 | 21 | 22 | 26) {
+    if !matches!(version, 1..=4 | 10 | 11 | 16 | 21 | 22 | 26 | 27) {
         return fail(
             ErrorCode::UnsupportedBytecodeVersion,
             "unsupported GFB format version",
@@ -2852,6 +2852,106 @@ fn verify_solar_bindings(manifest: &Value, module: &ghostflow_core::Module) -> R
     Ok(())
 }
 
+fn verify_weekday_daily_bindings(manifest: &Value, module: &ghostflow_core::Module) -> Result<()> {
+    use ghostflow_core::schedule_vm::PulseDescriptor;
+
+    let mismatch = |message: &str| PortablePackageError {
+        code: ErrorCode::ManifestMismatch,
+        message: message.into(),
+    };
+    if ["configs", "signals"]
+        .iter()
+        .any(|field| !manifest[field].as_array().is_some_and(Vec::is_empty))
+    {
+        return Err(mismatch(
+            "weekday Daily requires the standalone schedule profile",
+        ));
+    }
+    let schedules = manifest["schedules"]
+        .as_array()
+        .ok_or_else(|| mismatch("weekday Daily schedules must be an array"))?;
+    let requirements = module
+        .schedule_requirements()
+        .ok_or_else(|| mismatch("weekday Daily descriptors missing"))?;
+    for strategy in &requirements.strategies {
+        if strategy.schedules.len() != schedules.len() {
+            return Err(mismatch(
+                "weekday Daily schedule count differs from bytecode",
+            ));
+        }
+        let mut sites = HashSet::new();
+        for (schedule, actual) in schedules.iter().zip(&strategy.schedules) {
+            let PulseDescriptor::Daily(actual) = actual else {
+                return Err(mismatch("weekday Daily requires a Daily descriptor"));
+            };
+            let schedule_object = value_object(schedule, "weekday Daily schedule")?;
+            let mut keys = vec![
+                "kind",
+                "site",
+                "name",
+                "timezone",
+                "atMs",
+                "dstMissing",
+                "dstRepeated",
+                "policy",
+            ];
+            if actual.weekday_mask != 0 {
+                keys.push("day");
+                let day = value_object(&schedule["day"], "weekday selector")?;
+                exact_keys(
+                    day,
+                    &["kind", "mask"],
+                    "weekday selector",
+                    ErrorCode::ManifestMismatch,
+                )?;
+                if schedule["day"]["kind"] != "weekday"
+                    || schedule["day"]["mask"].as_u64() != Some(u64::from(actual.weekday_mask))
+                {
+                    return Err(mismatch("weekday mask differs from bytecode"));
+                }
+            }
+            exact_keys(
+                schedule_object,
+                &keys,
+                "weekday Daily schedule",
+                ErrorCode::ManifestMismatch,
+            )?;
+            let policy = &schedule["policy"];
+            exact_keys(
+                value_object(policy, "Daily policy")?,
+                &["basis", "when", "clock", "gapMs", "recovery", "fallback"],
+                "Daily policy",
+                ErrorCode::ManifestMismatch,
+            )?;
+            if !sites.insert(actual.site)
+                || schedule["kind"] != "daily"
+                || schedule["site"].as_u64() != Some(u64::from(actual.site))
+                || schedule["name"].as_str() != Some(actual.name.as_str())
+                || schedule["timezone"].as_str() != Some(actual.timezone.as_str())
+                || schedule["atMs"].as_u64() != Some(actual.at_ms)
+                || schedule["dstMissing"].as_str()
+                    != ["skip", "next_valid"]
+                        .get(usize::from(actual.dst_missing))
+                        .copied()
+                || schedule["dstRepeated"].as_str()
+                    != ["first", "second", "both", "skip"]
+                        .get(usize::from(actual.dst_repeated))
+                        .copied()
+                || policy["basis"] != "pulse"
+                || policy["clock"] != "trusted_only"
+                || policy["gapMs"].as_u64() != Some(actual.gap_ms)
+                || policy["recovery"] != "baseline"
+                || policy["fallback"] != "skip"
+                || predicate_projection::encode(&policy["when"], module).as_deref()
+                    != Some(actual.when.as_slice())
+            {
+                return Err(mismatch("weekday Daily descriptor differs from bytecode"));
+            }
+        }
+    }
+    Ok(())
+}
+
 fn verify_civil_range_bindings(manifest: &Value, module: &ghostflow_core::Module) -> Result<()> {
     use ghostflow_core::{context_vm::ScheduleDefinition, schedule_vm::PulseDescriptor};
     let mismatch = |message: &str| PortablePackageError {
@@ -3712,7 +3812,7 @@ pub fn verify_portable_package_with_signature_policy(
     }
     if !matches!(
         payload.bytecode.version.as_str(),
-        "1" | "2" | "3" | "4" | "10" | "11" | "16" | "21" | "22" | "26"
+        "1" | "2" | "3" | "4" | "10" | "11" | "16" | "21" | "22" | "26" | "27"
     ) {
         return fail(
             ErrorCode::UnsupportedBytecodeVersion,
@@ -3788,7 +3888,7 @@ pub fn verify_portable_package_with_signature_policy(
         message: format!("native artifact validation failed: {error}"),
     })?;
     let profile_version = module.bytecode_format_version();
-    if !matches!(profile_version, 1..=4 | 10 | 11 | 16 | 21 | 26)
+    if !matches!(profile_version, 1..=4 | 10 | 11 | 16 | 21 | 26 | 27)
         || (profile_version == 16 && bytecode_version == 22)
     {
         return fail(
@@ -3799,6 +3899,7 @@ pub fn verify_portable_package_with_signature_policy(
     if (profile_version == 11) != (payload.manifest.format == "GhostFlow/control-v10")
         || (profile_version == 16) != (payload.manifest.format == "GhostFlow/control-v15")
         || (profile_version == 26) != (payload.manifest.format == "GhostFlow/control-v26")
+        || (profile_version == 27) != (payload.manifest.format == "GhostFlow/control-v27")
         || matches!(profile_version, 11 | 16 | 21 | 26)
             != (identity.runtime_abi == "GhostFlow/context-scan-abi-v5")
     {
@@ -3857,6 +3958,9 @@ pub fn verify_portable_package_with_signature_policy(
     }
     if profile_version == 21 {
         verify_civil_range_bindings(&manifest, &module)?;
+    }
+    if profile_version == 27 {
+        verify_weekday_daily_bindings(&manifest, &module)?;
     }
     verify_adapt_bindings(&manifest, &bytecode)?;
     verify_debounce_bindings(&manifest, &bytecode)?;
