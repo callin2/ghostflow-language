@@ -432,13 +432,13 @@ impl ScanDriver {
                     .runtime
                     .module
                     .as_ref()
-                    .is_some_and(|m| matches!(m.format_version, 5 | 6 | 8 | 9)))
+                    .is_some_and(|m| matches!(m.format_version, 5 | 6 | 8 | 9 | 27)))
             || (self.runtime.context_runtime.is_some()
                 && ((name == "__gf_time_epoch"
                     && self.runtime.module.as_ref().is_some_and(|m| {
                         matches!(
                             m.format_version,
-                            10 | 11 | 12 | 13 | 14 | 15 | 16 | 18 | 19 | 20 | 21 | 23 | 24
+                            10 | 11 | 12 | 13 | 14 | 15 | 16 | 18 | 19 | 20 | 21 | 23 | 24 | 26
                         )
                     }))
                     || [
@@ -446,6 +446,7 @@ impl ScanDriver {
                         "__gf_natural_",
                         "__gf_accounting_",
                         "__gf_calendar_",
+                        "__gf_weekday_",
                     ]
                     .iter()
                     .any(|prefix| name.starts_with(prefix))))
@@ -498,7 +499,7 @@ impl ScanDriver {
             let derive_epoch = runtime.module.as_ref().is_some_and(|m| {
                 matches!(
                     m.format_version,
-                    10 | 11 | 12 | 13 | 14 | 15 | 16 | 18 | 19 | 20 | 21 | 23 | 24
+                    10 | 11 | 12 | 13 | 14 | 15 | 16 | 18 | 19 | 20 | 21 | 23 | 24 | 26
                 )
             });
             let result = if let Some((clock, facts)) = context {

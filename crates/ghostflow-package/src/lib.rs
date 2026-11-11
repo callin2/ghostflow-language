@@ -660,10 +660,10 @@ fn validate_gfb1(bytes: &[u8]) -> Result<u16> {
         return fail(ErrorCode::InvalidBytecodeFormat, "bytecode is not GFB1");
     }
     let version = u16::from_le_bytes([bytes[4], bytes[5]]);
-    if !matches!(version, 1..=4 | 10 | 11 | 16 | 21 | 22) {
+    if !matches!(version, 1..=4 | 10 | 11 | 16 | 21 | 22 | 26 | 27) {
         return fail(
             ErrorCode::UnsupportedBytecodeVersion,
-            "supported GFB format versions are 1, 2, 3, 4, 10, 11, 16, 21 and 22",
+            "unsupported GFB format version",
         );
     }
     ghostflow_core::Module::load(bytes).map_err(|error| PortablePackageError {
@@ -1917,9 +1917,14 @@ fn verify_config_bindings(manifest: &Value, module: &ghostflow_core::Module) -> 
         ));
     }
     let solar_profile = module.bytecode_format_version() == 16;
+    let weekday_profile = module.bytecode_format_version() == 26;
     let configs = manifest["configs"].as_array().unwrap();
     let manifest_schedules = manifest["schedules"].as_array().unwrap();
-    if configs.is_empty() && !solar_profile {
+    let weekdays = manifest["weekdayConditions"].as_array();
+    if weekday_profile && !weekdays.is_some_and(|items| !items.is_empty()) {
+        return Err(mismatch("missing weekday conditions"));
+    }
+    if configs.is_empty() && !solar_profile && !weekday_profile {
         return Err(mismatch("portable GFB11 profile requires config streams"));
     }
     let scalar_matches = |actual: MachineValue, expected: &Value| match actual {
@@ -1929,12 +1934,13 @@ fn verify_config_bindings(manifest: &Value, module: &ghostflow_core::Module) -> 
     };
     let inputs: HashMap<_, _> = module.input_fields().collect();
     let mut generated = HashMap::new();
-    if !manifest_schedules.is_empty() {
+    if !manifest_schedules.is_empty() || weekday_profile {
         generated.insert("__gf_now_ms".to_owned(), Type::Number);
         generated.insert("__gf_time_epoch".to_owned(), Type::Number);
     }
     for strategy in &schedules.strategies {
-        if strategy.schedules.len() != configs.len() + manifest_schedules.len() {
+        let weekday_count = weekdays.map_or(0, Vec::len);
+        if strategy.schedules.len() != configs.len() + manifest_schedules.len() + weekday_count {
             return Err(mismatch(
                 "manifest config/schedule count differs from bytecode",
             ));
@@ -1942,6 +1948,27 @@ fn verify_config_bindings(manifest: &Value, module: &ghostflow_core::Module) -> 
         let mut ids = HashSet::new();
         let mut sites = HashSet::new();
         for descriptor in &strategy.schedules {
+            if let PulseDescriptor::Weekday(weekday) = descriptor {
+                let projection = |suffix| format!("__gf_weekday_{}_{suffix}", weekday.site);
+                let expected = serde_json::json!({
+                    "site": weekday.site, "timezone": weekday.timezone, "mask": weekday.mask,
+                    "result": {"value": "Bool", "error": "ClockFault"},
+                    "projectionInputs": {"ok": projection("ok"), "value": projection("value"), "fault": projection("fault")}
+                });
+                if !sites.insert(weekday.site)
+                    || !weekdays.is_some_and(|items| items.iter().any(|item| *item == expected))
+                {
+                    return Err(mismatch("weekday condition differs from bytecode"));
+                }
+                for (suffix, ty) in [
+                    ("ok", Type::Bool),
+                    ("value", Type::Bool),
+                    ("fault", Type::Number),
+                ] {
+                    generated.insert(projection(suffix), ty);
+                }
+                continue;
+            }
             let PulseDescriptor::Config(config) = descriptor else {
                 let PulseDescriptor::Context(periodic) = descriptor else {
                     return Err(mismatch(
@@ -2097,7 +2124,7 @@ fn verify_config_bindings(manifest: &Value, module: &ghostflow_core::Module) -> 
                 ));
             }
         }
-        if ids.len() != configs.len() || sites.len() != manifest_schedules.len() {
+        if ids.len() != configs.len() || sites.len() != manifest_schedules.len() + weekday_count {
             return Err(mismatch(
                 "GFB11 config or Periodic identity count differs from bytecode",
             ));
@@ -2106,9 +2133,10 @@ fn verify_config_bindings(manifest: &Value, module: &ghostflow_core::Module) -> 
     if generated
         .iter()
         .any(|(name, ty)| inputs.get(name.as_str()) != Some(ty))
-        || inputs
-            .iter()
-            .any(|(name, ty)| name.starts_with("__gf_config_") && generated.get(*name) != Some(ty))
+        || inputs.iter().any(|(name, ty)| {
+            (name.starts_with("__gf_config_") || name.starts_with("__gf_weekday_"))
+                && generated.get(*name) != Some(ty)
+        })
     {
         return Err(mismatch("GFB11 generated input ports differ from bytecode"));
     }
@@ -2131,7 +2159,7 @@ fn verify_debounce_bindings(manifest: &Value, bytecode: &[u8]) -> Result<()> {
         code: ErrorCode::BytecodeRejected,
         message: format!("native artifact validation failed: {error}"),
     })?;
-    if matches!(module.bytecode_format_version(), 11 | 16) {
+    if matches!(module.bytecode_format_version(), 11 | 16 | 26) {
         verify_config_bindings(manifest, &module)?;
     } else {
         verify_window_bindings(manifest, &module)?;
@@ -2824,6 +2852,106 @@ fn verify_solar_bindings(manifest: &Value, module: &ghostflow_core::Module) -> R
     Ok(())
 }
 
+fn verify_weekday_daily_bindings(manifest: &Value, module: &ghostflow_core::Module) -> Result<()> {
+    use ghostflow_core::schedule_vm::PulseDescriptor;
+
+    let mismatch = |message: &str| PortablePackageError {
+        code: ErrorCode::ManifestMismatch,
+        message: message.into(),
+    };
+    if ["configs", "signals"]
+        .iter()
+        .any(|field| !manifest[field].as_array().is_some_and(Vec::is_empty))
+    {
+        return Err(mismatch(
+            "weekday Daily requires the standalone schedule profile",
+        ));
+    }
+    let schedules = manifest["schedules"]
+        .as_array()
+        .ok_or_else(|| mismatch("weekday Daily schedules must be an array"))?;
+    let requirements = module
+        .schedule_requirements()
+        .ok_or_else(|| mismatch("weekday Daily descriptors missing"))?;
+    for strategy in &requirements.strategies {
+        if strategy.schedules.len() != schedules.len() {
+            return Err(mismatch(
+                "weekday Daily schedule count differs from bytecode",
+            ));
+        }
+        let mut sites = HashSet::new();
+        for (schedule, actual) in schedules.iter().zip(&strategy.schedules) {
+            let PulseDescriptor::Daily(actual) = actual else {
+                return Err(mismatch("weekday Daily requires a Daily descriptor"));
+            };
+            let schedule_object = value_object(schedule, "weekday Daily schedule")?;
+            let mut keys = vec![
+                "kind",
+                "site",
+                "name",
+                "timezone",
+                "atMs",
+                "dstMissing",
+                "dstRepeated",
+                "policy",
+            ];
+            if actual.weekday_mask != 0 {
+                keys.push("day");
+                let day = value_object(&schedule["day"], "weekday selector")?;
+                exact_keys(
+                    day,
+                    &["kind", "mask"],
+                    "weekday selector",
+                    ErrorCode::ManifestMismatch,
+                )?;
+                if schedule["day"]["kind"] != "weekday"
+                    || schedule["day"]["mask"].as_u64() != Some(u64::from(actual.weekday_mask))
+                {
+                    return Err(mismatch("weekday mask differs from bytecode"));
+                }
+            }
+            exact_keys(
+                schedule_object,
+                &keys,
+                "weekday Daily schedule",
+                ErrorCode::ManifestMismatch,
+            )?;
+            let policy = &schedule["policy"];
+            exact_keys(
+                value_object(policy, "Daily policy")?,
+                &["basis", "when", "clock", "gapMs", "recovery", "fallback"],
+                "Daily policy",
+                ErrorCode::ManifestMismatch,
+            )?;
+            if !sites.insert(actual.site)
+                || schedule["kind"] != "daily"
+                || schedule["site"].as_u64() != Some(u64::from(actual.site))
+                || schedule["name"].as_str() != Some(actual.name.as_str())
+                || schedule["timezone"].as_str() != Some(actual.timezone.as_str())
+                || schedule["atMs"].as_u64() != Some(actual.at_ms)
+                || schedule["dstMissing"].as_str()
+                    != ["skip", "next_valid"]
+                        .get(usize::from(actual.dst_missing))
+                        .copied()
+                || schedule["dstRepeated"].as_str()
+                    != ["first", "second", "both", "skip"]
+                        .get(usize::from(actual.dst_repeated))
+                        .copied()
+                || policy["basis"] != "pulse"
+                || policy["clock"] != "trusted_only"
+                || policy["gapMs"].as_u64() != Some(actual.gap_ms)
+                || policy["recovery"] != "baseline"
+                || policy["fallback"] != "skip"
+                || predicate_projection::encode(&policy["when"], module).as_deref()
+                    != Some(actual.when.as_slice())
+            {
+                return Err(mismatch("weekday Daily descriptor differs from bytecode"));
+            }
+        }
+    }
+    Ok(())
+}
+
 fn verify_civil_range_bindings(manifest: &Value, module: &ghostflow_core::Module) -> Result<()> {
     use ghostflow_core::{context_vm::ScheduleDefinition, schedule_vm::PulseDescriptor};
     let mismatch = |message: &str| PortablePackageError {
@@ -3061,9 +3189,12 @@ fn verify_manifest(
     if object.contains_key("monitoring") {
         keys.push("monitoring");
     }
+    if object["format"].as_str() == Some("GhostFlow/control-v26") {
+        keys.push("weekdayConditions");
+    }
     if matches!(
         object["format"].as_str(),
-        Some("GhostFlow/control-v15" | "GhostFlow/control-v21")
+        Some("GhostFlow/control-v15" | "GhostFlow/control-v21" | "GhostFlow/control-v26")
     ) {
         for field in [
             "providers",
@@ -3681,11 +3812,11 @@ pub fn verify_portable_package_with_signature_policy(
     }
     if !matches!(
         payload.bytecode.version.as_str(),
-        "1" | "2" | "3" | "4" | "10" | "11" | "16" | "21" | "22"
+        "1" | "2" | "3" | "4" | "10" | "11" | "16" | "21" | "22" | "26" | "27"
     ) {
         return fail(
             ErrorCode::UnsupportedBytecodeVersion,
-            "payload bytecode version must be 1, 2, 3, 4, 10, 11, 16, 21 or 22",
+            "unsupported payload bytecode version",
         );
     }
     require_digest(&payload.bytecode.sha256, "payload.bytecode.sha256")?;
@@ -3757,7 +3888,7 @@ pub fn verify_portable_package_with_signature_policy(
         message: format!("native artifact validation failed: {error}"),
     })?;
     let profile_version = module.bytecode_format_version();
-    if !matches!(profile_version, 1..=4 | 10 | 11 | 16 | 21)
+    if !matches!(profile_version, 1..=4 | 10 | 11 | 16 | 21 | 26 | 27)
         || (profile_version == 16 && bytecode_version == 22)
     {
         return fail(
@@ -3767,12 +3898,14 @@ pub fn verify_portable_package_with_signature_policy(
     }
     if (profile_version == 11) != (payload.manifest.format == "GhostFlow/control-v10")
         || (profile_version == 16) != (payload.manifest.format == "GhostFlow/control-v15")
-        || matches!(profile_version, 11 | 16 | 21)
+        || (profile_version == 26) != (payload.manifest.format == "GhostFlow/control-v26")
+        || (profile_version == 27) != (payload.manifest.format == "GhostFlow/control-v27")
+        || matches!(profile_version, 11 | 16 | 21 | 26)
             != (identity.runtime_abi == "GhostFlow/context-scan-abi-v5")
     {
         return fail(
             ErrorCode::ManifestMismatch,
-            "GFB11/16/21 requires its matching manifest and context-scan-abi-v5",
+            "context bytecode requires its matching manifest and context-scan-abi-v5",
         );
     }
     let source_text = String::from_utf8(source_bytes).map_err(|_| PortablePackageError {
@@ -3825,6 +3958,9 @@ pub fn verify_portable_package_with_signature_policy(
     }
     if profile_version == 21 {
         verify_civil_range_bindings(&manifest, &module)?;
+    }
+    if profile_version == 27 {
+        verify_weekday_daily_bindings(&manifest, &module)?;
     }
     verify_adapt_bindings(&manifest, &bytecode)?;
     verify_debounce_bindings(&manifest, &bytecode)?;
@@ -5829,6 +5965,7 @@ mod tests {
                             settings: None,
                             accounting: vec![],
                             scheduled_dates: vec![],
+                            local_weekdays: vec![],
                         },
                     )
                     .map_err(|e| e.to_string())?;

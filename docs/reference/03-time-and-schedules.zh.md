@@ -1031,7 +1031,7 @@ calendar = workers;
 
 - `holiday` 表示属于公共节假日日期列表。
 - 同一日期的 `work` 例外会保留节假日事实。每周模式和节假日工作策略不会影响它。
-- `holiday`、`workday` 和 `offday` 的 Daily 脉冲使用带类型的日历以及显式的通用/夏令时策略。Daily 脉冲的星期标签仍不在此执行范围内。
+- `holiday`、`workday` 和 `offday` 的 Daily 脉冲使用带类型的日历以及显式的通用/夏令时策略。带 ``on = day`mon..fri` `` 的 Daily 脉冲按计划的本地日期判定，无需日历。星期筛选保留声明的时间精度和夏令时策略。
 - 带 `workday`、`offday` 或 `holiday` 选择器的普通 `calendar_is` 返回下文所示的带类型 Result。其有界可执行配置档需要显式的 UTC 日历绑定。其他时区配置档在激活时被拒绝，宿主也不提供预先计算的资格值。
 
 **日历的组合与版本管理。**
@@ -1060,6 +1060,7 @@ calendar = workers;
 
 ```ghost
 let weekday = local_day_is(day`mon..fri`, timezone: "Asia/Seoul");
+let weekday_start = case weekday { ok(value) => value; fault(_) => false; };
 let working = calendar_is(workers, day`workday`);
 let can_start = case working { ok(value) => value; fault(_) => false; };
 ```

@@ -1032,7 +1032,7 @@ calendar = workers;
 
 - `holiday`は、祝日の日付リストに含まれることを意味します。
 - 同じ日付に対する`work`例外があっても、祝日というファクトは維持されます。週間パターンや祝日の稼働ポリシーはこれに影響しません。
-- `holiday`、`workday`、`offday`に対するDailyのパルスは、型付きカレンダーと明示的な共通・DSTポリシーを使います。Dailyのパルスでの曜日タグは、まだこの実行範囲の外です。
+- `holiday`、`workday`、`offday`に対するDailyのパルスは、型付きカレンダーと明示的な共通・DSTポリシーを使います。``on = day`mon..fri` `` を指定したDailyパルスは、予定された現地日付で判定し、カレンダーを必要としません。指定した時刻の精度とDSTポリシーを維持します。
 - `workday`、`offday`、`holiday`セレクタを持つ通常の`calendar_is`は、後述の型付きResultを返します。その有界な実行可能プロファイルには、明示的なUTCカレンダーのバインディングが必要です。その他のタイムゾーンのプロファイルは有効化時に拒否され、ホストが事前計算した適格性の値を与えることはありません。
 
 **カレンダーの合成とバージョン管理**。
@@ -1061,6 +1061,7 @@ calendar = workers;
 
 ```ghost
 let weekday = local_day_is(day`mon..fri`, timezone: "Asia/Seoul");
+let weekday_start = case weekday { ok(value) => value; fault(_) => false; };
 let working = calendar_is(workers, day`workday`);
 let can_start = case working { ok(value) => value; fault(_) => false; };
 ```

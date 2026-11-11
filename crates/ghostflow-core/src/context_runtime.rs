@@ -26,6 +26,7 @@ pub struct Facts {
     pub solars: Vec<SolarContextEvidence>,
     pub schedules: Vec<ScheduleEvidence>,
     pub scheduled_dates: Vec<ScheduledLocalDateFact>,
+    pub local_weekdays: Vec<LocalWeekdayFact>,
     pub natural: Vec<ProviderObservation>,
     pub settings: Option<SettingsEvent>,
     pub accounting: Vec<AccountingInput>,
@@ -515,7 +516,9 @@ impl ContextRuntime {
                     if d.kind == NaturalKind::Tide { 0 } else { 1 },
                     None,
                 )),
-                PulseDescriptor::Accounting(_) | PulseDescriptor::Config(_) => None,
+                PulseDescriptor::Accounting(_)
+                | PulseDescriptor::Config(_)
+                | PulseDescriptor::Weekday(_) => None,
                 PulseDescriptor::Calendar(d) => {
                     Some((d.calendar.as_str(), 2, Some(d.timezone.as_str())))
                 }
@@ -635,6 +638,49 @@ impl ContextRuntime {
             trace: Vec::new(),
         };
         staged.runtime.clock.poll(clock)?;
+        let mut weekday_facts = BTreeMap::new();
+        for fact in &facts.local_weekdays {
+            let valid = descriptors.iter().any(|entry| {
+                matches!(entry, PulseDescriptor::Weekday(d)
+                    if d.site == fact.site && d.timezone == fact.timezone)
+            });
+            if !valid
+                || clock.trust != ClockTrust::Trusted
+                || clock.wall_ms != Some(fact.wall_ms)
+                || fact.local_day > 2_932_896
+                || u64::from(fact.local_day).abs_diff(fact.wall_ms / 86_400_000) > 1
+                || weekday_facts.insert(fact.site, fact).is_some()
+            {
+                return Err(invalid("invalid or duplicate local weekday fact"));
+            }
+        }
+        for entry in descriptors {
+            if let PulseDescriptor::Weekday(d) = entry {
+                let fact = weekday_facts.get(&d.site);
+                let value = fact.map(|date| d.mask & (1 << ((date.local_day + 4) % 7)) != 0);
+                inputs[usize::from(d.ok_input)] = Value::Bool(value.is_some());
+                inputs[usize::from(d.value_input)] = Value::Bool(value.unwrap_or(false));
+                inputs[usize::from(d.fault_input)] = Value::Number(0.0);
+                staged.trace.push(Observation {
+                    site: d.site,
+                    occurrence_id: format!("{}:weekday", d.site),
+                    planned_ms: clock.wall_ms,
+                    decision: value
+                        .map_or_else(|| "Fault(ClockUnknown)".into(), |v| format!("Ok({v})")),
+                    provider_revision: String::new(),
+                    context_revision: d.timezone.clone(),
+                    solar_fallback: None,
+                    source_day: None,
+                    scheduled_day: fact.map(|date| date.local_day as i32),
+                    date_resolver_revision: None,
+                    solar_unavailable_reason: None,
+                    clock_provenance: None,
+                    clock_source_revision: clock.source_revision.map(str::to_owned),
+                    clock_uncertainty_ms: clock.uncertainty_ms,
+                    unknown_reason: value.is_none().then(|| "ClockUnknown".into()),
+                });
+            }
+        }
         let expected = descriptors
             .iter()
             .filter(|d| matches!(d, PulseDescriptor::Calendar(_)) || matches!(d, PulseDescriptor::Context(c) if !matches!(c.definition, ScheduleDefinition::AtPulse { .. } | ScheduleDefinition::AtWindow { .. } | ScheduleDefinition::SolarContext { .. })))

@@ -183,6 +183,7 @@ impl SolarRuntime {
                 PulseDescriptor::Context(_)
                     | PulseDescriptor::Natural(_)
                     | PulseDescriptor::Calendar(_)
+                    | PulseDescriptor::Weekday(_)
                     | PulseDescriptor::Accounting(_)
             )
         }) {
@@ -301,13 +302,20 @@ impl SolarRuntime {
                 }
             }
             let stage = engine.begin_with_unknown(clock, input.facts, unknown_reason)?;
+            let eligible = match descriptor {
+                PulseDescriptor::Daily(d) if d.weekday_mask != 0 => stage
+                    .pending_source_day()
+                    .map(|day| d.weekday_mask & (1 << ((i64::from(day) + 4).rem_euclid(7))) != 0),
+                _ => Some(true),
+            };
             // Evaluate on the admitted crossing only. A false condition is a
             // terminal per-occurrence outcome; later ticks cannot re-fire it.
-            let predicate = if stage
-                .result()
-                .observations
-                .iter()
-                .any(|row| row.decision == crate::solar_admission::SolarDecision::Before)
+            let predicate = if eligible == Some(true)
+                && stage
+                    .result()
+                    .observations
+                    .iter()
+                    .any(|row| row.decision == crate::solar_admission::SolarDecision::Before)
             {
                 match eval_expression_with_preludes(
                     descriptor.when(),
@@ -325,7 +333,7 @@ impl SolarRuntime {
             } else {
                 false
             };
-            let mut result = engine.commit(stage.evaluate(predicate)?)?;
+            let mut result = engine.commit(stage.evaluate_with_day(predicate, eligible)?)?;
             if matches!(
                 descriptor,
                 PulseDescriptor::Daily(_) | PulseDescriptor::DailySlots(_)
