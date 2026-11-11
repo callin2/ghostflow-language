@@ -1516,7 +1516,7 @@ impl Runtime {
                 11 | 12 | 13 | 14 | 15 | 16 | 18 | 19 | 20 | 21 | 23 | 24 | 26
             )
         }) {
-            return Err(Error::new("context facts require GFB10, GFB11 or GFB12"));
+            return Err(Error::new("context facts require context bytecode"));
         }
         self.tick_inner(None, Some((clock, facts)), None)
     }
