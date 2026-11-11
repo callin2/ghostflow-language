@@ -16,6 +16,7 @@ pub unsafe extern "C" fn gf_rolling_output_open(
     limit_ms: u64,
     reserve_ms: u64,
     max_intervals: u32,
+    boot_epoch: u64,
     now_ms: u64,
     checkpoint: *const u8,
     checkpoint_len: usize,
@@ -34,10 +35,10 @@ pub unsafe extern "C" fn gf_rolling_output_open(
     };
     let mut pending = Vec::new();
     let owner = if checkpoint.is_null() && checkpoint_len == 0 {
-        RollingOutputOwner::initialize(policy, config, now_ms, capture(&mut pending))
+        RollingOutputOwner::initialize(policy, config, boot_epoch, now_ms, capture(&mut pending))
     } else if !checkpoint.is_null() {
         let bytes = std::slice::from_raw_parts(checkpoint, checkpoint_len);
-        RollingOutputOwner::restore(policy, config, bytes)
+        RollingOutputOwner::restore(policy, config, boot_epoch, bytes)
     } else {
         return std::ptr::null_mut();
     };

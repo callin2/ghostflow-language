@@ -10,7 +10,8 @@ function milliseconds(value) {
 /**
  * Connects a verified installation's one Bool output to an authored rolling
  * policy. The host supplies one monotonic clock for admission and applies ON/OFF
- * within the returned deadline using that same clock.
+ * within the returned deadline using that same clock. A new bootEpoch is
+ * required whenever the host clock resets.
  */
 export class RollingOutputRuntime {
   #wasm;
@@ -20,7 +21,7 @@ export class RollingOutputRuntime {
   #saved;
   #writing = false;
 
-  static async open(wasmBytes, source, { binding, clock, store, maxIntervals }) {
+  static async open(wasmBytes, source, { binding, bootEpoch, clock, store, maxIntervals }) {
     const { manifest } = await compileSource(source);
     const { resource, output, resourceId } = binding;
     if (!Number.isInteger(resourceId) || resourceId < 1 || resourceId > 0xffff_ffff
@@ -44,6 +45,7 @@ export class RollingOutputRuntime {
     if (typeof store?.read !== 'function' || typeof store?.commit !== 'function') {
       throw new TypeError('rolling output requires a durable checkpoint store');
     }
+    if (!Number.isSafeInteger(bootEpoch) || bootEpoch <= 0) throw new RangeError('rolling output requires a positive boot epoch');
     if (typeof clock !== 'function') throw new TypeError('rolling output requires a monotonic clock');
     const { instance: { exports: wasm } } = await WebAssembly.instantiate(wasmBytes);
     // null is an explicit known-empty result from the installation owner.
@@ -58,7 +60,7 @@ export class RollingOutputRuntime {
     try {
       if (size) new Uint8Array(wasm.memory.buffer, ptr, size).set(saved);
       handle = wasm.gf_rolling_output_open(resourceId, milliseconds(limit.basis.durationMs),
-        milliseconds(limit.boundMs), milliseconds(limit.reserveMs), maxIntervals, milliseconds(clock()), ptr, size);
+        milliseconds(limit.boundMs), milliseconds(limit.reserveMs), maxIntervals, BigInt(bootEpoch), milliseconds(clock()), ptr, size);
     } finally {
       if (size) wasm.gf_dealloc(ptr, size);
     }

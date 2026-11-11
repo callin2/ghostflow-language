@@ -20,7 +20,7 @@ test('WASM does not grant a watering deadline before saving the reservation', as
     const ptr = length ? wasm.gf_alloc(length) : 0;
     try {
       if (length) new Uint8Array(wasm.memory.buffer, ptr, length).set(checkpoint);
-      const handle = wasm.gf_rolling_output_open(1, 60_000n, 30_000n, 5_000n, 8, 0n, ptr, length);
+      const handle = wasm.gf_rolling_output_open(1, 60_000n, 30_000n, 5_000n, 8, 1n, 0n, ptr, length);
       assert.ok(handle);
       return handle;
     } finally {
@@ -104,7 +104,7 @@ test('an authored policy binds to the installed output and cannot authorize ON o
   };
   const binding = { resource: 'irrigation', output: 'valve', resourceId: 7 };
   let nowMs = 0;
-  const options = { clock: () => nowMs, binding, maxIntervals: 8, store };
+  const options = { bootEpoch: 1, clock: () => nowMs, binding, maxIntervals: 8, store };
   await assert.rejects(RollingOutputRuntime.open(binary, source, {
     ...options, binding: { ...binding, output: 'other' },
   }), /verified Bool resource and output/);
@@ -157,7 +157,7 @@ test('a checkpoint acknowledged at the ON deadline never authorizes an output', 
       return true;
     },
   };
-  const options = { clock: () => nowMs, maxIntervals: 8, store,
+  const options = { bootEpoch: 1, clock: () => nowMs, maxIntervals: 8, store,
     binding: { resource: 'irrigation', output: 'valve', resourceId: 7 } };
   const runtime = await RollingOutputRuntime.open(binary, source, options);
   try {
@@ -174,5 +174,39 @@ test('a checkpoint acknowledged at the ON deadline never authorizes an output', 
     assert.deepEqual(await reopened.requestOn(), { status: 'allowed', deadlineMs: 10_000 });
   } finally {
     reopened.dispose();
+  }
+});
+
+test('a fresh boot needs a full verified OFF window before the saved limit can resume', async () => {
+  let checkpoint = null;
+  let nowMs = 1_000_000;
+  const store = {
+    read: async () => checkpoint,
+    commit: async (bytes, expected) => {
+      if (expected === null ? checkpoint !== null : !checkpoint || !Buffer.from(expected).equals(checkpoint)) return false;
+      checkpoint = bytes;
+      return true;
+    },
+  };
+  const options = { bootEpoch: 1, clock: () => nowMs, maxIntervals: 8, store,
+    binding: { resource: 'irrigation', output: 'valve', resourceId: 7 } };
+  const original = await RollingOutputRuntime.open(binary, source, options);
+  try {
+    assert.deepEqual(await original.requestOn(), { status: 'allowed', deadlineMs: 1_005_000 });
+  } finally {
+    original.dispose();
+  }
+  nowMs = 0;
+  const restarted = await RollingOutputRuntime.open(binary, source, { ...options, bootEpoch: 2 });
+  try {
+    assert.deepEqual(await restarted.requestOn(), { status: 'unavailable' });
+    assert.equal(restarted.explain(nowMs), null);
+    nowMs = 60_999;
+    assert.equal(await restarted.recoverAfterConfirmedOff(1000, nowMs), false);
+    nowMs += 1;
+    assert.equal(await restarted.recoverAfterConfirmedOff(1000, nowMs), true);
+    assert.deepEqual(await restarted.requestOn(), { status: 'allowed', deadlineMs: 66_000 });
+  } finally {
+    restarted.dispose();
   }
 });
