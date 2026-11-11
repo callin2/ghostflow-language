@@ -1,5 +1,5 @@
 //! Durable admission for one explicitly bound physical output.
-//! Times must come from the same trusted, nondecreasing clock across restarts.
+//! The host supplies a trusted clock and a distinct identity for each reset of that clock.
 use super::{
     crc32, AccountingConfig, AccountingError, AccountingLedger, LedgerRead, ReservationState,
     RollingExplanation,
@@ -37,6 +37,8 @@ pub enum OutputAdmission {
 pub struct RollingOutputOwner {
     policy: RollingOutputPolicy,
     ledger: AccountingLedger,
+    boot_epoch: u64,
+    clock_epoch: u64,
     clock_floor_ms: u64,
     sequence: u64,
 }
@@ -46,13 +48,16 @@ impl RollingOutputOwner {
     pub fn initialize(
         policy: RollingOutputPolicy,
         config: AccountingConfig,
+        boot_epoch: u64,
         now_ms: u64,
         persist: impl FnOnce(&[u8]) -> bool,
     ) -> Result<Self, AccountingError> {
-        Self::validate_policy(policy, config)?;
+        Self::validate_policy(policy, config, boot_epoch)?;
         let mut owner = Self {
             policy,
             ledger: AccountingLedger::new(config)?,
+            boot_epoch,
+            clock_epoch: boot_epoch,
             clock_floor_ms: now_ms,
             sequence: 0,
         };
@@ -63,14 +68,15 @@ impl RollingOutputOwner {
     pub fn restore(
         policy: RollingOutputPolicy,
         config: AccountingConfig,
+        boot_epoch: u64,
         snapshot: &[u8],
     ) -> Result<Self, AccountingError> {
-        Self::validate_policy(policy, config)?;
+        Self::validate_policy(policy, config, boot_epoch)?;
         let invalid = AccountingError::InvalidSnapshot;
         let payload_len = snapshot.len().checked_sub(4).ok_or(invalid)?;
         let (payload, checksum) = snapshot.split_at(payload_len);
-        if payload.len() < 48
-            || &payload[..4] != b"GFRO"
+        if payload.len() < 56
+            || &payload[..4] != b"GFR1"
             || crc32(payload).to_le_bytes().as_slice() != checksum
             || payload[4..32] != Self::policy_bytes(policy)
         {
@@ -78,8 +84,10 @@ impl RollingOutputOwner {
         }
         let clock_floor_ms = u64::from_le_bytes(payload[32..40].try_into().unwrap());
         let sequence = u64::from_le_bytes(payload[40..48].try_into().unwrap());
-        let ledger = AccountingLedger::restore(config, &payload[48..])?;
-        if !ledger.events.is_empty()
+        let clock_epoch = u64::from_le_bytes(payload[48..56].try_into().unwrap());
+        let ledger = AccountingLedger::restore(config, &payload[56..])?;
+        if clock_epoch == 0
+            || !ledger.events.is_empty()
             || ledger.intervals.iter().any(|item| {
                 item.resource_id != policy.resource_id
                     || item.end_ms > clock_floor_ms
@@ -115,6 +123,8 @@ impl RollingOutputOwner {
         Ok(Self {
             policy,
             ledger,
+            boot_epoch,
+            clock_epoch,
             clock_floor_ms,
             sequence,
         })
@@ -252,19 +262,34 @@ impl RollingOutputOwner {
     }
 
     /// Release uncertainty after the host has continuously kept this output
-    /// OFF for a full window. After a restart without a verified off time the
-    /// host must start this wait again. A relay command alone is not evidence.
+    /// OFF for a full window. On a new boot the proof must start in the new
+    /// clock epoch. A relay command alone is not evidence.
     pub fn recover_after_confirmed_off(
         &mut self,
         confirmed_off_at_ms: u64,
         now_ms: u64,
         persist: impl FnOnce(&[u8]) -> bool,
     ) -> Result<bool, AccountingError> {
+        if confirmed_off_at_ms > now_ms {
+            return Err(AccountingError::InvalidReservation);
+        }
+        if self.clock_epoch != self.boot_epoch {
+            if now_ms - confirmed_off_at_ms < self.policy.window_ms {
+                return Ok(false);
+            }
+            // Old timestamps cannot be compared with this boot. The full OFF
+            // window excludes every old interval while preserving lease identity.
+            self.ledger = AccountingLedger::new(self.ledger.config)?;
+            self.clock_epoch = self.boot_epoch;
+            self.clock_floor_ms = now_ms;
+            self.persist(persist)?;
+            return Ok(true);
+        }
         self.check_time(now_ms)?;
         let Some(lease) = self.unresolved_lease() else {
             return Ok(false);
         };
-        if confirmed_off_at_ms < lease.admitted_at_ms || confirmed_off_at_ms > now_ms {
+        if confirmed_off_at_ms < lease.admitted_at_ms {
             return Err(AccountingError::InvalidReservation);
         }
         if now_ms - confirmed_off_at_ms < self.policy.window_ms {
@@ -283,8 +308,10 @@ impl RollingOutputOwner {
     fn validate_policy(
         p: RollingOutputPolicy,
         config: AccountingConfig,
+        boot_epoch: u64,
     ) -> Result<(), AccountingError> {
-        if p.resource_id == 0
+        if boot_epoch == 0
+            || p.resource_id == 0
             || p.window_ms == 0
             || p.window_ms > config.max_rolling_window_ms
             || p.reserve_ms == 0
@@ -297,7 +324,10 @@ impl RollingOutputOwner {
     }
 
     fn check_time(&self, now_ms: u64) -> Result<(), AccountingError> {
-        if !self.ledger.is_known() || now_ms < self.clock_floor_ms {
+        if self.clock_epoch != self.boot_epoch
+            || !self.ledger.is_known()
+            || now_ms < self.clock_floor_ms
+        {
             return Err(AccountingError::UnknownLedger);
         }
         Ok(())
@@ -320,10 +350,11 @@ impl RollingOutputOwner {
     }
 
     fn persist(&mut self, persist: impl FnOnce(&[u8]) -> bool) -> Result<(), AccountingError> {
-        let mut snapshot = b"GFRO".to_vec();
+        let mut snapshot = b"GFR1".to_vec();
         snapshot.extend_from_slice(&Self::policy_bytes(self.policy));
         snapshot.extend_from_slice(&self.clock_floor_ms.to_le_bytes());
         snapshot.extend_from_slice(&self.sequence.to_le_bytes());
+        snapshot.extend_from_slice(&self.clock_epoch.to_le_bytes());
         let ledger = self
             .ledger
             .snapshot_bytes()
