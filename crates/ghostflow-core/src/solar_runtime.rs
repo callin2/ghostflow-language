@@ -93,6 +93,115 @@ pub(crate) struct StagedSolar {
     pub trace: Vec<SolarStageResult>,
 }
 impl SolarRuntime {
+    pub(crate) fn schedule_snapshot(
+        &self,
+        descriptors: &[PulseDescriptor],
+        fingerprint: u64,
+    ) -> Result<Vec<u8>> {
+        if descriptors.iter().any(|d| {
+            !matches!(
+                d,
+                PulseDescriptor::Daily(_) | PulseDescriptor::DailySlots(_)
+            )
+        }) {
+            return Err(Error::new("civil checkpoint requires Daily or DailySlots"));
+        }
+        let mut out = b"GFSC\x01\x00".to_vec();
+        out.extend(fingerprint.to_le_bytes());
+        out.extend((descriptors.len() as u16).to_le_bytes());
+        for (descriptor, engine) in descriptors.iter().zip(&self.engines) {
+            out.extend(descriptor.site().to_le_bytes());
+            out.extend((engine.terminal_identities().len() as u16).to_le_bytes());
+            for (day, slot, fold) in engine.terminal_identities() {
+                out.extend(day.to_le_bytes());
+                out.extend(slot.to_le_bytes());
+                out.push(*fold);
+            }
+        }
+        out.extend(checksum(&out).to_le_bytes());
+        Ok(out)
+    }
+
+    pub(crate) fn schedule_restored(
+        &self,
+        descriptors: &[PulseDescriptor],
+        fingerprint: u64,
+        bytes: &[u8],
+    ) -> Result<Self> {
+        if bytes.len() < 20 || bytes.len() > 20 + 128 * (6 + 4096 * 7) {
+            return Err(Error::new("invalid civil checkpoint size"));
+        }
+        let (payload, crc) = bytes.split_at(bytes.len() - 4);
+        if checksum(payload) != u32::from_le_bytes(crc.try_into().unwrap()) {
+            return Err(Error::new("corrupt civil checkpoint"));
+        }
+        let mut reader = crate::Reader::new(payload);
+        if reader.take(4)? != b"GFSC"
+            || reader.u16()? != 1
+            || reader.u64()? != fingerprint
+            || usize::from(reader.u16()?) != descriptors.len()
+        {
+            return Err(Error::new("civil checkpoint Program identity mismatch"));
+        }
+        let mut restored = self.clone();
+        for (descriptor, engine) in descriptors.iter().zip(&mut restored.engines) {
+            if reader.u32()? != descriptor.site() {
+                return Err(Error::new("civil checkpoint site mismatch"));
+            }
+            let count = usize::from(reader.u16()?);
+            if count > 4096 {
+                return Err(Error::new("civil checkpoint capacity exceeded"));
+            }
+            let mut identities = Vec::with_capacity(count);
+            for _ in 0..count {
+                let day = reader.u32()? as i32;
+                let slot = reader.u16()?;
+                let fold = reader.u8()?;
+                let repeated = match descriptor {
+                    PulseDescriptor::Daily(d) if slot == 0 => d.dst_repeated,
+                    PulseDescriptor::DailySlots(d)
+                        if d.slots.iter().any(|(key, _)| *key == slot) =>
+                    {
+                        d.dst_repeated
+                    }
+                    _ => return Err(Error::new("civil checkpoint descriptor mismatch")),
+                };
+                if !matches!((repeated, fold), (_, 0) | (0, 1) | (1, 2) | (2, 1 | 2)) {
+                    return Err(Error::new("civil checkpoint fold mismatch"));
+                }
+                identities.push((day, slot, fold));
+            }
+            engine.restore_schedule_identities(identities)?;
+        }
+        if !reader.finished() {
+            return Err(Error::new("trailing civil checkpoint bytes"));
+        }
+        Ok(restored)
+    }
+
+    pub(crate) fn observe_schedules_paused(
+        &self,
+        descriptors: &[PulseDescriptor],
+        clock: ClockSnapshot<'_>,
+        facts: &[ScheduleInput<'_>],
+    ) -> Result<Self> {
+        validate_kinds(descriptors, facts)?;
+        let shared: Vec<_> = facts
+            .iter()
+            .map(|f| SolarInput {
+                site: f.site,
+                facts: f.facts,
+            })
+            .collect();
+        Self::validate_inputs(descriptors, &shared)?;
+        let mut staged = self.clone();
+        for (input, engine) in shared.iter().zip(&mut staged.engines) {
+            let stage = engine.begin(clock, input.facts)?.evaluate(false)?;
+            engine.commit(stage)?;
+        }
+        Ok(staged)
+    }
+
     // Mirrors the existing context checkpoint envelope: version, exact Program,
     // ordered declaration sites, bounded payload and CRC for accidental corruption.
     // Only terminal occurrence identities survive a reboot; clocks start fresh.

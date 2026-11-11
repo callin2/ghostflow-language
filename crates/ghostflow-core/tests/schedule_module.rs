@@ -1261,6 +1261,130 @@ fn daily_fixture() -> Fixture {
     }
 }
 
+fn weekday_daily_runtime(repeated: u8) -> Runtime {
+    let mut entry = daily_entry(repeated, &[1, 1]);
+    let mask_offset = 1 + 4 + 2 + "morning".len() + 2 + "Asia/Seoul".len() + 8 + 2;
+    entry[mask_offset] = 0b0111110;
+    let fixture = Fixture {
+        version: 27,
+        entries: vec![entry],
+        ..Fixture::default()
+    };
+    let mut runtime = Runtime::new(8);
+    runtime.install(Module::load(&fixture.bytes()).unwrap(), false);
+    runtime
+        .activate_with_schedules(&solar_activation())
+        .unwrap();
+    runtime
+}
+
+#[test]
+fn weekday_daily_checkpoint_keeps_fold_identity_and_rejects_corruption_atomically() {
+    use ghostflow_core::solar_admission::SolarFact;
+    use ghostflow_core::solar_runtime::ScheduleKind;
+    let mut runtime = weekday_daily_runtime(2);
+    let mut first = SolarFact::available(4, 1000, "iana-v1", "zone-v1");
+    first.fold = 1;
+    let rows = [first.clone()];
+    daily_tick(&mut runtime, 0, 900, &rows, ScheduleKind::Daily, 3000).unwrap();
+    assert_eq!(
+        daily_tick(&mut runtime, 100, 1000, &rows, ScheduleKind::Daily, 3000)
+            .unwrap()
+            .safe_intents["due"],
+        Value::Bool(true)
+    );
+    let checkpoint = runtime.schedule_checkpoint().unwrap();
+    assert!(runtime.restore_schedule_checkpoint(&checkpoint).is_err());
+    let mut reboot = weekday_daily_runtime(2);
+    reboot.restore_schedule_checkpoint(&checkpoint).unwrap();
+    let mut corrupt = checkpoint.clone();
+    corrupt[16] ^= 1;
+    assert!(reboot.restore_schedule_checkpoint(&corrupt).is_err());
+    assert_eq!(reboot.schedule_checkpoint().unwrap(), checkpoint);
+    daily_tick(&mut reboot, 0, 900, &rows, ScheduleKind::Daily, 3000).unwrap();
+    assert_eq!(
+        daily_tick(&mut reboot, 100, 1000, &rows, ScheduleKind::Daily, 3000)
+            .unwrap()
+            .safe_intents["due"],
+        Value::Bool(false)
+    );
+    let mut second = first;
+    second.fold = 2;
+    second.scheduled_wall_ms = Some(2000);
+    assert_eq!(
+        daily_tick(
+            &mut reboot,
+            1100,
+            2000,
+            &[second],
+            ScheduleKind::Daily,
+            3000
+        )
+        .unwrap()
+        .safe_intents["due"],
+        Value::Bool(true)
+    );
+    assert!(weekday_daily_runtime(0)
+        .restore_schedule_checkpoint(&checkpoint)
+        .is_err());
+}
+
+#[test]
+fn weekday_daily_pause_suppresses_crossing_and_keeps_next_day_eligible() {
+    use ghostflow_core::schedule_clock::{ClockSnapshot, ClockTrust};
+    use ghostflow_core::solar_admission::{SolarFact, SolarFacts};
+    use ghostflow_core::solar_runtime::{ScheduleInput, ScheduleKind};
+    let mut runtime = weekday_daily_runtime(0);
+    let rows = [SolarFact::available(4, 1000, "iana-v1", "zone-v1")];
+    for (mono, wall) in [(0, 900), (100, 1000)] {
+        runtime
+            .observe_schedules_paused(
+                ClockSnapshot {
+                    monotonic_ms: mono,
+                    boot_epoch: 3,
+                    wall_ms: Some(wall),
+                    trust: ClockTrust::Trusted,
+                    uncertainty_ms: Some(0),
+                    source_revision: Some("clock-v1"),
+                },
+                &[ScheduleInput {
+                    site: 7,
+                    kind: ScheduleKind::Daily,
+                    facts: SolarFacts {
+                        coverage_from_wall_ms: 0,
+                        coverage_to_wall_ms: 3000,
+                        rows: &rows,
+                    },
+                }],
+            )
+            .unwrap();
+    }
+    let checkpoint = runtime.schedule_checkpoint().unwrap();
+    let mut reboot = weekday_daily_runtime(0);
+    reboot.restore_schedule_checkpoint(&checkpoint).unwrap();
+    daily_tick(&mut reboot, 0, 900, &rows, ScheduleKind::Daily, 3000).unwrap();
+    assert_eq!(
+        daily_tick(&mut reboot, 100, 1000, &rows, ScheduleKind::Daily, 3000)
+            .unwrap()
+            .safe_intents["due"],
+        Value::Bool(false)
+    );
+    let next_day = [SolarFact::available(5, 2000, "iana-v1", "zone-v1")];
+    assert_eq!(
+        daily_tick(
+            &mut reboot,
+            1100,
+            2000,
+            &next_day,
+            ScheduleKind::Daily,
+            3000
+        )
+        .unwrap()
+        .safe_intents["due"],
+        Value::Bool(true)
+    );
+}
+
 fn daily_slots_entry(slots: &[(u16, u16)], repeated: u8, when: &[u8]) -> Vec<u8> {
     let mut b = vec![4];
     b.extend(7u32.to_le_bytes());

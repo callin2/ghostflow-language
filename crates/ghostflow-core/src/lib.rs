@@ -1751,6 +1751,68 @@ impl Runtime {
         Ok(())
     }
 
+    /// Persist civil occurrence identities, including DST folds and slot keys.
+    /// Scalar state and clock continuity are deliberately not restored.
+    pub fn schedule_checkpoint(&self) -> Result<Vec<u8>> {
+        let (descriptors, fingerprint) = self.civil_descriptors()?;
+        self.solar_runtime
+            .as_ref()
+            .ok_or_else(|| Error::new("no schedule runtime"))?
+            .schedule_snapshot(descriptors, fingerprint)
+    }
+
+    /// Restore exact-Program civil identities before the first scan, atomically.
+    pub fn restore_schedule_checkpoint(&mut self, bytes: &[u8]) -> Result<()> {
+        if self.next_tick != 1 {
+            return Err(Error::new("restore schedules before the first scan"));
+        }
+        let (descriptors, fingerprint) = self.civil_descriptors()?;
+        let restored = self
+            .solar_runtime
+            .as_ref()
+            .ok_or_else(|| Error::new("no schedule runtime"))?
+            .schedule_restored(descriptors, fingerprint, bytes)?;
+        self.solar_runtime = Some(restored);
+        Ok(())
+    }
+
+    /// Suppress occurrences crossed during a host pause without running controls.
+    pub fn observe_schedules_paused(
+        &mut self,
+        clock: schedule_clock::ClockSnapshot<'_>,
+        facts: &[solar_runtime::ScheduleInput<'_>],
+    ) -> Result<()> {
+        let (descriptors, _) = self.civil_descriptors()?;
+        let staged = self
+            .solar_runtime
+            .as_ref()
+            .ok_or_else(|| Error::new("no schedule runtime"))?
+            .observe_schedules_paused(descriptors, clock, facts)?;
+        self.solar_runtime = Some(staged);
+        Ok(())
+    }
+
+    fn civil_descriptors(&self) -> Result<(&[schedule_vm::PulseDescriptor], u64)> {
+        let module = self
+            .module
+            .as_ref()
+            .ok_or_else(|| Error::new("no module installed"))?;
+        if !matches!(module.format_version, 8 | 9 | 27) {
+            return Err(Error::new("civil schedule profile required"));
+        }
+        let selected = self
+            .active_strategy
+            .ok_or_else(|| Error::new("schedules are not active"))?;
+        let requirements = module
+            .schedules
+            .as_ref()
+            .ok_or_else(|| Error::new("no schedule requirements"))?;
+        Ok((
+            &requirements.strategies[selected].schedules,
+            module.fingerprint,
+        ))
+    }
+
     /// Bind provider occurrence facts to a schedule-only GFB5 module.
     /// Provider code must derive facts from the installed descriptor, including
     /// timezone/location/offset and complete coverage. No host due bit is accepted.

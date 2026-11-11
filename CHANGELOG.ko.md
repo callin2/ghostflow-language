@@ -3,6 +3,10 @@
 
 # 변경 기록
 
+## 민간시각 예약 체크포인트와 호스트 정지 — 2026-11-12
+
+Daily와 DailySlots 실행기는 `schedule_checkpoint`와 `restore_schedule_checkpoint`로 같은 프로그램의 처리된 예약을 저장하고 복원할 수 있습니다. 날짜·슬롯 키·서머타임 중복 시각을 함께 보존하며, 손상되거나 다른 프로그램의 기록은 실행 상태를 일부만 바꾸지 않고 거부합니다. `observe_schedules_paused`는 호스트가 제어를 정지한 동안 지나간 예약을 기록하되 사용자 제어 로직은 실행하지 않습니다. 재부팅 후 시계 기준은 새로 잡고 제어 상태는 복원하지 않습니다. [#155](https://github.com/callin2/ghostflow-language/issues/155)의 GFB27 장치 실행 경로 누락을 보완하며 GFB 바이트 형식은 바뀌지 않습니다. 네이티브 회귀 시험은 평일 예약 중복 차단, 중복 시각별 실행, 정지·재개와 오류 시 원자적 거부를 확인합니다.
+
 ## 미출시
 
 ### 2026-11-12 - UTC Daily Window와 Run 실행 ([#153](https://github.com/callin2/ghostflow-language/issues/153))

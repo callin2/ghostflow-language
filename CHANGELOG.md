@@ -1,5 +1,9 @@
 # Changelog
 
+## Civil schedule checkpoint and host pause — 2026-11-12
+
+Daily and DailySlots runtimes can now export and restore exact-Program terminal occurrence identities with `schedule_checkpoint` and `restore_schedule_checkpoint`. The checkpoint preserves civil date, slot key and DST fold; malformed or mismatched data is rejected without partially changing the runtime. `observe_schedules_paused` records missed crossings while the host pauses controls, without running user logic. A new boot keeps fresh clock baselines and does not restore scalar control state. This corrects the missing GFB27 device lifecycle path in [#155](https://github.com/callin2/ghostflow-language/issues/155); the GFB bytecode layout is unchanged. Native regressions cover weekday replay suppression, distinct repeated-time folds, pause/resume and atomic rejection.
+
 ## Unreleased
 
 ### 2026-11-12 - Execute UTC Daily Window and Run ([#153](https://github.com/callin2/ghostflow-language/issues/153))

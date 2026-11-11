@@ -146,9 +146,16 @@ impl SolarPulseEngine {
     }
 
     pub(crate) fn restore_solar_identities(&mut self, days: Vec<(i32, u16, u8)>) -> Result<()> {
+        if days.iter().any(|(_, slot, fold)| *slot != 0 || *fold != 0) {
+            return Err(Error::new("invalid solar checkpoint terminal identities"));
+        }
+        self.restore_schedule_identities(days)
+    }
+
+    pub(crate) fn restore_schedule_identities(&mut self, days: Vec<(i32, u16, u8)>) -> Result<()> {
         if days.len() > self.terminal_capacity
             || days.iter().any(|(day, slot, fold)| {
-                !(0..=MAX_SOURCE_DAY).contains(day) || *slot != 0 || *fold != 0
+                !(0..=MAX_SOURCE_DAY).contains(day) || *slot > 1440 || *fold > 2
             })
             || days.iter().collect::<std::collections::BTreeSet<_>>().len() != days.len()
         {
