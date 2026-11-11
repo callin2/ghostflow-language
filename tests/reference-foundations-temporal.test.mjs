@@ -267,6 +267,21 @@ test('At Window ends at the exact half-open boundary and cannot infer an open le
   assert.equal(unknownRows[1].outcome.trace.safe.due, false);
 });
 
+test('At Window admits the first true condition once, even when it turns true again later', async t => {
+  const artifact = await compile(atWindowProgram()), planned = 28_800_000;
+  const times = [0, 50_000, 100_000, 150_000, 150_001, 200_000, 250_000, 309_999, 310_000];
+  const allowed = at => (at >= 150_000 && at < 200_000) || at >= 250_000;
+  const rows = await parity(t, artifact, times.map(at => frame(at,
+    facts(at, planned - 10_000 + at), { allowed: allowed(at) })), 'context-settings-v1');
+  assert.deepEqual(rows.map(row => row.outcome.trace.safe.open),
+    [false, false, false, true, true, false, true, true, false]);
+  assert.deepEqual(rows.map(row => row.outcome.trace.safe.due),
+    [false, false, false, true, false, false, false, false, false]);
+  assert.equal(rows.flatMap(row => row.outcome.trace.contextTrace ?? [])
+    .filter(observation => observation.decision === 'Due').length, 1);
+  assert.equal(rows.at(-1).outcome.trace.safe.missed, false);
+});
+
 test('At Window rejected crossing rolls back admission and retries once in native and WASM', async t => {
   const source = atWindowProgram().replace('input allowed: Bool;', 'input allowed: Bool; input denominator: Int;')
     .replace('due <- visit.due;', 'due <- visit.due && ((1 div (denominator |> recover(0))) == 1);');
