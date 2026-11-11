@@ -143,6 +143,29 @@ function numberAtom(value) {
   if (point >= digits.length) return `${sign}${digits}${'0'.repeat(point - digits.length)}`;
   return `${sign}${digits.slice(0, point)}.${digits.slice(point)}`;
 }
+function weekdayMaskLiteral(node, label = 'weekday') {
+  const raw = node?.kind === 'literal' ? node.raw : node?.kind === 'context-literal' ? node.value : null;
+  const match = raw && /^day`([^`]+)`$/.exec(raw);
+  if (!match) error(node?.loc, `${label} requires a weekday day literal`);
+  const names = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'];
+  let mask = 0;
+  for (const part of match[1].split(',')) {
+    const range = /^([a-z]{3})\.\.([a-z]{3})$/.exec(part);
+    if (range) {
+      const from = names.indexOf(range[1]), to = names.indexOf(range[2]);
+      if (from < 0 || to < from) error(node.loc, 'weekday range must ascend from sun through sat');
+      for (let day = from; day <= to; day++) mask |= 1 << day;
+    } else {
+      const index = names.indexOf(part);
+      if (index < 0) error(node.loc, `${label} supports weekday names only`);
+      const bit = 1 << index;
+      if (mask & bit) error(node.loc, 'duplicate weekday in day filter');
+      mask |= bit;
+    }
+  }
+  if (!mask) error(node.loc, `${label} must select at least one weekday`);
+  return mask;
+}
 function gfbDefault(type, value) { return type.kind === 'Bool' ? (value ? 'true' : 'false') : numberAtom(value); }
 function defaultLowered(type) {
   if (type.kind === 'Result') return {
@@ -1733,6 +1756,15 @@ class Lowerer {
         error(this.ast.loc, 'civil Range profile requires immutable civil Range schedules without other schedule/provider/config profiles');
       }
       this.manifest.format = 'GhostFlow/control-v21';
+    }
+    if (this.manifest.weekdayConditions?.length) {
+      const allowed = new Set(['config-stream', 'weekday-result', 'window', 'true-for']);
+      if (solarForms.length || contextForms.some(form => !allowed.has(form[0]))
+        || this.manifest.schedules.length || this.manifest.calendars?.length || this.manifest.providers?.length
+        || this.manifest.naturalConditions?.length || this.manifest.calendarConditions?.length || this.accountingExecution) {
+        error(this.ast.loc, 'local_day_is profile only supports weekday conditions with config streams and temporal state');
+      }
+      this.manifest.format = 'GhostFlow/control-v25';
     }
     if (this.manifest.schedules.some(schedule => schedule.day?.kind === 'weekday')) {
       if (solarForms.length || contextForms.some(form => !['solar-weekday-pulse', 'tide-weekday-run'].includes(form[0]))
@@ -4175,6 +4207,27 @@ class Lowerer {
       error(node.loc, 'removed alias ifthenelse; use if condition then value else value');
     }
     if (node.name === 'elapsed' || node.name === 'hysteresis' || node.name === 'median') error(node.loc, `${node.name} is only valid in its declaration`);
+    if (node.name === 'local_day_is') {
+      if (node.args.length !== 1 || node.named.length !== 1 || node.named[0].name !== 'timezone') {
+        error(node.loc, 'local_day_is expects a weekday and timezone: "Area/City"');
+      }
+      const mask = weekdayMaskLiteral(node.args[0], 'local_day_is');
+      const timezoneNode = node.named[0].value;
+      if (timezoneNode.kind !== 'string') error(timezoneNode.loc, 'local_day_is timezone must be a string');
+      const timezone = timezoneNode.value;
+      if (!timezone.trim()) error(timezoneNode.loc, 'local_day_is timezone must be non-empty');
+      try { new Intl.DateTimeFormat('en-US', { timeZone: timezone }); }
+      catch { error(timezoneNode.loc, 'local_day_is timezone must be a supported IANA timezone'); }
+      const projectionInputs = Object.fromEntries(['ok', 'value', 'fault'].map(role => [role, this.generatedName(`weekday_${node.id}`, role)]));
+      for (const role of ['ok', 'value', 'fault']) this.addInput(projectionInputs[role], role === 'fault' ? NUMBER : BOOL, node.loc);
+      if (!this.hasClock) { this.addInput(`${RESERVED_PREFIX}now_ms`, NUMBER, node.loc); this.hasClock = true; }
+      if (!this.gfbInputs.some(input => input[1] === `${RESERVED_PREFIX}time_epoch`)) this.addInput(`${RESERVED_PREFIX}time_epoch`, NUMBER, node.loc);
+      (this.manifest.weekdayConditions ??= []).push({ site: node.id, timezone, mask,
+        result: { value: 'Bool', error: 'ClockFault' }, projectionInputs });
+      return { type: resultType(BOOL, semanticType('ClockFault')), ok: `input.${projectionInputs.ok}`, value: `input.${projectionInputs.value}`,
+        faultCode: `input.${projectionInputs.fault}`, originTag: numberAtom(node.id),
+        origins: [{ tag: node.id, nodeId: node.id, kind: 'weekday-condition', name: 'local_day_is' }], sample: scanSample() };
+    }
     if (node.name === 'calendar_is') {
       if (node.args.length !== 2 || node.named.length) error(node.loc, 'calendar_is expects a calendar and one day classification');
       const calendarRef = node.args[0];
@@ -4499,7 +4552,9 @@ class Lowerer {
     const calendarForms = (this.manifest.calendarConditions ?? []).map(condition => ['calendar-result', String(condition.site), `calendar_${condition.site}`,
       condition.calendar, condition.classification, condition.timezone,
       ...['ok','value','fault'].map(role => condition.projectionInputs[role])]);
-    return [...configForms, ...scheduleForms, ...naturalForms, ...accountingForms, ...calendarForms];
+    const weekdayForms = (this.manifest.weekdayConditions ?? []).map(condition => ['weekday-result', String(condition.site), `weekday_${condition.site}`,
+      condition.timezone, String(condition.mask), ...['ok','value','fault'].map(role => condition.projectionInputs[role])]);
+    return [...configForms, ...scheduleForms, ...naturalForms, ...accountingForms, ...calendarForms, ...weekdayForms];
   }
   windowForms() {
     return this.windows.map(({ descriptor, source, sample, outputType }) => [
