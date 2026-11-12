@@ -39,6 +39,7 @@ const TIMESLOTS_RANGE_FORMAT = 'GhostFlow/control-v20';
 const CIVIL_RANGE_FORMAT = 'GhostFlow/control-v21';
 const DAILY_WINDOW_RUN_FORMAT = 'GhostFlow/control-v28';
 const WEEKDAY_DAILY_FORMAT = 'GhostFlow/control-v27';
+const ROLLING_OUTPUT_FORMAT = 'GhostFlow/control-v29';
 const contextManifest = manifest => manifest?.format === STREAM_CONTEXT_FORMAT
   || manifest?.format === RANGE_LIVE_START_FORMAT
   || manifest?.format === TIMESLOTS_RANGE_FORMAT
@@ -632,11 +633,11 @@ function validateManifest(input, { acceptSettings = false, bytecodeFormat = null
   if ((Object.hasOwn(manifest, 'adaptPolicy') || Object.hasOwn(manifest, 'strategies')) && capabilities === undefined) {
     throw new Error('adapt strategy activation requires a capability-aware host; ControlRuntime cannot activate this manifest');
   }
-  keys(manifest, ['format', 'name', 'inputs', 'outputs', 'sensors', 'schedules', 'timers', 'signals', 'configs', 'bytecodeSha256'], ['adaptPolicy', 'strategies', 'objectives', 'resources', 'sensorInstances', 'lifecycle','legacyAdmission', 'outputObservations', 'requiredRuntimeFeatures', 'localConstraints', 'accounting', 'monitoring'], 'manifest');
+  keys(manifest, ['format', 'name', 'inputs', 'outputs', 'sensors', 'schedules', 'timers', 'signals', 'configs', 'bytecodeSha256'], ['adaptPolicy', 'strategies', 'objectives', 'resources', 'sensorInstances', 'lifecycle','legacyAdmission', 'outputObservations', 'requiredRuntimeFeatures', 'localConstraints', 'accounting', 'monitoring', ...(bytecodeFormat === 29 ? ['rollingOutput'] : [])], 'manifest');
   validateRequiredRuntimeFeatures(manifest);
   const outputObservations = validateOutputObservationsManifest(manifest, bytecodeFormat);
   const lifecycle = validateLifecycleManifest(manifest);
-  if (manifest.format !== OUTPUT_OBSERVATION_FORMAT && manifest.format !== FORMAT && manifest.format !== INTEGER_FORMAT && !(manifest.format === SETTINGS_FORMAT && acceptSettings) && manifest.format !== SOLAR_FORMAT && manifest.format !== SCHEDULE_FORMAT && manifest.format !== WEEKDAY_DAILY_FORMAT && manifest.format !== SCHEDULE_SLOTS_FORMAT && manifest.format !== AVAILABILITY_FORMAT && manifest.format !== RANGE_LIVE_START_FORMAT && manifest.format !== TIMESLOTS_RANGE_FORMAT) throw new Error(`unsupported manifest format ${String(manifest.format)}`);
+  if (manifest.format !== ROLLING_OUTPUT_FORMAT && manifest.format !== OUTPUT_OBSERVATION_FORMAT && manifest.format !== FORMAT && manifest.format !== INTEGER_FORMAT && !(manifest.format === SETTINGS_FORMAT && acceptSettings) && manifest.format !== SOLAR_FORMAT && manifest.format !== SCHEDULE_FORMAT && manifest.format !== WEEKDAY_DAILY_FORMAT && manifest.format !== SCHEDULE_SLOTS_FORMAT && manifest.format !== AVAILABILITY_FORMAT && manifest.format !== RANGE_LIVE_START_FORMAT && manifest.format !== TIMESLOTS_RANGE_FORMAT) throw new Error(`unsupported manifest format ${String(manifest.format)}`);
   const settingsManifest = manifest.format === SETTINGS_FORMAT || manifest.format === INTEGER_FORMAT || manifest.format === AVAILABILITY_FORMAT;
   const solarManifest = manifest.format === SOLAR_FORMAT || manifest.format === INTEGER_FORMAT || manifest.format === AVAILABILITY_FORMAT;
   name(manifest.name, 'manifest.name');
@@ -1142,7 +1143,7 @@ export function sensorFaultCode(reading) {
 function inputValue(value, inputType, label) { return typedValue(value, inputType, label); }
 
 function verifySourceBoundContext(artifact, compiledBytes, manifest, bytecodeFormat, hardwareProfiles) {
-  if (![11, 12].includes(bytecodeFormat)
+  if (![11, 12, 29].includes(bytecodeFormat)
     && artifact.sourceClosure === undefined && manifest?.sensorInstances === undefined) return;
   const { sourceDocument, sourceClosure } = artifact;
   if (!sourceDocument || typeof sourceDocument.text !== 'string'
@@ -1168,7 +1169,7 @@ function verifySourceBoundContext(artifact, compiledBytes, manifest, bytecodeFor
     throw new Error('composition manifest does not match canonical source');
 }
 
-async function instantiateControlRuntime(wasmBytes, artifact = {}, options, instantiateRuntime, supportsSchedules) {
+async function instantiateControlRuntime(wasmBytes, artifact = {}, options, instantiateRuntime, supportsSchedules, rollingOwner) {
   if (options.instructionWitnesses !== undefined && typeof options.instructionWitnesses !== 'boolean') throw new Error('instructionWitnesses must be Boolean');
   if (options.instructionWitnesses && instantiateRuntime !== FramedGhostFlowRuntime.instantiate) throw new Error('instruction witnesses require a framed host');
   const { bytes: bytecode, manifest } = artifact;
@@ -1189,9 +1190,19 @@ async function instantiateControlRuntime(wasmBytes, artifact = {}, options, inst
     if (innerLength < 6 || 10 + innerLength > compiledBytes.length) throw new Error('invalid GFB22 base payload length');
     bytecodeFormat = view.getUint16(14, true);
   }
+  let inputTableBytes = compiledBytes;
+  if (bytecodeFormat === 29 || manifest?.format === ROLLING_OUTPUT_FORMAT || rollingOwner) {
+    if (bytecodeFormat !== 29 || manifest?.format !== ROLLING_OUTPUT_FORMAT || !rollingOwner) {
+      throw new Error('GFB29 proposals require a bound rolling output owner');
+    }
+    if (compiledBytes.length < 16) throw new Error('truncated GFB29 envelope');
+    const size = new DataView(compiledBytes.buffer).getUint32(6, true);
+    if (size < 6 || size > compiledBytes.length - 10) throw new Error('invalid GFB29 scalar module length');
+    inputTableBytes = compiledBytes.subarray(10, 10 + size);
+  }
   const checkedManifest = validateManifest(manifest, { ...options, bytecodeFormat });
   verifySourceBoundContext(artifact, compiledBytes, manifest, bytecodeFormat, options.hardwareProfiles);
-  validateOutputObservationRails(checkedManifest.manifest, compiledBytes);
+  validateOutputObservationRails(checkedManifest.manifest, inputTableBytes);
   if (checkedManifest.manifest.outputObservations?.length) {
     if (instantiateRuntime !== FramedGhostFlowRuntime.instantiate) throw new Error('output observations require a framed host');
     if (typeof options.outputObservationProvider !== 'function' || typeof options.outputRunId !== 'string'
@@ -1275,12 +1286,13 @@ async function instantiateControlRuntime(wasmBytes, artifact = {}, options, inst
   const digest = await sha256(compiledBytes);
   if (digest !== checkedManifest.manifest.bytecodeSha256) throw new Error('bytecode SHA-256 does not match manifest');
 
-  const runtime = await instantiateRuntime(wasm);
+  const runtime = rollingOwner ? new FramedGhostFlowRuntime(rollingOwner.wasm) : await instantiateRuntime(wasm);
   const sensors = new Map();
   const signals = new Map();
   const afterEvents = new Map();
   try {
-    runtime.load(compiledBytes);
+    if (rollingOwner) rollingOwner.load(runtime, compiledBytes);
+    else runtime.load(compiledBytes);
     if (options.instructionWitnesses) runtime.enableInstructionWitnesses();
     const declaredPercentRange = validateRequiredRuntimeFeatures(checkedManifest.manifest).includes('percent-range-v1');
     if (runtime.requiresPercentRangeV1() !== declaredPercentRange) {
@@ -1333,6 +1345,14 @@ export class ControlRuntime {
   static async instantiateFramed(wasmBytes, artifact = {}, options = {}) {
     if ((artifact.manifest?.objectives?.length ?? 0) > 0) throw new Error('framed native objectives are not supported');
     const initialized = await instantiateControlRuntime(wasmBytes, artifact, options, FramedGhostFlowRuntime.instantiate, false);
+    return new ControlRuntime(initialized.runtime, initialized.checkedManifest, initialized.sensors, initialized.signals,
+      initialized.afterEvents, true, initialized.temporalEpoch, initialized.hasSolar, initialized.afterEventEpoch, initialized.hasSchedules, initialized.hasContext);
+  }
+
+  static async instantiateRollingProposals(wasmBytes, artifact, owner, options) {
+    const initialized = await instantiateControlRuntime(
+      wasmBytes, artifact, options, FramedGhostFlowRuntime.instantiate, false, owner,
+    );
     return new ControlRuntime(initialized.runtime, initialized.checkedManifest, initialized.sensors, initialized.signals,
       initialized.afterEvents, true, initialized.temporalEpoch, initialized.hasSolar, initialized.afterEventEpoch, initialized.hasSchedules, initialized.hasContext);
   }

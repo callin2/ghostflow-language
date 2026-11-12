@@ -12,6 +12,7 @@ import { reportWarnings } from './diagnostic-output.mjs';
 import { validateLegacyAdmission } from './legacy-admission.mjs';
 import { validateOutputObservationsManifest } from './output-observation-contract.mjs';
 import { validateRequiredRuntimeFeatures } from './runtime-features.mjs';
+import { validateClockPolicy, validateSolarFallback } from '../runtimes/wasm/solar-schedule.mjs';
 
 const UTF8 = new TextEncoder();
 const UTF8_FATAL = new TextDecoder('utf-8', { fatal: true });
@@ -388,7 +389,7 @@ function validateGfb1(bytes) {
     fail('invalid-bytecode-format', 'bytecode is not GFB1');
   }
   const version = bytes[4] | (bytes[5] << 8);
-  if (![1, 2, 3, 4, 11, 16, 18, 21, 22, 26, 27, 28].includes(version)) fail('unsupported-bytecode-version', 'unsupported GFB format version');
+  if (![1, 2, 3, 4, 11, 16, 18, 21, 22, 26, 27, 28, 29].includes(version)) fail('unsupported-bytecode-version', 'unsupported GFB format version');
   if (version === 22) {
     if (bytes.byteLength < 16) fail('invalid-bytecode-format', 'truncated GFB22 lifecycle envelope');
     const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
@@ -432,6 +433,24 @@ function validateGfbLifecycle(bytes, lifecycle) {
 }
 
 function validateConfigStreamPackageProfile(manifest, version, runtimeAbi) {
+  const rollingOwnerAbi = runtimeAbi === 'GhostFlow/rolling-output-owner-abi-v1';
+  if (version === '29' || manifest.format === 'GhostFlow/control-v29' || rollingOwnerAbi) {
+    if (version !== '29' || manifest.format !== 'GhostFlow/control-v29' || !rollingOwnerAbi) {
+      fail('unsupported-runtime-abi', 'signed GFB29 requires control-v29 and rolling-output-owner-abi-v1');
+    }
+    const policy = manifest.rollingOutput;
+    exactObject(policy, ['resource', 'output', 'stage', 'windowMs', 'limitMs', 'reserveMs'], 'manifest.rollingOutput');
+    ghostName(policy.resource, 'manifest.rollingOutput.resource');
+    ghostName(policy.output, 'manifest.rollingOutput.output');
+    if (policy.stage !== 'applied'
+      || ![policy.windowMs, policy.limitMs, policy.reserveMs].every(value => Number.isSafeInteger(value) && value > 0)
+      || policy.reserveMs > policy.limitMs || policy.limitMs > policy.windowMs
+      || manifest.outputs?.length !== 1 || manifest.outputs[0]?.name !== policy.output || manifest.outputs[0]?.type !== 'Bool') {
+      fail('manifest-mismatch', 'invalid mandatory rolling output policy');
+    }
+    return;
+  }
+
   if (version === '18' || manifest.format === 'GhostFlow/control-v18') {
     if (version !== '18' || manifest.format !== 'GhostFlow/control-v18'
       || runtimeAbi !== 'GhostFlow/context-scan-abi-v5'
@@ -494,14 +513,22 @@ function validateConfigStreamPackageProfile(manifest, version, runtimeAbi) {
       || !Array.isArray(manifest.schedules) || !manifest.schedules.length
       || manifest.schedules.some(schedule => schedule?.kind !== 'solar' || schedule.day !== undefined
         || !Array.isArray(schedule.configIds) || schedule.configIds.length
-        || schedule.policy?.basis !== 'pulse' || schedule.policy.clock !== 'trusted_only'
-        || schedule.policy.fallback !== 'skip' || schedule.policy.recovery !== 'baseline')
+        || schedule.policy?.basis !== 'pulse' || schedule.policy.recovery !== 'baseline')
       || !Array.isArray(manifest.configs) || manifest.configs.some(config => config.type !== 'Bool')
       || ['signals', 'providers', 'calendars', 'naturalConditions', 'calendarConditions',
         'objectives', 'adaptSettings', 'resources'].some(field => manifest[field] !== undefined
         && (!Array.isArray(manifest[field]) || manifest[field].length))
       || manifest.accounting !== undefined) {
       fail('unsupported-runtime-abi', 'signed GFB16 requires ordinary Solar pulse, control-v15 and context-scan-abi-v5');
+    }
+    const allowExtended = manifest.schedules.length === 1 && manifest.configs.length === 0;
+    for (const { policy } of manifest.schedules) {
+      try {
+        validateClockPolicy(policy.clock, { allowHold: allowExtended });
+        validateSolarFallback(policy.fallback, { allowFixed: allowExtended });
+      } catch (error) {
+        fail('unsupported-runtime-abi', 'signed GFB16 extended policies require one Solar pulse without configs', error);
+      }
     }
     return;
   }
@@ -778,7 +805,7 @@ function validateEmbeddedArtifacts(payload) {
 
   exactObject(payload.bytecode, ['format', 'version', 'sha256', 'contentBase64'], 'payload.bytecode');
   if (payload.bytecode.format !== 'GFB1') fail('invalid-bytecode-format', 'payload bytecode format must be GFB1');
-  if (!['1', '2', '3', '4', '11', '16', '18', '21', '22', '26', '27', '28'].includes(payload.bytecode.version)) fail('unsupported-bytecode-version', 'unsupported payload bytecode version');
+  if (!['1', '2', '3', '4', '11', '16', '18', '21', '22', '26', '27', '28', '29'].includes(payload.bytecode.version)) fail('unsupported-bytecode-version', 'unsupported payload bytecode version');
   digestValue(payload.bytecode.sha256, 'payload.bytecode.sha256');
 
   exactObject(payload.manifest, ['format', 'sha256', 'contentBase64'], 'payload.manifest');
@@ -867,6 +894,7 @@ export async function verifyPortablePackage(packageValue, options = {}) {
     // source lowering below; a signature cannot substitute instance provenance.
   }
   if (weekdayManifest) manifestKeys.push('weekdayConditions');
+  if (profileVersion === '29') manifestKeys.push('rollingOutput');
   if (civilManifest || weekdayManifest || calendarManifest) {
     for (const key of ['providers', 'calendars', 'naturalConditions', 'calendarConditions', 'accounting', 'resources', 'objectives', 'adaptSettings']) {
       if (Object.hasOwn(manifest, key)) manifestKeys.push(key);
@@ -1031,7 +1059,8 @@ export async function verifyPortablePackage(packageValue, options = {}) {
   } else try {
     const extraction = extractLiterate(sourceText, { filename: mappedDocument.filename });
     const guarded = Object.hasOwn(manifest,'legacyAdmission');
-    const replay = guarded ? compileSourceSync(sourceText, replayOptions)
+    const replayedLiterateSource = guarded || profileVersion === '29';
+    const replay = replayedLiterateSource ? compileSourceSync(sourceText, replayOptions)
       : compileControl(extraction.code, { filename: mappedDocument.filename });
     if (canonicalJson(requiredRuntimeFeatures(replay.manifest)) !== canonicalJson(requiredFeatures)) {
       throw new Error('runtime features do not match canonical source lowering');
@@ -1041,6 +1070,10 @@ export async function verifyPortablePackage(packageValue, options = {}) {
         || canonicalJson(manifest.outputObservations ?? null) !== canonicalJson(replay.manifest.outputObservations ?? null)) {
         throw new Error('output observation descriptors do not match canonical source lowering');
       }
+    }
+    if (profileVersion === '29' && (!equalBytes(replay.bytes, artifacts.bytecode)
+      || canonicalJson(replay.manifest.rollingOutput) !== canonicalJson(manifest.rollingOutput))) {
+      throw new Error('rolling output policy does not match canonical source lowering');
     }
     const replayManifest = monitoringCompatibleManifest(replay.manifest);
     if (manifest.monitoring !== undefined || replayManifest.monitoring !== undefined) {
@@ -1118,7 +1151,7 @@ export async function verifyPortablePackage(packageValue, options = {}) {
         if (continuousTimerNames.size) expectedTimerDependencies = replay.traceMetadata.dependencies.filter(entry => (
           entry.target.field === 'timerValue' && continuousTimerNames.has(entry.target.name)
         ));
-        const mappedTrace = guarded ? replay.traceMetadata : remapSourceTrace(replay.traceMetadata, extraction.sourceMap);
+        const mappedTrace = replayedLiterateSource ? replay.traceMetadata : remapSourceTrace(replay.traceMetadata, extraction.sourceMap);
         expectedDerivations = mappedTrace.derivations ?? [];
         expectedConstraintProof = mappedTrace.constraintProof ?? null;
         expectedResultSites = mappedTrace.resultSites;

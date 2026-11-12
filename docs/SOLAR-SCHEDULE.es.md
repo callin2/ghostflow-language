@@ -3,7 +3,7 @@
 
 # Programaciones horarias Solar: compilador y host de simulación
 
-Un único pulso Solar ordinario con `trusted_only` y `fallback = skip` se compila a GFB16 cuando el resto del control es compatible. La configuración en vivo es opcional. Las siguientes secciones describen el transporte independiente anterior para los demás perfiles.
+Un único pulso Solar ordinario se compila a GFB16 cuando el resto del control es compatible. Esto incluye `hold_trusted(..., terminal: skip)` y `fixed_time(..., terminal: skip)`. Los paquetes firmados con estas políticas requieren un único pulso sin configuración en vivo y un host que aporte las pruebas de reloj y ocurrencia correspondientes. Las siguientes secciones describen el transporte independiente anterior para otros perfiles. Varios pulsos sin filtro también usan GFB16 cuando cada uno utiliza `trusted_only` y `fallback = skip`.
 
 Esta guía describe el **perfil Solar independiente anterior**.
 

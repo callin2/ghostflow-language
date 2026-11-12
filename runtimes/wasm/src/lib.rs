@@ -36,6 +36,9 @@ mod station_abi;
 #[path = "../accounting_abi.rs"]
 pub mod accounting_abi;
 
+#[path = "../rolling_output_abi.rs"]
+mod rolling_output_abi;
+
 pub struct Handle {
     runtime: Runtime,
     error: String,

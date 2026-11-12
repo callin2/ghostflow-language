@@ -8,6 +8,18 @@ Daily and DailySlots runtimes can now export and restore exact-Program terminal 
 
 ## Unreleased
 
+### 2026-11-12 - Frame multiple ordinary Solar pulses ([#621](https://github.com/callin2/ghostflow-language/issues/621))
+
+Multiple unfiltered Solar pulses with trusted clocks and skip fallback now use GFB16. Native and WASM retain independent provider evidence and admission for each site. Target hosts must supply evidence for each descriptor.
+
+### 2026-11-12 - Frame ordinary Solar clock hold and fixed fallback ([#621](https://github.com/callin2/ghostflow-language/issues/621))
+
+A single unfiltered Solar pulse now uses existing GFB16 for held-clock and fixed-time fallback policies. Signed admission binds the exact duration and local fallback time for a single pulse without live configs. Native and WASM traces agree on fallback provenance, hold expiry and once-only admission. Target hosts must supply the matching clock and occurrence evidence.
+
+### 2026-11-12 - Bind one applied rolling output policy to GFB29 ([#96](https://github.com/callin2/ghostflow-language/issues/96))
+
+A durable applied account can explicitly name its Bool output with `output: pump`. For one static rolling limit, GFB29 binds the resource, output and timing policy to the Program. Signed admission requires the rolling owner ABI and exact policy metadata. The owner checks a proposed full-ON lease against the rolling limit through its deadline, including completed ON history that expires during the lease. It reports when the safe duration cannot meet the stop margin or when its bounded live history is full. Recovery from uncertain history requires a complete observed OFF window. Device and Simulator target support depend on integrating the enforcing output writer.
+
 ### 2026-11-12 - Match settings readback to its completed scan ([#288](https://github.com/callin2/ghostflow-language/issues/288))
 
 Completed snapshots verify each setting's identity, stream revision and Result status against the scan trace. A prior readback cannot show a default as ready for a scan that recorded a settings fault.

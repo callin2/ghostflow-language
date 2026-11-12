@@ -11,6 +11,18 @@ Daily와 DailySlots 실행기는 `schedule_checkpoint`와 `restore_schedule_chec
 
 ## 미출시
 
+### 2026-11-12 - 여러 일반 Solar pulse의 프레임 실행 ([#621](https://github.com/callin2/ghostflow-language/issues/621))
+
+날짜 필터가 없고 신뢰 시계와 건너뛰기 대체를 사용하는 Solar pulse 여러 개를 GFB16으로 실행합니다. 네이티브와 WASM은 각 사이트의 제공자 증거와 실행 판정을 독립적으로 유지합니다. 타깃 호스트가 각 디스크립터의 증거를 제공해야 합니다.
+
+### 2026-11-12 - 일반 Solar 시계 유지와 고정시각 대체의 프레임 실행 ([#621](https://github.com/callin2/ghostflow-language/issues/621))
+
+날짜 필터 없는 Solar pulse 하나는 시계 유지와 고정시각 대체 정책을 기존 GFB16으로 실행합니다. 서명 검증은 live config 없는 단일 pulse의 유지 시간과 현지 대체 시각을 대조합니다. 네이티브와 WASM은 대체 근거, 유지 만료, 단일 실행에 대해 동일한 추적을 기록합니다. 타깃 호스트가 해당 시계와 발생 증거를 제공해야 합니다.
+
+### 2026-11-12 - 적용 출력 한 개의 이동 한도를 GFB29에 결속 ([#96](https://github.com/callin2/ghostflow-language/issues/96))
+
+영속 적용 시간 계정은 `output: pump`로 Bool 출력을 지정할 수 있다. 정적 이동 한도 하나의 자원, 출력, 시간 정책을 GFB29 Program에 결속한다. 서명 패키지는 전용 출력 소유자 ABI와 정확한 정책 일치를 요구한다. 출력 소유자는 예약 마감까지 계속 ON인 경우를 검사하며, 그 사이 윈도우에서 벗어나는 완료된 ON 이력도 계산에 반영한다. 안전한 예약 시간이 정지 여유보다 짧거나 유효 이력 보관 한도에 도달하면 각각의 사유를 반환한다. 이력이 불명확하면 전체 윈도우에 걸쳐 OFF가 관찰된 뒤 복구한다. Device와 Simulator 타깃 지원에는 한도를 강제하는 출력 경로 연동이 필요하다.
+
 ### 2026-11-12 - 완료 스캔과 설정 읽기 결과 대조 ([#288](https://github.com/callin2/ghostflow-language/issues/288))
 
 완료 스냅샷은 각 설정의 식별자, 스트림 리비전, Result 상태를 해당 스캔의 추적 기록과 대조한다. 설정 오류가 기록된 스캔에 이전 읽기 결과를 붙여 기본값을 정상으로 표시하는 요청을 거부한다.

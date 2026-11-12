@@ -632,7 +632,14 @@ test('signed Solar v15 rejects re-signed descriptor and predicate changes before
   await verifyPortablePackage(fixture('solar-pulse-valid'), options);
   assert.ok(called);
   called = false;
-  for (const scenario of ['solar-pulse-descriptor', 'solar-pulse-predicate']) {
+  for (const scenario of ['solar-pulse-extended-valid', 'solar-pulse-multi-valid']) {
+    await verifyPortablePackage(fixture(scenario), options);
+    assert.ok(called);
+    called = false;
+  }
+  called = false;
+  for (const scenario of ['solar-pulse-descriptor', 'solar-pulse-predicate',
+    'solar-pulse-extended-clock', 'solar-pulse-extended-fallback']) {
     await assert.rejects(verifyPortablePackage(fixture(scenario), options), error => error.code === 'source-map-mismatch' && /context schedule manifest/.test(error.cause?.message));
     assert.equal(called, false);
   }
@@ -701,4 +708,81 @@ test('signed calendar Result preserves the Seoul date and rejects rewritten bind
   await resign(forged, current);
   await assert.rejects(verifyPortablePackage(forged, pinnedOptions),
     error => error.code === 'source-map-mismatch' && /context schedule manifest/.test(error.cause?.message));
+});
+
+test('#96 signed GFB29 requires an owner ABI and rejects replaced policy metadata', async () => {
+  const current = await currentKeyPromise;
+  const { RollingOutputRuntime } = await import('../runtimes/wasm/rolling-output-runtime.mjs');
+  const source = '# Rolling output\n\n```ghost\ncontrol Watering {\n'
+    + 'resource irrigation: BoolActuator;\n'
+    + 'account applied = on_time(irrigation, stage: applied, persistence: durable, output: pump);\n'
+    + 'constraints Budget { limit used(applied, rolling(60s)) <= 30s { reserve = 5s; on_unknown = block; } }\n'
+    + 'output pump: Bool; pump <- true;\n}\n```\n';
+  const artifact = await compileSource(source, { filename: 'rolling-package.ghost.md' });
+  const requiredCapabilities = [{ kind: 'actuator', name: 'pump', type: 'bool' }];
+  const ownerAbi = 'GhostFlow/rolling-output-owner-abi-v1';
+  const packageIdentity = { ...identity, runtimeAbi: ownerAbi, requiredCapabilities };
+  const signerOptions = buildOptions([{ keyId: current.keyId, privateKey: current.privateKey }]);
+  await expectsCode(() => buildPortablePackage(artifact,
+    { ...packageIdentity, runtimeAbi: identity.runtimeAbi }, signerOptions), 'unsupported-runtime-abi');
+  const packaged = await buildPortablePackage(artifact, packageIdentity, signerOptions);
+  const unsupported = { ...verifierOptions(current), supportedManifestFormats: ['GhostFlow/control-v29'],
+    availableCapabilities: requiredCapabilities };
+  await expectsCode(() => verifyPortablePackage(packaged, unsupported), 'unsupported-runtime-abi');
+  const target = { ...unsupported, supportedRuntimeAbis: [ownerAbi],
+    verifyBytecode: async (bytes, context) => {
+      assert.deepEqual(Buffer.from(bytes), artifact.bytes);
+      const runtime = await RollingOutputRuntime.createValidationRuntime(fs.readFileSync(wasmPath), bytes, context);
+      try {
+        assert.equal(runtime.step({ nowMs: 0 }).vm.safe.pump, true);
+        assert.equal(typeof runtime.requestOn, 'undefined');
+        return true;
+      } finally {
+        runtime.dispose();
+      }
+    } };
+  await verifyPortablePackage(packaged, target);
+  const anchored = fs.readFileSync(path.join(root, 'tests/fixtures/rolling-intent-package.ghost.md.txt'), 'utf8');
+  const ref = 'waveshare-esp32-s3-eth-8di-8ro-r8n16@1';
+  const channels = Object.fromEntries(Array.from({ length: 8 }, (_, index) => index + 1).flatMap(channel => [
+    [`DI${channel}`, { role: 'input', type: 'Bool' }],
+    [`RO${channel}`, { role: 'output', type: 'Bool' }],
+  ]));
+  const definition = { kind: 'board', connections: {}, defaults: {}, channels };
+  const hardwareProfiles = [{ ref, definition, sha256: await digestHex(encoder.encode(canonicalJson(definition))) }];
+  const anchoredArtifact = await compileSource(anchored, { filename: 'conversation-control.ghost.md', hardwareProfiles });
+  const anchoredPackage = await buildPortablePackage(anchoredArtifact, packageIdentity, {
+    ...signerOptions,
+    verifyCompilation: (text, { filename }) => compileSource(text, { filename, hardwareProfiles }),
+  });
+  await verifyPortablePackage(anchoredPackage, {
+    ...target, hardwareProfiles,
+    verifyBytecode: async (bytes, context) => {
+      assert.deepEqual(Buffer.from(bytes), anchoredArtifact.bytes);
+      assert.equal(context.sourceMap.traceMetadata.intentLinks[0].anchorId, 'GF-ASSUME-HIL-ROLLING');
+      const runtime = await RollingOutputRuntime.createValidationRuntime(fs.readFileSync(wasmPath), bytes, context, { hardwareProfiles });
+      try {
+        assert.deepEqual(runtime.step({ nowMs: 0 }).vm.safe, { pump: true });
+        return true;
+      } finally {
+        runtime.dispose();
+      }
+    },
+  });
+  const alteredLink = clone(anchoredPackage);
+  const sourceMap = JSON.parse(Buffer.from(alteredLink.payload.sourceMap.contentBase64, 'base64'));
+  sourceMap.traceMetadata.intentLinks[0].source.line++;
+  const sourceMapBytes = encoder.encode(canonicalJson(sourceMap));
+  alteredLink.payload.sourceMap.contentBase64 = base64(sourceMapBytes);
+  alteredLink.payload.sourceMap.sha256 = await digestHex(sourceMapBytes);
+  await resign(alteredLink, current);
+  await expectsCode(() => verifyPortablePackage(alteredLink, { ...target, hardwareProfiles }), 'source-map-mismatch');
+  const altered = clone(packaged);
+  const manifest = JSON.parse(Buffer.from(altered.payload.manifest.contentBase64, 'base64'));
+  manifest.rollingOutput.limitMs = 25_000;
+  const encoded = encoder.encode(canonicalJson(manifest));
+  altered.payload.manifest.contentBase64 = base64(encoded);
+  altered.payload.manifest.sha256 = await digestHex(encoded);
+  await resign(altered, current);
+  await expectsCode(() => verifyPortablePackage(altered, target), 'source-map-mismatch');
 });

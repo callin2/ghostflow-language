@@ -11,10 +11,12 @@ const wasmPath = path.join(root, 'target/wasm32-unknown-unknown/release/ghostflo
 const nativePath = path.join(root, 'target/release/examples/scan_adapter' + (process.platform === 'win32' ? '.exe' : ''));
 const sourcePath = path.join(root, 'examples/solar-watering.ghost.md');
 
-test('Solar GFB5 fails closed on framed hosts until the provider-fact frame ABI exists', async () => {
+test('Legacy Solar GFB5 remains rejected by the framed host', async () => {
   assert.ok(fs.existsSync(wasmPath), 'release WASM artifact is required; run npm test');
-  const source = fs.readFileSync(sourcePath, 'utf8');
+  const source = fs.readFileSync(sourcePath, 'utf8')
+    .replace('  schedule dawn:', '  schedule externalSlots: DailySlots<15min> { timezone = "UTC"; selected = [06:00]; }\n  schedule dawn:');
   const artifact = await compileSource(source, { filename: 'examples/solar-watering.ghost.md' });
+  assert.equal(Buffer.from(artifact.bytes).readUInt16LE(4), 5);
   await assert.rejects(() => ControlRuntime.instantiateFramed(fs.readFileSync(wasmPath), artifact,
     { solar: { bootEpoch: 7, terminalCapacity: 8 } }), /framed Solar activation/);
 });

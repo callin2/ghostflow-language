@@ -53,10 +53,12 @@ const facts = (site, monotonicMs, wallMs) => ({
 });
 const secondSolar = source.slice(source.indexOf('  schedule dawn:'), source.indexOf('  output due:'))
   .replace('schedule dawn:', 'schedule spare:');
-const legacySource = code => code.replace('  schedule dawn:', `${secondSolar}  schedule dawn:`);
+const legacySource = code => code.replace('  schedule dawn:', `  schedule externalSlots: DailySlots<15min> { timezone = "UTC"; selected = [06:00]; }
+${secondSolar}  schedule dawn:`);
 const legacyFacts = (artifact, nowMs, wallMs) => ({
   clock: facts(0, nowMs, wallMs).clock,
-  schedules: artifact.manifest.schedules.flatMap(schedule => facts(schedule.site, nowMs, wallMs).schedules),
+  schedules: artifact.manifest.schedules.filter(schedule => schedule.kind === 'solar')
+    .flatMap(schedule => facts(schedule.site, nowMs, wallMs).schedules),
 });
 
 test('ordinary Solar pulse selects the framed context runtime without an operator config', async t => {
@@ -109,9 +111,61 @@ test('ordinary Solar pulse selects the framed context runtime without an operato
   assert.deepEqual(native.map(row => row.outcome.trace), observed);
 });
 
+for (const [hold, fixed] of [[true, false], [false, true], [true, true]]) {
+  test(`#621 ordinary Solar hold=${hold} fixed=${fixed} preserves one framed admission`, async t => {
+    const text = source
+      .replace('clock = trusted_only;', hold ? 'clock = hold_trusted(2s, terminal: skip);' : 'clock = trusted_only;')
+      .replace('fallback = skip;', fixed ? 'fallback = fixed_time(time`06:00`, terminal: skip);' : 'fallback = skip;');
+    const artifact = await compileSource(text, { filename: 'ordinary-extended-solar.ghost.md' });
+    assert.equal(artifact.manifest.format, 'GhostFlow/control-v15');
+    assert.equal(Buffer.from(artifact.bytes).readUInt16LE(4), 16);
+    const [descriptor] = artifact.manifest.schedules;
+    const context = { bootEpoch: 7, terminalCapacity: 8, bindings: [] };
+    const runtime = await ControlRuntime.instantiateFramed(wasm, artifact, { context });
+    t.after(() => runtime.dispose());
+    const scans = [[0, 21_599_000, true, false], [1000, hold ? 1 : 21_600_000, !hold, false],
+      [2500, 1, false, false], [3000, 21_602_000, true, true], [4000, 21_603_000, true, true]];
+    const traces = scans.map(([nowMs, wallMs, trusted, recovered]) => {
+      const available = recovered || !fixed;
+      const contextFacts = {
+        clock: { ...facts(descriptor.site, nowMs, wallMs).clock, trusted, unknownReason: trusted ? null : 'TrustExpired' },
+        natural: [], schedules: [], settings: null,
+        solars: [solarContextEvidence(descriptor, {
+          site: descriptor.site, coverageFromWallMs: 0, coverageToWallMs: 86_400_000,
+          rows: [{ sourceDay: 0, available, scheduledWallMs: available ? recovered ? 21_602_000 : 21_600_000 : null,
+            fallbackWallMs: available ? null : 21_600_000, unavailableReason: available ? null : 2,
+            providerRevision: recovered ? 'solar-v2' : 'solar-v1', contextRevision: 'site-v1' }],
+        })],
+      };
+      return { contextFacts, trace: runtime.step({ nowMs, inputs: { allow: true }, contextFacts }).vm };
+    });
+    assert.deepEqual(traces.map(({ trace }) => trace.safe.due), [false, true, false, false, false]);
+    const due = traces[1].trace.contextTrace.find(row => row.decision === 'Due');
+    if (hold) assert.equal(due.clockProvenance, 'HeldClock');
+    assert.equal(due.fallback, fixed);
+    assert.equal(due.unavailableReason ?? null, fixed ? 2 : null);
+    assert.equal(due.providerRevision, 'solar-v1');
+    assert.equal(due.contextRevision, 'site-v1');
+    const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'gf-ordinary-extended-solar-'));
+    t.after(() => fs.rmSync(directory, { recursive: true, force: true }));
+    const modulePath = path.join(directory, 'ordinary.gfb'), tapePath = path.join(directory, 'tape.json');
+    fs.writeFileSync(modulePath, artifact.bytes);
+    fs.writeFileSync(tapePath, JSON.stringify({ profile: 'context-solar-v1', activation: context,
+      steps: scans.map(([nowMs], scanId) => ({
+        scanId, logicalTimeMs: nowMs, ...traces[scanId].contextFacts,
+        inputs: Object.entries(softwareQualityRails(artifact, { allow: true }, scanId + 1, nowMs))
+          .map(([name, value]) => ({ name, value })),
+      })) }));
+    const nativePath = fileURLToPath(new URL('../target/release/examples/context_tape', import.meta.url));
+    const native = execFileSync(nativePath + (process.platform === 'win32' ? '.exe' : ''),
+      [modulePath, tapePath], { encoding: 'utf8', timeout: 10_000 }).trim().split('\n').map(JSON.parse);
+    assert.deepEqual(native.map(row => row.outcome?.trace), traces.map(({ trace }) => trace));
+  });
+}
+
 test('ControlRuntime executes compiled Solar from provider facts and rejects host due injection', async () => {
   const artifact = await compileSource(legacySource(source), { filename: 'native-solar.ghost.md' });
-  const descriptor = artifact.manifest.schedules[1];
+  const descriptor = artifact.manifest.schedules.find(schedule => schedule.name === 'dawn');
   assert.equal(new DataView(artifact.bytes.buffer, artifact.bytes.byteOffset).getUint16(4, true), 5);
   assert.equal(Object.hasOwn(descriptor, 'dueInput'), false);
 
@@ -136,7 +190,7 @@ test('ControlRuntime validates strict Solar policy metadata before activation', 
   const artifact = await compileSource(legacySource(source), { filename: 'native-solar.ghost.md' });
   const corrupt = mutate => {
     const manifest = structuredClone(artifact.manifest);
-    mutate(manifest.schedules[0]);
+    mutate(manifest.schedules.find(schedule => schedule.name === 'dawn'));
     return ControlRuntime.instantiate(wasm, { ...artifact, manifest }, {
       solar: { bootEpoch: 7, terminalCapacity: 8 },
     });

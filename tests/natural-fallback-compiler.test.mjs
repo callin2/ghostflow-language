@@ -14,11 +14,11 @@ const solar = (clock = 'trusted_only', fallback = 'skip', declarations = '') => 
   output start: Bool; start <- dawn.due;
 }`;
 
-test('extended natural policies select GFB13 while ordinary Solar selects GFB16', () => {
+test('ordinary Solar pulse and its extended policies use GFB16', () => {
   assert.equal(format(compileControl(solar())), 16);
   const compiled = compileControl(solar('hold_trusted(2min, terminal: skip)', 'fixed_time(time`06:30`, terminal: skip)'));
-  assert.equal(format(compiled), 13);
-  assert.equal(compiled.manifest.format, 'GhostFlow/control-v12');
+  assert.equal(format(compiled), 16);
+  assert.equal(compiled.manifest.format, 'GhostFlow/control-v15');
   const schedule = compiled.manifest.schedules[0];
   assert.equal(schedule.offsetMs, 1);
   assert.deepEqual(schedule.policy.clock, { kind: 'hold_trusted', durationMs: 120000, terminal: 'skip' });
@@ -38,7 +38,7 @@ test('fixed_time requires a valid TimeOfDay literal and explicit terminal skip',
     'fixed_time(time`06:30`)', 'fixed_time(time`06:30`, terminal: baseline)', 'fixed_time(at, terminal: skip)']) {
     assert.throws(() => compileControl(solar('trusted_only', fallback, 'let at = time`06:30`;')));
   }
-  assert.equal(format(compileControl(solar('trusted_only', 'fixed_time(time`00:00`, terminal: skip)'))), 13);
+  assert.equal(format(compileControl(solar('trusted_only', 'fixed_time(time`00:00`, terminal: skip)'))), 16);
 });
 
 test('Tide hold is GFB13 and fixed_time remains Solar only', () => {
@@ -81,7 +81,7 @@ test('extended Solar retains Int state and scalar quantity support', () => {
   const source = solar('hold_trusted(1min, terminal: skip)', 'skip',
     'state count: Int = 0; let threshold: Temperature = 293K;')
     .replace('output start: Bool;', "count' = if dawn.due then count + 1 else count; output start: Bool;");
-  assert.equal(format(compileControl(source)), 13);
+  assert.equal(format(compileControl(source)), 16);
 });
 
 test('extended Solar S-expression preserves semantic IR roundtrip and rejects empty extension', () => {
