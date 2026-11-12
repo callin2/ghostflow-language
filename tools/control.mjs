@@ -2440,12 +2440,20 @@ class Lowerer {
       if (!Number.isSafeInteger(durationMs) || durationMs <= 0) continue;
       const scheduleIds = positiveScheduleConjuncts(transition.no);
       if (!scheduleIds || scheduleIds.length !== 1) continue;
+      const [scheduleId] = scheduleIds;
+      const schedule = this.manifest.schedules.find(candidate => candidate.name === scheduleId);
+      const policy = schedule?.policy;
+      const directDue = transition.no.kind === 'member' && transition.no.member === 'due';
+      const startCondition = directDue && this.constraints.length === 0
+        && schedule && (schedule.kind == null && policy == null
+          || policy?.basis === 'pulse' && policy.when === 'true' && policy.cancelWhen === undefined)
+        ? 'schedule-only' : 'conditional';
       for (const connection of this.ast.body) {
         if (connection.kind !== 'connection' || connection.value.kind !== 'nextReference'
           || connection.value.name !== nextNode.name || this.outputs.get(connection.name)?.type.kind !== 'Bool') continue;
         patterns.push({
           kind: 'scheduled-timed-latch', outputName: connection.name, stateName: nextNode.name,
-          timerId, durationMs, scheduleId: scheduleIds[0],
+          timerId, durationMs, scheduleId, startCondition,
         });
       }
     }

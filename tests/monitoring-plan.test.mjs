@@ -21,7 +21,7 @@ const code = ({ duration = '5min', start = '((enabled |> recover(false)) && dawn
 }`;
 const expectedPattern = {
   kind: 'scheduled-timed-latch', outputName: 'running', stateName: 'active',
-  timerId: 'elapsedActive', durationMs: 300_000, scheduleId: 'dawn',
+  timerId: 'elapsedActive', durationMs: 300_000, scheduleId: 'dawn', startCondition: 'conditional',
 };
 const digest = bytes => createHash('sha256').update(bytes).digest('hex');
 
@@ -65,7 +65,7 @@ test('the Periodic and UTC DailySlots monitoring duration matches the actual tim
   for (const form of forms) await t.test(form.name, async t => {
     const source = code({ start: 'dawn.due', schedule: form.schedule, config: '' });
     const compiled = await compileSource(source, { filename: 'monitoring-schedule.ghost' });
-    assert.deepEqual(compiled.manifest.monitoring.patterns, [expectedPattern]);
+    assert.deepEqual(compiled.manifest.monitoring.patterns, [{ ...expectedPattern, startCondition: 'schedule-only' }]);
     const runtime = await ControlRuntime.instantiate(wasm, compiled, form.options);
     t.after(() => runtime.dispose());
     const site = compiled.manifest.schedules[0].site;
@@ -76,6 +76,23 @@ test('the Periodic and UTC DailySlots monitoring duration matches the actual tim
     const end = 1 + compiled.manifest.monitoring.patterns[0].durationMs;
     assert.deepEqual([0, 1, end - 1, end].map(step), [false, true, true, false]);
   });
+});
+
+test('scheduled monitoring distinguishes direct due from source conditions', async () => {
+  const schedule = 'schedule dawn: DailySlots<15min> { timezone = "UTC"; selected = [06:00]; dst_missing = skip; dst_repeated = first;';
+  const direct = code({ start: 'dawn.due', schedule, config: '' });
+  const gated = code({ start: 'dawn.due && (permit |> recover(false))', schedule, config: 'input permit: Bool;' });
+  const policyGated = direct.replace('when = true;', 'when = false;');
+  const outputGuarded = direct.replace("running <- active';", "running <- active'; output spare: Bool; spare <- true; require !(running && spare);");
+  for (const [source, expected] of [
+    [direct, 'schedule-only'],
+    [gated, 'conditional'],
+    [policyGated, 'conditional'],
+    [outputGuarded, 'conditional'],
+  ]) {
+    const compiled = await compileSource(source, { filename: 'forecast-start.ghost' });
+    assert.equal(compiled.manifest.monitoring.patterns[0].startCondition, expected);
+  }
 });
 
 test('only a positive required schedule conjunction and a direct post-state output are covered', async () => {
@@ -118,16 +135,26 @@ test('portable package replay rejects a substituted monitoring plan', async () =
   const accepted = await verifyPortablePackage(packageValue, verifyOptions);
   assert.deepEqual(accepted.manifest.monitoring.patterns, [expectedPattern]);
 
-  const changed = structuredClone(packageValue);
-  const manifest = JSON.parse(Buffer.from(changed.payload.manifest.contentBase64, 'base64').toString('utf8'));
-  manifest.monitoring.patterns[0].scheduleId = 'forged';
-  const manifestBytes = Buffer.from(canonicalJson(manifest));
-  changed.payload.manifest.contentBase64 = manifestBytes.toString('base64');
-  changed.payload.manifest.sha256 = digest(manifestBytes);
-  const payloadBytes = Buffer.from(canonicalJson(changed.payload));
-  changed.payloadSha256 = digest(payloadBytes);
-  changed.signatures[0].signatureBase64 = Buffer.from(await crypto.subtle.sign('Ed25519', key.privateKey, payloadBytes)).toString('base64');
-  await assert.rejects(verifyPortablePackage(changed, verifyOptions), /monitoring plan does not match canonical source lowering|does not match declared output/);
+  const withMonitoringChange = async change => {
+    const changed = structuredClone(packageValue);
+    const manifest = JSON.parse(Buffer.from(changed.payload.manifest.contentBase64, 'base64').toString('utf8'));
+    change(manifest.monitoring.patterns[0]);
+    const manifestBytes = Buffer.from(canonicalJson(manifest));
+    changed.payload.manifest.contentBase64 = manifestBytes.toString('base64');
+    changed.payload.manifest.sha256 = digest(manifestBytes);
+    const payloadBytes = Buffer.from(canonicalJson(changed.payload));
+    changed.payloadSha256 = digest(payloadBytes);
+    changed.signatures[0].signatureBase64 = Buffer.from(await crypto.subtle.sign('Ed25519', key.privateKey, payloadBytes)).toString('base64');
+    return changed;
+  };
+  await assert.rejects(verifyPortablePackage(await withMonitoringChange(pattern => { pattern.scheduleId = 'forged'; }), verifyOptions),
+    /does not match declared output/);
+  await assert.rejects(verifyPortablePackage(await withMonitoringChange(pattern => { pattern.startCondition = 'schedule-only'; }), verifyOptions),
+    error => error.cause?.message === 'monitoring plan does not match canonical source lowering');
+  await assert.rejects(verifyPortablePackage(await withMonitoringChange(pattern => { pattern.startCondition = 'guaranteed'; }), verifyOptions),
+    /startCondition is unsupported/);
+  const legacy = await verifyPortablePackage(await withMonitoringChange(pattern => { delete pattern.startCondition; }), verifyOptions);
+  assert.equal(Object.hasOwn(legacy.manifest.monitoring.patterns[0], 'startCondition'), false);
 });
 
 test('configured timed outputs expose the direct Duration setting and enum order', async () => {
