@@ -1,5 +1,6 @@
 import { compileSource } from '../../tools/compile-source.mjs';
 import { FramedGhostFlowRuntime } from './framed-runtime.mjs';
+import { ControlRuntime } from './control-runtime.mjs';
 
 const creation = Symbol('verified rolling output');
 
@@ -20,12 +21,15 @@ export class RollingOutputRuntime {
   #store;
   #clock;
   #saved;
-  #programBytes;
+  #artifact;
+  #wasmBytes;
+  #hardwareProfiles;
   #binding;
   #writing = false;
 
   static async open(wasmBytes, source, { binding, bootEpoch, clock, store, maxIntervals, filename, hardwareProfiles }) {
-    const { manifest, bytes } = await compileSource(source, { filename, hardwareProfiles });
+    const artifact = await compileSource(source, { filename, hardwareProfiles });
+    const { manifest } = artifact;
     const { resource, output, resourceId } = binding;
     const policy = manifest.rollingOutput;
     if (manifest.format !== 'GhostFlow/control-v29' || !policy
@@ -41,7 +45,8 @@ export class RollingOutputRuntime {
     }
     if (!Number.isSafeInteger(bootEpoch) || bootEpoch <= 0) throw new RangeError('rolling output requires a positive boot epoch');
     if (typeof clock !== 'function') throw new TypeError('rolling output requires a monotonic clock');
-    const { instance: { exports: wasm } } = await WebAssembly.instantiate(wasmBytes);
+    const binary = wasmBytes instanceof ArrayBuffer ? new Uint8Array(wasmBytes.slice(0)) : new Uint8Array(wasmBytes);
+    const { instance: { exports: wasm } } = await WebAssembly.instantiate(binary);
     // null is an explicit known-empty result from the installation owner.
     // Missing or unreadable existing history must be reported as an error.
     const saved = await store.read();
@@ -59,7 +64,7 @@ export class RollingOutputRuntime {
       if (size) wasm.gf_dealloc(ptr, size);
     }
     if (!handle) throw new Error('rolling output checkpoint does not match the installed policy');
-    const runtime = new RollingOutputRuntime(wasm, handle, store, clock, saved, bytes, { resource, output, resourceId }, creation);
+    const runtime = new RollingOutputRuntime(wasm, handle, store, clock, saved, artifact, binary, hardwareProfiles, { resource, output, resourceId }, creation);
     try {
       if (saved === null) await runtime.#commit();
       return runtime;
@@ -69,14 +74,16 @@ export class RollingOutputRuntime {
     }
   }
 
-  constructor(wasm, handle, store, clock, saved, programBytes, binding, token) {
+  constructor(wasm, handle, store, clock, saved, artifact, wasmBytes, hardwareProfiles, binding, token) {
     if (token !== creation) throw new Error('use RollingOutputRuntime.open with a verified installation binding');
     this.#wasm = wasm;
     this.#handle = handle;
     this.#store = store;
     this.#clock = clock;
     this.#saved = saved?.slice() ?? null;
-    this.#programBytes = programBytes;
+    this.#artifact = artifact;
+    this.#wasmBytes = wasmBytes;
+    this.#hardwareProfiles = hardwareProfiles;
     this.#binding = binding;
   }
 
@@ -108,7 +115,7 @@ export class RollingOutputRuntime {
     this.#requireReady();
     const runtime = new FramedGhostFlowRuntime(this.#wasm);
     try {
-      runtime.loadRollingProposals(this.#programBytes, this.#handle, this.#binding);
+      runtime.loadRollingProposals(this.#artifact.bytes, this.#handle, this.#binding);
       for (const { kind, name, type } of capabilities) runtime.addCapability(kind, name, type);
       runtime.activate();
       return runtime;
@@ -116,6 +123,18 @@ export class RollingOutputRuntime {
       runtime.dispose();
       throw error;
     }
+  }
+
+  /** Condition typed inputs and evaluate safe proposals without applying outputs. */
+  async createControlRuntime(options = {}) {
+    this.#requireReady();
+    return ControlRuntime.instantiateRollingProposals(this.#wasmBytes, this.#artifact, {
+      wasm: this.#wasm,
+      load: (runtime, bytes) => {
+        this.#requireReady();
+        runtime.loadRollingProposals(bytes, this.#handle, this.#binding);
+      },
+    }, { ...options, hardwareProfiles: this.#hardwareProfiles });
   }
 
   async requestOn(stopMarginMs = 0) {

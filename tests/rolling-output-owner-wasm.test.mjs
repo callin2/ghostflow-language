@@ -260,16 +260,24 @@ test('mandatory GFB29 evaluates safe proposals only through a bound rolling owne
     },
   });
   const runtime = owner.createProposalRuntime([{ kind: 'actuator', name: 'valve', type: 'bool' }]);
+  const typed = await owner.createControlRuntime();
   try {
     const inputs = Object.entries(softwareQualityRails(artifact, { manual: true }, 1, 0))
       .map(([name, value]) => ({ name, value }));
     const result = runtime.scan({ scanId: 0, logicalTimeMs: 0, inputs });
     assert.equal(result.trace.safe.valve, true);
+    const checked = typed.step({ nowMs: 0, samples: {
+      manual: { quality: 'Good', value: true, epoch: 1, id: 1, timestampMs: 0 },
+    } });
+    assert.equal(checked.vm.safe.valve, true);
     assert.deepEqual(owner.explain(0), { usedMs: 0n, reservedMs: 0n, blocked: false, nextReleaseMs: null });
     assert.deepEqual(await owner.requestOn(1), { status: 'allowed', deadlineMs: 5000 });
     assert.equal(owner.explain(0).reservedMs, 5000n);
   } finally {
+    typed.dispose();
     runtime.dispose();
+    const pending = owner.createControlRuntime();
     owner.dispose();
+    await assert.rejects(pending, /unavailable while saving or closed/);
   }
 });
