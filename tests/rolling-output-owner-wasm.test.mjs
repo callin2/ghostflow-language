@@ -267,6 +267,8 @@ test('mandatory GFB29 evaluates safe proposals only through a bound rolling owne
     ...ownerOptions, expectedBytecodeSha256: artifact.manifest.bytecodeSha256,
   });
   assert.equal(owner.bytecodeSha256, artifact.manifest.bytecodeSha256);
+  assert.deepEqual(owner.policy, artifact.manifest.rollingOutput);
+  assert.ok(Object.isFrozen(owner.policy));
   const runtime = owner.createProposalRuntime([{ kind: 'actuator', name: 'valve', type: 'bool' }]);
   const typed = await owner.createControlRuntime();
   try {

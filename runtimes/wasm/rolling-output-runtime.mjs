@@ -121,6 +121,10 @@ export class RollingOutputRuntime {
     return this.#artifact.manifest.bytecodeSha256;
   }
 
+  get policy() {
+    return Object.freeze({ ...this.#artifact.manifest.rollingOutput });
+  }
+
   /** Evaluate safe proposals. This never applies an actuator value. */
   createProposalRuntime(capabilities) {
     this.#requireReady();
