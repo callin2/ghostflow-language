@@ -1553,6 +1553,24 @@ function wrapLifecycleGfb(bytes, lifecycle) {
   return concatBytes(prefix, bytes, descriptor);
 }
 
+function wrapRollingOutputGfb(bytes, policy) {
+  const encoder = new TextEncoder();
+  const resource = encoder.encode(policy.resource);
+  const output = encoder.encode(policy.output);
+  const prefix = new Uint8Array(10);
+  prefix.set([0x47, 0x46, 0x42, 0x31]);
+  const header = new DataView(prefix.buffer);
+  header.setUint16(4, 29, true);
+  header.setUint32(6, bytes.length, true);
+  const times = new Uint8Array(24);
+  const descriptor = new DataView(times.buffer);
+  descriptor.setBigUint64(0, BigInt(policy.windowMs), true);
+  descriptor.setBigUint64(8, BigInt(policy.limitMs), true);
+  descriptor.setBigUint64(16, BigInt(policy.reserveMs), true);
+  return concatBytes(prefix, bytes, Uint8Array.of(resource.length, 0), resource,
+    Uint8Array.of(output.length, 0), output, times);
+}
+
 function concatBytes(...parts) {
   const result = new Uint8Array(parts.reduce((size, part) => size + part.length, 0));
   let offset = 0;
@@ -4976,7 +4994,51 @@ export function compileAccountingControl(source, { filename = '<control>' } = {}
   if (ast.kind !== 'control' || !ast.body.some(item => item.kind === 'account' || item.kind === 'account-constraints')) {
     error(ast.loc, 'expected a control with accounting declarations');
   }
-  return new Lowerer(ast, filename).lower({ emitBytecode: true, accountingExecution: true });
+  const accounts = ast.body.filter(item => item.kind === 'account');
+  const explicitlyBound = accounts.filter(item => item.value.named?.some(option => option.name === 'output'));
+  if (explicitlyBound.length) {
+    const account = explicitlyBound[0].value;
+    const options = account.named.map(option => option.name).sort().join(',');
+    const stage = account.named.find(option => option.name === 'stage')?.value;
+    if (accounts.length !== 1 || account.name !== 'on_time' || account.args.length !== 1
+        || options !== 'output,persistence,stage' || stage?.kind !== 'reference' || stage.name !== 'applied') {
+      error(ast.loc, 'mandatory rolling output requires one applied account with explicit output binding');
+    }
+  }
+  const lowered = new Lowerer(ast, filename).lower({ emitBytecode: true, accountingExecution: true });
+  if (!explicitlyBound.length) return lowered;
+  const { manifest, bytes } = lowered;
+  const account = manifest.accounting.bindings[0];
+  const limit = manifest.accounting.constraints[0]?.limits[0];
+  const outputOptions = explicitlyBound[0].value.named.filter(option => option.name === 'output');
+  const output = outputOptions[0]?.value;
+  const resource = account.evidenceBinding.target;
+  const coreVersion = new DataView(bytes.buffer, bytes.byteOffset).getUint16(4, true);
+  if (accounts.length !== 1 || account.operation !== 'on_time'
+      || account.evidenceBinding.stage !== 'applied' || account.persistence !== 'durable'
+      || manifest.resources?.length !== 1 || manifest.resources[0].type !== 'BoolActuator'
+      || manifest.accounting.constraints.length !== 1 || manifest.accounting.constraints[0].limits.length !== 1
+      || limit?.basis.kind !== 'rolling' || limit.operator !== '<=' || limit.onUnknown !== 'block'
+      || ![1, 2, 3].includes(coreVersion)) {
+    error(ast.loc, 'mandatory rolling output requires one standalone durable applied BoolActuator rolling limit');
+  }
+  if (outputOptions.length !== 1 || output?.kind !== 'reference' || manifest.outputs.length !== 1
+      || manifest.outputs[0].name !== output.name || manifest.outputs[0].type !== 'Bool'
+      || !/^[A-Za-z_][A-Za-z0-9_]{0,127}$/.test(resource) || !/^[A-Za-z_][A-Za-z0-9_]{0,127}$/.test(output.name)) {
+    error(ast.loc, 'mandatory rolling output requires an explicit binding to the single Bool output');
+  }
+  if (limit.reserveMs > limit.boundMs || limit.boundMs > limit.basis.durationMs) {
+    error(ast.loc, 'mandatory rolling output requires reserve <= limit <= window');
+  }
+  const policy = { resource, output: output.name, stage: 'applied', windowMs: limit.basis.durationMs,
+    limitMs: limit.boundMs, reserveMs: limit.reserveMs };
+  delete manifest.accounting;
+  delete manifest.resources;
+  manifest.rollingOutput = policy;
+  manifest.format = 'GhostFlow/control-v29';
+  lowered.bytes = wrapRollingOutputGfb(bytes, policy);
+  lowered.traceMetadata = { ...lowered.traceMetadata, moduleFingerprint: moduleFingerprint(lowered.bytes) };
+  return lowered;
 }
 
 /** Only this bounded civil pulse slice has a VM/provider transport. */

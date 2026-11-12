@@ -21,6 +21,7 @@ pub mod output_observation;
 pub mod range_schedule;
 pub mod resource_constraints;
 pub mod resource_policy;
+pub mod rolling_output_policy;
 pub mod scan;
 pub mod schedule_clock;
 pub mod schedule_vm;
