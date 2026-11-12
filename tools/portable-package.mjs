@@ -1059,7 +1059,8 @@ export async function verifyPortablePackage(packageValue, options = {}) {
   } else try {
     const extraction = extractLiterate(sourceText, { filename: mappedDocument.filename });
     const guarded = Object.hasOwn(manifest,'legacyAdmission');
-    const replay = guarded || profileVersion === '29' ? compileSourceSync(sourceText, replayOptions)
+    const replayedLiterateSource = guarded || profileVersion === '29';
+    const replay = replayedLiterateSource ? compileSourceSync(sourceText, replayOptions)
       : compileControl(extraction.code, { filename: mappedDocument.filename });
     if (canonicalJson(requiredRuntimeFeatures(replay.manifest)) !== canonicalJson(requiredFeatures)) {
       throw new Error('runtime features do not match canonical source lowering');
@@ -1150,7 +1151,7 @@ export async function verifyPortablePackage(packageValue, options = {}) {
         if (continuousTimerNames.size) expectedTimerDependencies = replay.traceMetadata.dependencies.filter(entry => (
           entry.target.field === 'timerValue' && continuousTimerNames.has(entry.target.name)
         ));
-        const mappedTrace = guarded ? replay.traceMetadata : remapSourceTrace(replay.traceMetadata, extraction.sourceMap);
+        const mappedTrace = replayedLiterateSource ? replay.traceMetadata : remapSourceTrace(replay.traceMetadata, extraction.sourceMap);
         expectedDerivations = mappedTrace.derivations ?? [];
         expectedConstraintProof = mappedTrace.constraintProof ?? null;
         expectedResultSites = mappedTrace.resultSites;

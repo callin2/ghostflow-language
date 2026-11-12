@@ -742,6 +742,41 @@ test('#96 signed GFB29 requires an owner ABI and rejects replaced policy metadat
       }
     } };
   await verifyPortablePackage(packaged, target);
+  const anchored = fs.readFileSync(path.join(root, 'tests/fixtures/rolling-intent-package.ghost.md'), 'utf8');
+  const ref = 'waveshare-esp32-s3-eth-8di-8ro-r8n16@1';
+  const channels = Object.fromEntries(Array.from({ length: 8 }, (_, index) => index + 1).flatMap(channel => [
+    [`DI${channel}`, { role: 'input', type: 'Bool' }],
+    [`RO${channel}`, { role: 'output', type: 'Bool' }],
+  ]));
+  const definition = { kind: 'board', connections: {}, defaults: {}, channels };
+  const hardwareProfiles = [{ ref, definition, sha256: await digestHex(encoder.encode(canonicalJson(definition))) }];
+  const anchoredArtifact = await compileSource(anchored, { filename: 'conversation-control.ghost.md', hardwareProfiles });
+  const anchoredPackage = await buildPortablePackage(anchoredArtifact, packageIdentity, {
+    ...signerOptions,
+    verifyCompilation: (text, { filename }) => compileSource(text, { filename, hardwareProfiles }),
+  });
+  await verifyPortablePackage(anchoredPackage, {
+    ...target, hardwareProfiles,
+    verifyBytecode: async (bytes, context) => {
+      assert.deepEqual(Buffer.from(bytes), anchoredArtifact.bytes);
+      assert.equal(context.sourceMap.traceMetadata.intentLinks[0].anchorId, 'GF-ASSUME-HIL-ROLLING');
+      const runtime = await RollingOutputRuntime.createValidationRuntime(fs.readFileSync(wasmPath), bytes, context, { hardwareProfiles });
+      try {
+        assert.deepEqual(runtime.step({ nowMs: 0 }).vm.safe, { pump: true });
+        return true;
+      } finally {
+        runtime.dispose();
+      }
+    },
+  });
+  const alteredLink = clone(anchoredPackage);
+  const sourceMap = JSON.parse(Buffer.from(alteredLink.payload.sourceMap.contentBase64, 'base64'));
+  sourceMap.traceMetadata.intentLinks[0].source.line++;
+  const sourceMapBytes = encoder.encode(canonicalJson(sourceMap));
+  alteredLink.payload.sourceMap.contentBase64 = base64(sourceMapBytes);
+  alteredLink.payload.sourceMap.sha256 = await digestHex(sourceMapBytes);
+  await resign(alteredLink, current);
+  await expectsCode(() => verifyPortablePackage(alteredLink, { ...target, hardwareProfiles }), 'source-map-mismatch');
   const altered = clone(packaged);
   const manifest = JSON.parse(Buffer.from(altered.payload.manifest.contentBase64, 'base64'));
   manifest.rollingOutput.limitMs = 25_000;
