@@ -905,6 +905,16 @@ fn verify_monitoring_plan(manifest: &Value) -> Result<()> {
                     "configName",
                     "activeValue",
                 ]
+            } else if pattern.contains_key("startCondition") {
+                &[
+                    "kind",
+                    "outputName",
+                    "stateName",
+                    "timerId",
+                    "durationMs",
+                    "scheduleId",
+                    "startCondition",
+                ]
             } else {
                 &[
                     "kind",
@@ -920,6 +930,12 @@ fn verify_monitoring_plan(manifest: &Value) -> Result<()> {
         )?;
         if !configured && pattern["kind"].as_str() != Some("scheduled-timed-latch") {
             return Err(mismatch("monitoring pattern kind is unsupported"));
+        }
+        if pattern
+            .get("startCondition")
+            .is_some_and(|value| !matches!(value.as_str(), Some("schedule-only" | "conditional")))
+        {
+            return Err(mismatch("monitoring startCondition is unsupported"));
         }
         let name = |key: &str| -> Result<&str> {
             let value = pattern[key]
@@ -4335,6 +4351,16 @@ mod tests {
         .expect("prepared Solar manifest must pass native manifest verification");
         assert_eq!(module.bytecode_format_version(), 16);
         assert_eq!(manifest["monitoring"]["patterns"][0]["durationMs"], 300_000);
+        for (condition, accepted) in [
+            (serde_json::json!("schedule-only"), true),
+            (serde_json::json!("conditional"), true),
+            (serde_json::json!("guaranteed"), false),
+            (serde_json::Value::Null, false),
+        ] {
+            let mut candidate = manifest.clone();
+            candidate["monitoring"]["patterns"][0]["startCondition"] = condition;
+            assert_eq!(verify_monitoring_plan(&candidate).is_ok(), accepted);
+        }
         let loader = |bytes: &[u8], _: &TargetLoaderContext<'_>| {
             ghostflow_core::Module::load(bytes)
                 .map(|_| true)

@@ -281,6 +281,8 @@ For first and last recorded Git commit dates, run `node <skill>/scripts/docs-ind
 | [docs/LLM-TOOLCHAIN-ARCHITECTURE.ko.md](LLM-TOOLCHAIN-ARCHITECTURE.ko.md) | 작성 및 가상 시뮬레이션 아키텍처 | md |
 | [docs/LLM-TOOLCHAIN-ARCHITECTURE.md](LLM-TOOLCHAIN-ARCHITECTURE.md) | Authoring and virtual simulation architecture | md |
 | [docs/LLM-TOOLCHAIN-ARCHITECTURE.zh.md](LLM-TOOLCHAIN-ARCHITECTURE.zh.md) | 编写与虚拟模拟架构 | md |
+| [docs/MONITORING-PLAN.ko.md](MONITORING-PLAN.ko.md) | 모니터링 계획의 시작 조건 | md |
+| [docs/MONITORING-PLAN.md](MONITORING-PLAN.md) | Monitoring plan start conditions | md |
 | [docs/OBSERVATION-EVENT-HISTORY.es.md](OBSERVATION-EVENT-HISTORY.es.md) | Historial acotado de eventos de observación | md |
 | [docs/OBSERVATION-EVENT-HISTORY.ja.md](OBSERVATION-EVENT-HISTORY.ja.md) | 有界な観測イベント履歴 | md |
 | [docs/OBSERVATION-EVENT-HISTORY.ko.md](OBSERVATION-EVENT-HISTORY.ko.md) | 보존 범위가 있는 관찰 event 이력 | md |
@@ -3479,4 +3481,4 @@ For first and last recorded Git commit dates, run `node <skill>/scripts/docs-ind
 | [docs/research/GF-COMPOSE-R9-ACCEPTANCE.md](research/GF-COMPOSE-R9-ACCEPTANCE.md) | GF-COMPOSE R9: acceptance and implementation handoff | md |
 | [docs/research/GF-COMPOSE-R9-ACCEPTANCE.zh.md](research/GF-COMPOSE-R9-ACCEPTANCE.zh.md) | GF-COMPOSE R9：验收与实现交接 | md |
 
-2735 documents.
+2737 documents.

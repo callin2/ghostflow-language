@@ -86,7 +86,7 @@ function validateMonitoringPlanManifest(manifest) {
     const path = `manifest.monitoring.patterns[${index}]`;
     const keys = pattern.kind === 'configured-timed-output'
       ? ['kind', 'outputName', 'stateName', 'timerId', 'configName', 'activeValue', ...('cycle' in pattern ? ['cycle'] : []), ...('sequence' in pattern ? ['sequence'] : [])]
-      : ['kind', 'outputName', 'stateName', 'timerId', 'durationMs', 'scheduleId'];
+      : ['kind', 'outputName', 'stateName', 'timerId', 'durationMs', 'scheduleId', ...('startCondition' in pattern ? ['startCondition'] : [])];
     exactObject(pattern, keys, path);
     if (!['scheduled-timed-latch', 'configured-timed-output'].includes(pattern.kind)) fail('manifest-mismatch', `${path}.kind is unsupported`);
     ghostName(pattern.outputName, `${path}.outputName`);
@@ -135,6 +135,9 @@ function validateMonitoringPlanManifest(manifest) {
       continue;
     }
     ghostName(pattern.scheduleId, `${path}.scheduleId`);
+    if (Object.hasOwn(pattern, 'startCondition') && !['schedule-only', 'conditional'].includes(pattern.startCondition)) {
+      fail('manifest-mismatch', `${path}.startCondition is unsupported`);
+    }
     if (!Number.isSafeInteger(pattern.durationMs) || pattern.durationMs <= 0) fail('manifest-mismatch', `${path}.durationMs must be positive`);
     if (outputs.get(pattern.outputName)?.type !== 'Bool' || !schedules.has(pattern.scheduleId)
         || timers.get(pattern.timerId)?.state !== pattern.stateName || seenOutputs.has(pattern.outputName)) {
@@ -1002,6 +1005,15 @@ export async function verifyPortablePackage(packageValue, options = {}) {
     fail('source-map-mismatch', 'source map nodes/lines have an unsupported shape');
   }
   const replayOptions = { filename: mappedDocument.filename, hardwareProfiles: options.hardwareProfiles };
+  // Older signed plans never claimed a source-proven start condition. Keep
+  // all their original relations exact and leave their forecasts conditional.
+  const legacyMonitoring = manifest.monitoring?.patterns.every(pattern => !Object.hasOwn(pattern, 'startCondition'));
+  const monitoringCompatibleManifest = candidate => legacyMonitoring && candidate.monitoring
+    ? { ...candidate, monitoring: {
+      ...candidate.monitoring,
+      patterns: candidate.monitoring.patterns.map(({ startCondition, ...pattern }) => pattern),
+    } }
+    : candidate;
   if (Object.hasOwn(sourceMap, 'sourceClosure')) {
     try {
       if (sourceMap.sourceClosure?.format !== 'GhostFlow/source-closure-v1') throw new Error('invalid source closure format');
@@ -1009,7 +1021,7 @@ export async function verifyPortablePackage(packageValue, options = {}) {
         ...replayOptions, sourceClosure: sourceMap.sourceClosure.documents,
       });
       if (!equalBytes(replay.bytes, artifacts.bytecode)
-          || canonicalJson(replay.manifest) !== canonicalJson(manifest)
+          || canonicalJson(monitoringCompatibleManifest(replay.manifest)) !== canonicalJson(manifest)
           || canonicalJson(sourceMapEnvelope(replay)) !== canonicalJson(sourceMap)) {
         throw new Error('signed source closure does not reproduce exact bytecode, manifest and provenance');
       }
@@ -1030,12 +1042,13 @@ export async function verifyPortablePackage(packageValue, options = {}) {
         throw new Error('output observation descriptors do not match canonical source lowering');
       }
     }
-    if (manifest.monitoring !== undefined || replay.manifest.monitoring !== undefined) {
-      if (canonicalJson(manifest.monitoring ?? null) !== canonicalJson(replay.manifest.monitoring ?? null)) {
+    const replayManifest = monitoringCompatibleManifest(replay.manifest);
+    if (manifest.monitoring !== undefined || replayManifest.monitoring !== undefined) {
+      if (canonicalJson(manifest.monitoring ?? null) !== canonicalJson(replayManifest.monitoring ?? null)) {
         throw new Error('monitoring plan does not match canonical source lowering');
       }
     }
-    if (guarded && canonicalJson(replay.manifest) !== canonicalJson(manifest)) throw new Error('legacy admission manifest does not match canonical source');
+    if (guarded && canonicalJson(replayManifest) !== canonicalJson(manifest)) throw new Error('legacy admission manifest does not match canonical source');
     if (Object.hasOwn(manifest,'adaptPolicy') || Object.hasOwn(replay.manifest,'adaptPolicy')) {
       if (canonicalJson(manifest.adaptPolicy ?? null) !== canonicalJson(replay.manifest.adaptPolicy ?? null)
         || canonicalJson(manifest.strategies ?? null) !== canonicalJson(replay.manifest.strategies ?? null)
@@ -1043,7 +1056,8 @@ export async function verifyPortablePackage(packageValue, options = {}) {
     }
     if (!equalBytes(replay.bytes, artifacts.bytecode)) throw new Error('canonical source does not reproduce package bytecode');
     if ((civilManifest || calendarManifest || profileVersion === '16')
-      && canonicalJson(manifest) !== canonicalJson((guarded ? replay : compileSourceSync(sourceText, replayOptions)).manifest)) {
+      && canonicalJson(manifest) !== canonicalJson(guarded ? replayManifest
+        : monitoringCompatibleManifest(compileSourceSync(sourceText, replayOptions).manifest))) {
       throw new Error('context schedule manifest does not match exact owner source lowering');
     }
     if (profileVersion === '11'
