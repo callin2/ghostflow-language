@@ -342,13 +342,18 @@ control QuantitySetting {
   assert.deepEqual(interaction.interactionSchema.descriptors[0].sourceType, { kind: 'nominal', name: 'Temperature', unit: 'K' });
   const interactionRuntime = await ControlRuntime.instantiate(wasm, interaction,
     { context: { bootEpoch: 1, terminalCapacity: 8, bindings: [] } });
+  const { vm: trace } = interactionRuntime.step({ nowMs: 0, contextFacts: {
+    clock: { monotonicMs: 0, bootEpoch: 1, wallMs: 0, uncertaintyMs: 0, trusted: true,
+      unknownReason: null, sourceRevision: 'quantity-clock-v1' },
+    natural: [], schedules: [], settings: null,
+  } });
   const settingsState = interactionRuntime.contextSnapshot().state;
   interactionRuntime.dispose();
   const snapshot = emitCompletedScanSnapshot({
     compilation: interaction,
     runId: 'run.quantity-setting',
     completion: { kind: 'completed-scan', scanId: 0, logicalTimeMs: 0 },
-    trace: { module: interaction.traceMetadata.moduleFingerprint, inputs: {}, stateAfter: {} },
+    trace,
     settingsState,
   });
   assert.deepEqual(snapshot.observations, [{ descriptorId: 'setting.target', status: 'ready', value: 298.15,

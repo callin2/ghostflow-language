@@ -110,7 +110,8 @@ test('GF-TEST-interaction-setting-error: current fault rail is visible without m
   const runtime = await ControlRuntime.instantiate(wasm, artifact,
     { context: { bootEpoch: 1, terminalCapacity: 8, bindings: [] } });
   try {
-    const fingerprint = runtime.contextSnapshot().state.programFingerprint;
+    const previous = runtime.contextSnapshot().state;
+    const fingerprint = previous.programFingerprint;
     const outcome = runtime.step({ nowMs: 1, contextFacts: {
       clock: { monotonicMs: 1, bootEpoch: 1, wallMs: 1, uncertaintyMs: 0,
         trusted: true, unknownReason: null, sourceRevision: 'interaction-clock-v1' },
@@ -125,6 +126,10 @@ test('GF-TEST-interaction-setting-error: current fault rail is visible without m
       trace: outcome.vm, settingsState: runtime.contextSnapshot().state });
     const producer = prepareCompletedScanSnapshot({ compilation: artifact, runId: 'run.operator-settings-fault' });
     assert.deepEqual(producer.emit({ completion: { kind: 'completed-scan', scanId: 0, logicalTimeMs: 1 }, trace: outcome.vm, settingsState: runtime.contextSnapshot().state }), snapshot);
+    assert.throws(() => producer.emit({
+      completion: { kind: 'completed-scan', scanId: 0, logicalTimeMs: 1 },
+      trace: outcome.vm, settingsState: previous,
+    }), /settings.*scan/i, 'a prior readback cannot turn the completed fault scan into a ready setting');
     assert.deepEqual(snapshot.observations[0], {
       descriptorId: 'setting.duration', defaultValue: 300000, emissionRevision: 1, applicationPosition: 1,
       status: 'error', error: 'SettingsUnavailable',

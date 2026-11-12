@@ -11,6 +11,10 @@ Daily와 DailySlots 실행기는 `schedule_checkpoint`와 `restore_schedule_chec
 
 ## 미출시
 
+### 2026-11-12 - 완료 스캔과 설정 읽기 결과 대조 ([#288](https://github.com/callin2/ghostflow-language/issues/288))
+
+완료 스냅샷은 각 설정의 식별자, 스트림 리비전, Result 상태를 해당 스캔의 추적 기록과 대조한다. 설정 오류가 기록된 스캔에 이전 읽기 결과를 붙여 기본값을 정상으로 표시하는 요청을 거부한다.
+
 ### 2026-11-12 - 일반 Solar pulse의 framed 실행 ([#621](https://github.com/callin2/ghostflow-language/issues/621))
 
 호환 제어에서 `trusted_only`, `fallback = skip`을 사용하는 일반 Solar pulse 하나를 기존 GFB16 context로 실행합니다. 운영 설정이 없어도 사용할 수 있습니다. 네이티브와 WASM은 같은 시각 통과, 롤백, 시계 복구와 관측 공백을 대조합니다. 여러 예약과 확장 정책은 기존 실행 경로를 사용합니다.
