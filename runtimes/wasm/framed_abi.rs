@@ -252,6 +252,47 @@ pub unsafe extern "C" fn gf_frame_load(
 }
 
 #[no_mangle]
+pub unsafe extern "C" fn gf_frame_load_rolling_proposals(
+    handle: *mut FramedHandle,
+    owner: *const crate::rolling_output_abi::RollingOutputHandle,
+    ptr: *const u8,
+    len: usize,
+    resource_ptr: *const u8,
+    resource_len: usize,
+    output_ptr: *const u8,
+    output_len: usize,
+    resource_id: u32,
+) -> i32 {
+    use ghostflow_core::rolling_output_policy::RollingOutputProgram;
+    let Some(handle) = handle.as_mut() else {
+        return 0;
+    };
+    let result: Result<(), String> = (|| {
+        let owner = owner.as_ref().ok_or("rolling owner is missing")?;
+        if len > MAX_MODULE_BYTES {
+            return Err("rolling program byte limit exceeded".into());
+        }
+        let program = RollingOutputProgram::load(bytes(ptr, len, "rolling program")?)
+            .map_err(|error| error.to_string())?;
+        let resource = utf8(resource_ptr, resource_len, "rolling resource")?;
+        let output = utf8(output_ptr, output_len, "rolling output")?;
+        let FramedState::Configuring(runtime) = &mut handle.state else {
+            return Err("framed runtime is already active".into());
+        };
+        program
+            .install_proposals(runtime, &owner.owner, resource, output, resource_id)
+            .map_err(|error| error.to_string())?;
+        handle.lifecycle_required = false;
+        handle.restart_init = None;
+        Ok(())
+    })();
+    match result {
+        Ok(()) => handle.success(),
+        Err(error) => handle.failure(error),
+    }
+}
+
+#[no_mangle]
 pub unsafe extern "C" fn gf_frame_requires_percent_range_v1(handle: *mut FramedHandle) -> i32 {
     let Some(handle) = handle.as_mut() else {
         return -1;

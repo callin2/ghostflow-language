@@ -4,7 +4,7 @@ use ghostflow_core::accounting::{
 };
 
 pub struct RollingOutputHandle {
-    owner: RollingOutputOwner,
+    pub(crate) owner: RollingOutputOwner,
     pending: Vec<u8>,
     lease: Option<OutputLease>,
 }

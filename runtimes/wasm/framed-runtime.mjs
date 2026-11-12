@@ -195,6 +195,18 @@ export class FramedGhostFlowRuntime {
     this.#bytes(bytes, (ptr, len) => this.#check(this.wasm.gf_frame_load(this.handle, ptr, len)));
   }
 
+  loadRollingProposals(moduleBytes, ownerHandle, { resource, output, resourceId }) {
+    this.#live();
+    if (typeof this.wasm.gf_frame_load_rolling_proposals !== 'function') {
+      throw new Error('WASM artifact does not support rolling proposal activation');
+    }
+    const bytes = byteBuffer(moduleBytes, 'rolling program', MAX_MODULE_BYTES);
+    this.#bytes(bytes, (ptr, len) => this.#bytes(identifier(resource, 'rolling resource'), (rp, rl) =>
+      this.#bytes(identifier(output, 'rolling output'), (op, ol) => this.#check(
+        this.wasm.gf_frame_load_rolling_proposals(this.handle, ownerHandle, ptr, len, rp, rl, op, ol, resourceId),
+      ))));
+  }
+
   requiresPercentRangeV1() {
     this.#live();
     if (typeof this.wasm.gf_frame_requires_percent_range_v1 !== 'function') return false;

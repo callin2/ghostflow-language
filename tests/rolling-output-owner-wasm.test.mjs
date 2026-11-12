@@ -2,6 +2,9 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import test from 'node:test';
 import { RollingOutputRuntime } from '../runtimes/wasm/rolling-output-runtime.mjs';
+import { FramedGhostFlowRuntime } from '../runtimes/wasm/framed-runtime.mjs';
+import { compileSource } from '../tools/compile-source.mjs';
+import { softwareQualityRails } from './helpers/software-quality-observations.mjs';
 
 const binary = readFileSync(new URL('../target/wasm32-unknown-unknown/release/ghostflow_wasm.wasm', import.meta.url));
 
@@ -236,4 +239,37 @@ test('same-boot late OFF requires a new complete OFF window and checkpoint', asy
     assert.equal(await runtime.recoverAfterConfirmedOff(5001, nowMs), true);
     assert.deepEqual(await runtime.requestOn(), { status: 'allowed', deadlineMs: 70001 });
   } finally { runtime.dispose(); }
+});
+
+
+test('mandatory GFB29 evaluates safe proposals only through a bound rolling owner', async () => {
+  const artifact = await compileSource(source);
+  const generic = await FramedGhostFlowRuntime.instantiate(binary);
+  try {
+    assert.throws(() => generic.load(artifact.bytes), /unsupported GFB format/);
+  } finally {
+    generic.dispose();
+  }
+  let checkpoint = null;
+  const owner = await RollingOutputRuntime.open(binary, source, {
+    bootEpoch: 1, clock: () => 0,
+    binding: { resource: 'irrigation', output: 'valve', resourceId: 7 }, maxIntervals: 8,
+    store: {
+      read: async () => checkpoint,
+      commit: async bytes => { checkpoint = bytes; return true; },
+    },
+  });
+  const runtime = owner.createProposalRuntime([{ kind: 'actuator', name: 'valve', type: 'bool' }]);
+  try {
+    const inputs = Object.entries(softwareQualityRails(artifact, { manual: true }, 1, 0))
+      .map(([name, value]) => ({ name, value }));
+    const result = runtime.scan({ scanId: 0, logicalTimeMs: 0, inputs });
+    assert.equal(result.trace.safe.valve, true);
+    assert.deepEqual(owner.explain(0), { usedMs: 0n, reservedMs: 0n, blocked: false, nextReleaseMs: null });
+    assert.deepEqual(await owner.requestOn(1), { status: 'allowed', deadlineMs: 5000 });
+    assert.equal(owner.explain(0).reservedMs, 5000n);
+  } finally {
+    runtime.dispose();
+    owner.dispose();
+  }
 });

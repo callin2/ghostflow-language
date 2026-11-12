@@ -1,4 +1,5 @@
 import { compileSource } from '../../tools/compile-source.mjs';
+import { FramedGhostFlowRuntime } from './framed-runtime.mjs';
 
 const creation = Symbol('verified rolling output');
 
@@ -19,10 +20,12 @@ export class RollingOutputRuntime {
   #store;
   #clock;
   #saved;
+  #programBytes;
+  #binding;
   #writing = false;
 
   static async open(wasmBytes, source, { binding, bootEpoch, clock, store, maxIntervals }) {
-    const { manifest } = await compileSource(source);
+    const { manifest, bytes } = await compileSource(source);
     const { resource, output, resourceId } = binding;
     const policy = manifest.rollingOutput;
     if (manifest.format !== 'GhostFlow/control-v29' || !policy
@@ -56,7 +59,7 @@ export class RollingOutputRuntime {
       if (size) wasm.gf_dealloc(ptr, size);
     }
     if (!handle) throw new Error('rolling output checkpoint does not match the installed policy');
-    const runtime = new RollingOutputRuntime(wasm, handle, store, clock, saved, creation);
+    const runtime = new RollingOutputRuntime(wasm, handle, store, clock, saved, bytes, { resource, output, resourceId }, creation);
     try {
       if (saved === null) await runtime.#commit();
       return runtime;
@@ -66,13 +69,15 @@ export class RollingOutputRuntime {
     }
   }
 
-  constructor(wasm, handle, store, clock, saved, token) {
+  constructor(wasm, handle, store, clock, saved, programBytes, binding, token) {
     if (token !== creation) throw new Error('use RollingOutputRuntime.open with a verified installation binding');
     this.#wasm = wasm;
     this.#handle = handle;
     this.#store = store;
     this.#clock = clock;
     this.#saved = saved?.slice() ?? null;
+    this.#programBytes = programBytes;
+    this.#binding = binding;
   }
 
   #requireReady() {
@@ -95,6 +100,21 @@ export class RollingOutputRuntime {
       return wasm.gf_rolling_output_ack(this.#handle);
     } finally {
       this.#writing = false;
+    }
+  }
+
+  /** Evaluate safe proposals. This never applies an actuator value. */
+  createProposalRuntime(capabilities) {
+    this.#requireReady();
+    const runtime = new FramedGhostFlowRuntime(this.#wasm);
+    try {
+      runtime.loadRollingProposals(this.#programBytes, this.#handle, this.#binding);
+      for (const { kind, name, type } of capabilities) runtime.addCapability(kind, name, type);
+      runtime.activate();
+      return runtime;
+    } catch (error) {
+      runtime.dispose();
+      throw error;
     }
   }
 

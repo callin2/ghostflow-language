@@ -93,6 +93,30 @@ impl RollingOutputProgram {
         capabilities: impl IntoIterator<Item = Capability>,
         journal_capacity: usize,
     ) -> Result<ScanDriver> {
+        let mut runtime = Runtime::new(journal_capacity);
+        self.install_proposals(
+            &mut runtime,
+            owner,
+            installed_resource,
+            installed_output,
+            installed_resource_id,
+        )?;
+        for capability in capabilities {
+            runtime.add_capability(capability)?;
+        }
+        runtime.activate()?;
+        Ok(ScanDriver::new(runtime))
+    }
+
+    /// Install a proposal-only module into a configuring host runtime.
+    pub fn install_proposals(
+        self,
+        runtime: &mut Runtime,
+        owner: &RollingOutputOwner,
+        installed_resource: &str,
+        installed_output: &str,
+        installed_resource_id: u32,
+    ) -> Result<()> {
         let policy = owner.policy();
         if installed_resource != self.descriptor.resource
             || installed_output != self.descriptor.output
@@ -103,13 +127,8 @@ impl RollingOutputProgram {
         {
             return Err(Error::new("installed rolling output owner policy mismatch"));
         }
-        let mut runtime = Runtime::new(journal_capacity);
         runtime.install(self.module, false);
-        for capability in capabilities {
-            runtime.add_capability(capability)?;
-        }
-        runtime.activate()?;
-        Ok(ScanDriver::new(runtime))
+        Ok(())
     }
 }
 
