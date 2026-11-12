@@ -742,7 +742,7 @@ test('#96 signed GFB29 requires an owner ABI and rejects replaced policy metadat
       }
     } };
   await verifyPortablePackage(packaged, target);
-  const anchored = fs.readFileSync(path.join(root, 'tests/fixtures/rolling-intent-package.ghost.md'), 'utf8');
+  const anchored = fs.readFileSync(path.join(root, 'tests/fixtures/rolling-intent-package.ghost.md.txt'), 'utf8');
   const ref = 'waveshare-esp32-s3-eth-8di-8ro-r8n16@1';
   const channels = Object.fromEntries(Array.from({ length: 8 }, (_, index) => index + 1).flatMap(channel => [
     [`DI${channel}`, { role: 'input', type: 'Bool' }],
