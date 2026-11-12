@@ -3,6 +3,8 @@
 
 # Solar 예약: 컴파일러와 시뮬레이션 호스트
 
+제어가 context 프로필의 범위에 맞으면 `trusted_only`, `fallback = skip`을 쓰는 일반 Solar pulse 하나를 GFB16 context로 컴파일합니다. live config는 선택 사항입니다. 아래 절은 나머지 프로필이 사용하는 이전 단독 전송을 설명합니다.
+
 이 가이드는 **이전의 단독 Solar 프로필**을 설명합니다.
 
 - live 형식 지정 config Result를 공유하고 Rust가 소유하는 context admission(수용)을

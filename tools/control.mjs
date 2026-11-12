@@ -1693,8 +1693,15 @@ class Lowerer {
     const deviceQuery = this.manifest.outputs.length === 0
       ? 'true'
       : ['all', ...this.manifest.outputs.map(output => ['has', 'actuator', output.name, gfbType(semanticType(output.type))])];
-    const solarForms = this.solarForms();
-    const contextForms = emitBytecode ? this.contextForms() : [];
+    const [schedule] = this.manifest.schedules;
+    const ordinarySolarContext = emitBytecode && this.manifest.schedules.length === 1
+      && schedule.kind === 'solar' && !schedule.day && schedule.policy.clock === 'trusted_only'
+      && schedule.policy.fallback === 'skip' && !this.manifest.signals.length
+      && !this.windows.length && !this.trueFors.length && !this.adaptPolicy
+      && !this.objectives.size && !this.providers.size && !this.calendars.size
+      && !this.resources.size && !this.naturalConditions.length && !this.accountingResults.length;
+    const solarForms = this.solarForms(ordinarySolarContext);
+    const contextForms = emitBytecode ? this.contextForms(ordinarySolarContext) : [];
     if (contextForms.some(form => form[0] === 'holiday-daily-pulse') && solarForms.length) {
       error(this.ast.loc, 'Holiday Daily cannot mix with legacy Solar or non-calendar Daily/DailySlots execution');
     }
@@ -4517,8 +4524,8 @@ class Lowerer {
       ['interval-inputs', ...['present', 'epoch', 'id', 'start', 'end', 'value', 'quality', 'fault'].map(field => descriptor.intervalInputs[field])],
     ]);
   }
-  solarForms() {
-    return this.manifest.schedules.filter(schedule => schedule.kind === 'solar' && !this.configStreams.length && !schedule.day
+  solarForms(ordinarySolarContext) {
+    return this.manifest.schedules.filter(schedule => schedule.kind === 'solar' && !ordinarySolarContext && !this.configStreams.length && !schedule.day
       || ['daily', 'daily-slots'].includes(schedule.kind) && schedule.policy.basis === 'pulse'
         && schedule.policy.clock === 'trusted_only' && (!schedule.day || schedule.day.kind === 'weekday') && !schedule.selectedConfig).map(schedule => schedule.kind === 'daily' ? [
       'daily-pulse', String(schedule.site), schedule.name, schedule.timezone, String(schedule.atMs),
@@ -4540,7 +4547,7 @@ class Lowerer {
         ? [String(schedule.policy.clock.durationMs ?? 0), String(schedule.policy.fallback.atMs ?? 86400000)] : []),
     ]);
   }
-  contextForms() {
+  contextForms(ordinarySolarContext) {
     const configForms = this.configStreams.map(stream => {
       const config = this.manifest.configs.find(item => item.id === stream.id);
       if (!config) internal(`missing config stream ${stream.name}`);
@@ -4554,7 +4561,7 @@ class Lowerer {
         config.settings?.access === 'operator' ? 'true' : 'false', payload,
         inputs?.ok ?? 'none', inputs?.value ?? 'none', inputs?.fault ?? 'none'];
     });
-    const scheduleForms = this.manifest.schedules.filter(schedule => schedule.kind === 'solar' && (this.configStreams.length || schedule.day?.kind === 'weekday')
+    const scheduleForms = this.manifest.schedules.filter(schedule => schedule.kind === 'solar' && (ordinarySolarContext || this.configStreams.length || schedule.day?.kind === 'weekday')
       || schedule.kind === 'at' || schedule.policy?.basis?.kind === 'range'
       || schedule.kind === 'daily' && ['window', 'run'].includes(schedule.policy?.basis?.kind)
       || ['periodic', 'cron', 'tide'].includes(schedule.kind)

@@ -44,10 +44,11 @@ test('Solar lowers a strict native provider descriptor without a generated due i
   const source = solarControl(dawn);
   const result = compileControl(source, { filename: 'solar-fixture.ghost' });
 
-  assert.equal(result.manifest.format, 'GhostFlow/control-v3');
+  assert.equal(result.manifest.format, 'GhostFlow/control-v15');
   assert.deepEqual(result.manifest.schedules, [{
     kind: 'solar', site: 8, name: 'dawn', timezone: 'Asia/Seoul', latitude: 37.5665,
     longitude: 126.978, event: 'rise', offsetMs: 1_800_000,
+    configIds: [],
     policy: { basis: 'pulse', when: 'true', clock: 'trusted_only', gapMs: 60_000, recovery: 'baseline', fallback: 'skip' },
   }]);
   assert.equal(Object.hasOwn(result.manifest.schedules[0], 'dueInput'), false);

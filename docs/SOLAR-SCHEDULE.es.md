@@ -3,6 +3,8 @@
 
 # Programaciones horarias Solar: compilador y host de simulación
 
+Un único pulso Solar ordinario con `trusted_only` y `fallback = skip` se compila a GFB16 cuando el resto del control es compatible. La configuración en vivo es opcional. Las siguientes secciones describen el transporte independiente anterior para los demás perfiles.
+
 Esta guía describe el **perfil Solar independiente anterior**.
 
 - Para un Solar que comparte Results de configuración tipados en vivo y usa la
