@@ -12,6 +12,7 @@ import { reportWarnings } from './diagnostic-output.mjs';
 import { validateLegacyAdmission } from './legacy-admission.mjs';
 import { validateOutputObservationsManifest } from './output-observation-contract.mjs';
 import { validateRequiredRuntimeFeatures } from './runtime-features.mjs';
+import { validateClockPolicy, validateSolarFallback } from '../runtimes/wasm/solar-schedule.mjs';
 
 const UTF8 = new TextEncoder();
 const UTF8_FATAL = new TextDecoder('utf-8', { fatal: true });
@@ -512,14 +513,22 @@ function validateConfigStreamPackageProfile(manifest, version, runtimeAbi) {
       || !Array.isArray(manifest.schedules) || !manifest.schedules.length
       || manifest.schedules.some(schedule => schedule?.kind !== 'solar' || schedule.day !== undefined
         || !Array.isArray(schedule.configIds) || schedule.configIds.length
-        || schedule.policy?.basis !== 'pulse' || schedule.policy.clock !== 'trusted_only'
-        || schedule.policy.fallback !== 'skip' || schedule.policy.recovery !== 'baseline')
+        || schedule.policy?.basis !== 'pulse' || schedule.policy.recovery !== 'baseline')
       || !Array.isArray(manifest.configs) || manifest.configs.some(config => config.type !== 'Bool')
       || ['signals', 'providers', 'calendars', 'naturalConditions', 'calendarConditions',
         'objectives', 'adaptSettings', 'resources'].some(field => manifest[field] !== undefined
         && (!Array.isArray(manifest[field]) || manifest[field].length))
       || manifest.accounting !== undefined) {
       fail('unsupported-runtime-abi', 'signed GFB16 requires ordinary Solar pulse, control-v15 and context-scan-abi-v5');
+    }
+    const allowExtended = manifest.schedules.length === 1 && manifest.configs.length === 0;
+    for (const { policy } of manifest.schedules) {
+      try {
+        validateClockPolicy(policy.clock, { allowHold: allowExtended });
+        validateSolarFallback(policy.fallback, { allowFixed: allowExtended });
+      } catch (error) {
+        fail('unsupported-runtime-abi', 'signed GFB16 extended policies require one Solar pulse without configs', error);
+      }
     }
     return;
   }

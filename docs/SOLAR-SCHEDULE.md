@@ -1,6 +1,6 @@
 # Solar schedules: compiler and simulation host
 
-A single ordinary Solar pulse with `trusted_only` and `fallback = skip` now lowers to the GFB16 context profile when the rest of the control fits that profile. A live config is optional. The following sections cover the older standalone transport used by the remaining profiles.
+A single ordinary Solar pulse lowers to the GFB16 context profile when the rest of the control fits that profile. This includes `hold_trusted(..., terminal: skip)` and `fixed_time(..., terminal: skip)`. Signed packages with either extended policy require one Solar pulse without live configs and a host that supplies the corresponding clock and occurrence evidence. The following sections cover the older standalone transport used by other profiles.
 
 This guide describes the **older standalone Solar profile**.
 

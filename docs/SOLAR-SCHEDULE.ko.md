@@ -3,7 +3,7 @@
 
 # Solar 예약: 컴파일러와 시뮬레이션 호스트
 
-제어가 context 프로필의 범위에 맞으면 `trusted_only`, `fallback = skip`을 쓰는 일반 Solar pulse 하나를 GFB16 context로 컴파일합니다. live config는 선택 사항입니다. 아래 절은 나머지 프로필이 사용하는 이전 단독 전송을 설명합니다.
+제어가 context 프로필 범위에 맞으면 일반 Solar pulse 하나를 GFB16으로 컴파일합니다. `hold_trusted(..., terminal: skip)`와 `fixed_time(..., terminal: skip)`도 이 경로를 사용합니다. 확장 정책을 포함한 서명 패키지는 live config 없는 Solar pulse 하나와 시계·발생 증거를 제공하는 호스트를 요구합니다. 아래 절은 다른 프로필에서 쓰는 이전 단독 전송을 설명합니다.
 
 이 가이드는 **이전의 단독 Solar 프로필**을 설명합니다.
 

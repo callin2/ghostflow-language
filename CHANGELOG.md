@@ -8,6 +8,10 @@ Daily and DailySlots runtimes can now export and restore exact-Program terminal 
 
 ## Unreleased
 
+### 2026-11-12 - Frame ordinary Solar clock hold and fixed fallback ([#621](https://github.com/callin2/ghostflow-language/issues/621))
+
+A single unfiltered Solar pulse now uses existing GFB16 for held-clock and fixed-time fallback policies. Signed admission binds the exact duration and local fallback time for a single pulse without live configs. Native and WASM traces agree on fallback provenance, hold expiry and once-only admission. Target hosts must supply the matching clock and occurrence evidence.
+
 ### 2026-11-12 - Bind one applied rolling output policy to GFB29 ([#96](https://github.com/callin2/ghostflow-language/issues/96))
 
 A durable applied account can explicitly name its Bool output with `output: pump`. For one static rolling limit, GFB29 binds the resource, output and timing policy to the Program. Signed admission requires the rolling owner ABI and exact policy metadata. The owner reserves at most the available budget, reports when that duration cannot meet the stop margin, and requires a complete observed OFF window before recovering uncertain history. Device and Simulator target support depend on integrating the enforcing output writer.

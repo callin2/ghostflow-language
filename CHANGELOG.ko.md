@@ -11,6 +11,10 @@ Daily와 DailySlots 실행기는 `schedule_checkpoint`와 `restore_schedule_chec
 
 ## 미출시
 
+### 2026-11-12 - 일반 Solar 시계 유지와 고정시각 대체의 프레임 실행 ([#621](https://github.com/callin2/ghostflow-language/issues/621))
+
+날짜 필터 없는 Solar pulse 하나는 시계 유지와 고정시각 대체 정책을 기존 GFB16으로 실행합니다. 서명 검증은 live config 없는 단일 pulse의 유지 시간과 현지 대체 시각을 대조합니다. 네이티브와 WASM은 대체 근거, 유지 만료, 단일 실행에 대해 동일한 추적을 기록합니다. 타깃 호스트가 해당 시계와 발생 증거를 제공해야 합니다.
+
 ### 2026-11-12 - 적용 출력 한 개의 이동 한도를 GFB29에 결속 ([#96](https://github.com/callin2/ghostflow-language/issues/96))
 
 영속 적용 시간 계정은 `output: pump`로 Bool 출력을 지정할 수 있다. 정적 이동 한도 하나의 자원, 출력, 시간 정책을 GFB29 Program에 결속한다. 서명 패키지는 전용 출력 소유자 ABI와 정확한 정책 일치를 요구한다. 출력 소유자는 남은 예산 이내에서만 예약하고, 정지 여유 시간을 확보할 수 없는 경우를 별도로 알린다. 이력이 불명확하면 전체 윈도우에 걸쳐 OFF가 관찰된 뒤 복구한다. Device와 Simulator 타깃 지원에는 한도를 강제하는 출력 경로 연동이 필요하다.

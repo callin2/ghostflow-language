@@ -632,7 +632,11 @@ test('signed Solar v15 rejects re-signed descriptor and predicate changes before
   await verifyPortablePackage(fixture('solar-pulse-valid'), options);
   assert.ok(called);
   called = false;
-  for (const scenario of ['solar-pulse-descriptor', 'solar-pulse-predicate']) {
+  await verifyPortablePackage(fixture('solar-pulse-extended-valid'), options);
+  assert.ok(called);
+  called = false;
+  for (const scenario of ['solar-pulse-descriptor', 'solar-pulse-predicate',
+    'solar-pulse-extended-clock', 'solar-pulse-extended-fallback']) {
     await assert.rejects(verifyPortablePackage(fixture(scenario), options), error => error.code === 'source-map-mismatch' && /context schedule manifest/.test(error.cause?.message));
     assert.equal(called, false);
   }

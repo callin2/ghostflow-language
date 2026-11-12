@@ -3,7 +3,7 @@
 
 # Solar 调度计划：编译器与模拟宿主
 
-当控制符合上下文配置范围时，使用 `trusted_only` 和 `fallback = skip` 的单个普通 Solar pulse 编译为 GFB16。实时配置可选。以下章节介绍其余配置所使用的旧独立传输。
+当控制符合上下文配置范围时，单个普通 Solar pulse 编译为 GFB16，包括 `hold_trusted(..., terminal: skip)` 和 `fixed_time(..., terminal: skip)`。含这些扩展策略的签名包要求单个不含实时配置的脉冲，以及能提供相应时钟和事件证据的宿主。以下章节介绍其他配置所使用的旧独立传输。
 
 本指南描述**较早的独立 Solar profile**。
 
