@@ -135,6 +135,22 @@ test('GF-TEST-interaction-setting-error: current fault rail is visible without m
       status: 'error', error: 'SettingsUnavailable',
     });
     assert.equal(validateInteraction(artifact.interactionSchema, snapshot).valid, true);
+    const recovery = runtime.step({ nowMs: 2, contextFacts: {
+      clock: { monotonicMs: 2, bootEpoch: 1, wallMs: 2, uncertaintyMs: 0,
+        trusted: true, unknownReason: null, sourceRevision: 'interaction-clock-v1' },
+      natural: [], schedules: [], settings: {
+        programFingerprint: fingerprint, eventId: 'duration-recovered', baseRevision: 1,
+        position: 2, origin: 'producerObservation',
+        changes: [{ configId: 2, result: { ok: true, type: 'Duration', value: 360000 } }],
+      },
+    } });
+    const recovered = { completion: { kind: 'completed-scan', scanId: 1, logicalTimeMs: 2 },
+      trace: recovery.vm, settingsState: runtime.contextSnapshot().state };
+    assert.equal(producer.emit(recovered).observations[0].value, 360000);
+    assert.throws(() => producer.emit({ ...recovered, settingsState: previous }), /settings.*scan/i);
+    for (const contextTrace of [undefined, []]) {
+      assert.throws(() => producer.emit({ ...recovered, trace: { ...recovered.trace, contextTrace } }), /settings.*scan/i);
+    }
   } finally { runtime.dispose(); }
 });
 
