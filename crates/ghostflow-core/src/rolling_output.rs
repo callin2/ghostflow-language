@@ -28,6 +28,12 @@ impl OutputLease {
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct AdmissionWindow {
+    pub start_ms: u64,
+    pub deadline_ms: u64,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum OutputAdmission {
     Allowed(OutputLease),
     BudgetExceeded,
@@ -207,14 +213,20 @@ impl RollingOutputOwner {
 
     /// Earliest conditional admission with the same margin and capacity checks
     /// as the live path. The caller must have confirmed OFF and no new exposure.
-    pub fn next_admission_ms(
+    pub fn next_admission(
         &self,
         now_ms: u64,
         stop_margin_ms: u64,
-    ) -> Result<Option<u64>, AccountingError> {
-        let allowed = |at| {
+    ) -> Result<Option<AdmissionWindow>, AccountingError> {
+        let candidate = |at| {
             self.admission_at(at, stop_margin_ms)
-                .map(|admission| matches!(admission, OutputAdmission::Allowed(_)))
+                .map(|admission| match admission {
+                    OutputAdmission::Allowed(lease) => Some(AdmissionWindow {
+                        start_ms: lease.admitted_at_ms,
+                        deadline_ms: lease.deadline_ms,
+                    }),
+                    _ => None,
+                })
         };
         self.check_time(now_ms)?;
         if self.unresolved_lease().is_some()
@@ -222,25 +234,25 @@ impl RollingOutputOwner {
         {
             return Ok(None);
         }
-        if allowed(now_ms)? {
-            return Ok(Some(now_ms));
+        if let Some(lease) = candidate(now_ms)? {
+            return Ok(Some(lease));
         }
         let mut low = now_ms;
         let mut high = now_ms.saturating_add(self.policy.window_ms);
-        if !allowed(high)? {
+        if candidate(high)?.is_none() {
             return Ok(None);
         }
         // With no new exposure, the applied usage and occupied slots can only
         // decrease as the settled intervals leave the rolling window.
         while low < high {
             let middle = low + (high - low) / 2;
-            if allowed(middle)? {
+            if candidate(middle)?.is_some() {
                 high = middle;
             } else {
                 low = middle + 1;
             }
         }
-        Ok(Some(low))
+        candidate(low)
     }
 
     fn admission_at(

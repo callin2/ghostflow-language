@@ -41,11 +41,13 @@ fn forecast_waits_for_the_live_margin_and_does_not_settle_or_reserve() {
     let mut owner =
         RollingOutputOwner::initialize(policy, CONFIG, BOOT, 0, store(&mut saved)).unwrap();
     let lease = start(&mut owner, 0, &mut saved);
-    assert_eq!(owner.next_admission_ms(30_000, 100).unwrap(), None);
+    assert_eq!(owner.next_admission(30_000, 100).unwrap(), None);
     owner
         .record_off(lease, Some(0), 29_950, store(&mut saved))
         .unwrap();
-    assert_eq!(owner.next_admission_ms(29_950, 100).unwrap(), Some(59_950));
+    let forecast = owner.next_admission(29_950, 100).unwrap().unwrap();
+    assert_eq!(forecast.start_ms, 59_950);
+    assert_eq!(forecast.deadline_ms, 89_950);
     assert!(owner.unresolved_lease().is_none());
     assert_eq!(
         owner
@@ -75,7 +77,9 @@ fn forecast_respects_capacity_until_the_whole_record_expires() {
     owner
         .record_off(lease, Some(0), 1_000, store(&mut saved))
         .unwrap();
-    assert_eq!(owner.next_admission_ms(1_000, 100).unwrap(), Some(61_000));
+    let forecast = owner.next_admission(1_000, 100).unwrap().unwrap();
+    assert_eq!(forecast.start_ms, 61_000);
+    assert_eq!(forecast.deadline_ms, 66_000);
     assert_eq!(
         owner
             .request_on_with_stop_margin(60_999, 100, |_| panic!("no free slot"))
