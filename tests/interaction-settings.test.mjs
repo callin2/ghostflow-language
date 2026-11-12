@@ -110,7 +110,8 @@ test('GF-TEST-interaction-setting-error: current fault rail is visible without m
   const runtime = await ControlRuntime.instantiate(wasm, artifact,
     { context: { bootEpoch: 1, terminalCapacity: 8, bindings: [] } });
   try {
-    const fingerprint = runtime.contextSnapshot().state.programFingerprint;
+    const previous = runtime.contextSnapshot().state;
+    const fingerprint = previous.programFingerprint;
     const outcome = runtime.step({ nowMs: 1, contextFacts: {
       clock: { monotonicMs: 1, bootEpoch: 1, wallMs: 1, uncertaintyMs: 0,
         trusted: true, unknownReason: null, sourceRevision: 'interaction-clock-v1' },
@@ -125,11 +126,31 @@ test('GF-TEST-interaction-setting-error: current fault rail is visible without m
       trace: outcome.vm, settingsState: runtime.contextSnapshot().state });
     const producer = prepareCompletedScanSnapshot({ compilation: artifact, runId: 'run.operator-settings-fault' });
     assert.deepEqual(producer.emit({ completion: { kind: 'completed-scan', scanId: 0, logicalTimeMs: 1 }, trace: outcome.vm, settingsState: runtime.contextSnapshot().state }), snapshot);
+    assert.throws(() => producer.emit({
+      completion: { kind: 'completed-scan', scanId: 0, logicalTimeMs: 1 },
+      trace: outcome.vm, settingsState: previous,
+    }), /settings.*scan/i, 'a prior readback cannot turn the completed fault scan into a ready setting');
     assert.deepEqual(snapshot.observations[0], {
       descriptorId: 'setting.duration', defaultValue: 300000, emissionRevision: 1, applicationPosition: 1,
       status: 'error', error: 'SettingsUnavailable',
     });
     assert.equal(validateInteraction(artifact.interactionSchema, snapshot).valid, true);
+    const recovery = runtime.step({ nowMs: 2, contextFacts: {
+      clock: { monotonicMs: 2, bootEpoch: 1, wallMs: 2, uncertaintyMs: 0,
+        trusted: true, unknownReason: null, sourceRevision: 'interaction-clock-v1' },
+      natural: [], schedules: [], settings: {
+        programFingerprint: fingerprint, eventId: 'duration-recovered', baseRevision: 1,
+        position: 2, origin: 'producerObservation',
+        changes: [{ configId: 2, result: { ok: true, type: 'Duration', value: 360000 } }],
+      },
+    } });
+    const recovered = { completion: { kind: 'completed-scan', scanId: 1, logicalTimeMs: 2 },
+      trace: recovery.vm, settingsState: runtime.contextSnapshot().state };
+    assert.equal(producer.emit(recovered).observations[0].value, 360000);
+    assert.throws(() => producer.emit({ ...recovered, settingsState: previous }), /settings.*scan/i);
+    for (const contextTrace of [undefined, []]) {
+      assert.throws(() => producer.emit({ ...recovered, trace: { ...recovered.trace, contextTrace } }), /settings.*scan/i);
+    }
   } finally { runtime.dispose(); }
 });
 

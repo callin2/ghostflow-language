@@ -227,6 +227,16 @@ function emitVerifiedSnapshot({ verifiedSchema, traceMetadata, configs, runtimeN
     const declared = new Map(configs.map(config => [config.id, config]));
     const settingTypes = new Map(verifiedSchema.descriptors.filter(descriptor => descriptor.kind === 'setting')
       .map(descriptor => [runtimeNames.get(descriptor.provenance.sourceNode.id), descriptor.sourceType]));
+    const configObservations = new Map();
+    for (const observation of trace.contextTrace ?? []) {
+      const config = declared.get(observation.site);
+      if (!config || config.name !== observation.contextRevision
+          || !['SettingsOk', 'SettingsInvalid', 'SettingsUnavailable'].includes(observation.decision)) continue;
+      if (configObservations.has(config.id)) {
+        throw new Error('interaction runtime snapshot: duplicate settings observation for the completed scan');
+      }
+      configObservations.set(config.id, observation);
+    }
     for (const item of settingsState.settings) {
       const config = declared.get(item?.id), result = item?.result;
       if (!config || item.name !== config.name || item.type !== config.type || settings.has(item.name)
@@ -240,6 +250,11 @@ function emitVerifiedSnapshot({ verifiedSchema, traceMetadata, configs, runtimeN
           || result.ok && (typeof item.override !== 'boolean' || item.override !== (item.emissionRevision !== 0) || !Object.hasOwn(result, 'value') || item.emissionRevision === 0 && result.value !== item.defaultValue)
           || !result.ok && (item.emissionRevision === 0 || Object.hasOwn(item, 'override') || !['SettingsInvalid','SettingsUnavailable'].includes(result.fault))) {
         throw new Error('interaction runtime snapshot: settings state identity or Result mismatch');
+      }
+      const observation = configObservations.get(config.id);
+      if (observation?.providerRevision !== String(settingsState.settingsRevision)
+          || observation.decision !== (result.ok ? 'SettingsOk' : result.fault)) {
+        throw new Error('interaction runtime snapshot: settings state disagrees with the completed scan');
       }
       settings.set(item.name, item);
     }

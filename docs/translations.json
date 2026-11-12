@@ -3508,13 +3508,13 @@
       "files": {
         "en": {
           "path": "CHANGELOG.md",
-          "sha256": "2f8a017bbe84277c08ad7ba5d3a1f0bdb14de738e754a4199f69a23b98878a9a"
+          "sha256": "8df5dfed10fbfd4b680fb1f85c45cf19c7fc9c6e3443590f039480775fee58f6"
         },
         "ko": {
           "path": "CHANGELOG.ko.md",
-          "sha256": "c04b7a0d51e317e7a9810fc72b5f6aeb833ed9125e4ade1843d3617992c3b124",
+          "sha256": "bb56887375ee20bffdd82f0ba5729ec5b28d87eeeb092a5122e7268f3fca1c33",
           "from": "en",
-          "sourceSha256": "2f8a017bbe84277c08ad7ba5d3a1f0bdb14de738e754a4199f69a23b98878a9a"
+          "sourceSha256": "8df5dfed10fbfd4b680fb1f85c45cf19c7fc9c6e3443590f039480775fee58f6"
         }
       }
     },
