@@ -376,6 +376,8 @@ For first and last recorded Git commit dates, run `node <skill>/scripts/docs-ind
 | [docs/LLM-TOOLCHAIN-ARCHITECTURE.ko.md](docs/LLM-TOOLCHAIN-ARCHITECTURE.ko.md) | 작성 및 가상 시뮬레이션 아키텍처 | md |
 | [docs/LLM-TOOLCHAIN-ARCHITECTURE.md](docs/LLM-TOOLCHAIN-ARCHITECTURE.md) | Authoring and virtual simulation architecture | md |
 | [docs/LLM-TOOLCHAIN-ARCHITECTURE.zh.md](docs/LLM-TOOLCHAIN-ARCHITECTURE.zh.md) | 编写与虚拟模拟架构 | md |
+| [docs/MONITORING-PLAN.ko.md](docs/MONITORING-PLAN.ko.md) | 모니터링 계획의 시작 조건 | md |
+| [docs/MONITORING-PLAN.md](docs/MONITORING-PLAN.md) | Monitoring plan start conditions | md |
 | [docs/OBSERVATION-EVENT-HISTORY.es.md](docs/OBSERVATION-EVENT-HISTORY.es.md) | Historial acotado de eventos de observación | md |
 | [docs/OBSERVATION-EVENT-HISTORY.ja.md](docs/OBSERVATION-EVENT-HISTORY.ja.md) | 有界な観測イベント履歴 | md |
 | [docs/OBSERVATION-EVENT-HISTORY.ko.md](docs/OBSERVATION-EVENT-HISTORY.ko.md) | 보존 범위가 있는 관찰 event 이력 | md |
@@ -1188,4 +1190,4 @@ For first and last recorded Git commit dates, run `node <skill>/scripts/docs-ind
 | [tests/reference/README.es.md](tests/reference/README.es.md) | Pruebas de aceptación de la Language Reference (por caso) | md |
 | [tests/reference/README.md](tests/reference/README.md) | Language Reference 개별 수용 테스트 | md |
 
-963 documents.
+965 documents.
