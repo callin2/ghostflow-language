@@ -65,7 +65,8 @@ if (scenario === 'gfb10-valid') {
   process.exit(0);
 }
 if (scenario.startsWith('solar-pulse-')) {
-  const source = '# Solar pulse\n\n```ghost\n' + `control SignedSolar {
+  const extended = scenario.startsWith('solar-pulse-extended');
+  let source = '# Solar pulse\n\n```ghost\n' + `control SignedSolar {
     config enabled: Bool = true { access = operator; }
     schedule dawn: Solar { timezone = "Asia/Seoul"; latitude = 37.5665; longitude = 126.978;
       at = sun\`rise\`; basis = pulse; when = true; clock = trusted_only;
@@ -73,6 +74,9 @@ if (scenario.startsWith('solar-pulse-')) {
     output pump: Bool;
     pump <- dawn.due;
   }` + '\n```\n';
+  if (extended) source = source.replace('config enabled: Bool = true { access = operator; }', '')
+    .replace('clock = trusted_only;', 'clock = hold_trusted(2s, terminal: skip);')
+    .replace('fallback = skip;', 'fallback = fixed_time(time`06:00`, terminal: skip);');
   identity.runtimeAbi = 'GhostFlow/context-scan-abi-v5';
   identity.requiredCapabilities = [{ kind: 'actuator', name: 'pump', type: 'bool' }];
   const artifact = await compileSource(source, { filename: 'solar-pulse.ghost.md' });
@@ -80,9 +84,11 @@ if (scenario.startsWith('solar-pulse-')) {
     signers: [{ keyId: 'test-current-2026', privateKey }],
     verifyCompilation: (text, { filename }) => compileSource(text, { filename }),
   }));
-  if (scenario === 'solar-pulse-descriptor' || scenario === 'solar-pulse-predicate') {
+  if (['solar-pulse-descriptor', 'solar-pulse-predicate', 'solar-pulse-extended-clock', 'solar-pulse-extended-fallback'].includes(scenario)) {
     const manifest = JSON.parse(Buffer.from(candidate.payload.manifest.contentBase64, 'base64').toString('utf8'));
     if (scenario.endsWith('descriptor')) manifest.schedules[0].longitude++;
+    else if (scenario.endsWith('clock')) manifest.schedules[0].policy.clock.durationMs++;
+    else if (scenario.endsWith('fallback')) manifest.schedules[0].policy.fallback.atMs++;
     else manifest.schedules[0].policy.when = 'false';
     const bytes = encoder.encode(canonicalJson(manifest));
     candidate.payload.manifest.contentBase64 = Buffer.from(bytes).toString('base64');

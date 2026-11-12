@@ -2,7 +2,6 @@
 import assert from 'node:assert/strict';
 import { softwareQualityObservations, softwareQualityRails } from './helpers/software-quality-observations.mjs';
 const ControlRuntime = {
-  instantiate: async (...args) => softwareQualityObservations(await BaseControlRuntime.instantiate(...args)),
   instantiateFramed: async (...args) => softwareQualityObservations(await BaseControlRuntime.instantiateFramed(...args)),
 };
 
@@ -15,6 +14,7 @@ import test from 'node:test';
 import { encode } from '@toon-format/toon';
 import { compileSource, writeArtifact } from '../tools/toolchain.mjs';
 import { ControlRuntime as BaseControlRuntime } from '../runtimes/wasm/control-runtime.mjs';
+import { solarContextEvidence } from '../runtimes/wasm/context-abi.mjs';
 import { solarFallbackWallMs } from '../runtimes/wasm/solar-schedule.mjs';
 
 const root = fileURLToPath(new URL('..', import.meta.url));
@@ -44,14 +44,17 @@ const source = '# Natural fallback\n\n```ghost\n' + `control NaturalFallback {
   require pump => permit;
 }` + '\n```\n';
 
-function facts(site, monotonicMs, wallMs, { trusted = true, available = false, reason = 2 } = {}) {
+const context = { bootEpoch: 7, terminalCapacity: 16, bindings: [] };
+
+function facts(descriptor, monotonicMs, wallMs, { trusted = true, available = false, reason = 2 } = {}) {
   return {
     clock: { monotonicMs, bootEpoch: 7, wallMs, trusted, uncertaintyMs: 7, sourceRevision: 'clock-v1',
-      ...(!trusted ? { unknownReason: 'TrustExpired' } : {}) },
-    schedules: [{ site, coverageFromWallMs: 0, coverageToWallMs: 86_400_000,
+      unknownReason: trusted ? null : 'TrustExpired' },
+    natural: [], schedules: [], settings: null,
+    solars: [solarContextEvidence(descriptor, { site: descriptor.site, coverageFromWallMs: 0, coverageToWallMs: 86_400_000,
       rows: [{ sourceDay: 0, scheduledWallMs: available ? 21_602_000 : null, available,
         providerRevision: available ? 'solar-v2' : 'solar-v1', contextRevision: 'site-v1',
-        fallbackWallMs: available ? null : 21_600_000, unavailableReason: available ? null : reason }] }],
+        fallbackWallMs: available ? null : 21_600_000, unavailableReason: available ? null : reason }] })],
   };
 }
 
@@ -63,7 +66,7 @@ function run(command, args) {
 
 test('held clock, fallback recovery and safety retain native/WASM/ghostsim parity', async t => {
   const artifact = await compileSource(source, { filename: 'natural-fallback.ghost.md' });
-  const site = artifact.manifest.schedules[0].site;
+  const [descriptor] = artifact.manifest.schedules;
   const rows = [
     [0, 21_599_000, {}],
     [1000, 1, { trusted: false }],
@@ -73,93 +76,98 @@ test('held clock, fallback recovery and safety retain native/WASM/ghostsim parit
     [5000, 21_604_000, { available: true }],
     [6000, 21_605_000, { available: true }],
   ].map(([nowMs, wallMs, options]) => ({ nowMs, inputs: { unsafe: nowMs === 5000 },
-    solarFacts: facts(site, nowMs, wallMs, options) }));
-  const runtime = await ControlRuntime.instantiate(wasm, artifact, { solar: { bootEpoch: 7, terminalCapacity: 16 } });
+    contextFacts: facts(descriptor, nowMs, wallMs, options) }));
+  const runtime = await ControlRuntime.instantiateFramed(wasm, artifact, { context });
   t.after(() => runtime.dispose());
   const traces = rows.map(row => runtime.step(row).vm);
   assert.deepEqual(traces.map(trace => trace.safe.due), [false, true, false, false, false, false, false]);
   assert.deepEqual(traces.map(trace => trace.safe.pump), [false, true, true, true, true, false, false]);
-  assert.equal(traces[1].scheduleTrace[0].observations[0].fallback, true);
-  assert.equal(traces[1].scheduleTrace[0].observations[0].unavailableReason, 2);
-  assert.match(JSON.stringify(traces[1].scheduleTrace), /HeldClock/);
-  assert.equal(traces[1].scheduleTrace[0].clockUncertaintyMs, 1007);
-  assert.equal(traces[1].scheduleTrace[0].clockSourceRevision, 'clock-v1');
-  assert.match(JSON.stringify(traces[2].scheduleTrace), /TrustExpired|ClockUnknown/);
+  const due = traces[1].contextTrace.find(row => row.decision === 'Due');
+  assert.equal(due.fallback, true);
+  assert.equal(due.unavailableReason, 2);
+  assert.equal(due.clockProvenance, 'HeldClock');
+  assert.equal(due.clockUncertaintyMs, 1007);
+  assert.equal(due.clockSourceRevision, 'clock-v1');
+  assert.match(JSON.stringify(traces[2].contextTrace), /TrustExpired|ClockUnknown/);
 
   const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'ghostflow-natural-fallback-'));
   t.after(() => fs.rmSync(directory, { recursive: true, force: true }));
   const binary = path.join(directory, 'natural.gfb');
   writeArtifact(artifact, binary);
   const tape = path.join(directory, 'tape.json');
-  fs.writeFileSync(tape, JSON.stringify({ bootEpoch: 7, terminalCapacity: 16, scans: rows.map((row, index) => ({ ...row, inputs: softwareQualityRails(artifact, row.inputs, index + 1, row.nowMs) })) }));
-  const native = run(path.join(root, 'target/release/examples/solar_tape' + (process.platform === 'win32' ? '.exe' : '')), [binary, tape])
+  fs.writeFileSync(tape, JSON.stringify({ profile: 'context-solar-v1', activation: context,
+    steps: rows.map((row, scanId) => ({ scanId, logicalTimeMs: row.nowMs, ...row.contextFacts,
+      inputs: Object.entries(softwareQualityRails(artifact, row.inputs, scanId + 1, row.nowMs))
+        .map(([name, value]) => ({ name, value })) })) }));
+  const native = run(path.join(root, 'target/release/examples/context_tape' + (process.platform === 'win32' ? '.exe' : '')), [binary, tape])
     .trim().split('\n').map(line => JSON.parse(line));
   assert.ok(native.every(row => row.accepted));
-  assert.deepEqual(native.map(row => row.trace.safe), traces.map(trace => trace.safe));
-  assert.deepEqual(native.map(row => row.trace.scheduleTrace), traces.map(trace => trace.scheduleTrace));
+  assert.deepEqual(native.map(row => row.outcome.trace.safe), traces.map(trace => trace.safe));
+  assert.deepEqual(native.map(row => row.outcome.trace.contextTrace), traces.map(trace => trace.contextTrace));
 
   const scenario = path.join(directory, 'scenario.toon');
   fs.writeFileSync(scenario, encode({ format: 'GhostFlow/scenario-v1', id: 'natural-fallback-parity',
     initialInputs: [{ name: 'unsafe', type: 'Bool', value: false }], keyBindings: [],
-    solar: { bootEpoch: 7, terminalCapacity: 16 },
+    context,
     actions: rows.flatMap((row, index) => [
       { kind: 'input', name: 'unsafe', type: 'Bool', value: row.inputs.unsafe },
-      { kind: 'scan', atMs: row.nowMs, solarFacts: row.solarFacts },
+      { kind: 'scan', atMs: row.nowMs, contextFacts: row.contextFacts },
     ]) }) + '\n');
   const simulated = JSON.parse(run(process.execPath, [path.join(root, 'tools/ghostsim.mjs'), binary, scenario, '--format', 'json']));
   assert.deepEqual(simulated.scans.map(scan => scan.safeVirtualIntent), traces.map(trace => trace.safe));
-  assert.deepEqual(simulated.scans.map(scan => scan.scheduleTrace), traces.map(trace => trace.scheduleTrace));
+  assert.deepEqual(simulated.scans.map(scan => scan.contextTrace), traces.map(trace => trace.contextTrace));
 });
 
 for (const [reason, label] of [[1, 'LocationUnknown'], [2, 'EventUnavailable'], [3, 'PredictionMissing'], [4, 'PredictionStale']]) {
   test(`${label} selects the explicit fixed-time route and retains the cause`, async t => {
     const artifact = await compileSource(source, { filename: `fallback-${label}.ghost.md` });
-    const site = artifact.manifest.schedules[0].site;
-    const runtime = await ControlRuntime.instantiate(wasm, artifact, { solar: { bootEpoch: 7, terminalCapacity: 16 } });
+    const [descriptor] = artifact.manifest.schedules;
+    const runtime = await ControlRuntime.instantiateFramed(wasm, artifact, { context });
     t.after(() => runtime.dispose());
-    runtime.step({ nowMs: 0, inputs: { unsafe: false }, solarFacts: facts(site, 0, 21_599_000, { reason }) });
-    const admitted = runtime.step({ nowMs: 1000, inputs: { unsafe: false }, solarFacts: facts(site, 1000, 21_600_000, { reason }) }).vm;
+    runtime.step({ nowMs: 0, inputs: { unsafe: false }, contextFacts: facts(descriptor, 0, 21_599_000, { reason }) });
+    const admitted = runtime.step({ nowMs: 1000, inputs: { unsafe: false }, contextFacts: facts(descriptor, 1000, 21_600_000, { reason }) }).vm;
     assert.equal(admitted.safe.due, true);
-    assert.equal(admitted.scheduleTrace[0].observations[0].unavailableReason, reason);
-    assert.equal(admitted.scheduleTrace[0].observations[0].fallback, true);
+    const due = admitted.contextTrace.find(row => row.decision === 'Due');
+    assert.equal(due.unavailableReason, reason);
+    assert.equal(due.fallback, true);
   });
 }
 
 test('fixed-time fallback never starts without a trusted anchor', async t => {
   const artifact = await compileSource(source, { filename: 'no-clock-fallback.ghost.md' });
-  const site = artifact.manifest.schedules[0].site;
-  const runtime = await ControlRuntime.instantiate(wasm, artifact, { solar: { bootEpoch: 7, terminalCapacity: 16 } });
+  const [descriptor] = artifact.manifest.schedules;
+  const runtime = await ControlRuntime.instantiateFramed(wasm, artifact, { context });
   t.after(() => runtime.dispose());
   for (const nowMs of [0, 1000, 2000]) {
-    const packet = facts(site, nowMs, 21_600_000, { trusted: false });
-    assert.equal(runtime.step({ nowMs, inputs: { unsafe: false }, solarFacts: packet }).vm.safe.pump, false);
+    const packet = facts(descriptor, nowMs, 21_600_000, { trusted: false });
+    assert.equal(runtime.step({ nowMs, inputs: { unsafe: false }, contextFacts: packet }).vm.safe.pump, false);
   }
 });
 
 test('unknown anchor uncertainty prevents held-clock fallback admission', async t => {
   const artifact = await compileSource(source, { filename: 'uncertain-clock-fallback.ghost.md' });
-  const site = artifact.manifest.schedules[0].site;
-  const runtime = await ControlRuntime.instantiate(wasm, artifact, { solar: { bootEpoch: 7, terminalCapacity: 16 } });
+  const [descriptor] = artifact.manifest.schedules;
+  const runtime = await ControlRuntime.instantiateFramed(wasm, artifact, { context });
   t.after(() => runtime.dispose());
-  const baseline = facts(site, 0, 21_599_000);
+  const baseline = facts(descriptor, 0, 21_599_000);
   baseline.clock.uncertaintyMs = null;
-  runtime.step({ nowMs: 0, inputs: { unsafe: false }, solarFacts: baseline });
-  const held = runtime.step({ nowMs: 1000, inputs: { unsafe: false }, solarFacts: facts(site, 1000, 21_600_000, { trusted: false }) });
+  runtime.step({ nowMs: 0, inputs: { unsafe: false }, contextFacts: baseline });
+  const held = runtime.step({ nowMs: 1000, inputs: { unsafe: false }, contextFacts: facts(descriptor, 1000, 21_600_000, { trusted: false }) });
   assert.equal(held.vm.safe.pump, false);
-  assert.match(JSON.stringify(held.vm.scheduleTrace), /TrustExpired|ClockUnknown/);
+  assert.match(JSON.stringify(held.vm.contextTrace), /TrustExpired|ClockUnknown/);
 });
 
 test('fallback facts cannot retime the authored fallback or impersonate another local date', async t => {
   const artifact = await compileSource(source, { filename: 'fallback-binding.ghost.md' });
-  const site = artifact.manifest.schedules[0].site;
-  const runtime = await ControlRuntime.instantiate(wasm, artifact, { solar: { bootEpoch: 7, terminalCapacity: 16 } });
+  const [descriptor] = artifact.manifest.schedules;
+  const runtime = await ControlRuntime.instantiateFramed(wasm, artifact, { context });
   t.after(() => runtime.dispose());
   for (const [key, value] of [['fallbackWallMs', 21_600_001], ['sourceDay', 1]]) {
-    const packet = facts(site, 0, 21_599_000);
-    packet.schedules[0].rows[0][key] = value;
-    assert.throws(() => runtime.step({ nowMs: 0, inputs: { unsafe: false }, solarFacts: packet }), /fallback|local date|sourceDay/i);
+    const packet = facts(descriptor, 0, 21_599_000);
+    packet.solars[0].rows[0][key] = value;
+    assert.throws(() => runtime.step({ nowMs: 0, inputs: { unsafe: false }, contextFacts: packet }), /fallback|local date|sourceDay/i);
   }
-  const accepted = runtime.step({ nowMs: 0, inputs: { unsafe: false }, solarFacts: facts(site, 0, 21_599_000) });
+  const accepted = runtime.step({ nowMs: 0, inputs: { unsafe: false }, contextFacts: facts(descriptor, 0, 21_599_000) });
   assert.equal(accepted.vm.safe.pump, false, 'rejected provider facts preserve the same-time retry');
 });
 

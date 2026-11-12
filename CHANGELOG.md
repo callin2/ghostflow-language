@@ -8,6 +8,10 @@ Daily and DailySlots runtimes can now export and restore exact-Program terminal 
 
 ## Unreleased
 
+### 2026-11-12 - Frame ordinary Solar clock hold and fixed fallback ([#621](https://github.com/callin2/ghostflow-language/issues/621))
+
+A single unfiltered Solar pulse now uses existing GFB16 for held-clock and fixed-time fallback policies. Signed admission binds the exact duration and local fallback time for a single pulse without live configs. Native and WASM traces agree on fallback provenance, hold expiry and once-only admission. Target hosts must supply the matching clock and occurrence evidence.
+
 ### 2026-11-12 - Match settings readback to its completed scan ([#288](https://github.com/callin2/ghostflow-language/issues/288))
 
 Completed snapshots verify each setting's identity, stream revision and Result status against the scan trace. A prior readback cannot show a default as ready for a scan that recorded a settings fault.

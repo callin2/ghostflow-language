@@ -1695,8 +1695,7 @@ class Lowerer {
       : ['all', ...this.manifest.outputs.map(output => ['has', 'actuator', output.name, gfbType(semanticType(output.type))])];
     const [schedule] = this.manifest.schedules;
     const ordinarySolarContext = emitBytecode && this.manifest.schedules.length === 1
-      && schedule.kind === 'solar' && !schedule.day && schedule.policy.clock === 'trusted_only'
-      && schedule.policy.fallback === 'skip' && !this.manifest.signals.length
+      && schedule.kind === 'solar' && !schedule.day && !this.manifest.signals.length
       && !this.windows.length && !this.trueFors.length && !this.adaptPolicy
       && !this.objectives.size && !this.providers.size && !this.calendars.size
       && !this.resources.size && !this.naturalConditions.length && !this.accountingResults.length;

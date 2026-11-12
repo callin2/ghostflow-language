@@ -2693,6 +2693,27 @@ fn verify_solar_bindings(manifest: &Value, module: &ghostflow_core::Module) -> R
                 "Solar policy",
                 ErrorCode::ManifestMismatch,
             )?;
+            let expected_clock = match actual.clock_hold_ms {
+                Some(duration_ms) => serde_json::json!({
+                    "kind": "hold_trusted", "durationMs": duration_ms, "terminal": "skip"
+                }),
+                None => serde_json::json!("trusted_only"),
+            };
+            let expected_fallback = match fallback_time_ms {
+                Some(at_ms) => serde_json::json!({
+                    "kind": "fixed_time", "atMs": at_ms, "terminal": "skip"
+                }),
+                None => serde_json::json!("skip"),
+            };
+            let extended = actual.clock_hold_ms.is_some() || fallback_time_ms.is_some();
+            if extended
+                && (expected.len() != 1
+                    || !manifest["configs"].as_array().is_some_and(Vec::is_empty))
+            {
+                return Err(mismatch(
+                    "signed GFB16 extended policies require one Solar pulse without configs",
+                ));
+            }
             if !sites.insert(actual.site)
                 || schedule["kind"] != "solar"
                 || schedule["name"].as_str() != Some(actual.name.as_str())
@@ -2703,12 +2724,10 @@ fn verify_solar_bindings(manifest: &Value, module: &ghostflow_core::Module) -> R
                 || schedule["offsetMs"].as_i64() != Some(*offset_ms)
                 || !schedule["configIds"].as_array().is_some_and(Vec::is_empty)
                 || policy["basis"] != "pulse"
-                || policy["clock"] != "trusted_only"
+                || policy["clock"] != expected_clock
                 || policy["gapMs"].as_u64() != Some(actual.gap_ms)
                 || policy["recovery"] != "baseline"
-                || policy["fallback"] != "skip"
-                || actual.clock_hold_ms.is_some()
-                || fallback_time_ms.is_some()
+                || policy["fallback"] != expected_fallback
                 || weekday_mask.is_some()
                 || !config_ids.is_empty()
             {
@@ -5866,7 +5885,14 @@ mod tests {
         current.supported_manifest_formats = &formats;
         verify_portable_package(&fixture_for("solar-pulse-valid"), &current).unwrap();
         assert!(called.replace(false));
-        for scenario in ["solar-pulse-descriptor", "solar-pulse-predicate"] {
+        verify_portable_package(&fixture_for("solar-pulse-extended-valid"), &current).unwrap();
+        assert!(called.replace(false));
+        for scenario in [
+            "solar-pulse-descriptor",
+            "solar-pulse-predicate",
+            "solar-pulse-extended-clock",
+            "solar-pulse-extended-fallback",
+        ] {
             let error = verify_portable_package(&fixture_for(scenario), &current).unwrap_err();
             assert_eq!(
                 error.code,

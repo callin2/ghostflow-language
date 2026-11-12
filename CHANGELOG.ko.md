@@ -11,6 +11,10 @@ Daily와 DailySlots 실행기는 `schedule_checkpoint`와 `restore_schedule_chec
 
 ## 미출시
 
+### 2026-11-12 - 일반 Solar 시계 유지와 고정시각 대체의 프레임 실행 ([#621](https://github.com/callin2/ghostflow-language/issues/621))
+
+날짜 필터 없는 Solar pulse 하나는 시계 유지와 고정시각 대체 정책을 기존 GFB16으로 실행합니다. 서명 검증은 live config 없는 단일 pulse의 유지 시간과 현지 대체 시각을 대조합니다. 네이티브와 WASM은 대체 근거, 유지 만료, 단일 실행에 대해 동일한 추적을 기록합니다. 타깃 호스트가 해당 시계와 발생 증거를 제공해야 합니다.
+
 ### 2026-11-12 - 완료 스캔과 설정 읽기 결과 대조 ([#288](https://github.com/callin2/ghostflow-language/issues/288))
 
 완료 스냅샷은 각 설정의 식별자, 스트림 리비전, Result 상태를 해당 스캔의 추적 기록과 대조한다. 설정 오류가 기록된 스캔에 이전 읽기 결과를 붙여 기본값을 정상으로 표시하는 요청을 거부한다.
