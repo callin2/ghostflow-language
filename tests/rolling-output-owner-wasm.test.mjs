@@ -291,3 +291,22 @@ test('mandatory GFB29 evaluates safe proposals only through a bound rolling owne
     await assert.rejects(pending, /unavailable while saving or closed/);
   }
 });
+
+
+test('verified package validation opens only a disposable typed proposal runtime', async () => {
+  const artifact = await compileSource(source, { filename: 'validation-rolling.ghost.md' });
+  const context = { manifest: artifact.manifest, sourceMap: { sourceDocument: artifact.sourceDocument } };
+  const validation = await RollingOutputRuntime.createValidationRuntime(binary, artifact.bytes, context);
+  try {
+    const result = validation.step({ nowMs: 0, samples: {
+      manual: { quality: 'Good', value: true, epoch: 1, id: 1, timestampMs: 0 },
+    } });
+    assert.equal(result.vm.safe.valve, true);
+    assert.equal(typeof validation.requestOn, 'undefined');
+  } finally {
+    validation.dispose();
+  }
+  const forged = structuredClone(context);
+  forged.manifest.rollingOutput.limitMs--;
+  await assert.rejects(RollingOutputRuntime.createValidationRuntime(binary, artifact.bytes, forged), /policy differs/);
+});

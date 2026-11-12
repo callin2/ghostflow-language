@@ -712,6 +712,7 @@ test('signed calendar Result preserves the Seoul date and rejects rewritten bind
 
 test('#96 signed GFB29 requires an owner ABI and rejects replaced policy metadata', async () => {
   const current = await currentKeyPromise;
+  const { RollingOutputRuntime } = await import('../runtimes/wasm/rolling-output-runtime.mjs');
   const source = '# Rolling output\n\n```ghost\ncontrol Watering {\n'
     + 'resource irrigation: BoolActuator;\n'
     + 'account applied = on_time(irrigation, stage: applied, persistence: durable, output: pump);\n'
@@ -729,9 +730,16 @@ test('#96 signed GFB29 requires an owner ABI and rejects replaced policy metadat
     availableCapabilities: requiredCapabilities };
   await expectsCode(() => verifyPortablePackage(packaged, unsupported), 'unsupported-runtime-abi');
   const target = { ...unsupported, supportedRuntimeAbis: [ownerAbi],
-    verifyBytecode: async bytes => {
+    verifyBytecode: async (bytes, context) => {
       assert.deepEqual(Buffer.from(bytes), artifact.bytes);
-      return true;
+      const runtime = await RollingOutputRuntime.createValidationRuntime(fs.readFileSync(wasmPath), bytes, context);
+      try {
+        assert.equal(runtime.step({ nowMs: 0 }).vm.safe.pump, true);
+        assert.equal(typeof runtime.requestOn, 'undefined');
+        return true;
+      } finally {
+        runtime.dispose();
+      }
     } };
   await verifyPortablePackage(packaged, target);
   const altered = clone(packaged);

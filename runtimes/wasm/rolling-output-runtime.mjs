@@ -1,4 +1,6 @@
 import { compileSource } from '../../tools/compile-source.mjs';
+import { canonicalJson } from '../../tools/canonical-json.mjs';
+import { sha256Hex } from '../../tools/sha256.mjs';
 import { FramedGhostFlowRuntime } from './framed-runtime.mjs';
 import { ControlRuntime } from './control-runtime.mjs';
 
@@ -78,6 +80,31 @@ export class RollingOutputRuntime {
     } catch (error) {
       runtime.dispose();
       throw error;
+    }
+  }
+
+  /** Open a disposable proposal scanner for verified package admission. */
+  static async createValidationRuntime(wasmBytes, bytecode, { manifest, sourceMap }, { hardwareProfiles, capabilities } = {}) {
+    const policy = manifest?.rollingOutput;
+    const document = sourceMap?.sourceDocument;
+    if (manifest?.format !== 'GhostFlow/control-v29' || !policy
+      || typeof document?.text !== 'string' || typeof document.filename !== 'string'
+      || sha256Hex(bytecode) !== manifest.bytecodeSha256) {
+      throw new Error('GFB29 validation requires its verified package artifacts');
+    }
+    const owner = await this.open(wasmBytes, document.text, {
+      filename: document.filename, hardwareProfiles, expectedBytecodeSha256: manifest.bytecodeSha256,
+      binding: { resource: policy.resource, output: policy.output, resourceId: 1 },
+      bootEpoch: 1, clock: () => 0, maxIntervals: 1,
+      store: { read: async () => null, commit: async () => true },
+    });
+    try {
+      if (canonicalJson(owner.policy) !== canonicalJson(policy)) {
+        throw new Error('GFB29 validation policy differs from the verified program');
+      }
+      return await owner.createControlRuntime({ capabilities });
+    } finally {
+      owner.dispose();
     }
   }
 
