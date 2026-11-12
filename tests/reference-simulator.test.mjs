@@ -6,6 +6,7 @@ import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { after, test } from 'node:test';
 import { encode } from '@toon-format/toon';
+import { solarContextEvidence } from '../runtimes/wasm/context-abi.mjs';
 
 const root = fileURLToPath(new URL('../', import.meta.url));
 const files = [
@@ -228,6 +229,22 @@ function solarOracle(id, manifest) {
         available: index === 0, providerRevision: 'solar-v1', contextRevision: 'site-v1' }],
     })),
   });
+  if (manifest.format === 'GhostFlow/control-v15') {
+    const scan = (atMs, wallMs) => {
+      const { clock, schedules } = facts(atMs, wallMs);
+      return { kind: 'scan', atMs, contextFacts: {
+        clock: { ...clock, unknownReason: null },
+        natural: [], schedules: [], settings: null,
+        solars: schedules.map((row, index) => solarContextEvidence(manifest.schedules[index], row)),
+      } };
+    };
+    return {
+      context: { bootEpoch: 7, terminalCapacity: 8, bindings: [] },
+      actions: [scan(0, 900), scan(100, 1000)],
+      requested: [{ due: false }, { due: true }],
+      framedSolar: true,
+    };
+  }
   return {
     solar: { bootEpoch: 7, terminalCapacity: 8 },
     actions: [{ kind: 'scan', atMs: 0, solarFacts: facts(0, 900) },
@@ -282,7 +299,7 @@ for (const entry of accepted) {
       assert.equal(compiled.status, 0, `${entry.id}: compiler failed: ${compiled.stderr}`);
       const manifest = JSON.parse(fs.readFileSync(`${artifact}.manifest.json`, 'utf8'));
       record.artifactFormat = manifest.format;
-      if (!/^GhostFlow\/control-v(?:[1-9]|10)$/.test(manifest.format)) {
+      if (!/^GhostFlow\/control-v(?:[1-9]|10|15)$/.test(manifest.format)) {
         if (standaloneDescriptors.has(entry.id)) {
           assert.equal(manifest.format, standaloneDescriptors.get(entry.id),
             `${entry.id}: unexpected standalone descriptor format`);
@@ -370,6 +387,9 @@ for (const entry of accepted) {
           ? outcome.scans.map(row => row.trueForTrace[0].coveredMs)
           : outcome.scans.at(-1).windowTrace.map(trace => trace.value);
         assert.deepEqual(values, oracle.trace, `${entry.id}: temporal evidence trace`);
+      }
+      if (oracle?.framedSolar) {
+        assert.equal(outcome.scans[1].contextTrace.find(row => row.decision === 'Due')?.providerRevision, 'solar-v1');
       }
       if (oracle?.solar) {
         assert.equal(outcome.scans[1].scheduleTrace.length, manifest.schedules.length);
