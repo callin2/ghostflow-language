@@ -2,7 +2,7 @@
 
 use crate::accounting::RollingOutputOwner;
 use crate::scan::ScanDriver;
-use crate::{Capability, Error, Module, Reader, Result, Runtime, Type, MAX_MODULE_BYTES};
+use crate::{Capability, Error, Module, Reader, Result, Runtime, Type, Value, MAX_MODULE_BYTES};
 
 const MAX_EXACT_DURATION: u64 = (1 << 53) - 1;
 
@@ -80,6 +80,22 @@ impl RollingOutputProgram {
 
     pub fn descriptor(&self) -> &RollingOutputPolicyDescriptor {
         &self.descriptor
+    }
+
+    pub fn name(&self) -> &str {
+        self.module.name()
+    }
+
+    pub fn input_fields(&self) -> impl Iterator<Item = (&str, Type)> {
+        self.module.input_fields()
+    }
+
+    pub fn state_fields(&self) -> impl Iterator<Item = (&str, Type, Value)> {
+        self.module.state_fields()
+    }
+
+    pub fn output_fields(&self) -> impl Iterator<Item = (&str, Type)> {
+        self.module.output_fields()
     }
 
     /// Activate only safe-intent evaluation. The sole output writer must
@@ -171,6 +187,14 @@ mod tests {
     #[test]
     fn mandatory_policy_inspects_without_generic_activation() {
         let bytes = program("pump", 5_000);
+        let program = RollingOutputProgram::load(&bytes).unwrap();
+        assert_eq!(program.name(), "Watering");
+        assert_eq!(program.input_fields().count(), 0);
+        assert_eq!(program.state_fields().count(), 0);
+        assert_eq!(
+            program.output_fields().collect::<Vec<_>>(),
+            [("pump", Type::Bool)]
+        );
         assert!(Module::load(&bytes).is_err());
         assert_eq!(
             RollingOutputPolicyDescriptor::inspect(&bytes).unwrap(),
