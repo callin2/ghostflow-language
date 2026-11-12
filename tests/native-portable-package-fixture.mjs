@@ -102,6 +102,15 @@ if (scenario.startsWith('solar-pulse-')) {
     output pump: Bool;
     pump <- dawn.due;
   }` + '\n```\n';
+  if (scenario === 'solar-pulse-multi-valid') {
+    source = source.replace('config enabled: Bool = true { access = operator; }', '')
+      .replace('output pump: Bool;', `schedule dusk: Solar {
+        timezone = "UTC"; latitude = 0; longitude = 0; at = sun\`set\`; basis = pulse;
+        when = true; clock = trusted_only; gap = skip_after(60s); recovery = baseline; fallback = skip;
+      }
+      output pump: Bool;`)
+      .replace('pump <- dawn.due;', 'pump <- dawn.due || dusk.due;');
+  }
   if (extended) source = source.replace('config enabled: Bool = true { access = operator; }', '')
     .replace('clock = trusted_only;', 'clock = hold_trusted(2s, terminal: skip);')
     .replace('fallback = skip;', 'fallback = fixed_time(time`06:00`, terminal: skip);');

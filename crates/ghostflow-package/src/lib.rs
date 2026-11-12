@@ -5975,8 +5975,10 @@ mod tests {
         current.supported_manifest_formats = &formats;
         verify_portable_package(&fixture_for("solar-pulse-valid"), &current).unwrap();
         assert!(called.replace(false));
-        verify_portable_package(&fixture_for("solar-pulse-extended-valid"), &current).unwrap();
-        assert!(called.replace(false));
+        for scenario in ["solar-pulse-extended-valid", "solar-pulse-multi-valid"] {
+            verify_portable_package(&fixture_for(scenario), &current).unwrap();
+            assert!(called.replace(false));
+        }
         for scenario in [
             "solar-pulse-descriptor",
             "solar-pulse-predicate",

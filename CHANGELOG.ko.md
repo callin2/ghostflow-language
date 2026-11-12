@@ -11,6 +11,10 @@ Daily와 DailySlots 실행기는 `schedule_checkpoint`와 `restore_schedule_chec
 
 ## 미출시
 
+### 2026-11-12 - 여러 일반 Solar pulse의 프레임 실행 ([#621](https://github.com/callin2/ghostflow-language/issues/621))
+
+날짜 필터가 없고 신뢰 시계와 건너뛰기 대체를 사용하는 Solar pulse 여러 개를 GFB16으로 실행합니다. 네이티브와 WASM은 각 사이트의 제공자 증거와 실행 판정을 독립적으로 유지합니다. 타깃 호스트가 각 디스크립터의 증거를 제공해야 합니다.
+
 ### 2026-11-12 - 일반 Solar 시계 유지와 고정시각 대체의 프레임 실행 ([#621](https://github.com/callin2/ghostflow-language/issues/621))
 
 날짜 필터 없는 Solar pulse 하나는 시계 유지와 고정시각 대체 정책을 기존 GFB16으로 실행합니다. 서명 검증은 live config 없는 단일 pulse의 유지 시간과 현지 대체 시각을 대조합니다. 네이티브와 WASM은 대체 근거, 유지 만료, 단일 실행에 대해 동일한 추적을 기록합니다. 타깃 호스트가 해당 시계와 발생 증거를 제공해야 합니다.

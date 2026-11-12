@@ -53,10 +53,12 @@ const facts = (site, monotonicMs, wallMs) => ({
 });
 const secondSolar = source.slice(source.indexOf('  schedule dawn:'), source.indexOf('  output due:'))
   .replace('schedule dawn:', 'schedule spare:');
-const legacySource = code => code.replace('  schedule dawn:', `${secondSolar}  schedule dawn:`);
+const legacySource = code => code.replace('  schedule dawn:', `  schedule externalSlots: DailySlots<15min> { timezone = "UTC"; selected = [06:00]; }
+${secondSolar}  schedule dawn:`);
 const legacyFacts = (artifact, nowMs, wallMs) => ({
   clock: facts(0, nowMs, wallMs).clock,
-  schedules: artifact.manifest.schedules.flatMap(schedule => facts(schedule.site, nowMs, wallMs).schedules),
+  schedules: artifact.manifest.schedules.filter(schedule => schedule.kind === 'solar')
+    .flatMap(schedule => facts(schedule.site, nowMs, wallMs).schedules),
 });
 
 test('ordinary Solar pulse selects the framed context runtime without an operator config', async t => {
@@ -163,7 +165,7 @@ for (const [hold, fixed] of [[true, false], [false, true], [true, true]]) {
 
 test('ControlRuntime executes compiled Solar from provider facts and rejects host due injection', async () => {
   const artifact = await compileSource(legacySource(source), { filename: 'native-solar.ghost.md' });
-  const descriptor = artifact.manifest.schedules[1];
+  const descriptor = artifact.manifest.schedules.find(schedule => schedule.name === 'dawn');
   assert.equal(new DataView(artifact.bytes.buffer, artifact.bytes.byteOffset).getUint16(4, true), 5);
   assert.equal(Object.hasOwn(descriptor, 'dueInput'), false);
 
@@ -188,7 +190,7 @@ test('ControlRuntime validates strict Solar policy metadata before activation', 
   const artifact = await compileSource(legacySource(source), { filename: 'native-solar.ghost.md' });
   const corrupt = mutate => {
     const manifest = structuredClone(artifact.manifest);
-    mutate(manifest.schedules[0]);
+    mutate(manifest.schedules.find(schedule => schedule.name === 'dawn'));
     return ControlRuntime.instantiate(wasm, { ...artifact, manifest }, {
       solar: { bootEpoch: 7, terminalCapacity: 8 },
     });

@@ -229,27 +229,20 @@ function solarOracle(id, manifest) {
         available: index === 0, providerRevision: 'solar-v1', contextRevision: 'site-v1' }],
     })),
   });
-  if (manifest.format === 'GhostFlow/control-v15') {
-    const scan = (atMs, wallMs) => {
-      const { clock, schedules } = facts(atMs, wallMs);
-      return { kind: 'scan', atMs, contextFacts: {
-        clock: { ...clock, unknownReason: null },
-        natural: [], schedules: [], settings: null,
-        solars: schedules.map((row, index) => solarContextEvidence(manifest.schedules[index], row)),
-      } };
-    };
-    return {
-      context: { bootEpoch: 7, terminalCapacity: 8, bindings: [] },
-      actions: [scan(0, 900), scan(100, 1000)],
-      requested: [{ due: false }, { due: true }],
-      framedSolar: true,
-    };
-  }
+  assert.equal(manifest.format, 'GhostFlow/control-v15');
+  const scan = (atMs, wallMs) => {
+    const { clock, schedules } = facts(atMs, wallMs);
+    return { kind: 'scan', atMs, contextFacts: {
+      clock: { ...clock, unknownReason: null },
+      natural: [], schedules: [], settings: null,
+      solars: schedules.map((row, index) => solarContextEvidence(manifest.schedules[index], row)),
+    } };
+  };
   return {
-    solar: { bootEpoch: 7, terminalCapacity: 8 },
-    actions: [{ kind: 'scan', atMs: 0, solarFacts: facts(0, 900) },
-      { kind: 'scan', atMs: 100, solarFacts: facts(100, 1000) }],
+    context: { bootEpoch: 7, terminalCapacity: 8, bindings: [] },
+    actions: [scan(0, 900), scan(100, 1000)],
     requested: [{ due: false }, { due: true }],
+    framedSolar: true,
   };
 }
 
@@ -349,7 +342,6 @@ for (const entry of accepted) {
         ...(oracle?.temporal ? { temporal: oracle.temporal } : {}),
         ...(oracle?.afterEvent ? { afterEvent: oracle.afterEvent } : {}),
         ...(oracle?.capabilities ? { capabilities: oracle.capabilities } : {}),
-        ...(oracle?.solar ? { solar: oracle.solar } : {}),
         ...(oracle?.schedule ? { schedule: oracle.schedule } : {}),
         ...(oracle?.context ? { context: oracle.context }
           : manifest.format === 'GhostFlow/control-v10'
@@ -390,10 +382,6 @@ for (const entry of accepted) {
       }
       if (oracle?.framedSolar) {
         assert.equal(outcome.scans[1].contextTrace.find(row => row.decision === 'Due')?.providerRevision, 'solar-v1');
-      }
-      if (oracle?.solar) {
-        assert.equal(outcome.scans[1].scheduleTrace.length, manifest.schedules.length);
-        assert.equal(outcome.scans[1].scheduleTrace[0].observations[0].providerRevision, 'solar-v1');
       }
       record.outcome = 'passed';
       record.scans = outcome.scans.length;

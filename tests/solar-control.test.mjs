@@ -131,7 +131,7 @@ test('the existing DailySlots snapshot remains v1-compatible', () => {
 test('the canonical Solar literate fixture preserves original schedule locations', async () => {
   const source = fs.readFileSync(new URL('../examples/solar-watering.ghost.md', import.meta.url), 'utf8');
   const result = await compileSource(source, { filename: 'examples/solar-watering.ghost.md' });
-  assert.equal(result.manifest.format, 'GhostFlow/control-v3');
+  assert.equal(result.manifest.format, 'GhostFlow/control-v15');
   assert.deepEqual(result.manifest.schedules.map(({ name, event, offsetMs, policy }) => ({ name, event, offsetMs, fallback: policy.fallback })), [
     { name: 'dawn', event: 'rise', offsetMs: 1_800_000, fallback: 'skip' },
     { name: 'dusk', event: 'set', offsetMs: -1_800_000, fallback: 'skip' },

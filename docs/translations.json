@@ -3053,31 +3053,31 @@
       "files": {
         "en": {
           "path": "docs/SOLAR-SCHEDULE.md",
-          "sha256": "0e5ac5cdb1101bc367d57d2dee581cb45a56ea52d14c8d12aaa218f9e2c6ef2f"
+          "sha256": "f43baa4fa7a4128e13a7c04e50319d38dd9b86d26798eda38094c0ab179883ed"
         },
         "ko": {
           "path": "docs/SOLAR-SCHEDULE.ko.md",
-          "sha256": "bfa5e6e93f3dde5e18fc0e87f45055ed81ae0263ea06f52e5121cc41afd530e1",
+          "sha256": "83a81ce67b731662035408220e07d71292999685a63ca63e9e2c0202be614817",
           "from": "en",
-          "sourceSha256": "0e5ac5cdb1101bc367d57d2dee581cb45a56ea52d14c8d12aaa218f9e2c6ef2f"
+          "sourceSha256": "f43baa4fa7a4128e13a7c04e50319d38dd9b86d26798eda38094c0ab179883ed"
         },
         "zh": {
           "path": "docs/SOLAR-SCHEDULE.zh.md",
-          "sha256": "03442e6aac384712af8d182cdba8dd505b988f6b85310631a7b7a7829adc492b",
+          "sha256": "d8925376e293175cabdd37b06fd0232669e13f12620543e35fdc39392b4f1fe3",
           "from": "en",
-          "sourceSha256": "0e5ac5cdb1101bc367d57d2dee581cb45a56ea52d14c8d12aaa218f9e2c6ef2f"
+          "sourceSha256": "f43baa4fa7a4128e13a7c04e50319d38dd9b86d26798eda38094c0ab179883ed"
         },
         "es": {
           "path": "docs/SOLAR-SCHEDULE.es.md",
-          "sha256": "d6b8d0e7788cf33c42ed1dfbf1ef130736c68bebe48cf61ee31acbc5823719e4",
+          "sha256": "dc4b4e97e01212895e67d501be668e7198ec8749f4daa34d6e1f1ac438521167",
           "from": "en",
-          "sourceSha256": "0e5ac5cdb1101bc367d57d2dee581cb45a56ea52d14c8d12aaa218f9e2c6ef2f"
+          "sourceSha256": "f43baa4fa7a4128e13a7c04e50319d38dd9b86d26798eda38094c0ab179883ed"
         },
         "ja": {
           "path": "docs/SOLAR-SCHEDULE.ja.md",
-          "sha256": "daf1af137047c6d5f8a39ef7c8016f814a1ed8c6f4e85cb783840eee7b3e07f9",
+          "sha256": "0f573dd864c565cce8422885fa7ea0ace82d412ebac2d33785f91aac0ccdec3d",
           "from": "en",
-          "sourceSha256": "0e5ac5cdb1101bc367d57d2dee581cb45a56ea52d14c8d12aaa218f9e2c6ef2f"
+          "sourceSha256": "f43baa4fa7a4128e13a7c04e50319d38dd9b86d26798eda38094c0ab179883ed"
         }
       }
     },
@@ -3508,13 +3508,13 @@
       "files": {
         "en": {
           "path": "CHANGELOG.md",
-          "sha256": "60d23ce2e77b0737f12d9ca7380f1469ff0e7576f9588c665a24421569659b9a"
+          "sha256": "37c5c1c03a50edf76da2bce279dc23b6078cddc03459cea43744b08eeed332be"
         },
         "ko": {
           "path": "CHANGELOG.ko.md",
-          "sha256": "eee38887b7e55ba2c772977d099dedaea3c74b2242c21b76fb94f628011ab643",
+          "sha256": "c12ad467dfdfa567b069ebcadec691fd00c4d92709875bb82ddddcd49d1196dd",
           "from": "en",
-          "sourceSha256": "60d23ce2e77b0737f12d9ca7380f1469ff0e7576f9588c665a24421569659b9a"
+          "sourceSha256": "37c5c1c03a50edf76da2bce279dc23b6078cddc03459cea43744b08eeed332be"
         }
       }
     },
