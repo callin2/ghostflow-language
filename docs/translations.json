@@ -5956,6 +5956,23 @@
       }
     },
     {
+      "document": "docs/reports/2026-11-12-ref-04-065-unproven-constraints.md",
+      "baseLanguage": "en",
+      "canonical": "en",
+      "files": {
+        "en": {
+          "path": "docs/reports/2026-11-12-ref-04-065-unproven-constraints.md",
+          "sha256": "fa7521b6ae4dcb05dd1755e2d00249a40ffc5073a92ae659cbd983a6564547c5"
+        },
+        "ko": {
+          "path": "docs/reports/2026-11-12-ref-04-065-unproven-constraints.ko.md",
+          "sha256": "f3888a196d4ae9d698d1846c48c859bb7fae09ddaa59471252468b13038fa0e6",
+          "from": "en",
+          "sourceSha256": "fa7521b6ae4dcb05dd1755e2d00249a40ffc5073a92ae659cbd983a6564547c5"
+        }
+      }
+    },
+    {
       "document": "docs/MONITORING-PLAN.md",
       "baseLanguage": "en",
       "canonical": "en",

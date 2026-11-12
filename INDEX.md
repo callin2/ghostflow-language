@@ -625,6 +625,8 @@ For first and last recorded Git commit dates, run `node <skill>/scripts/docs-ind
 | [docs/reports/2026-10-28-reference-foundations-590.md](docs/reports/2026-10-28-reference-foundations-590.md) | 남은 Reference 계약의 기초 검증 — #590 | md |
 | [docs/reports/2026-10-29-compiler-proof-obligations-590.md](docs/reports/2026-10-29-compiler-proof-obligations-590.md) | GhostFlow 컴파일러 정확성 증명 의무 현행화 (#590) | md |
 | [docs/reports/2026-10-29-unattended-correctness-590.md](docs/reports/2026-10-29-unattended-correctness-590.md) | GhostFlow 검증 진행 기록 (2026-10-29, #590) | md |
+| [docs/reports/2026-11-12-ref-04-065-unproven-constraints.ko.md](docs/reports/2026-11-12-ref-04-065-unproven-constraints.ko.md) | REF-04-065 증명 범위 밖의 제약 실행 | md |
+| [docs/reports/2026-11-12-ref-04-065-unproven-constraints.md](docs/reports/2026-11-12-ref-04-065-unproven-constraints.md) | REF-04-065 unproven constraint execution | md |
 
 ## docs/research/
 
@@ -1190,4 +1192,4 @@ For first and last recorded Git commit dates, run `node <skill>/scripts/docs-ind
 | [tests/reference/README.es.md](tests/reference/README.es.md) | Pruebas de aceptación de la Language Reference (por caso) | md |
 | [tests/reference/README.md](tests/reference/README.md) | Language Reference 개별 수용 테스트 | md |
 
-965 documents.
+967 documents.
