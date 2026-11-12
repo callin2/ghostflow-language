@@ -1,5 +1,7 @@
 # Solar schedules: compiler and simulation host
 
+A single ordinary Solar pulse with `trusted_only` and `fallback = skip` now lowers to the GFB16 context profile when the rest of the control fits that profile. A live config is optional. The following sections cover the older standalone transport used by the remaining profiles.
+
 This guide describes the **older standalone Solar profile**.
 
 - For Solar that shares live typed config Results and uses Rust-owned context

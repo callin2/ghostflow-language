@@ -3,6 +3,8 @@
 
 # Solar 调度计划：编译器与模拟宿主
 
+当控制符合上下文配置范围时，使用 `trusted_only` 和 `fallback = skip` 的单个普通 Solar pulse 编译为 GFB16。实时配置可选。以下章节介绍其余配置所使用的旧独立传输。
+
 本指南描述**较早的独立 Solar profile**。
 
 - 如果 Solar 需要共享实时的带类型 config Result 并使用由 Rust 负责的上下文准入，

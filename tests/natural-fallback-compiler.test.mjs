@@ -14,9 +14,8 @@ const solar = (clock = 'trusted_only', fallback = 'skip', declarations = '') => 
   output start: Bool; start <- dawn.due;
 }`;
 
-test('natural policy objects select GFB13 while legacy Solar stays GFB5', () => {
-  const legacy = compileControl(solar());
-  assert.equal(format(legacy), 5);
+test('extended natural policies select GFB13 while ordinary Solar selects GFB16', () => {
+  assert.equal(format(compileControl(solar())), 16);
   const compiled = compileControl(solar('hold_trusted(2min, terminal: skip)', 'fixed_time(time`06:30`, terminal: skip)'));
   assert.equal(format(compiled), 13);
   assert.equal(compiled.manifest.format, 'GhostFlow/control-v12');

@@ -11,6 +11,10 @@ Daily와 DailySlots 실행기는 `schedule_checkpoint`와 `restore_schedule_chec
 
 ## 미출시
 
+### 2026-11-12 - 일반 Solar pulse의 framed 실행 ([#621](https://github.com/callin2/ghostflow-language/issues/621))
+
+호환 제어에서 `trusted_only`, `fallback = skip`을 사용하는 일반 Solar pulse 하나를 기존 GFB16 context로 실행합니다. 운영 설정이 없어도 사용할 수 있습니다. 네이티브와 WASM은 같은 시각 통과, 롤백, 시계 복구와 관측 공백을 대조합니다. 여러 예약과 확장 정책은 기존 실행 경로를 사용합니다.
+
 ### 2026-11-12 - 래치 예정 시작 조건 구분 ([#622](https://github.com/callin2/ghostflow-language/issues/622))
 
 [모니터링 계획](docs/MONITORING-PLAN.ko.md)은 일정에서 직접 시작하는 관계와

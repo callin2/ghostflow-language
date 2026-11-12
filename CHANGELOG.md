@@ -8,6 +8,10 @@ Daily and DailySlots runtimes can now export and restore exact-Program terminal 
 
 ## Unreleased
 
+### 2026-11-12 - Frame an ordinary Solar pulse ([#621](https://github.com/callin2/ghostflow-language/issues/621))
+
+A single ordinary Solar pulse using `trusted_only` and `fallback = skip` uses the existing GFB16 context transport for compatible controls, including controls without an operator config. Native and WASM compare the same crossing, rollback, clock recovery and observation gap. Multiple-schedule and extended-policy programs retain their existing routes.
+
 ### 2026-11-12 - Classify planned latch starts ([#622](https://github.com/callin2/ghostflow-language/issues/622))
 
 The [monitoring plan](docs/MONITORING-PLAN.md) distinguishes a direct schedule

@@ -3053,31 +3053,31 @@
       "files": {
         "en": {
           "path": "docs/SOLAR-SCHEDULE.md",
-          "sha256": "cfd25c73d42781fc6f15b6360a278456354b7ac623c2cf8f372aa43ffb0497e5"
+          "sha256": "9e9f06b2b47b645f7645db9d76536d256c1beb640df9c5381f153bd1b11a7090"
         },
         "ko": {
           "path": "docs/SOLAR-SCHEDULE.ko.md",
-          "sha256": "fbd1ec8f14659878f20e15ef1fddf5497148a9af87410ce06aabc8eb8b91901c",
+          "sha256": "afa0c868406125578ac24df0e3db46f3b704e0296643e8de94ed2e428b73114f",
           "from": "en",
-          "sourceSha256": "cfd25c73d42781fc6f15b6360a278456354b7ac623c2cf8f372aa43ffb0497e5"
+          "sourceSha256": "9e9f06b2b47b645f7645db9d76536d256c1beb640df9c5381f153bd1b11a7090"
         },
         "zh": {
           "path": "docs/SOLAR-SCHEDULE.zh.md",
-          "sha256": "68bbfb456d04190a81924c3d8cd3376fb1b609ada3ab317006a750b44a2bdefb",
+          "sha256": "fe90ebc965eaabdccaea53a985bb346e3ea75589da3f56064f53f1f000c85aa8",
           "from": "en",
-          "sourceSha256": "cfd25c73d42781fc6f15b6360a278456354b7ac623c2cf8f372aa43ffb0497e5"
+          "sourceSha256": "9e9f06b2b47b645f7645db9d76536d256c1beb640df9c5381f153bd1b11a7090"
         },
         "es": {
           "path": "docs/SOLAR-SCHEDULE.es.md",
-          "sha256": "89c2f333e19672ccd1cfb86765e54c37f7cc0613db14c8d519bb5b3614aa7cdb",
+          "sha256": "e630e73e69777600d3a7fcea5fcb99162d03f04e4b5000966fa92f3814da7ad5",
           "from": "en",
-          "sourceSha256": "cfd25c73d42781fc6f15b6360a278456354b7ac623c2cf8f372aa43ffb0497e5"
+          "sourceSha256": "9e9f06b2b47b645f7645db9d76536d256c1beb640df9c5381f153bd1b11a7090"
         },
         "ja": {
           "path": "docs/SOLAR-SCHEDULE.ja.md",
-          "sha256": "b2d2c0cdcadd2ff0239509d00fb62fbbdaa09916b55b9e6c49bcda982b0b9002",
+          "sha256": "08499e1b1b555f0fe764a1438edb47d9c9abb79d7a374a082a6b03106b02f58f",
           "from": "en",
-          "sourceSha256": "cfd25c73d42781fc6f15b6360a278456354b7ac623c2cf8f372aa43ffb0497e5"
+          "sourceSha256": "9e9f06b2b47b645f7645db9d76536d256c1beb640df9c5381f153bd1b11a7090"
         }
       }
     },
@@ -3508,13 +3508,13 @@
       "files": {
         "en": {
           "path": "CHANGELOG.md",
-          "sha256": "cc65d0b397092a9c80a0b3161fc23b5f28ef80320abae6aa5dc33a669571d644"
+          "sha256": "2f8a017bbe84277c08ad7ba5d3a1f0bdb14de738e754a4199f69a23b98878a9a"
         },
         "ko": {
           "path": "CHANGELOG.ko.md",
-          "sha256": "b0a27e1da19846f9e2ced941a1ea1e95ce184c519cc14583dd1b0caedd606b00",
+          "sha256": "c04b7a0d51e317e7a9810fc72b5f6aeb833ed9125e4ade1843d3617992c3b124",
           "from": "en",
-          "sourceSha256": "cc65d0b397092a9c80a0b3161fc23b5f28ef80320abae6aa5dc33a669571d644"
+          "sourceSha256": "2f8a017bbe84277c08ad7ba5d3a1f0bdb14de738e754a4199f69a23b98878a9a"
         }
       }
     },

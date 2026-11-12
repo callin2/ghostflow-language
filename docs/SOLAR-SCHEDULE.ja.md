@@ -3,6 +3,8 @@
 
 # Solar スケジュール：コンパイラとシミュレーションホスト
 
+制御がコンテキストプロファイルの範囲に収まる場合、`trusted_only` と `fallback = skip` を使う単一の通常 Solar pulse は GFB16 にコンパイルされます。ライブ設定は任意です。以下では残りのプロファイルが使う従来の転送を説明します。
+
 このガイドは、**以前のスタンドアロン Solar プロファイル**を説明します。
 
 - 共有のライブな型付き config Result を使い、Rust が所有するコンテキストの受け入れ（アドミッション）を使う Solar については、[Solar/config の実行](SOLAR-CONFIG-EXECUTION.ja.md)を使ってください。
