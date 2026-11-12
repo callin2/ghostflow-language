@@ -8,6 +8,10 @@ Daily and DailySlots runtimes can now export and restore exact-Program terminal 
 
 ## Unreleased
 
+### 2026-11-12 - Bind one applied rolling output policy to GFB29 ([#96](https://github.com/callin2/ghostflow-language/issues/96))
+
+A durable applied account can explicitly name its Bool output with `output: pump`. For one static rolling limit, GFB29 binds the resource, output and timing policy to the Program. Signed admission requires the rolling owner ABI and exact policy metadata. The owner reserves at most the available budget, reports when that duration cannot meet the stop margin, and requires a complete observed OFF window before recovering uncertain history. Device and Simulator target support depend on integrating the enforcing output writer.
+
 ### 2026-11-12 - Match settings readback to its completed scan ([#288](https://github.com/callin2/ghostflow-language/issues/288))
 
 Completed snapshots verify each setting's identity, stream revision and Result status against the scan trace. A prior readback cannot show a default as ready for a scan that recorded a settings fault.

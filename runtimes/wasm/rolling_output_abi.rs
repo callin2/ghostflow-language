@@ -66,26 +66,30 @@ pub unsafe extern "C" fn gf_rolling_output_close(handle: *mut RollingOutputHandl
     }
 }
 
-/// 1 prepares a reservation, 2 is over budget, 3 is unsettled, 0 is unavailable.
+/// 1 prepares a reservation, 2 is over budget, 3 is unsettled,
+/// 4 cannot meet the stop margin, and 0 is unavailable.
 /// A prepared reservation has no readable deadline until persistence is acknowledged.
 #[no_mangle]
 pub unsafe extern "C" fn gf_rolling_output_prepare(
     handle: *mut RollingOutputHandle,
     now_ms: u64,
+    stop_margin_ms: u64,
 ) -> u32 {
     let Some(handle) = handle.as_mut().filter(|handle| handle.pending.is_empty()) else {
         return 0;
     };
-    match handle
-        .owner
-        .request_on(now_ms, capture(&mut handle.pending))
-    {
+    match handle.owner.request_on_with_stop_margin(
+        now_ms,
+        stop_margin_ms,
+        capture(&mut handle.pending),
+    ) {
         Ok(OutputAdmission::Allowed(lease)) => {
             handle.lease = Some(lease);
             1
         }
         Ok(OutputAdmission::BudgetExceeded) => 2,
         Ok(OutputAdmission::UnsettledOutput) => 3,
+        Ok(OutputAdmission::StopMargin) => 4,
         Err(_) => 0,
     }
 }
@@ -123,10 +127,10 @@ pub unsafe extern "C" fn gf_rolling_output_recover(
     confirmed_off_at_ms: u64,
     now_ms: u64,
 ) -> u32 {
-    let Some(handle) = handle
-        .as_mut()
-        .filter(|handle| handle.pending.is_empty() && handle.lease.is_none())
-    else {
+    let Some(handle) = handle.as_mut().filter(|handle| {
+        handle.pending.is_empty()
+            && (handle.lease.is_none() || handle.owner.requires_off_recovery())
+    }) else {
         return 0;
     };
     match handle.owner.recover_after_confirmed_off(
@@ -134,7 +138,10 @@ pub unsafe extern "C" fn gf_rolling_output_recover(
         now_ms,
         capture(&mut handle.pending),
     ) {
-        Ok(true) => 1,
+        Ok(true) => {
+            handle.lease = None;
+            1
+        }
         Ok(false) => 2,
         Err(_) => 0,
     }

@@ -1,6 +1,8 @@
 //! Bytecode-owned policy inspection. Ordinary Module activation rejects this profile.
 
-use crate::{Error, Module, Reader, Result, Type, MAX_MODULE_BYTES};
+use crate::accounting::RollingOutputOwner;
+use crate::scan::ScanDriver;
+use crate::{Capability, Error, Module, Reader, Result, Runtime, Type, MAX_MODULE_BYTES};
 
 const MAX_EXACT_DURATION: u64 = (1 << 53) - 1;
 
@@ -16,6 +18,18 @@ pub struct RollingOutputPolicyDescriptor {
 impl RollingOutputPolicyDescriptor {
     /// Validate the mandatory profile and return only its immutable policy.
     pub fn inspect(bytes: &[u8]) -> Result<Self> {
+        Ok(RollingOutputProgram::load(bytes)?.descriptor)
+    }
+}
+
+/// Verified rolling control whose scalar module cannot be installed separately.
+pub struct RollingOutputProgram {
+    module: Module,
+    descriptor: RollingOutputPolicyDescriptor,
+}
+
+impl RollingOutputProgram {
+    pub fn load(bytes: &[u8]) -> Result<Self> {
         if bytes.len() > MAX_MODULE_BYTES {
             return Err(Error::new("rolling output module byte limit exceeded"));
         }
@@ -28,8 +42,8 @@ impl RollingOutputPolicyDescriptor {
         if !matches!(inner.get(4..6), Some([1..=3, 0])) {
             return Err(Error::new("rolling output requires a scalar base module"));
         }
-        let module = Module::load(inner)?;
-        let policy = Self {
+        let mut module = Module::load(inner)?;
+        let policy = RollingOutputPolicyDescriptor {
             resource: reader.string()?,
             output: reader.string()?,
             window_ms: reader.u64()?,
@@ -54,7 +68,48 @@ impl RollingOutputPolicyDescriptor {
         {
             return Err(Error::new("rolling output requires one scalar Bool intent"));
         }
-        Ok(policy)
+        module.fingerprint = bytes.iter().fold(0xcbf29ce484222325u64, |hash, byte| {
+            (hash ^ u64::from(*byte)).wrapping_mul(0x100000001b3)
+        });
+        module.bytecode_sha256 = crate::alarm_stream::sha256(bytes);
+        Ok(Self {
+            module,
+            descriptor: policy,
+        })
+    }
+
+    pub fn descriptor(&self) -> &RollingOutputPolicyDescriptor {
+        &self.descriptor
+    }
+
+    /// Activate only safe-intent evaluation. The sole output writer must
+    /// independently reserve and settle an owner lease before applying ON.
+    pub fn activate(
+        self,
+        owner: &RollingOutputOwner,
+        installed_resource: &str,
+        installed_output: &str,
+        installed_resource_id: u32,
+        capabilities: impl IntoIterator<Item = Capability>,
+        journal_capacity: usize,
+    ) -> Result<ScanDriver> {
+        let policy = owner.policy();
+        if installed_resource != self.descriptor.resource
+            || installed_output != self.descriptor.output
+            || installed_resource_id != policy.resource_id
+            || policy.window_ms != self.descriptor.window_ms
+            || policy.limit_ms != self.descriptor.limit_ms
+            || policy.reserve_ms != self.descriptor.reserve_ms
+        {
+            return Err(Error::new("installed rolling output owner policy mismatch"));
+        }
+        let mut runtime = Runtime::new(journal_capacity);
+        runtime.install(self.module, false);
+        for capability in capabilities {
+            runtime.add_capability(capability)?;
+        }
+        runtime.activate()?;
+        Ok(ScanDriver::new(runtime))
     }
 }
 
@@ -116,5 +171,49 @@ mod tests {
         let mut trailing = bytes;
         trailing.push(0);
         assert!(RollingOutputPolicyDescriptor::inspect(&trailing).is_err());
+    }
+
+    #[test]
+    fn activation_requires_the_matching_installed_owner() {
+        use crate::accounting::{AccountingConfig, RollingOutputPolicy};
+        let bytes = program("pump", 5_000);
+        let owner = RollingOutputOwner::initialize(
+            RollingOutputPolicy {
+                resource_id: 7,
+                window_ms: 60_000,
+                limit_ms: 30_000,
+                reserve_ms: 5_000,
+            },
+            AccountingConfig {
+                max_intervals: 8,
+                max_events: 1,
+                max_reservations: 8,
+                max_rolling_window_ms: 60_000,
+            },
+            1,
+            0,
+            |_| true,
+        )
+        .unwrap();
+        assert!(RollingOutputProgram::load(&bytes)
+            .unwrap()
+            .activate(&owner, "irrigation", "other", 7, [], 4)
+            .is_err());
+        assert!(RollingOutputProgram::load(&bytes)
+            .unwrap()
+            .activate(&owner, "irrigation", "pump", 8, [], 4)
+            .is_err());
+        let mut driver = RollingOutputProgram::load(&bytes)
+            .unwrap()
+            .activate(&owner, "irrigation", "pump", 7, [], 4)
+            .unwrap();
+        let outcome = driver
+            .scan(crate::scan::ScanFrameV1 {
+                scan_id: 0,
+                logical_time_ms: 0,
+                inputs: vec![],
+            })
+            .unwrap();
+        assert_eq!(outcome.trace.safe_intents["pump"], crate::Value::Bool(true));
     }
 }

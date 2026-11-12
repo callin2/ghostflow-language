@@ -796,7 +796,7 @@ function validateEmbeddedArtifacts(payload) {
 
   exactObject(payload.bytecode, ['format', 'version', 'sha256', 'contentBase64'], 'payload.bytecode');
   if (payload.bytecode.format !== 'GFB1') fail('invalid-bytecode-format', 'payload bytecode format must be GFB1');
-  if (!['1', '2', '3', '4', '11', '16', '18', '21', '22', '26', '27', '28'].includes(payload.bytecode.version)) fail('unsupported-bytecode-version', 'unsupported payload bytecode version');
+  if (!['1', '2', '3', '4', '11', '16', '18', '21', '22', '26', '27', '28', '29'].includes(payload.bytecode.version)) fail('unsupported-bytecode-version', 'unsupported payload bytecode version');
   digestValue(payload.bytecode.sha256, 'payload.bytecode.sha256');
 
   exactObject(payload.manifest, ['format', 'sha256', 'contentBase64'], 'payload.manifest');

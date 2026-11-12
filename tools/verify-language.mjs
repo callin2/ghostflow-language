@@ -158,6 +158,7 @@ export const LANGUAGE_TESTS = Object.freeze([
   'tests/rolling-overlap-admission-boundary.test.mjs',
   'tests/rolling-output-admission.test.mjs',
   'tests/rolling-output-owner-wasm.test.mjs',
+  'tests/rolling-output-policy.test.mjs',
   'tests/applied-ledger-evidence-boundary.test.mjs',
   'tests/ghost-timeline-noninterference.test.mjs',
   'tests/event-count-accounting-faults.test.mjs',

@@ -64,6 +64,34 @@ if (scenario === 'gfb10-valid') {
   process.stdout.write(serializePortablePackage(candidate));
   process.exit(0);
 }
+if (scenario.startsWith('rolling-output-')) {
+  const source = '# Rolling output\n\n```ghost\n' + `control SignedRolling {
+    resource irrigation: BoolActuator;
+    account applied = on_time(irrigation, stage: applied, persistence: durable, output: pump);
+    constraints Budget { limit used(applied, rolling(60s)) <= 30s { reserve = 5s; on_unknown = block; } }
+    output pump: Bool;
+    pump <- true;
+  }` + '\n```\n';
+  identity.runtimeAbi = 'GhostFlow/rolling-output-owner-abi-v1';
+  identity.requiredCapabilities = [{ kind: 'actuator', name: 'pump', type: 'bool' }];
+  const artifact = await compileSource(source, { filename: 'rolling-output.ghost.md' });
+  const candidate = structuredClone(await buildPortablePackage(artifact, identity, {
+    signers: [{ keyId: 'test-current-2026', privateKey }],
+    verifyCompilation: (text, { filename }) => compileSource(text, { filename }),
+  }));
+  if (scenario === 'rolling-output-descriptor') {
+    const manifest = JSON.parse(Buffer.from(candidate.payload.manifest.contentBase64, 'base64').toString('utf8'));
+    manifest.rollingOutput.limitMs = 25_000;
+    const bytes = encoder.encode(canonicalJson(manifest));
+    candidate.payload.manifest.contentBase64 = Buffer.from(bytes).toString('base64');
+    candidate.payload.manifest.sha256 = Buffer.from(await crypto.subtle.digest('SHA-256', bytes)).toString('hex');
+    const payloadBytes = encoder.encode(canonicalJson(candidate.payload));
+    candidate.payloadSha256 = Buffer.from(await crypto.subtle.digest('SHA-256', payloadBytes)).toString('hex');
+    candidate.signatures[0].signatureBase64 = Buffer.from(await crypto.subtle.sign('Ed25519', privateKey, payloadBytes)).toString('base64');
+  }
+  process.stdout.write(serializePortablePackage(candidate));
+  process.exit(0);
+}
 if (scenario.startsWith('solar-pulse-')) {
   const source = '# Solar pulse\n\n```ghost\n' + `control SignedSolar {
     config enabled: Bool = true { access = operator; }

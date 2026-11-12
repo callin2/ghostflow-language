@@ -702,3 +702,37 @@ test('signed calendar Result preserves the Seoul date and rejects rewritten bind
   await assert.rejects(verifyPortablePackage(forged, pinnedOptions),
     error => error.code === 'source-map-mismatch' && /context schedule manifest/.test(error.cause?.message));
 });
+
+test('#96 signed GFB29 requires an owner ABI and rejects replaced policy metadata', async () => {
+  const current = await currentKeyPromise;
+  const source = '# Rolling output\n\n```ghost\ncontrol Watering {\n'
+    + 'resource irrigation: BoolActuator;\n'
+    + 'account applied = on_time(irrigation, stage: applied, persistence: durable, output: pump);\n'
+    + 'constraints Budget { limit used(applied, rolling(60s)) <= 30s { reserve = 5s; on_unknown = block; } }\n'
+    + 'output pump: Bool; pump <- true;\n}\n```\n';
+  const artifact = await compileSource(source, { filename: 'rolling-package.ghost.md' });
+  const requiredCapabilities = [{ kind: 'actuator', name: 'pump', type: 'bool' }];
+  const ownerAbi = 'GhostFlow/rolling-output-owner-abi-v1';
+  const packageIdentity = { ...identity, runtimeAbi: ownerAbi, requiredCapabilities };
+  const signerOptions = buildOptions([{ keyId: current.keyId, privateKey: current.privateKey }]);
+  await expectsCode(() => buildPortablePackage(artifact,
+    { ...packageIdentity, runtimeAbi: identity.runtimeAbi }, signerOptions), 'unsupported-runtime-abi');
+  const packaged = await buildPortablePackage(artifact, packageIdentity, signerOptions);
+  const unsupported = { ...verifierOptions(current), supportedManifestFormats: ['GhostFlow/control-v29'],
+    availableCapabilities: requiredCapabilities };
+  await expectsCode(() => verifyPortablePackage(packaged, unsupported), 'unsupported-runtime-abi');
+  const target = { ...unsupported, supportedRuntimeAbis: [ownerAbi],
+    verifyBytecode: async bytes => {
+      assert.deepEqual(Buffer.from(bytes), artifact.bytes);
+      return true;
+    } };
+  await verifyPortablePackage(packaged, target);
+  const altered = clone(packaged);
+  const manifest = JSON.parse(Buffer.from(altered.payload.manifest.contentBase64, 'base64'));
+  manifest.rollingOutput.limitMs = 25_000;
+  const encoded = encoder.encode(canonicalJson(manifest));
+  altered.payload.manifest.contentBase64 = base64(encoded);
+  altered.payload.manifest.sha256 = await digestHex(encoded);
+  await resign(altered, current);
+  await expectsCode(() => verifyPortablePackage(altered, target), 'source-map-mismatch');
+});

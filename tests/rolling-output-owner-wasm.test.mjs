@@ -40,35 +40,36 @@ test('WASM does not grant a watering deadline before saving the reservation', as
     }
   };
   try {
-    assert.equal(wasm.gf_rolling_output_prepare(handle, 0n), 0);
+    assert.equal(wasm.gf_rolling_output_prepare(handle, 0n, 0n), 0);
     assert.equal(save(handle), 0n);
     for (let time = 0n; time < 30_000n; time += 5_000n) {
-      assert.equal(wasm.gf_rolling_output_prepare(handle, time), 1);
-      assert.equal(wasm.gf_rolling_output_prepare(handle, time), 0);
+      assert.equal(wasm.gf_rolling_output_prepare(handle, time, 0n), 1);
+      assert.equal(wasm.gf_rolling_output_prepare(handle, time, 0n), 0);
       assert.equal(explanation(time), null);
       assert.equal(wasm.gf_rolling_output_finish(handle, true, time, time + 5_000n), 0);
       assert.equal(save(handle), time + 5_000n);
       assert.equal(wasm.gf_rolling_output_finish(handle, true, time, time + 5_000n), 1);
       assert.equal(save(handle), 0n);
     }
-    assert.deepEqual(explanation(30_000n), [30_000n, 0n, 1n, 1n, 65_000n]);
-    assert.deepEqual(explanation(62_500n), [27_500n, 0n, 1n, 1n, 65_000n]);
-    for (const time of [30_000n, 60_000n, 64_999n]) {
-      assert.equal(wasm.gf_rolling_output_prepare(handle, time), 2);
+    assert.deepEqual(explanation(30_000n), [30_000n, 0n, 1n, 1n, 60_001n]);
+    assert.deepEqual(explanation(62_500n), [27_500n, 0n, 0n, 0n, 0n]);
+    for (const time of [30_000n, 60_000n]) {
+      assert.equal(wasm.gf_rolling_output_prepare(handle, time, 0n), 2);
       assert.equal(wasm.gf_rolling_output_pending_len(handle), 0);
     }
-    assert.equal(wasm.gf_rolling_output_prepare(handle, 65_000n), 1);
-    assert.equal(save(handle), 70_000n);
-    assert.deepEqual(explanation(65_000n), [25_000n, 5_000n, 1n, 0n, 0n]);
+    assert.equal(wasm.gf_rolling_output_prepare(handle, 60_001n, 1n), 4);
+    assert.equal(wasm.gf_rolling_output_prepare(handle, 60_002n, 1n), 1);
+    assert.equal(save(handle), 60_004n);
+    assert.deepEqual(explanation(60_002n), [29_998n, 2n, 1n, 0n, 0n]);
     wasm.gf_rolling_output_close(handle);
     handle = open();
     assert.equal(wasm.gf_rolling_output_ack(handle), 0n);
-    assert.equal(wasm.gf_rolling_output_prepare(handle, 80_000n), 3);
+    assert.equal(wasm.gf_rolling_output_prepare(handle, 80_000n, 0n), 3);
     assert.equal(wasm.gf_rolling_output_recover(handle, 80_000n, 139_999n), 2);
     assert.equal(wasm.gf_rolling_output_recover(handle, 80_000n, 140_000n), 1);
-    assert.equal(wasm.gf_rolling_output_prepare(handle, 140_000n), 0);
+    assert.equal(wasm.gf_rolling_output_prepare(handle, 140_000n, 0n), 0);
     assert.equal(save(handle), 0n);
-    assert.equal(wasm.gf_rolling_output_prepare(handle, 140_000n), 1);
+    assert.equal(wasm.gf_rolling_output_prepare(handle, 140_000n, 0n), 1);
     assert.equal(save(handle), 145_000n);
   } finally {
     wasm.gf_rolling_output_close(handle);
@@ -82,7 +83,7 @@ const source = [
   'control Water {',
   '  input manual: Bool;',
   '  resource irrigation: BoolActuator;',
-  '  account watering = on_time(irrigation, stage: applied, persistence: durable);',
+  '  account watering = on_time(irrigation, stage: applied, persistence: durable, output: valve);',
   '  constraints Budget { limit used(watering, rolling(60s)) <= 30s { reserve = 5s; on_unknown = block; } }',
   '  output valve: Bool;',
   '  valve <- manual |> recover(false);',
@@ -115,11 +116,13 @@ test('an authored policy binds to the installed output and cannot authorize ON o
       assert.deepEqual(await runtime.requestOn(), { status: 'allowed', deadlineMs: now + 5_000 });
       await runtime.recordOff(now, now + 5_000);
     }
-    nowMs = 64_999;
+    nowMs = 60_000;
     assert.deepEqual(await runtime.requestOn(), { status: 'budget-exceeded' });
-    assert.deepEqual(runtime.explain(64_999), {
-      usedMs: 25_001n, reservedMs: 0n, blocked: true, nextReleaseMs: 65_000n,
+    assert.deepEqual(runtime.explain(60_000), {
+      usedMs: 30_000n, reservedMs: 0n, blocked: true, nextReleaseMs: 60_001n,
     });
+    nowMs = 60_001;
+    assert.deepEqual(await runtime.requestOn(1), { status: 'stop-margin' });
     let rejectCommit;
     nextCommit = new Promise(resolve => { rejectCommit = resolve; });
     nowMs = 65_000;
@@ -209,4 +212,28 @@ test('a fresh boot needs a full verified OFF window before the saved limit can r
   } finally {
     restarted.dispose();
   }
+});
+
+
+test('same-boot late OFF requires a new complete OFF window and checkpoint', async () => {
+  let checkpoint = null;
+  let nowMs = 0;
+  const runtime = await RollingOutputRuntime.open(binary, source, {
+    bootEpoch: 1, clock: () => nowMs,
+    binding: { resource: 'irrigation', output: 'valve', resourceId: 7 }, maxIntervals: 8,
+    store: {
+      read: async () => checkpoint,
+      commit: async bytes => { checkpoint = bytes; return true; },
+    },
+  });
+  try {
+    assert.deepEqual(await runtime.requestOn(), { status: 'allowed', deadlineMs: 5000 });
+    await assert.rejects(runtime.recordOff(0, 5001), /could not settle/);
+    nowMs = 65000;
+    assert.equal(await runtime.recoverAfterConfirmedOff(5001, nowMs), false);
+    assert.deepEqual(await runtime.requestOn(), { status: 'unavailable' });
+    nowMs = 65001;
+    assert.equal(await runtime.recoverAfterConfirmedOff(5001, nowMs), true);
+    assert.deepEqual(await runtime.requestOn(), { status: 'allowed', deadlineMs: 70001 });
+  } finally { runtime.dispose(); }
 });

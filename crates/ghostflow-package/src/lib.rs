@@ -660,16 +660,18 @@ fn validate_gfb1(bytes: &[u8]) -> Result<u16> {
         return fail(ErrorCode::InvalidBytecodeFormat, "bytecode is not GFB1");
     }
     let version = u16::from_le_bytes([bytes[4], bytes[5]]);
-    if !matches!(version, 1..=4 | 11 | 16 | 18 | 21 | 22 | 26 | 27 | 28) {
+    if !matches!(version, 1..=4 | 11 | 16 | 18 | 21 | 22 | 26 | 27 | 28 | 29) {
         return fail(
             ErrorCode::UnsupportedBytecodeVersion,
             "unsupported GFB format version",
         );
     }
-    ghostflow_core::Module::load(bytes).map_err(|error| PortablePackageError {
-        code: ErrorCode::BytecodeRejected,
-        message: format!("native artifact validation failed: {error}"),
-    })?;
+    if version != 29 {
+        ghostflow_core::Module::load(bytes).map_err(|error| PortablePackageError {
+            code: ErrorCode::BytecodeRejected,
+            message: format!("native artifact validation failed: {error}"),
+        })?;
+    }
     Ok(version)
 }
 
@@ -3273,6 +3275,9 @@ fn verify_manifest(
     if object.contains_key("monitoring") {
         keys.push("monitoring");
     }
+    if object["format"].as_str() == Some("GhostFlow/control-v29") {
+        keys.push("rollingOutput");
+    }
     if object["format"].as_str() == Some("GhostFlow/control-v26") {
         keys.push("weekdayConditions");
     }
@@ -3901,7 +3906,7 @@ pub fn verify_portable_package_with_signature_policy(
     }
     if !matches!(
         payload.bytecode.version.as_str(),
-        "1" | "2" | "3" | "4" | "11" | "16" | "18" | "21" | "22" | "26" | "27" | "28"
+        "1" | "2" | "3" | "4" | "11" | "16" | "18" | "21" | "22" | "26" | "27" | "28" | "29"
     ) {
         return fail(
             ErrorCode::UnsupportedBytecodeVersion,
@@ -3972,10 +3977,41 @@ pub fn verify_portable_package_with_signature_policy(
             "payload bytecode version does not match its GFB header",
         );
     }
-    let module = ghostflow_core::Module::load(&bytecode).map_err(|error| PortablePackageError {
-        code: ErrorCode::BytecodeRejected,
-        message: format!("native artifact validation failed: {error}"),
-    })?;
+    let rolling = if bytecode_version == 29 {
+        use ghostflow_core::rolling_output_policy::RollingOutputPolicyDescriptor;
+        Some(
+            RollingOutputPolicyDescriptor::inspect(&bytecode).map_err(|error| {
+                PortablePackageError {
+                    code: ErrorCode::BytecodeRejected,
+                    message: format!(
+                        "mandatory rolling output artifact validation failed: {error}"
+                    ),
+                }
+            })?,
+        )
+    } else {
+        None
+    };
+    if rolling.is_some() != (payload.manifest.format == "GhostFlow/control-v29")
+        || rolling.is_some() != (identity.runtime_abi == "GhostFlow/rolling-output-owner-abi-v1")
+    {
+        return fail(
+            ErrorCode::ManifestMismatch,
+            "GFB29 requires its mandatory rolling owner ABI and manifest",
+        );
+    }
+    let core_bytecode = if rolling.is_some() {
+        // The policy inspector has already validated the inner length.
+        let size = u32::from_le_bytes(bytecode[6..10].try_into().unwrap()) as usize;
+        &bytecode[10..10 + size]
+    } else {
+        &bytecode
+    };
+    let module =
+        ghostflow_core::Module::load(core_bytecode).map_err(|error| PortablePackageError {
+            code: ErrorCode::BytecodeRejected,
+            message: format!("native artifact validation failed: {error}"),
+        })?;
     let profile_version = module.bytecode_format_version();
     if !matches!(profile_version, 1..=4 | 11 | 16 | 18 | 21 | 26 | 27 | 28)
         || (profile_version == 16 && bytecode_version == 22)
@@ -4005,13 +4041,28 @@ pub fn verify_portable_package_with_signature_policy(
     })?;
     let manifest = parse_embedded_canonical_json(&manifest_bytes, "manifest", profile.limits)?;
     let source_map = parse_embedded_canonical_json(&source_map_bytes, "sourceMap", profile.limits)?;
-    verify_lifecycle_manifest(&manifest, &bytecode)?;
+    verify_lifecycle_manifest(&manifest, core_bytecode)?;
     verify_manifest(
         &manifest,
         &payload.manifest.format,
         &bytecode_sha256,
         &identity.required_capabilities,
     )?;
+    if let Some(policy) = rolling {
+        let expected = serde_json::json!({
+            "resource": policy.resource, "output": policy.output, "stage": "applied",
+            "windowMs": policy.window_ms, "limitMs": policy.limit_ms, "reserveMs": policy.reserve_ms,
+        });
+        if manifest.get("rollingOutput") != Some(&expected)
+            || manifest["outputs"]
+                != serde_json::json!([{ "name": expected["output"], "type": "Bool" }])
+        {
+            return fail(
+                ErrorCode::ManifestMismatch,
+                "rolling output policy differs from the GFB29 descriptor",
+            );
+        }
+    }
     let declared_percent_range = required_runtime_features(&manifest)?;
     let actual_percent_range =
         module
@@ -4053,8 +4104,8 @@ pub fn verify_portable_package_with_signature_policy(
     if profile_version == 28 {
         verify_daily_window_run_bindings(&manifest, &module)?;
     }
-    verify_adapt_bindings(&manifest, &bytecode)?;
-    verify_debounce_bindings(&manifest, &bytecode)?;
+    verify_adapt_bindings(&manifest, core_bytecode)?;
+    verify_debounce_bindings(&manifest, core_bytecode)?;
     verify_source_map(
         &source_map,
         &payload.source,
@@ -5851,6 +5902,45 @@ mod tests {
             );
             assert!(!called.get(), "{scenario} reached target loader");
         }
+    }
+
+    #[test]
+    fn signed_rolling_policy_requires_the_owner_abi_and_exact_bytecode() {
+        use ghostflow_core::rolling_output_policy::RollingOutputProgram;
+        let called = std::cell::Cell::new(false);
+        let accept = |bytes: &[u8],
+                      _: &TargetLoaderContext<'_>|
+         -> std::result::Result<bool, String> {
+            called.set(true);
+            assert!(ghostflow_core::Module::load(bytes).is_err());
+            let program = RollingOutputProgram::load(bytes).map_err(|error| error.to_string())?;
+            assert_eq!(program.descriptor().output, "pump");
+            assert_eq!(program.descriptor().limit_ms, 30_000);
+            Ok(true)
+        };
+        let mut current = profile(&accept);
+        let formats = strings(&["GhostFlow/control-v29"]);
+        current.supported_manifest_formats = &formats;
+        let candidate = fixture_for("rolling-output-valid");
+        assert_eq!(
+            verify_portable_package(&candidate, &current)
+                .unwrap_err()
+                .code,
+            ErrorCode::UnsupportedRuntimeAbi
+        );
+        assert!(!called.get());
+        let abis = strings(&["GhostFlow/rolling-output-owner-abi-v1"]);
+        current.supported_runtime_abis = &abis;
+        verify_portable_package(&candidate, &current).unwrap();
+        assert!(called.replace(false));
+        let altered = fixture_for("rolling-output-descriptor");
+        assert_eq!(
+            verify_portable_package(&altered, &current)
+                .unwrap_err()
+                .code,
+            ErrorCode::ManifestMismatch
+        );
+        assert!(!called.get());
     }
 
     #[test]

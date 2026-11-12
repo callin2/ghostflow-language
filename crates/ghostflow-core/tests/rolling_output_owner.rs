@@ -46,21 +46,29 @@ fn only_persisted_leases_can_apply_and_the_rolling_budget_recovers_at_the_exact_
             .record_off(lease, Some(now), now + 5_000, store(&mut saved))
             .unwrap();
     }
-    for now in [30_000, 60_000, 64_999] {
+    for now in [30_000, 60_000] {
         assert_eq!(
             owner.request_on(now, |_| panic!("blocked ON must not be persisted")),
             Ok(OutputAdmission::BudgetExceeded)
         );
     }
-    let LedgerRead::Known(explanation) = owner.explain(64_999) else {
+    let LedgerRead::Known(explanation) = owner.explain(60_000) else {
         panic!("applied output evidence must be available");
     };
-    assert_eq!(explanation.used_ms, 25_001);
-    assert_eq!(explanation.next_release_ms, Some(65_000));
+    assert_eq!(explanation.used_ms, 30_000);
+    assert_eq!(explanation.next_release_ms, Some(60_001));
     let mut restored = RollingOutputOwner::restore(POLICY, CONFIG, BOOT, &saved).unwrap();
-    let lease = start(&mut restored, 65_000, &mut saved);
-    assert_eq!(lease.deadline_ms(), 70_000);
-    assert_eq!(restored.explain(64_999), LedgerRead::Unknown);
+    assert_eq!(
+        restored.request_on_with_stop_margin(60_001, 1, |_| panic!(
+            "unusable residual must not persist"
+        )),
+        Ok(OutputAdmission::StopMargin)
+    );
+    let lease = start(&mut restored, 60_002, &mut saved);
+    assert_eq!(lease.deadline_ms(), 60_004);
+    let restored = RollingOutputOwner::restore(POLICY, CONFIG, BOOT, &saved).unwrap();
+    assert_eq!(restored.unresolved_lease(), Some(lease));
+    assert_eq!(restored.explain(60_001), LedgerRead::Unknown);
 }
 
 #[test]
@@ -186,4 +194,34 @@ fn changed_boot_waits_for_a_full_off_window_in_the_new_clock() {
             66_000
         );
     }
+}
+
+#[test]
+fn late_application_requires_full_same_boot_off_proof_and_durable_recovery() {
+    let mut saved = vec![];
+    let mut owner =
+        RollingOutputOwner::initialize(POLICY, CONFIG, BOOT, 0, store(&mut saved)).unwrap();
+    let lease = start(&mut owner, 0, &mut saved);
+    assert_eq!(
+        owner.record_off(lease, Some(0), 5_001, |_| panic!(
+            "late evidence is not a successful settlement"
+        )),
+        Err(AccountingError::InvalidReservation)
+    );
+    assert_eq!(owner.explain(5_001), LedgerRead::Unknown);
+    assert!(!owner
+        .recover_after_confirmed_off(5_001, 65_000, |_| panic!())
+        .unwrap());
+    assert_eq!(
+        owner.request_on(65_000, |_| panic!()),
+        Err(AccountingError::UnknownLedger)
+    );
+    assert!(owner
+        .recover_after_confirmed_off(5_001, 65_001, store(&mut saved))
+        .unwrap());
+    let mut restored = RollingOutputOwner::restore(POLICY, CONFIG, BOOT, &saved).unwrap();
+    assert_eq!(
+        start(&mut restored, 65_001, &mut saved).deadline_ms(),
+        70_001
+    );
 }

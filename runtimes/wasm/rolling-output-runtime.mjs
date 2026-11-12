@@ -24,20 +24,11 @@ export class RollingOutputRuntime {
   static async open(wasmBytes, source, { binding, bootEpoch, clock, store, maxIntervals }) {
     const { manifest } = await compileSource(source);
     const { resource, output, resourceId } = binding;
-    if (!Number.isInteger(resourceId) || resourceId < 1 || resourceId > 0xffff_ffff
-      || !manifest.resources?.some(port => port.name === resource && port.type === 'BoolActuator')
-      || !manifest.outputs.some(port => port.name === output && port.type === 'Bool')) {
+    const policy = manifest.rollingOutput;
+    if (manifest.format !== 'GhostFlow/control-v29' || !policy
+      || !Number.isInteger(resourceId) || resourceId < 1 || resourceId > 0xffff_ffff
+      || policy.resource !== resource || policy.output !== output) {
       throw new Error('rolling output requires a verified Bool resource and output binding');
-    }
-    const { bindings = [], constraints = [] } = manifest.accounting ?? {};
-    const [account] = bindings;
-    const limits = constraints.flatMap(group => group.limits);
-    const [limit] = limits;
-    if (bindings.length !== 1 || limits.length !== 1 || account.operation !== 'on_time'
-      || account.persistence !== 'durable' || account.evidenceBinding.stage !== 'applied'
-      || account.evidenceBinding.target !== resource || limit.account !== account.name
-      || limit.operator !== '<=' || limit.basis.kind !== 'rolling' || limit.onUnknown !== 'block') {
-      throw new Error('expected one durable applied rolling limit for the installed output');
     }
     if (!Number.isInteger(maxIntervals) || maxIntervals < 1 || maxIntervals > 4096) {
       throw new RangeError('maxIntervals must be 1..4096');
@@ -59,8 +50,8 @@ export class RollingOutputRuntime {
     let handle;
     try {
       if (size) new Uint8Array(wasm.memory.buffer, ptr, size).set(saved);
-      handle = wasm.gf_rolling_output_open(resourceId, milliseconds(limit.basis.durationMs),
-        milliseconds(limit.boundMs), milliseconds(limit.reserveMs), maxIntervals, BigInt(bootEpoch), milliseconds(clock()), ptr, size);
+      handle = wasm.gf_rolling_output_open(resourceId, milliseconds(policy.windowMs),
+        milliseconds(policy.limitMs), milliseconds(policy.reserveMs), maxIntervals, BigInt(bootEpoch), milliseconds(clock()), ptr, size);
     } finally {
       if (size) wasm.gf_dealloc(ptr, size);
     }
@@ -107,22 +98,23 @@ export class RollingOutputRuntime {
     }
   }
 
-  async requestOn() {
+  async requestOn(stopMarginMs = 0) {
     this.#requireReady();
     const nowMs = this.#clock();
-    const status = this.#wasm.gf_rolling_output_prepare(this.#handle, milliseconds(nowMs));
+    const status = this.#wasm.gf_rolling_output_prepare(this.#handle, milliseconds(nowMs), milliseconds(stopMarginMs));
     if (status === 2) return { status: 'budget-exceeded' };
     if (status === 3) return { status: 'unsettled-output' };
+    if (status === 4) return { status: 'stop-margin' };
     if (status !== 1) return { status: 'unavailable' };
     const deadline = Number(await this.#commit());
     if (!Number.isSafeInteger(deadline) || deadline <= nowMs) return { status: 'unavailable' };
     const committedAtMs = this.#clock();
     milliseconds(committedAtMs);
     if (committedAtMs < nowMs) return { status: 'unavailable' };
-    if (committedAtMs >= deadline) {
+    if (deadline - committedAtMs <= stopMarginMs) {
       // No ON was granted. Release the expired reservation durably.
       await this.recordOff(null, committedAtMs);
-      return { status: 'deadline-expired' };
+      return { status: committedAtMs >= deadline ? 'deadline-expired' : 'stop-margin' };
     }
     return { status: 'allowed', deadlineMs: deadline };
   }

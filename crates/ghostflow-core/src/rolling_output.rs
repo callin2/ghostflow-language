@@ -31,6 +31,7 @@ impl OutputLease {
 pub enum OutputAdmission {
     Allowed(OutputLease),
     BudgetExceeded,
+    StopMargin,
     UnsettledOutput,
 }
 
@@ -101,7 +102,7 @@ impl RollingOutputOwner {
                     || entry.reservation_id != Self::identity(id_sequence, 1)
                     || entry.window_ms != policy.window_ms
                     || entry.limit_ms != policy.limit_ms
-                    || entry.reserve_ms != policy.reserve_ms
+                    || entry.reserve_ms > policy.reserve_ms
                     || entry.admitted_at_ms > clock_floor_ms
                     || match entry.state {
                         ReservationState::Settled(evidence)
@@ -112,10 +113,7 @@ impl RollingOutputOwner {
                     }
                     || (entry.state == ReservationState::Outstanding
                         && (entry.reservation_id != Self::identity(sequence, 1)
-                            || entry
-                                .admitted_at_ms
-                                .checked_add(policy.reserve_ms)
-                                .is_none()))
+                            || entry.admitted_at_ms.checked_add(entry.reserve_ms).is_none()))
             })
         {
             return Err(invalid);
@@ -128,6 +126,14 @@ impl RollingOutputOwner {
             clock_floor_ms,
             sequence,
         })
+    }
+
+    pub fn policy(&self) -> RollingOutputPolicy {
+        self.policy
+    }
+
+    pub fn requires_off_recovery(&self) -> bool {
+        self.clock_epoch != self.boot_epoch || !self.ledger.is_known()
     }
 
     /// A restored lease represents uncertainty until the host proves the output
@@ -150,12 +156,35 @@ impl RollingOutputOwner {
         now_ms: u64,
         persist: impl FnOnce(&[u8]) -> bool,
     ) -> Result<OutputAdmission, AccountingError> {
+        self.request_on_with_stop_margin(now_ms, 0, persist)
+    }
+
+    /// The host supplies a conservative bound for persistence and applying OFF.
+    pub fn request_on_with_stop_margin(
+        &mut self,
+        now_ms: u64,
+        stop_margin_ms: u64,
+        persist: impl FnOnce(&[u8]) -> bool,
+    ) -> Result<OutputAdmission, AccountingError> {
         self.check_time(now_ms)?;
         if self.unresolved_lease().is_some() {
             return Ok(OutputAdmission::UnsettledOutput);
         }
+        let p = self.policy;
+        let LedgerRead::Known(used_ms) =
+            self.ledger.used_rolling(p.resource_id, now_ms, p.window_ms)
+        else {
+            return Err(AccountingError::UnknownLedger);
+        };
+        let reserve_ms = p.reserve_ms.min(p.limit_ms.saturating_sub(used_ms));
+        if reserve_ms == 0 {
+            return Ok(OutputAdmission::BudgetExceeded);
+        }
+        if reserve_ms <= stop_margin_ms {
+            return Ok(OutputAdmission::StopMargin);
+        }
         let deadline_ms = now_ms
-            .checked_add(self.policy.reserve_ms)
+            .checked_add(reserve_ms)
             .ok_or(AccountingError::InvalidReservation)?;
         let sequence = self
             .sequence
@@ -178,14 +207,13 @@ impl RollingOutputOwner {
         if self.ledger.intervals.len() == self.ledger.config.max_intervals {
             return Err(AccountingError::Capacity);
         }
-        let p = self.policy;
         match self.ledger.reserve_rolling(
             Self::identity(sequence, 1),
             p.resource_id,
             now_ms,
             p.window_ms,
             p.limit_ms,
-            p.reserve_ms,
+            reserve_ms,
         ) {
             Err(AccountingError::LimitExceeded) => return Ok(OutputAdmission::BudgetExceeded),
             result => {
@@ -218,6 +246,7 @@ impl RollingOutputOwner {
         let evidence = Self::identity(lease.sequence, 2);
         if let Some(start) = started_at_ms {
             if off_at_ms > lease.deadline_ms {
+                self.clock_floor_ms = off_at_ms;
                 self.ledger.mark_unknown();
                 return Err(AccountingError::InvalidReservation);
             }
@@ -244,13 +273,9 @@ impl RollingOutputOwner {
             return LedgerRead::Unknown;
         }
         let p = self.policy;
-        let result = self.ledger.explain_rolling(
-            p.resource_id,
-            now_ms,
-            p.window_ms,
-            p.limit_ms,
-            p.reserve_ms,
-        );
+        let result = self
+            .ledger
+            .explain_rolling(p.resource_id, now_ms, p.window_ms, p.limit_ms, 1);
         match result {
             LedgerRead::Known(mut evidence) if self.unresolved_lease().is_some() => {
                 evidence.blocked = true;
@@ -281,6 +306,19 @@ impl RollingOutputOwner {
             // window excludes every old interval while preserving lease identity.
             self.ledger = AccountingLedger::new(self.ledger.config)?;
             self.clock_epoch = self.boot_epoch;
+            self.clock_floor_ms = now_ms;
+            self.persist(persist)?;
+            return Ok(true);
+        }
+        if !self.ledger.is_known() {
+            if confirmed_off_at_ms < self.clock_floor_ms {
+                return Err(AccountingError::InvalidReservation);
+            }
+            if now_ms - confirmed_off_at_ms < self.policy.window_ms {
+                return Ok(false);
+            }
+            // A full observed OFF window excludes every uncertain prior interval.
+            self.ledger = AccountingLedger::new(self.ledger.config)?;
             self.clock_floor_ms = now_ms;
             self.persist(persist)?;
             return Ok(true);
@@ -324,10 +362,7 @@ impl RollingOutputOwner {
     }
 
     fn check_time(&self, now_ms: u64) -> Result<(), AccountingError> {
-        if self.clock_epoch != self.boot_epoch
-            || !self.ledger.is_known()
-            || now_ms < self.clock_floor_ms
-        {
+        if self.requires_off_recovery() || now_ms < self.clock_floor_ms {
             return Err(AccountingError::UnknownLedger);
         }
         Ok(())
