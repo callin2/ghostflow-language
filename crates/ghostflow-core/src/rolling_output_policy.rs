@@ -187,12 +187,12 @@ mod tests {
     #[test]
     fn mandatory_policy_inspects_without_generic_activation() {
         let bytes = program("pump", 5_000);
-        let program = RollingOutputProgram::load(&bytes).unwrap();
-        assert_eq!(program.name(), "Watering");
-        assert_eq!(program.input_fields().count(), 0);
-        assert_eq!(program.state_fields().count(), 0);
+        let verified = RollingOutputProgram::load(&bytes).unwrap();
+        assert_eq!(verified.name(), "Watering");
+        assert_eq!(verified.input_fields().count(), 0);
+        assert_eq!(verified.state_fields().count(), 0);
         assert_eq!(
-            program.output_fields().collect::<Vec<_>>(),
+            verified.output_fields().collect::<Vec<_>>(),
             [("pump", Type::Bool)]
         );
         assert!(Module::load(&bytes).is_err());
