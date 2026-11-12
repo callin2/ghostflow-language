@@ -61,6 +61,46 @@ function railsCsv(rows) {
 }
 const clone = value => JSON.parse(JSON.stringify(value));
 
+test('REF-04-065: an out-of-scope proof retains both checks in native and WASM', async t => {
+  const outputs = Array.from({ length: 9 }, (_, index) => `out${index}`);
+  const request = ['true', 'observed_conflict |> recover(false)', ...Array(7).fill('false')];
+  const mutex = `mutex(${outputs.join(', ')});`;
+  const compiled = await compileSource(`\`\`\`ghost
+control UnprovenEnvelope {
+  input observed_conflict: Bool;
+  output ${outputs.join(', ')}: Bool;
+  ${outputs.map((output, index) => `${output} <- ${request[index]};`).join('\n  ')}
+  ${mutex}
+  ${mutex}
+}
+\`\`\``, { filename: 'unproven-envelope.ghost.md' });
+  assert.equal(Object.hasOwn(compiled.traceMetadata, 'constraintProof'), false);
+  assert.equal(compiled.traceMetadata.constraints.length, 2);
+
+  const root = fileURLToPath(new URL('../', import.meta.url));
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'gf-unproven-envelope-'));
+  t.after(() => fs.rmSync(directory, { recursive: true, force: true }));
+  const modulePath = path.join(directory, 'control.gfb');
+  const inputPath = path.join(directory, 'inputs.csv');
+  const inputs = [true, false].map(conflict => goodRails(compiled, { conflict }));
+  fs.writeFileSync(modulePath, compiled.bytes);
+  fs.writeFileSync(inputPath, railsCsv(inputs));
+  const native = execFileSync(path.join(root, 'target/release/examples/run' + (process.platform === 'win32' ? '.exe' : '')),
+    [modulePath, inputPath], { encoding: 'utf8' }).trim().split('\n').map(JSON.parse);
+
+  const wasm = fs.readFileSync(path.join(root, 'target/wasm32-unknown-unknown/release/ghostflow_wasm.wasm'));
+  const runtime = await FramedGhostFlowRuntime.instantiate(wasm);
+  t.after(() => runtime.dispose());
+  runtime.load(compiled.bytes);
+  for (const output of outputs) runtime.addCapability('actuator', output, 'bool');
+  runtime.activate();
+  const observed = inputs.map((rails, scanId) => runtime.scan({ scanId, logicalTimeMs: scanId, inputs: rails }).trace);
+  assert.deepEqual(observed, native);
+  assert.deepEqual(observed.map(trace => trace.safetyTrace.constraints.length), [2, 2]);
+  assert.deepEqual(observed.map(trace => [trace.requested.out0, trace.requested.out1, trace.safe.out0, trace.safe.out1]),
+    [[true, true, false, false], [true, false, true, false]]);
+});
+
 test('GF-TEST-local-constraint-envelope: grouped mandatory outputs enforce and recover identically in native and both WASM ABIs', async t => {
   const root = fileURLToPath(new URL('../', import.meta.url));
   const document = fs.readFileSync(path.join(root, 'examples/constraint-envelope.ghost.md'), 'utf8');
@@ -181,6 +221,7 @@ test('GF-TEST-constraint-proof: independent checker rejects changed effects, ord
   assert.equal(checkedAdjacentConstraints([a, a], () => { throw new Error('forced checker timeout'); }), null);
   assert.equal(checkedAdjacentConstraints([a, a], () => false), null);
   assert.equal(checkedAdjacentConstraints([a, a], () => undefined), null);
+  assert.equal(checkedAdjacentConstraints([a, a], () => ({ kind: 'Unknown', reason: 'budget' })), null);
   for (const invalid of [['requires', 'a', 'b', 'c'], ['requires-any', 'a', 'b'], ['mutex', 'a'], ['mutex', 'a', 'a']]) {
     assert.equal(checkedAdjacentConstraints([invalid, invalid]), null);
   }
