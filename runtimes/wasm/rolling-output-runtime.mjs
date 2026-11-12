@@ -24,8 +24,8 @@ export class RollingOutputRuntime {
   #binding;
   #writing = false;
 
-  static async open(wasmBytes, source, { binding, bootEpoch, clock, store, maxIntervals }) {
-    const { manifest, bytes } = await compileSource(source);
+  static async open(wasmBytes, source, { binding, bootEpoch, clock, store, maxIntervals, filename, hardwareProfiles }) {
+    const { manifest, bytes } = await compileSource(source, { filename, hardwareProfiles });
     const { resource, output, resourceId } = binding;
     const policy = manifest.rollingOutput;
     if (manifest.format !== 'GhostFlow/control-v29' || !policy
