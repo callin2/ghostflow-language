@@ -39,6 +39,7 @@
 | `docs/EXECUTION-EVIDENCE.md` | [English](EXECUTION-EVIDENCE.md) | [한국어](EXECUTION-EVIDENCE.ko.md) |
 | `docs/INTENT-DECISIONS.md` | [English](INTENT-DECISIONS.md) | [한국어](INTENT-DECISIONS.ko.md) |
 | `docs/BOOLEAN-OUTPUT-EXPLANATION.md` | [English](BOOLEAN-OUTPUT-EXPLANATION.md) | [한국어](BOOLEAN-OUTPUT-EXPLANATION.ko.md) |
+| `docs/MONITORING-PLAN.md` | [English](MONITORING-PLAN.md) | [한국어](MONITORING-PLAN.ko.md) |
 | `docs/BYTECODE.md` | [English](BYTECODE.md) | [한국어](BYTECODE.ko.md) |
 | `docs/CALENDAR-PROVIDERS.md` | [English](CALENDAR-PROVIDERS.md) | [한국어](CALENDAR-PROVIDERS.ko.md) |
 | `docs/COMPILER-DIAGNOSTICS.md` | [English](COMPILER-DIAGNOSTICS.md) | [한국어](COMPILER-DIAGNOSTICS.ko.md) |
