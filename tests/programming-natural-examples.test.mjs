@@ -1,3 +1,5 @@
+import { solarContextEvidence } from '../runtimes/wasm/context-abi.mjs';
+import { softwareQualityRails } from './helpers/software-quality-observations.mjs';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
@@ -83,35 +85,43 @@ test('Programming E35 offset equality and half-open DateTime boundaries execute 
 
 test('Programming E36 executes explicit Solar fallback, held-clock expiry and recovery deduplication', async t => {
   const artifact = await compileSource(example('E36'), { filename: 'E36.ghost.md' });
-  const site = artifact.manifest.schedules[0].site;
+  const [descriptor] = artifact.manifest.schedules;
+  const context = { bootEpoch: 7, terminalCapacity: 16, bindings: [] };
   const fallback = 23_400_000;
   const facts = (monotonicMs, trusted, available = false) => ({
     clock: { monotonicMs, bootEpoch: 7, wallMs: trusted ? fallback - 1000 + monotonicMs : 1,
-      trusted, uncertaintyMs: 0, sourceRevision: 'book-clock-v1', ...(!trusted ? { unknownReason: 'TrustExpired' } : {}) },
-    schedules: [{ site, coverageFromWallMs: 0, coverageToWallMs: 86_400_000,
+      trusted, uncertaintyMs: 0, sourceRevision: 'book-clock-v1', unknownReason: trusted ? null : 'TrustExpired' },
+    natural: [], schedules: [], settings: null,
+    solars: [solarContextEvidence(descriptor, { site: descriptor.site, coverageFromWallMs: 0, coverageToWallMs: 86_400_000,
       rows: [{ sourceDay: 0, scheduledWallMs: available ? fallback + 121_000 : null, available,
         providerRevision: available ? 'solar-v2' : 'solar-v1', contextRevision: 'book-site-v1',
-        fallbackWallMs: available ? null : fallback, unavailableReason: available ? null : 2 }] }],
+        fallbackWallMs: available ? null : fallback, unavailableReason: available ? null : 2 }] })],
   });
   const rows = [[0, true, false], [1000, false, false], [2000, false, false],
     [120_000, false, false], [122_000, true, true]].map(([nowMs, trusted, available]) => ({
-      nowMs, inputs: { enabled: true }, solarFacts: facts(nowMs, trusted, available),
+      nowMs, inputs: { enabled: true }, contextFacts: facts(nowMs, trusted, available),
     }));
-  const runtime = await ControlRuntime.instantiate(wasm, artifact, { solar: { bootEpoch: 7, terminalCapacity: 16 } });
+  const runtime = await ControlRuntime.instantiateFramed(wasm, artifact, { context });
   t.after(() => runtime.dispose());
   const traces = rows.map((row, index) => runtime.step(healthyObservations(artifact, row, index)).vm);
   assert.deepEqual(traces.map(trace => trace.safe.start), [false, true, false, false, false]);
-  assert.equal(traces[1].scheduleTrace[0].observations[0].fallback, true);
-  assert.match(JSON.stringify(traces[1].scheduleTrace), /HeldClock/);
-  assert.match(JSON.stringify(traces[3].scheduleTrace), /ClockUnknown|TrustExpired/);
+  const due = traces[1].contextTrace.find(row => row.decision === 'Due');
+  assert.equal(due.fallback, true);
+  assert.equal(due.clockProvenance, 'HeldClock');
+  assert.match(JSON.stringify(traces[3].contextTrace), /ClockUnknown|TrustExpired/);
   const directory = workspace(t), module = path.join(directory, 'solar.gfb'), tape = path.join(directory, 'solar.json');
-  fs.writeFileSync(module, artifact.bytes); fs.writeFileSync(tape, JSON.stringify({ bootEpoch: 7, terminalCapacity: 16,
-    scans: rows.map((row, index) => ({ ...row, inputs: traces[index].inputs })) }));
-  const native = execFileSync(executable('solar_tape'), [module, tape], { encoding: 'utf8', timeout: 20_000 })
+  fs.writeFileSync(module, artifact.bytes);
+  fs.writeFileSync(tape, JSON.stringify({ profile: 'context-solar-v1', activation: context,
+    steps: rows.map((row, scanId) => ({ scanId, logicalTimeMs: row.nowMs, ...row.contextFacts,
+      inputs: Object.entries(softwareQualityRails(artifact,
+        Object.fromEntries(Object.entries(healthyObservations(artifact, row, scanId).samples)
+          .map(([name, sample]) => [name, sample.value])), scanId + 1, row.nowMs))
+        .map(([name, value]) => ({ name, value })) })) }));
+  const native = execFileSync(executable('context_tape'), [module, tape], { encoding: 'utf8', timeout: 20_000 })
     .trim().split('\n').map(JSON.parse);
   assert.ok(native.every(row => row.accepted));
-  assert.deepEqual(native.map(row => row.trace.safe), traces.map(trace => trace.safe));
-  assert.deepEqual(native.map(row => row.trace.scheduleTrace), traces.map(trace => trace.scheduleTrace));
+  assert.deepEqual(native.map(row => row.outcome.trace.safe), traces.map(trace => trace.safe));
+  assert.deepEqual(native.map(row => row.outcome.trace.contextTrace), traces.map(trace => trace.contextTrace));
 });
 
 test('Programming E37 requires a Tide provider and executes cancellation without re-admission', async t => {
