@@ -2,7 +2,7 @@
 //! The host supplies a trusted clock and a distinct identity for each reset of that clock.
 use super::{
     crc32, AccountingConfig, AccountingError, AccountingLedger, LedgerRead, ReservationState,
-    RollingExplanation,
+    RollingExplanation, RollingReservation,
 };
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -33,6 +33,7 @@ pub enum OutputAdmission {
     BudgetExceeded,
     StopMargin,
     UnsettledOutput,
+    CapacityWait,
 }
 
 pub struct RollingOutputOwner {
@@ -45,6 +46,14 @@ pub struct RollingOutputOwner {
 }
 
 impl RollingOutputOwner {
+    /// Maximum checkpoint payload, before any host storage envelope.
+    pub fn checkpoint_max_bytes(config: AccountingConfig) -> Result<usize, AccountingError> {
+        let config = config.validate()?;
+        AccountingLedger::checkpoint_size(config.max_intervals, 0, config.max_reservations)
+            .and_then(|size| size.checked_add(60))
+            .ok_or(AccountingError::Capacity)
+    }
+
     /// Use only when provisioning an output with known-empty history.
     pub fn initialize(
         policy: RollingOutputPolicy,
@@ -171,12 +180,7 @@ impl RollingOutputOwner {
             return Ok(OutputAdmission::UnsettledOutput);
         }
         let p = self.policy;
-        let LedgerRead::Known(used_ms) =
-            self.ledger.used_rolling(p.resource_id, now_ms, p.window_ms)
-        else {
-            return Err(AccountingError::UnknownLedger);
-        };
-        let reserve_ms = p.reserve_ms.min(p.limit_ms.saturating_sub(used_ms));
+        let reserve_ms = self.prospective_duration(now_ms)?;
         if reserve_ms == 0 {
             return Ok(OutputAdmission::BudgetExceeded);
         }
@@ -204,16 +208,22 @@ impl RollingOutputOwner {
         // An unsuccessful reservation must not make a later, older query
         // assume history that has already been removed from memory.
         self.clock_floor_ms = now_ms;
-        if self.ledger.intervals.len() == self.ledger.config.max_intervals {
-            return Err(AccountingError::Capacity);
+        if self.ledger.intervals.len() == self.ledger.config.max_intervals
+            || self.ledger.reservations.len() == self.ledger.config.max_reservations
+        {
+            return Ok(OutputAdmission::CapacityWait);
         }
-        match self.ledger.reserve_rolling(
-            Self::identity(sequence, 1),
-            p.resource_id,
-            now_ms,
-            p.window_ms,
-            p.limit_ms,
-            reserve_ms,
+        match self.ledger.reserve_rolling_inner(
+            RollingReservation {
+                reservation_id: Self::identity(sequence, 1),
+                resource_id: p.resource_id,
+                admitted_at_ms: now_ms,
+                window_ms: p.window_ms,
+                limit_ms: p.limit_ms,
+                reserve_ms,
+                state: ReservationState::Outstanding,
+            },
+            true,
         ) {
             Err(AccountingError::LimitExceeded) => return Ok(OutputAdmission::BudgetExceeded),
             result => {
@@ -227,6 +237,42 @@ impl RollingOutputOwner {
             admitted_at_ms: now_ms,
             deadline_ms,
         }))
+    }
+
+    fn prospective_duration(&self, now_ms: u64) -> Result<u64, AccountingError> {
+        let p = self.policy;
+        let mut high = p.reserve_ms.min(u64::MAX - now_ms);
+        let fits = |duration| {
+            let LedgerRead::Known(past_ms) =
+                self.ledger
+                    .used_rolling(p.resource_id, now_ms + duration, p.window_ms)
+            else {
+                return Err(AccountingError::UnknownLedger);
+            };
+            Ok(past_ms <= p.limit_ms - duration)
+        };
+        // Through any candidate lease (at most one window), new ON exposure
+        // grows by one millisecond per millisecond. The union of completed ON
+        // history can lose at most that much, so total exposure is greatest at
+        // the candidate deadline and feasibility is monotone in lease length.
+        // Most scans either permit the whole quantum or cannot permit any ON.
+        if high == 0 || !fits(1)? {
+            return Ok(0);
+        }
+        if high == 1 || fits(high)? {
+            return Ok(high);
+        }
+        let mut low = 1;
+        high -= 1;
+        while low < high {
+            let middle = low + (high - low).div_ceil(2);
+            if fits(middle)? {
+                low = middle;
+            } else {
+                high = middle - 1;
+            }
+        }
+        Ok(low)
     }
 
     /// Supply the time of the applied ON transition and the confirmed OFF
@@ -280,6 +326,25 @@ impl RollingOutputOwner {
             LedgerRead::Known(mut evidence) if self.unresolved_lease().is_some() => {
                 evidence.blocked = true;
                 evidence.next_release_ms = None;
+                LedgerRead::Known(evidence)
+            }
+            LedgerRead::Known(mut evidence) => {
+                if let Some(next_ms) = now_ms.checked_add(1) {
+                    let LedgerRead::Known(projected) = self.ledger.explain_rolling(
+                        p.resource_id,
+                        next_ms,
+                        p.window_ms,
+                        p.limit_ms,
+                        1,
+                    ) else {
+                        return LedgerRead::Unknown;
+                    };
+                    evidence.blocked = projected.blocked;
+                    evidence.next_release_ms = projected.next_release_ms.map(|time| time - 1);
+                } else {
+                    evidence.blocked = true;
+                    evidence.next_release_ms = None;
+                }
                 LedgerRead::Known(evidence)
             }
             result => result,

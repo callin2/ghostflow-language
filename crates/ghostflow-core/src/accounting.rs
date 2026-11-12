@@ -456,6 +456,34 @@ impl AccountingLedger {
         limit_ms: u64,
         reserve_ms: u64,
     ) -> Result<AdmissionResult, AccountingError> {
+        self.reserve_rolling_inner(
+            RollingReservation {
+                reservation_id,
+                resource_id,
+                admitted_at_ms,
+                window_ms,
+                limit_ms,
+                reserve_ms,
+                state: ReservationState::Outstanding,
+            },
+            false,
+        )
+    }
+
+    fn reserve_rolling_inner(
+        &mut self,
+        incoming: RollingReservation,
+        prospective: bool,
+    ) -> Result<AdmissionResult, AccountingError> {
+        let RollingReservation {
+            reservation_id,
+            resource_id,
+            admitted_at_ms,
+            window_ms,
+            limit_ms,
+            reserve_ms,
+            ..
+        } = incoming;
         if !self.known {
             return Err(AccountingError::UnknownLedger);
         }
@@ -468,15 +496,6 @@ impl AccountingLedger {
         {
             return Err(AccountingError::InvalidReservation);
         }
-        let incoming = RollingReservation {
-            reservation_id,
-            resource_id,
-            admitted_at_ms,
-            window_ms,
-            limit_ms,
-            reserve_ms,
-            state: ReservationState::Outstanding,
-        };
         if let Some(existing) = self
             .reservations
             .iter()
@@ -488,8 +507,26 @@ impl AccountingLedger {
                 Err(AccountingError::IdentityCollision)
             };
         }
+        let evaluation_ms = if prospective {
+            if reserve_ms > window_ms
+                || self
+                    .intervals
+                    .iter()
+                    .any(|entry| entry.resource_id == resource_id && entry.end_ms > admitted_at_ms)
+                || self.reservations.iter().any(|entry| {
+                    entry.resource_id == resource_id && entry.state == ReservationState::Outstanding
+                })
+            {
+                return Err(AccountingError::InvalidReservation);
+            }
+            admitted_at_ms
+                .checked_add(reserve_ms)
+                .ok_or(AccountingError::InvalidReservation)?
+        } else {
+            admitted_at_ms
+        };
         let LedgerRead::Known(applied_ms) =
-            self.used_rolling(resource_id, admitted_at_ms, window_ms)
+            self.used_rolling(resource_id, evaluation_ms, window_ms)
         else {
             return Err(AccountingError::UnknownLedger);
         };
@@ -590,16 +627,22 @@ impl AccountingLedger {
         }
     }
 
+    fn checkpoint_size(intervals: usize, events: usize, reservations: usize) -> Option<usize> {
+        intervals
+            .checked_mul(56)
+            .and_then(|size| size.checked_add(events.checked_mul(24)?))
+            .and_then(|size| size.checked_add(reservations.checked_mul(69)?))
+            .and_then(|size| size.checked_add(43))
+    }
+
     /// Encode a canonical bounded checkpoint. The host owns writing it durably.
     pub fn snapshot_bytes(&self) -> Result<Vec<u8>, AccountingError> {
-        let capacity = self
-            .intervals
-            .len()
-            .checked_mul(56)
-            .and_then(|size| size.checked_add(self.events.len().checked_mul(24)?))
-            .and_then(|size| size.checked_add(self.reservations.len().checked_mul(69)?))
-            .and_then(|size| size.checked_add(39))
-            .ok_or(AccountingError::Capacity)?;
+        let capacity = Self::checkpoint_size(
+            self.intervals.len(),
+            self.events.len(),
+            self.reservations.len(),
+        )
+        .ok_or(AccountingError::Capacity)?;
         let mut out = Vec::new();
         out.try_reserve_exact(capacity)
             .map_err(|_| AccountingError::Capacity)?;

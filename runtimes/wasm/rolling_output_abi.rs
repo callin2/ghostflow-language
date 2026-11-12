@@ -90,6 +90,7 @@ pub unsafe extern "C" fn gf_rolling_output_prepare(
         Ok(OutputAdmission::BudgetExceeded) => 2,
         Ok(OutputAdmission::UnsettledOutput) => 3,
         Ok(OutputAdmission::StopMargin) => 4,
+        Ok(OutputAdmission::CapacityWait) => 5,
         Err(_) => 0,
     }
 }

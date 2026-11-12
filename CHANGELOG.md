@@ -18,7 +18,7 @@ A single unfiltered Solar pulse now uses existing GFB16 for held-clock and fixed
 
 ### 2026-11-12 - Bind one applied rolling output policy to GFB29 ([#96](https://github.com/callin2/ghostflow-language/issues/96))
 
-A durable applied account can explicitly name its Bool output with `output: pump`. For one static rolling limit, GFB29 binds the resource, output and timing policy to the Program. Signed admission requires the rolling owner ABI and exact policy metadata. The owner reserves at most the available budget, reports when that duration cannot meet the stop margin, and requires a complete observed OFF window before recovering uncertain history. Device and Simulator target support depend on integrating the enforcing output writer.
+A durable applied account can explicitly name its Bool output with `output: pump`. For one static rolling limit, GFB29 binds the resource, output and timing policy to the Program. Signed admission requires the rolling owner ABI and exact policy metadata. The owner checks a proposed full-ON lease against the rolling limit through its deadline, including completed ON history that expires during the lease. It reports when the safe duration cannot meet the stop margin or when its bounded live history is full. Recovery from uncertain history requires a complete observed OFF window. Device and Simulator target support depend on integrating the enforcing output writer.
 
 ### 2026-11-12 - Match settings readback to its completed scan ([#288](https://github.com/callin2/ghostflow-language/issues/288))
 

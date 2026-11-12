@@ -186,6 +186,7 @@ export class RollingOutputRuntime {
     if (status === 2) return { status: 'budget-exceeded' };
     if (status === 3) return { status: 'unsettled-output' };
     if (status === 4) return { status: 'stop-margin' };
+    if (status === 5) return { status: 'capacity-wait' };
     if (status !== 1) return { status: 'unavailable' };
     const deadline = Number(await this.#commit());
     if (!Number.isSafeInteger(deadline) || deadline <= nowMs) return { status: 'unavailable' };

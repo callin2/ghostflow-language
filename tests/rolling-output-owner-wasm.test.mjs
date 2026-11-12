@@ -54,16 +54,16 @@ test('WASM does not grant a watering deadline before saving the reservation', as
       assert.equal(wasm.gf_rolling_output_finish(handle, true, time, time + 5_000n), 1);
       assert.equal(save(handle), 0n);
     }
-    assert.deepEqual(explanation(30_000n), [30_000n, 0n, 1n, 1n, 60_001n]);
+    assert.deepEqual(explanation(30_000n), [30_000n, 0n, 1n, 1n, 60_000n]);
     assert.deepEqual(explanation(62_500n), [27_500n, 0n, 0n, 0n, 0n]);
-    for (const time of [30_000n, 60_000n]) {
+    for (const time of [30_000n, 59_999n]) {
       assert.equal(wasm.gf_rolling_output_prepare(handle, time, 0n), 2);
       assert.equal(wasm.gf_rolling_output_pending_len(handle), 0);
     }
-    assert.equal(wasm.gf_rolling_output_prepare(handle, 60_001n, 1n), 4);
-    assert.equal(wasm.gf_rolling_output_prepare(handle, 60_002n, 1n), 1);
-    assert.equal(save(handle), 60_004n);
-    assert.deepEqual(explanation(60_002n), [29_998n, 2n, 1n, 0n, 0n]);
+    assert.equal(wasm.gf_rolling_output_prepare(handle, 60_000n, 5_000n), 4);
+    assert.equal(wasm.gf_rolling_output_prepare(handle, 60_000n, 1n), 1);
+    assert.equal(save(handle), 65_000n);
+    assert.deepEqual(explanation(60_000n), [30_000n, 5_000n, 1n, 0n, 0n]);
     wasm.gf_rolling_output_close(handle);
     handle = open();
     assert.equal(wasm.gf_rolling_output_ack(handle), 0n);
@@ -119,13 +119,13 @@ test('an authored policy binds to the installed output and cannot authorize ON o
       assert.deepEqual(await runtime.requestOn(), { status: 'allowed', deadlineMs: now + 5_000 });
       await runtime.recordOff(now, now + 5_000);
     }
-    nowMs = 60_000;
+    nowMs = 59_999;
     assert.deepEqual(await runtime.requestOn(), { status: 'budget-exceeded' });
-    assert.deepEqual(runtime.explain(60_000), {
-      usedMs: 30_000n, reservedMs: 0n, blocked: true, nextReleaseMs: 60_001n,
+    assert.deepEqual(runtime.explain(59_999), {
+      usedMs: 30_000n, reservedMs: 0n, blocked: true, nextReleaseMs: 60_000n,
     });
-    nowMs = 60_001;
-    assert.deepEqual(await runtime.requestOn(1), { status: 'stop-margin' });
+    nowMs = 60_000;
+    assert.deepEqual(await runtime.requestOn(5_000), { status: 'stop-margin' });
     let rejectCommit;
     nextCommit = new Promise(resolve => { rejectCommit = resolve; });
     nowMs = 65_000;
