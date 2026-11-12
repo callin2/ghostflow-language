@@ -251,14 +251,22 @@ test('mandatory GFB29 evaluates safe proposals only through a bound rolling owne
     generic.dispose();
   }
   let checkpoint = null;
-  const owner = await RollingOutputRuntime.open(binary, source, {
+  const ownerOptions = {
     bootEpoch: 1, clock: () => 0,
     binding: { resource: 'irrigation', output: 'valve', resourceId: 7 }, maxIntervals: 8,
     store: {
       read: async () => checkpoint,
       commit: async bytes => { checkpoint = bytes; return true; },
     },
+  };
+  await assert.rejects(RollingOutputRuntime.open(binary, source, {
+    ...ownerOptions, expectedBytecodeSha256: '0'.repeat(64),
+  }), /differs from the expected GFB29 artifact/);
+  assert.equal(checkpoint, null);
+  const owner = await RollingOutputRuntime.open(binary, source, {
+    ...ownerOptions, expectedBytecodeSha256: artifact.manifest.bytecodeSha256,
   });
+  assert.equal(owner.bytecodeSha256, artifact.manifest.bytecodeSha256);
   const runtime = owner.createProposalRuntime([{ kind: 'actuator', name: 'valve', type: 'bool' }]);
   const typed = await owner.createControlRuntime();
   try {

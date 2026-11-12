@@ -27,9 +27,14 @@ export class RollingOutputRuntime {
   #binding;
   #writing = false;
 
-  static async open(wasmBytes, source, { binding, bootEpoch, clock, store, maxIntervals, filename, hardwareProfiles }) {
+  static async open(wasmBytes, source, {
+    binding, bootEpoch, clock, store, maxIntervals, filename, hardwareProfiles, expectedBytecodeSha256,
+  }) {
     const artifact = await compileSource(source, { filename, hardwareProfiles });
     const { manifest } = artifact;
+    if (expectedBytecodeSha256 !== undefined && expectedBytecodeSha256 !== manifest.bytecodeSha256) {
+      throw new Error('rolling output source replay differs from the expected GFB29 artifact');
+    }
     const { resource, output, resourceId } = binding;
     const policy = manifest.rollingOutput;
     if (manifest.format !== 'GhostFlow/control-v29' || !policy
@@ -45,7 +50,9 @@ export class RollingOutputRuntime {
     }
     if (!Number.isSafeInteger(bootEpoch) || bootEpoch <= 0) throw new RangeError('rolling output requires a positive boot epoch');
     if (typeof clock !== 'function') throw new TypeError('rolling output requires a monotonic clock');
-    const binary = wasmBytes instanceof ArrayBuffer ? new Uint8Array(wasmBytes.slice(0)) : new Uint8Array(wasmBytes);
+    const binary = ArrayBuffer.isView(wasmBytes)
+      ? new Uint8Array(wasmBytes.buffer, wasmBytes.byteOffset, wasmBytes.byteLength).slice()
+      : new Uint8Array(wasmBytes).slice();
     const { instance: { exports: wasm } } = await WebAssembly.instantiate(binary);
     // null is an explicit known-empty result from the installation owner.
     // Missing or unreadable existing history must be reported as an error.
@@ -108,6 +115,10 @@ export class RollingOutputRuntime {
     } finally {
       this.#writing = false;
     }
+  }
+
+  get bytecodeSha256() {
+    return this.#artifact.manifest.bytecodeSha256;
   }
 
   /** Evaluate safe proposals. This never applies an actuator value. */
