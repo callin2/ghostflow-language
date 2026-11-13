@@ -28,6 +28,12 @@ impl OutputLease {
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct AdmissionWindow {
+    pub start_ms: u64,
+    pub deadline_ms: u64,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum OutputAdmission {
     Allowed(OutputLease),
     BudgetExceeded,
@@ -36,6 +42,7 @@ pub enum OutputAdmission {
     CapacityWait,
 }
 
+#[derive(Clone)]
 pub struct RollingOutputOwner {
     policy: RollingOutputPolicy,
     ledger: AccountingLedger,
@@ -175,11 +182,88 @@ impl RollingOutputOwner {
         stop_margin_ms: u64,
         persist: impl FnOnce(&[u8]) -> bool,
     ) -> Result<OutputAdmission, AccountingError> {
+        let admission = self.admission_at(now_ms, stop_margin_ms)?;
+        let OutputAdmission::Allowed(lease) = admission else {
+            if admission == OutputAdmission::CapacityWait {
+                self.prune(now_ms);
+            }
+            return Ok(admission);
+        };
+        let p = self.policy;
+        self.prune(now_ms);
+        match self.ledger.reserve_rolling_inner(
+            RollingReservation {
+                reservation_id: Self::identity(lease.sequence, 1),
+                resource_id: p.resource_id,
+                admitted_at_ms: now_ms,
+                window_ms: p.window_ms,
+                limit_ms: p.limit_ms,
+                reserve_ms: lease.deadline_ms - now_ms,
+                state: ReservationState::Outstanding,
+            },
+            true,
+        ) {
+            Err(AccountingError::LimitExceeded) => return Ok(OutputAdmission::BudgetExceeded),
+            result => result?,
+        };
+        self.sequence = lease.sequence;
+        self.persist(persist)?;
+        Ok(admission)
+    }
+
+    /// Earliest conditional admission with the same margin and capacity checks
+    /// as the live path. The caller must have confirmed OFF and no new exposure.
+    pub fn next_admission(
+        &self,
+        now_ms: u64,
+        stop_margin_ms: u64,
+    ) -> Result<Option<AdmissionWindow>, AccountingError> {
+        let candidate = |at| {
+            self.admission_at(at, stop_margin_ms)
+                .map(|admission| match admission {
+                    OutputAdmission::Allowed(lease) => Some(AdmissionWindow {
+                        start_ms: lease.admitted_at_ms,
+                        deadline_ms: lease.deadline_ms,
+                    }),
+                    _ => None,
+                })
+        };
+        self.check_time(now_ms)?;
+        if self.unresolved_lease().is_some()
+            || self.ledger.intervals.iter().any(|i| i.end_ms > now_ms)
+        {
+            return Ok(None);
+        }
+        if let Some(lease) = candidate(now_ms)? {
+            return Ok(Some(lease));
+        }
+        let mut low = now_ms;
+        let mut high = now_ms.saturating_add(self.policy.window_ms);
+        if candidate(high)?.is_none() {
+            return Ok(None);
+        }
+        // With no new exposure, the applied usage and occupied slots can only
+        // decrease as the settled intervals leave the rolling window.
+        while low < high {
+            let middle = low + (high - low) / 2;
+            if candidate(middle)?.is_some() {
+                high = middle;
+            } else {
+                low = middle + 1;
+            }
+        }
+        candidate(low)
+    }
+
+    fn admission_at(
+        &self,
+        now_ms: u64,
+        stop_margin_ms: u64,
+    ) -> Result<OutputAdmission, AccountingError> {
         self.check_time(now_ms)?;
         if self.unresolved_lease().is_some() {
             return Ok(OutputAdmission::UnsettledOutput);
         }
-        let p = self.policy;
         let reserve_ms = self.prospective_duration(now_ms)?;
         if reserve_ms == 0 {
             return Ok(OutputAdmission::BudgetExceeded);
@@ -195,6 +279,41 @@ impl RollingOutputOwner {
             .checked_add(1)
             .ok_or(AccountingError::Capacity)?;
         let cutoff = now_ms.saturating_sub(self.policy.window_ms);
+        let retained = |entry: &super::AppliedSegment| entry.end_ms > cutoff;
+        let intervals = self
+            .ledger
+            .intervals
+            .iter()
+            .filter(|entry| retained(entry))
+            .count();
+        let reservations = self
+            .ledger
+            .reservations
+            .iter()
+            .filter(|entry| match entry.state {
+                ReservationState::Settled(receipt) => self
+                    .ledger
+                    .intervals
+                    .iter()
+                    .any(|segment| retained(segment) && segment.receipt_id == receipt),
+                ReservationState::Cancelled(_) => false,
+                ReservationState::Outstanding => true,
+            })
+            .count();
+        if intervals == self.ledger.config.max_intervals
+            || reservations == self.ledger.config.max_reservations
+        {
+            return Ok(OutputAdmission::CapacityWait);
+        }
+        Ok(OutputAdmission::Allowed(OutputLease {
+            sequence,
+            admitted_at_ms: now_ms,
+            deadline_ms,
+        }))
+    }
+
+    fn prune(&mut self, now_ms: u64) {
+        let cutoff = now_ms.saturating_sub(self.policy.window_ms);
         self.ledger.intervals.retain(|entry| entry.end_ms > cutoff);
         self.ledger.reservations.retain(|entry| match entry.state {
             ReservationState::Settled(receipt) => self
@@ -208,35 +327,6 @@ impl RollingOutputOwner {
         // An unsuccessful reservation must not make a later, older query
         // assume history that has already been removed from memory.
         self.clock_floor_ms = now_ms;
-        if self.ledger.intervals.len() == self.ledger.config.max_intervals
-            || self.ledger.reservations.len() == self.ledger.config.max_reservations
-        {
-            return Ok(OutputAdmission::CapacityWait);
-        }
-        match self.ledger.reserve_rolling_inner(
-            RollingReservation {
-                reservation_id: Self::identity(sequence, 1),
-                resource_id: p.resource_id,
-                admitted_at_ms: now_ms,
-                window_ms: p.window_ms,
-                limit_ms: p.limit_ms,
-                reserve_ms,
-                state: ReservationState::Outstanding,
-            },
-            true,
-        ) {
-            Err(AccountingError::LimitExceeded) => return Ok(OutputAdmission::BudgetExceeded),
-            result => {
-                result?;
-            }
-        }
-        self.sequence = sequence;
-        self.persist(persist)?;
-        Ok(OutputAdmission::Allowed(OutputLease {
-            sequence,
-            admitted_at_ms: now_ms,
-            deadline_ms,
-        }))
     }
 
     fn prospective_duration(&self, now_ms: u64) -> Result<u64, AccountingError> {

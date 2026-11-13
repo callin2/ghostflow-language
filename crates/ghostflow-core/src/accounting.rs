@@ -6,7 +6,9 @@
 
 #[path = "rolling_output.rs"]
 mod rolling_output;
-pub use rolling_output::{OutputAdmission, OutputLease, RollingOutputOwner, RollingOutputPolicy};
+pub use rolling_output::{
+    AdmissionWindow, OutputAdmission, OutputLease, RollingOutputOwner, RollingOutputPolicy,
+};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct AccountingConfig {

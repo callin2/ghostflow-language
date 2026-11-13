@@ -32,6 +32,69 @@ fn start(owner: &mut RollingOutputOwner, time: u64, snapshot: &mut Vec<u8>) -> O
 }
 
 #[test]
+fn forecast_waits_for_the_live_margin_and_does_not_settle_or_reserve() {
+    let mut saved = vec![];
+    let policy = RollingOutputPolicy {
+        reserve_ms: 30_000,
+        ..POLICY
+    };
+    let mut owner =
+        RollingOutputOwner::initialize(policy, CONFIG, BOOT, 0, store(&mut saved)).unwrap();
+    let lease = start(&mut owner, 0, &mut saved);
+    assert_eq!(owner.next_admission(30_000, 100).unwrap(), None);
+    owner
+        .record_off(lease, Some(0), 29_950, store(&mut saved))
+        .unwrap();
+    let forecast = owner.next_admission(29_950, 100).unwrap().unwrap();
+    assert_eq!(forecast.start_ms, 59_950);
+    assert_eq!(forecast.deadline_ms, 89_950);
+    assert!(owner.unresolved_lease().is_none());
+    assert_eq!(
+        owner
+            .request_on_with_stop_margin(59_949, 100, |_| panic!("must not persist a denial"))
+            .unwrap(),
+        OutputAdmission::StopMargin
+    );
+    assert!(matches!(
+        owner
+            .request_on_with_stop_margin(59_950, 100, store(&mut saved))
+            .unwrap(),
+        OutputAdmission::Allowed(_)
+    ));
+}
+
+#[test]
+fn forecast_respects_capacity_until_the_whole_record_expires() {
+    let mut saved = vec![];
+    let config = AccountingConfig {
+        max_intervals: 1,
+        max_reservations: 1,
+        ..CONFIG
+    };
+    let mut owner =
+        RollingOutputOwner::initialize(POLICY, config, BOOT, 0, store(&mut saved)).unwrap();
+    let lease = start(&mut owner, 0, &mut saved);
+    owner
+        .record_off(lease, Some(0), 1_000, store(&mut saved))
+        .unwrap();
+    let forecast = owner.next_admission(1_000, 100).unwrap().unwrap();
+    assert_eq!(forecast.start_ms, 61_000);
+    assert_eq!(forecast.deadline_ms, 66_000);
+    assert_eq!(
+        owner
+            .request_on_with_stop_margin(60_999, 100, |_| panic!("no free slot"))
+            .unwrap(),
+        OutputAdmission::CapacityWait
+    );
+    assert!(matches!(
+        owner
+            .request_on_with_stop_margin(61_000, 100, store(&mut saved))
+            .unwrap(),
+        OutputAdmission::Allowed(_)
+    ));
+}
+
+#[test]
 fn only_persisted_leases_can_apply_and_the_rolling_budget_recovers_at_the_exact_boundary() {
     let mut saved = vec![];
     let mut owner =
