@@ -44,7 +44,7 @@ pub type ScanOutcome = ScanOutcomeV1;
 /// keeps sequencing outside `Runtime`, so a WASM handle can own this object
 /// without a self-reference and legacy setter/tick callers remain unchanged.
 pub struct ScanDriver {
-    runtime: Runtime,
+    runtime: Box<Runtime>,
     first_scan_tick: u64,
     next_scan_id: Option<u64>,
     last_time_ms: Option<u64>,
@@ -71,6 +71,11 @@ impl Runtime {
 impl ScanDriver {
     /// Creates an owning framed driver at scan ID zero.
     pub fn new(runtime: Runtime) -> Self {
+        Self::from_boxed_runtime(Box::new(runtime))
+    }
+
+    /// Take ownership of an already allocated runtime without moving its value.
+    pub fn from_boxed_runtime(runtime: Box<Runtime>) -> Self {
         let restart = runtime
             .module
             .as_ref()
@@ -218,7 +223,7 @@ impl ScanDriver {
     }
 
     pub fn into_runtime(self) -> Runtime {
-        self.runtime
+        *self.runtime
     }
 
     /// Observe the paused UTC Daily clock without changing the scan ID or scalar frame.

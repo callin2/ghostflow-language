@@ -8,6 +8,10 @@ Daily and DailySlots runtimes can now export and restore exact-Program terminal 
 
 ## Unreleased
 
+### 2026-11-13 - Share rolling output admission with the forecast ([#96](https://github.com/callin2/ghostflow-language/issues/96))
+
+The rolling output owner can report the next admissible start and deadline using the same capacity, time and stop-margin rules as live admission. The forecast requires confirmed OFF and settled history. It makes no reservation.
+
 ### 2026-11-12 - Frame multiple ordinary Solar pulses ([#621](https://github.com/callin2/ghostflow-language/issues/621))
 
 Multiple unfiltered Solar pulses with trusted clocks and skip fallback now use GFB16. Native and WASM retain independent provider evidence and admission for each site. Target hosts must supply evidence for each descriptor.
