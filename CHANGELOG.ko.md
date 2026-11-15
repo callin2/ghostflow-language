@@ -11,6 +11,10 @@ Daily와 DailySlots 실행기는 `schedule_checkpoint`와 `restore_schedule_chec
 
 ## 미출시
 
+### 2026-11-16 - 고정 주기의 Periodic 서명 패키지 허용 ([#622](https://github.com/callin2/ghostflow-language/issues/622))
+
+양의 고정 Duration을 쓰는 Periodic pulse는 기존 GFB11 주기 형식을 사용합니다. 서명 패키지 검증은 운전 설정을 요구하지 않고 바이트코드의 주기와 밀리초 값이 일치하는지 확인합니다.
+
 ### 2026-11-13 - 누적 출력 한도의 운전 판정과 예정 계산 통일 ([#96](https://github.com/callin2/ghostflow-language/issues/96))
 
 누적 출력 한도는 실제 운전과 같은 시간·저장 용량·정지 여유 기준으로 다음 시작 가능 시각과 종료 한도를 계산합니다. 출력이 꺼진 상태와 확정된 이력이 있어야 계산할 수 있습니다. 예정 계산은 운전을 예약하지 않습니다.

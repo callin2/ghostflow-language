@@ -8,6 +8,10 @@ Daily and DailySlots runtimes can now export and restore exact-Program terminal 
 
 ## Unreleased
 
+### 2026-11-16 - Accept fixed Periodic intervals in signed packages ([#622](https://github.com/callin2/ghostflow-language/issues/622))
+
+A positive fixed Duration in a Periodic pulse uses the existing GFB11 interval encoding. Signed package admission checks its milliseconds against the bytecode without requiring an operator setting.
+
 ### 2026-11-13 - Share rolling output admission with the forecast ([#96](https://github.com/callin2/ghostflow-language/issues/96))
 
 The rolling output owner can report the next admissible start and deadline using the same capacity, time and stop-margin rules as live admission. The forecast requires confirmed OFF and settled history. It makes no reservation.
