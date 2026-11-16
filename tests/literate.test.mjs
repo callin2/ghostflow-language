@@ -70,8 +70,27 @@ assert.throws(() => extractLiterate('```ghost\ncontrol Unclosed {}'), /unclosed 
 
 assert.throws(() => extractLiterate('```ghost\n```\n'), /no executable/);
 
-const hidden = extractLiterate('---\n```ghost\ncontrol FrontMatter {}\n```\n---\n\n<!--\n```ghost\ncontrol Comment {}\n```\n-->\n\n<script>\n```ghost\ncontrol Html {}\n```\n</script>\n\n```ghost\ncontrol Real {}\n```');
+const hidden = extractLiterate('\uFEFF---\n```ghost\ncontrol FrontMatter {}\n```\n---\n\n<!--\n```ghost\ncontrol Comment {}\n```\n-->\n\n<script>\n```ghost\ncontrol Html {}\n```\n</script>\n\n```ghost\ncontrol Real {}\n```');
 assert.equal(hidden.code, 'control Real {}\n');
+const firstFence = extractLiterate('\uFEFF```ghost\ncontrol First {}\n```\n');
+assert.equal(firstFence.code, 'control First {}\n');
+assert.equal(mapSourcePosition(firstFence.sourceMap, 1, 1).line, 2);
+assert.throws(() => extractLiterate('\uFEFF```ghost\ncontrol Unclosed {}'), {
+  line: 1, column: 2, message: /unclosed ghost fence/,
+});
+assert.throws(() => extractLiterate('\uFEFF---\ntitle: unclosed'), {
+  line: 1, column: 2, message: /unclosed front matter/,
+});
+const firstAnchor = extractLiterate([
+  '\uFEFF<!-- ghostflow:anchor id=GF-BOM kind=intent status=confirmed origin=user -->',
+  'Use the declared behavior.',
+  '',
+  '```ghost',
+  'control First {}',
+  '```',
+].join('\n'));
+assert.equal(firstAnchor.anchors[0].directiveSource.column, 2);
+assert.equal(firstAnchor.anchors[0].source.line, 2);
 const indented = extractLiterate('   ~~~ghost\n    control Indented {}\n   ~~~\n');
 assert.equal(indented.code, '    control Indented {}\n');
 const serializedMap = JSON.parse(JSON.stringify(mapped.sourceMap));

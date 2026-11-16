@@ -78,8 +78,8 @@ const nextKeyPromise = testKey(
   '3d4017c3e843895a92b70aa74d1b7ebc9c982ccf2ec4968cc0cd55f12af4660c',
 );
 
-async function fixture() {
-  const source = fs.readFileSync(path.join(root, 'examples/tutorial/01-latch.ghost.md'), 'utf8');
+async function fixture({ prefix = '' } = {}) {
+  const source = prefix + fs.readFileSync(path.join(root, 'examples/tutorial/01-latch.ghost.md'), 'utf8');
   const compilation = await compileSource(source, { filename: '01-latch.ghost.md' });
   const current = await currentKeyPromise;
   const packageValue = await buildPortablePackage(compilation, identity, {
@@ -88,6 +88,15 @@ async function fixture() {
   });
   return { compilation, current, packageValue };
 }
+
+test('a signed package reopens a canonical UTF-8 source with its leading BOM intact', async () => {
+  const { compilation, current, packageValue } = await fixture({ prefix: '\ufeff' });
+  assert.equal(compilation.sourceDocument.text.codePointAt(0), 0xfeff);
+  const verified = await verifyPortablePackage(packageValue, verifierOptions(current));
+  assert.equal(verified.source.text, compilation.sourceDocument.text);
+  assert.equal(verified.source.sha256, compilation.sourceDocument.sha256);
+  assert.equal(createHash('sha256').update(verified.source.text).digest('hex'), verified.source.sha256);
+});
 
 function verifierOptions(current, verifyBytecode = async () => true) {
   return {
@@ -645,12 +654,12 @@ test('signed Solar v15 rejects re-signed descriptor and predicate changes before
   }
 });
 
-test('signed calendar Result preserves the Seoul date and rejects rewritten bindings', async () => {
+test('signed calendar Result preserves the Seoul date and rejects rewritten bindings with a leading BOM', async () => {
   const { ControlRuntime } = await import('../runtimes/wasm/control-runtime.mjs');
   const { createKoreanHolidayCalendar } = await import('../runtimes/node/calendar.mjs');
   const current = await currentKeyPromise;
   const source = [
-    '---', 'profile: test-board@1', 'bindings:', '  permitted: board.RO1', '---',
+    '\uFEFF---', 'profile: test-board@1', 'bindings:', '  permitted: board.RO1', '---',
     '# Calendar decision', '```ghost', 'control HolidayCheck {', ' calendar holidays: HolidayCalendar;',
     ' let holiday = calendar_is(holidays, day`holiday`, timezone: "Asia/Seoul");',
     ' output permitted: Bool;', ' permitted <- case holiday { ok(value) => !value; fault(_) => false; };',
@@ -677,6 +686,8 @@ test('signed calendar Result preserves the Seoul date and rejects rewritten bind
   }), error => error.code === 'source-map-mismatch' && /digest|SHA-256/.test(error.cause?.message));
   const pinnedOptions = { ...options, hardwareProfiles };
   const verified = await verifyPortablePackage(packaged, pinnedOptions);
+  assert.equal(verified.source.text, source);
+  assert.equal(verified.source.sha256, compilation.sourceDocument.sha256);
   const { site } = verified.manifest.calendarConditions[0];
   const wasm = fs.readFileSync(wasmPath);
   const context = { bootEpoch: 1, terminalCapacity: 64, bindings: [{ kind: 'calendar', provider: 'holidays',
