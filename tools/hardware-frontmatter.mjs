@@ -25,7 +25,7 @@ export function parseHardwareFrontMatter(source, { filename = 'program.ghost.md'
   if (!isWellFormedUnicode(source) || utf8ByteLength(source) > 1024 * 1024) throw new TypeError('hardware source must be well-formed UTF-8 within 1 MiB');
   if (!isWellFormedUnicode(filename) || !filename || filename.includes('\0')) throw new TypeError('invalid hardware source filename');
   const lines = source.split(/\r\n|\r|\n/);
-  if (lines[0] !== '---') return null;
+  if (lines[0] !== '---' && lines[0] !== '\uFEFF---') return null;
   const end = lines.findIndex((line, index) => index > 0 && (line === '---' || line === '...'));
   // The literate extractor owns unclosed ordinary front matter diagnostics.
   if (end < 0) return null;

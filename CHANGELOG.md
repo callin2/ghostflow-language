@@ -8,6 +8,10 @@ Daily and DailySlots runtimes can now export and restore exact-Program terminal 
 
 ## Unreleased
 
+### 2026-11-16 - Preserve exact signed source with a UTF-8 BOM ([#314](https://github.com/callin2/ghostflow-language/issues/314))
+
+Literate and hardware readers recognize a leading UTF-8 byte order mark and retain original source positions. Package verification replays the signed Markdown bytes, including the mark and line endings.
+
 ### 2026-11-16 - Accept fixed Periodic intervals in signed packages ([#622](https://github.com/callin2/ghostflow-language/issues/622))
 
 A positive fixed Duration in a Periodic pulse uses the existing GFB11 interval encoding. Signed package admission checks its milliseconds against the bytecode without requiring an operator setting.

@@ -11,6 +11,10 @@ Daily와 DailySlots 실행기는 `schedule_checkpoint`와 `restore_schedule_chec
 
 ## 미출시
 
+### 2026-11-16 - UTF-8 표시가 있는 서명 원문 보존 ([#314](https://github.com/callin2/ghostflow-language/issues/314))
+
+문서 및 배선 선언 파서는 파일 첫머리의 UTF-8 표시를 인식하고 원문상의 위치를 유지합니다. 패키지를 다시 검증할 때 이 표시와 줄바꿈을 포함한 서명 당시의 마크다운 바이트를 그대로 사용합니다.
+
 ### 2026-11-16 - 고정 주기의 Periodic 서명 패키지 허용 ([#622](https://github.com/callin2/ghostflow-language/issues/622))
 
 양의 고정 Duration을 쓰는 Periodic pulse는 기존 GFB11 주기 형식을 사용합니다. 서명 패키지 검증은 운전 설정을 요구하지 않고 바이트코드의 주기와 밀리초 값이 일치하는지 확인합니다.

@@ -46,6 +46,17 @@ test('compiler exposes optional plan without modifying executable bytes or sourc
   assert.equal(result.hardwarePlan.hardware.instances.panel.role, 'output');
 });
 
+test('a leading UTF-8 BOM preserves hardware admission and exact source identity', () => {
+  const source = '\uFEFF' + document();
+  const result = compileSourceSync(source, { filename: 'farm.ghost.md' });
+  const plain = compileSourceSync(document(), { filename: 'farm.ghost.md' });
+  assert.deepEqual(result.bytes, plain.bytes);
+  assert.deepEqual(result.hardwarePlan.hardware, plain.hardwarePlan.hardware);
+  assert.equal(result.sourceDocument.text, source);
+  assert.equal(result.hardwarePlan.source.sha256, sha256Hex(source));
+  assert.notEqual(result.hardwarePlan.source.sha256, plain.hardwarePlan.source.sha256);
+});
+
 test('ordinary front matter remains untouched', () => {
   for (const prefix of ['', '---\ntitle: Farm\n---\n', '---\n```ghost\ncontrol Hidden {}\n```\n---\n']) {
     assert.equal(parseHardwareFrontMatter(prefix + '# Prose'), null);
@@ -87,7 +98,7 @@ test('rejects duplicate YAML keys, aliases, anchors, explicit tags, merges and n
 
 test('schema diagnostics retain exact canonical line/column across line endings', () => {
   for (const newline of ['\n', '\r\n']) {
-    const source = document().replace('schema: GhostFlow/hardware-v1', 'schema: invalid').replaceAll('\n', newline);
+    const source = '\uFEFF' + document().replace('schema: GhostFlow/hardware-v1', 'schema: invalid').replaceAll('\n', newline);
     const lines = source.split(newline);
     const line = lines.findIndex(value => value.includes('schema: invalid'));
     assert.throws(() => parseHardwareFrontMatter(source), error => {

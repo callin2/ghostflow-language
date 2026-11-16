@@ -30,10 +30,14 @@ export function extractLiterate(markdown, { filename = '<literate>' } = {}) {
   if (new TextEncoder().encode(markdown).byteLength > MAX_INPUT_BYTES) throw new RangeError('literate byte limit exceeded');
   const lines = markdown.replace(/\r\n?/g, '\n').split('\n');
   if (lines.length > MAX_INPUT_LINES) throw new RangeError('literate line limit exceeded');
+  // Parse the first line without a UTF-8 BOM, preserving canonical positions.
+  const leadingBom = lines[0].startsWith('\uFEFF') ? 1 : 0;
+  if (leadingBom) lines[0] = lines[0].slice(1);
+  const sourceColumn = (line, column) => line === 1 ? column + leadingBom : column;
   let frontMatterEnd = -1;
   if (lines[0] === '---') {
     frontMatterEnd = lines.findIndex((line, index) => index > 0 && (line === '---' || line === '...'));
-    if (frontMatterEnd < 0) throw new LiterateError(filename, 1, 1, 'unclosed front matter');
+    if (frontMatterEnd < 0) throw new LiterateError(filename, 1, sourceColumn(1, 1), 'unclosed front matter');
   }
   // Preserve every line number while preventing front matter from becoming Markdown code.
   const parsedSource = lines.map((line, index) => index <= frontMatterEnd ? '' : line).join('\n');
@@ -48,7 +52,8 @@ export function extractLiterate(markdown, { filename = '<literate>' } = {}) {
     if (node.type !== 'code_block') continue;
     const info = node.info ?? '';
     if (!/^ghost(?:$|[-\s])/.test(info)) continue;
-    const [[first, column], [last]] = node.sourcepos;
+    const [[first, markdownColumn], [last]] = node.sourcepos;
+    const column = sourceColumn(first, markdownColumn);
     if (node.parent.type !== 'document') {
       warnings.push(`${filename}:${first}:${column}: nested ghost fence inside ${node.parent.type} is ignored`);
       continue;
@@ -91,18 +96,20 @@ export function extractLiterate(markdown, { filename = '<literate>' } = {}) {
     const match = ANCHOR.exec(node.literal);
     if (!match) {
       if (node.literal.startsWith('<!-- ghostflow:anchor') && !node.literal.includes('\n')) {
-        throw new LiterateError(filename, firstLine, directiveColumn(lines[firstLine - 1], 'ghostflow:anchor'), 'malformed ghostflow anchor directive');
+        throw new LiterateError(filename, firstLine,
+          sourceColumn(firstLine, directiveColumn(lines[firstLine - 1], 'ghostflow:anchor')), 'malformed ghostflow anchor directive');
       }
       continue;
     }
     const body = topLevel[index + 1];
     if (!body || !['paragraph', 'block_quote'].includes(body.type)) {
-      throw new LiterateError(filename, firstLine, firstColumn, 'ghostflow anchor requires one following top-level paragraph or block quote');
+      throw new LiterateError(filename, firstLine, sourceColumn(firstLine, firstColumn),
+        'ghostflow anchor requires one following top-level paragraph or block quote');
     }
     const [[bodyFirstLine, bodyFirstColumn], [bodyLastLine, bodyLastColumn]] = body.sourcepos;
     anchors.push({
       id: match[1], kind: match[2], status: match[3], origin: match[4],
-      directiveSource: range(filename, firstLine, firstColumn, lastLine, lastColumn),
+      directiveSource: range(filename, firstLine, sourceColumn(firstLine, firstColumn), lastLine, sourceColumn(lastLine, lastColumn)),
       source: range(filename, bodyFirstLine, bodyFirstColumn, bodyLastLine, bodyLastColumn),
     });
   }

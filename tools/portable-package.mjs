@@ -16,6 +16,7 @@ import { validateClockPolicy, validateSolarFallback } from '../runtimes/wasm/sol
 
 const UTF8 = new TextEncoder();
 const UTF8_FATAL = new TextDecoder('utf-8', { fatal: true });
+const EXACT_SOURCE_UTF8 = new TextDecoder('utf-8', { fatal: true, ignoreBOM: true });
 const PACKAGE_FORMAT = 'GhostFlow/portable-package-v1';
 const PAYLOAD_FORMAT = 'GhostFlow/portable-payload-v1';
 const SOURCE_FORMAT = 'GhostFlow/source-document-v1';
@@ -214,9 +215,9 @@ function decodeBase64(value, path, maximum = MAX_ARTIFACT_BYTES) {
   return decoded;
 }
 
-function decodeUtf8(bytes, path) {
+function decodeUtf8(bytes, path, decoder = UTF8_FATAL) {
   try {
-    return UTF8_FATAL.decode(bytes);
+    return decoder.decode(bytes);
   } catch (error) {
     fail('invalid-utf8', `${path} must be well-formed UTF-8`, error);
   }
@@ -874,7 +875,7 @@ export async function verifyPortablePackage(packageValue, options = {}) {
     fail('bytecode-version-mismatch', 'payload bytecode version does not match its GFB header');
   }
 
-  const sourceText = decodeUtf8(artifacts.sourceBytes, 'source');
+  const sourceText = decodeUtf8(artifacts.sourceBytes, 'source', EXACT_SOURCE_UTF8);
   const manifest = parseCanonicalJson(artifacts.manifestBytes, 'manifest');
   const sourceMap = parseCanonicalJson(artifacts.sourceMapBytes, 'sourceMap');
   const bytecodeVersion = packageValue.payload.bytecode.version;
