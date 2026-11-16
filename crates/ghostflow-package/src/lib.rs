@@ -1943,7 +1943,9 @@ fn verify_config_bindings(manifest: &Value, module: &ghostflow_core::Module) -> 
         return Err(mismatch("missing weekday conditions"));
     }
     if configs.is_empty() && manifest_schedules.is_empty() && !solar_profile && !weekday_profile {
-        return Err(mismatch("portable GFB11 profile requires configs or Periodic schedules"));
+        return Err(mismatch(
+            "portable GFB11 profile requires configs or Periodic schedules",
+        ));
     }
     let scalar_matches = |actual: MachineValue, expected: &Value| match actual {
         MachineValue::Bool(value) => expected.as_bool() == Some(value),
@@ -2044,7 +2046,12 @@ fn verify_config_bindings(manifest: &Value, module: &ghostflow_core::Module) -> 
                 } else {
                     &["expression", "initialMs", "config", "configId"]
                 };
-                exact_keys(interval, interval_keys, "GFB11 Periodic interval", ErrorCode::ManifestMismatch)?;
+                exact_keys(
+                    interval,
+                    interval_keys,
+                    "GFB11 Periodic interval",
+                    ErrorCode::ManifestMismatch,
+                )?;
                 let policy = value_object(&expected["policy"], "GFB11 Periodic policy")?;
                 exact_keys(
                     policy,
