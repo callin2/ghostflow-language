@@ -34,3 +34,10 @@ test('signed GFB11 profile still rejects other schedule kinds', async () => {
   await assert.rejects(() => verifyPortablePackage(signed('wrong-kind'), options),
     error => error instanceof PortablePackageError && error.code === 'unsupported-bytecode-version');
 });
+
+test('a fixed Periodic interval needs no operator config to produce a signed package', async () => {
+  const verified = await verifyPortablePackage(signed('fixed-valid'), options);
+  assert.equal(verified.manifest.schedules[0].every.initialMs, 900000);
+  assert.equal(verified.manifest.schedules[0].every.configId, undefined);
+  assert.deepEqual(verified.manifest.configs, []);
+});

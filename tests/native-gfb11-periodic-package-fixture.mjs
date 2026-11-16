@@ -7,7 +7,10 @@ const scenario = process.argv[2] ?? 'valid';
 const cases = JSON.parse(fs.readFileSync(new URL('./reference/cases/02-time-control.json', import.meta.url), 'utf8')).cases;
 const reference = cases.find(item => item.id === 'REF-03-036');
 if (!reference) throw new Error('REF-03-036 is missing');
-const compilation = await compileSource(reference.source, { filename: reference.filename });
+const fixed = scenario.startsWith('fixed-');
+const source = fixed ? reference.source.replace('  config interval: Duration = 15min;\n', '')
+  .replace('every = interval;', 'every = 15min;') : reference.source;
+const compilation = await compileSource(source, { filename: reference.filename });
 const privateDer = Buffer.from('302e020100300506032b6570042204209d61b19deffd5a60ba844af492ec2cc44449c5697b326919703bac031cae7f60', 'hex');
 const privateKey = await crypto.subtle.importKey('pkcs8', privateDer, 'Ed25519', false, ['sign']);
 const identity = {
@@ -21,7 +24,7 @@ const signed = await buildPortablePackage(compilation, identity, {
   verifyCompilation: (source, options) => compileSource(source, options),
 });
 const packageValue = structuredClone(signed);
-if (scenario !== 'valid') {
+if (scenario !== 'valid' && scenario !== 'fixed-valid') {
   const manifest = JSON.parse(Buffer.from(packageValue.payload.manifest.contentBase64, 'base64').toString('utf8'));
   const schedule = manifest.schedules[0];
   if (scenario === 'missing-schedule') manifest.schedules = [];
@@ -30,7 +33,8 @@ if (scenario !== 'valid') {
   else if (scenario === 'wrong-name') schedule.name = 'other';
   else if (scenario === 'wrong-config-id') schedule.every.configId += 1;
   else if (scenario === 'wrong-config-name') schedule.every.config = 'other';
-  else if (scenario === 'wrong-initial') schedule.every.initialMs += 1;
+  else if (scenario === 'wrong-initial' || scenario === 'fixed-wrong-initial') schedule.every.initialMs += 1;
+  else if (scenario === 'fixed-fake-config') Object.assign(schedule.every, { config: 'interval', configId: 1 });
   else if (scenario === 'wrong-anchor') schedule.anchor.instantMs += 1;
   else if (scenario === 'wrong-gap') schedule.policy.gapMs += 1;
   else if (scenario === 'wrong-clock') schedule.policy.clock = 'untrusted';

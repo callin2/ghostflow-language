@@ -1942,8 +1942,10 @@ fn verify_config_bindings(manifest: &Value, module: &ghostflow_core::Module) -> 
     if weekday_profile && !weekdays.is_some_and(|items| !items.is_empty()) {
         return Err(mismatch("missing weekday conditions"));
     }
-    if configs.is_empty() && !solar_profile && !weekday_profile {
-        return Err(mismatch("portable GFB11 profile requires config streams"));
+    if configs.is_empty() && manifest_schedules.is_empty() && !solar_profile && !weekday_profile {
+        return Err(mismatch(
+            "portable GFB11 profile requires configs or Periodic schedules",
+        ));
     }
     let scalar_matches = |actual: MachineValue, expected: &Value| match actual {
         MachineValue::Bool(value) => expected.as_bool() == Some(value),
@@ -2039,9 +2041,14 @@ fn verify_config_bindings(manifest: &Value, module: &ghostflow_core::Module) -> 
                     ErrorCode::ManifestMismatch,
                 )?;
                 let interval = value_object(&expected["every"], "GFB11 Periodic interval")?;
+                let interval_keys: &[&str] = if every.id == 0 {
+                    &["expression", "initialMs"]
+                } else {
+                    &["expression", "initialMs", "config", "configId"]
+                };
                 exact_keys(
                     interval,
-                    &["expression", "initialMs", "config", "configId"],
+                    interval_keys,
                     "GFB11 Periodic interval",
                     ErrorCode::ManifestMismatch,
                 )?;
@@ -2052,10 +2059,6 @@ fn verify_config_bindings(manifest: &Value, module: &ghostflow_core::Module) -> 
                     "GFB11 Periodic policy",
                     ErrorCode::ManifestMismatch,
                 )?;
-                let config = configs
-                    .iter()
-                    .find(|entry| entry["id"].as_u64() == Some(u64::from(every.id)))
-                    .ok_or_else(|| mismatch("Periodic config identity differs from bytecode"))?;
                 if !sites.insert(periodic.site)
                     || expected["kind"].as_str() != Some("periodic")
                     || expected["name"].as_str() != Some(periodic.name.as_str())
@@ -2063,15 +2066,7 @@ fn verify_config_bindings(manifest: &Value, module: &ghostflow_core::Module) -> 
                     || anchor["kind"].as_str() != Some("instant")
                     || anchor["instantMs"].as_u64() != Some(*anchor_ms)
                     || epoch_id != &format!("instant:{anchor_ms}")
-                    || interval["configId"].as_u64() != Some(u64::from(every.id))
-                    || interval["config"].as_str() != Some(every.name.as_str())
-                    || interval["expression"].as_str() != Some(every.name.as_str())
                     || interval["initialMs"].as_u64() != Some(every.initial_ms)
-                    || config["name"].as_str() != Some(every.name.as_str())
-                    || config["type"].as_str() != Some("Duration")
-                    || config["value"].as_u64() != Some(every.initial_ms)
-                    || (config["settings"]["access"].as_str() == Some("operator"))
-                        != every.operator_editable
                     || policy["basis"].as_str() != Some("pulse")
                     || policy["when"].as_str() != Some("true")
                     || periodic.when != [1, 1]
@@ -2080,6 +2075,29 @@ fn verify_config_bindings(manifest: &Value, module: &ghostflow_core::Module) -> 
                     || policy["gapMs"].as_u64() != Some(periodic.gap_ms)
                     || policy["recovery"].as_str() != Some("baseline")
                     || policy["fallback"].as_str() != Some("skip")
+                {
+                    return Err(mismatch("GFB11 Periodic descriptor differs from bytecode"));
+                }
+                if every.id == 0 {
+                    // The compiler stores the source expression for display. The
+                    // verified milliseconds above are the executable interval.
+                    if !interval["expression"].is_string() && !interval["expression"].is_array() {
+                        return Err(mismatch("invalid fixed Periodic interval expression"));
+                    }
+                    continue;
+                }
+                let config = configs
+                    .iter()
+                    .find(|entry| entry["id"].as_u64() == Some(u64::from(every.id)))
+                    .ok_or_else(|| mismatch("Periodic config identity differs from bytecode"))?;
+                if interval["configId"].as_u64() != Some(u64::from(every.id))
+                    || interval["config"].as_str() != Some(every.name.as_str())
+                    || interval["expression"].as_str() != Some(every.name.as_str())
+                    || config["name"].as_str() != Some(every.name.as_str())
+                    || config["type"].as_str() != Some("Duration")
+                    || config["value"].as_u64() != Some(every.initial_ms)
+                    || (config["settings"]["access"].as_str() == Some("operator"))
+                        != every.operator_editable
                 {
                     return Err(mismatch("GFB11 Periodic descriptor differs from bytecode"));
                 }
@@ -5578,6 +5596,7 @@ mod tests {
         }];
         current.available_capabilities = &capabilities;
         verify_portable_package(&fixture_for("gfb11-periodic-valid"), &current).unwrap();
+        verify_portable_package(&fixture_for("gfb11-periodic-fixed-valid"), &current).unwrap();
 
         let reject_loader =
             |_: &[u8], _: &TargetLoaderContext<'_>| -> std::result::Result<bool, String> {
@@ -5592,6 +5611,8 @@ mod tests {
             "wrong-config-id",
             "wrong-config-name",
             "wrong-initial",
+            "fixed-wrong-initial",
+            "fixed-fake-config",
             "wrong-anchor",
             "wrong-gap",
             "wrong-clock",

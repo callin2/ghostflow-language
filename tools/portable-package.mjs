@@ -550,8 +550,8 @@ function validateConfigStreamPackageProfile(manifest, version, runtimeAbi) {
     fail('unsupported-runtime-abi', 'GFB11, control-v10 and context-scan-abi-v5 must be selected together');
   }
   if (!stream) return;
-  if (!Array.isArray(manifest.configs) || !manifest.configs.length
-    || !Array.isArray(manifest.schedules)
+  if (!Array.isArray(manifest.configs) || !Array.isArray(manifest.schedules)
+    || (!manifest.configs.length && !manifest.schedules.length)
     || manifest.schedules.some(schedule => schedule?.kind !== 'periodic')
     || ['signals','naturalConditions','providers','calendars','objectives','adaptSettings']
       .some(field => manifest[field] !== undefined && (!Array.isArray(manifest[field]) || manifest[field].length))
