@@ -868,7 +868,11 @@ fn verify_monitoring_plan(manifest: &Value) -> Result<()> {
     }
     let mut outputs = HashSet::new();
     let duration_key = |entry: &serde_json::Map<String, Value>| {
-        if entry.contains_key("configName") { "configName" } else { "durationMs" }
+        if entry.contains_key("configName") {
+            "configName"
+        } else {
+            "durationMs"
+        }
     };
     let valid_duration = |entry: &serde_json::Map<String, Value>| {
         if duration_key(entry) == "configName" {
@@ -882,7 +886,9 @@ fn verify_monitoring_plan(manifest: &Value) -> Result<()> {
                 })
             })
         } else {
-            entry.get("durationMs").and_then(Value::as_u64)
+            entry
+                .get("durationMs")
+                .and_then(Value::as_u64)
                 .is_some_and(|ms| (1..=9_007_199_254_740_991).contains(&ms))
         }
     };
@@ -899,7 +905,11 @@ fn verify_monitoring_plan(manifest: &Value) -> Result<()> {
         let mut keys = vec!["kind", "outputName", "stateName", "timerId"];
         if configured {
             keys.extend([limit_key, "activeValue"]);
-            keys.extend(["cycle", "sequence"].into_iter().filter(|key| pattern.contains_key(*key)));
+            keys.extend(
+                ["cycle", "sequence"]
+                    .into_iter()
+                    .filter(|key| pattern.contains_key(*key)),
+            );
         } else {
             keys.extend(["durationMs", "scheduleId"]);
             if pattern.contains_key("startCondition") {
@@ -984,10 +994,13 @@ fn verify_monitoring_plan(manifest: &Value) -> Result<()> {
                     if !id.is_some_and(|id| values.insert(id)) || !valid_duration(stage) {
                         return Err(mismatch("monitoring stages contain an invalid stage"));
                     }
-                    active |= value == &pattern["activeValue"] && stage.get(limit_key) == pattern.get(limit_key);
+                    active |= value == &pattern["activeValue"]
+                        && stage.get(limit_key) == pattern.get(limit_key);
                 }
                 if !active {
-                    return Err(mismatch("monitoring stages do not include the active stage"));
+                    return Err(mismatch(
+                        "monitoring stages do not include the active stage",
+                    ));
                 }
             }
             continue;
@@ -4320,7 +4333,10 @@ mod tests {
                 2 => pattern["sequence"][0]["durationMs"] = 7000.into(),
                 _ => pattern["durationMs"] = 0.into(),
             }
-            assert_eq!(verify_monitoring_plan(&bad).unwrap_err().code, ErrorCode::ManifestMismatch);
+            assert_eq!(
+                verify_monitoring_plan(&bad).unwrap_err().code,
+                ErrorCode::ManifestMismatch
+            );
         }
         for scenario in 0..8 {
             let mut bad = manifest.clone();
