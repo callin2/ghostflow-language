@@ -1,5 +1,9 @@
 # GhostFlow language ownership
 
+## 작업 범위 라우팅
+
+공통 작업 원칙과 적용 범위는 Farm Studio의 [WORK-GUIDANCE.ko.md](https://github.com/callin2/farm_studio_system/blob/dev/docs/WORK-GUIDANCE.ko.md)를 따른다. 이 저장소에서는 GhostFlow 문법·파서·타입·컴파일·VM·WASM 의미만 수정하고, Authoring·API·Simulator·Device의 소비자 동작은 해당 저장소에서 수정한다.
+
 These are the rules for AI coding agents and other contributors working in this
 repository. Read the first section before any task.
 
