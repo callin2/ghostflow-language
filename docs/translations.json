@@ -3508,13 +3508,13 @@
       "files": {
         "en": {
           "path": "CHANGELOG.md",
-          "sha256": "329c7436d0b24856452954eb79ad29071cbff9734f3998616bcb53fc1fd65426"
+          "sha256": "6fc1fdb795c50bdff67fb85208205f899010b92c947cd22296361a77c56053a6"
         },
         "ko": {
           "path": "CHANGELOG.ko.md",
-          "sha256": "19bab192ef6a9655302ac7e5ea522e8684ea867a974b409632cc1ce465895000",
+          "sha256": "f605f53072fca91bf58e60907c835d0cca8025ea61e26695d3e536b29d416085",
           "from": "en",
-          "sourceSha256": "329c7436d0b24856452954eb79ad29071cbff9734f3998616bcb53fc1fd65426"
+          "sourceSha256": "6fc1fdb795c50bdff67fb85208205f899010b92c947cd22296361a77c56053a6"
         }
       }
     },
@@ -5979,13 +5979,13 @@
       "files": {
         "en": {
           "path": "docs/MONITORING-PLAN.md",
-          "sha256": "c2be459d2b2bbc66ac147d5ff2518a93000a4a6f1b66b6bc756d89b575a00758"
+          "sha256": "708cf023608c8891ce8bec16e592d225e176dec698fce61ba3c818982db9296f"
         },
         "ko": {
           "path": "docs/MONITORING-PLAN.ko.md",
-          "sha256": "3cefe367b8e7bb1db0cd0de793f660f79e8117a3ee4d2579d5902857aca827ec",
+          "sha256": "1b9f54a49d9f413d9e82dbce623cb65af91a9005b76081e18ddcf7f397f219df",
           "from": "en",
-          "sourceSha256": "c2be459d2b2bbc66ac147d5ff2518a93000a4a6f1b66b6bc756d89b575a00758"
+          "sourceSha256": "708cf023608c8891ce8bec16e592d225e176dec698fce61ba3c818982db9296f"
         }
       }
     }

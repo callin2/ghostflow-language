@@ -867,69 +867,56 @@ fn verify_monitoring_plan(manifest: &Value) -> Result<()> {
         return Err(mismatch("monitoring.patterns must contain 1 to 32 entries"));
     }
     let mut outputs = HashSet::new();
+    let duration_key = |entry: &serde_json::Map<String, Value>| {
+        if entry.contains_key("configName") {
+            "configName"
+        } else {
+            "durationMs"
+        }
+    };
+    let valid_duration = |entry: &serde_json::Map<String, Value>| {
+        if duration_key(entry) == "configName" {
+            entry["configName"].as_str().is_some_and(|name| {
+                manifest["configs"].as_array().is_some_and(|configs| {
+                    configs.iter().any(|config| {
+                        config["name"].as_str() == Some(name)
+                            && config["type"].as_str() == Some("Duration")
+                            && config["settings"].is_object()
+                    })
+                })
+            })
+        } else {
+            entry
+                .get("durationMs")
+                .and_then(Value::as_u64)
+                .is_some_and(|ms| (1..=9_007_199_254_740_991).contains(&ms))
+        }
+    };
     for (index, value) in patterns.iter().enumerate() {
         let label = format!("monitoring.patterns[{index}]");
         let pattern = value_object(value, &label)?;
         let configured = pattern["kind"].as_str() == Some("configured-timed-output");
+        let limit_key = duration_key(pattern);
         if configured && pattern.contains_key("cycle") && pattern.contains_key("sequence") {
             return Err(mismatch(
                 "monitoring configured pattern cannot contain both cycle and sequence",
             ));
         }
-        exact_keys(
-            pattern,
-            if configured && pattern.contains_key("cycle") {
-                &[
-                    "kind",
-                    "outputName",
-                    "stateName",
-                    "timerId",
-                    "configName",
-                    "activeValue",
-                    "cycle",
-                ]
-            } else if configured && pattern.contains_key("sequence") {
-                &[
-                    "kind",
-                    "outputName",
-                    "stateName",
-                    "timerId",
-                    "configName",
-                    "activeValue",
-                    "sequence",
-                ]
-            } else if configured {
-                &[
-                    "kind",
-                    "outputName",
-                    "stateName",
-                    "timerId",
-                    "configName",
-                    "activeValue",
-                ]
-            } else if pattern.contains_key("startCondition") {
-                &[
-                    "kind",
-                    "outputName",
-                    "stateName",
-                    "timerId",
-                    "durationMs",
-                    "scheduleId",
-                    "startCondition",
-                ]
-            } else {
-                &[
-                    "kind",
-                    "outputName",
-                    "stateName",
-                    "timerId",
-                    "durationMs",
-                    "scheduleId",
-                ]
-            },
-            &label,
-            ErrorCode::ManifestMismatch,
-        )?;
+        let mut keys = vec!["kind", "outputName", "stateName", "timerId"];
+        if configured {
+            keys.extend([limit_key, "activeValue"]);
+            keys.extend(
+                ["cycle", "sequence"]
+                    .into_iter()
+                    .filter(|key| pattern.contains_key(*key)),
+            );
+        } else {
+            keys.extend(["durationMs", "scheduleId"]);
+            if pattern.contains_key("startCondition") {
+                keys.push("startCondition");
+            }
+        }
+        exact_keys(pattern, &keys, &label, ErrorCode::ManifestMismatch)?;
         if !configured && pattern["kind"].as_str() != Some("scheduled-timed-latch") {
             return Err(mismatch("monitoring pattern kind is unsupported"));
         }
@@ -953,25 +940,17 @@ fn verify_monitoring_plan(manifest: &Value) -> Result<()> {
         let state = name("stateName")?;
         let timer = name("timerId")?;
         if configured {
-            let config = name("configName")?;
             if !(pattern["activeValue"] == true
                 || pattern["activeValue"]
                     .as_u64()
-                    .is_some_and(|value| value <= 9_007_199_254_740_991))
+                    .is_some_and(|value| value <= u64::from(u32::MAX)))
             {
                 return Err(mismatch(
-                    "configured monitoring activeValue must be true or a non-negative safe integer",
+                    "configured monitoring activeValue must be true or an unsigned 32-bit integer",
                 ));
             }
-            if !manifest["configs"].as_array().is_some_and(|configs| {
-                configs.iter().any(|candidate| {
-                    candidate["name"].as_str() == Some(config)
-                        && candidate["type"].as_str() == Some("Duration")
-                })
-            }) {
-                return Err(mismatch(
-                    "configured monitoring config must be a declared Duration",
-                ));
+            if !valid_duration(pattern) {
+                return Err(mismatch("configured monitoring requires a positive duration or declared Duration setting"));
             }
             if !outputs.insert(output)
                 || !manifest["outputs"].as_array().is_some_and(|ports| {
@@ -991,19 +970,19 @@ fn verify_monitoring_plan(manifest: &Value) -> Result<()> {
                     "configured monitoring pattern does not match output and elapsed timer",
                 ));
             }
-            if let Some(cycle) = pattern.get("cycle") {
-                let stages = cycle
+            if let Some(stages) = pattern.get("cycle").or_else(|| pattern.get("sequence")) {
+                let stages = stages
                     .as_array()
                     .filter(|items| (2..=8).contains(&items.len()))
-                    .ok_or_else(|| mismatch("monitoring cycle must contain 2 to 8 stages"))?;
+                    .ok_or_else(|| mismatch("monitoring requires 2 to 8 stages"))?;
                 let mut values = HashSet::new();
                 let mut active = false;
                 for stage in stages {
-                    let stage = value_object(stage, "monitoring cycle stage")?;
+                    let stage = value_object(stage, "monitoring stage")?;
                     exact_keys(
                         stage,
-                        &["value", "configName"],
-                        "monitoring cycle stage",
+                        &["value", duration_key(stage)],
+                        "monitoring stage",
                         ErrorCode::ManifestMismatch,
                     )?;
                     let value = &stage["value"];
@@ -1012,62 +991,15 @@ fn verify_monitoring_plan(manifest: &Value) -> Result<()> {
                     } else {
                         value.as_u64().filter(|id| *id <= u64::from(u32::MAX))
                     };
-                    let config_name = stage["configName"].as_str();
-                    if !id.is_some_and(|id| values.insert(id))
-                        || !manifest["configs"].as_array().is_some_and(|configs| {
-                            configs.iter().any(|candidate| {
-                                candidate["name"].as_str() == config_name
-                                    && candidate["type"].as_str() == Some("Duration")
-                            })
-                        })
-                    {
-                        return Err(mismatch("monitoring cycle has an invalid stage"));
+                    if !id.is_some_and(|id| values.insert(id)) || !valid_duration(stage) {
+                        return Err(mismatch("monitoring stages contain an invalid stage"));
                     }
-                    active |= value == &pattern["activeValue"] && config_name == Some(config);
+                    active |= value == &pattern["activeValue"]
+                        && stage.get(limit_key) == pattern.get(limit_key);
                 }
                 if !active {
                     return Err(mismatch(
-                        "monitoring cycle does not include the active stage",
-                    ));
-                }
-            }
-            if let Some(sequence) = pattern.get("sequence") {
-                let stages = sequence
-                    .as_array()
-                    .filter(|items| (2..=8).contains(&items.len()))
-                    .ok_or_else(|| mismatch("monitoring sequence must contain 2 to 8 stages"))?;
-                let mut values = HashSet::new();
-                let mut active = false;
-                for stage in stages {
-                    let stage = value_object(stage, "monitoring sequence stage")?;
-                    exact_keys(
-                        stage,
-                        &["value", "configName"],
-                        "monitoring sequence stage",
-                        ErrorCode::ManifestMismatch,
-                    )?;
-                    let value = &stage["value"];
-                    let id = if pattern["activeValue"].is_boolean() {
-                        value.as_bool().map(u64::from)
-                    } else {
-                        value.as_u64().filter(|id| *id <= u64::from(u32::MAX))
-                    };
-                    let config_name = stage["configName"].as_str();
-                    if !id.is_some_and(|id| values.insert(id))
-                        || !manifest["configs"].as_array().is_some_and(|configs| {
-                            configs.iter().any(|candidate| {
-                                candidate["name"].as_str() == config_name
-                                    && candidate["type"].as_str() == Some("Duration")
-                            })
-                        })
-                    {
-                        return Err(mismatch("monitoring sequence has an invalid stage"));
-                    }
-                    active |= value == &pattern["activeValue"] && config_name == Some(config);
-                }
-                if !active {
-                    return Err(mismatch(
-                        "monitoring sequence does not include the active stage",
+                        "monitoring stages do not include the active stage",
                     ));
                 }
             }
@@ -4371,7 +4303,7 @@ mod tests {
     #[test]
     fn finite_monitoring_sequences_and_cycles_require_bounded_declared_stages() {
         let manifest = serde_json::json!({
-            "configs": [{"name": "first_time", "type": "Duration"}, {"name": "rest_time", "type": "Duration"}],
+            "configs": [{"name": "first_time", "type": "Duration", "settings": {}}, {"name": "rest_time", "type": "Duration", "settings": {}}],
             "outputs": [{"name": "valve", "type": "Bool"}],
             "timers": [{"name": "age", "state": "phase"}],
             "monitoring": {"schema": "GhostFlow/monitoring-plan-v1", "patterns": [{
@@ -4386,6 +4318,26 @@ mod tests {
         let stages = pattern.remove("sequence").unwrap();
         pattern.insert("cycle".into(), stages);
         verify_monitoring_plan(&cycle).unwrap();
+        let mut fixed = manifest.clone();
+        let pattern = fixed["monitoring"]["patterns"][0].as_object_mut().unwrap();
+        pattern.remove("configName");
+        pattern.insert("durationMs".into(), 8000.into());
+        pattern["sequence"][0] = serde_json::json!({"value": 1, "durationMs": 8000});
+        verify_monitoring_plan(&fixed).unwrap();
+        for scenario in 0..4 {
+            let mut bad = fixed.clone();
+            let pattern = &mut bad["monitoring"]["patterns"][0];
+            match scenario {
+                0 => pattern["configName"] = "first_time".into(),
+                1 => pattern["sequence"][1]["durationMs"] = 2000.into(),
+                2 => pattern["sequence"][0]["durationMs"] = 7000.into(),
+                _ => pattern["durationMs"] = 0.into(),
+            }
+            assert_eq!(
+                verify_monitoring_plan(&bad).unwrap_err().code,
+                ErrorCode::ManifestMismatch
+            );
+        }
         for scenario in 0..8 {
             let mut bad = manifest.clone();
             let pattern = &mut bad["monitoring"]["patterns"][0];
