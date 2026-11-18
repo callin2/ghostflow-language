@@ -11,6 +11,10 @@ Daily와 DailySlots 실행기는 `schedule_checkpoint`와 `restore_schedule_chec
 
 ## 미출시
 
+### 2026-11-18 - 고정 시간을 사용하는 순차 운전의 예정 표시 ([#622](https://github.com/callin2/ghostflow-language/issues/622))
+
+한 번 실행하고 대기로 돌아오는 순차 운전은 단계 시간이 고정값이거나 운전 설정일 때 이후 단계를 운행도에 표시할 수 있습니다. 정지 입력을 처리하는 Result `case`가 정상 입력값을 그대로 사용하고 오류를 `recover`와 같은 방식으로 처리하는 경우도 포함합니다. 예정 계산은 대기 상태에서 끝나며 제어 코드의 실행 동작은 바뀌지 않습니다.
+
 ### 2026-11-16 - UTF-8 표시가 있는 서명 원문 보존 ([#314](https://github.com/callin2/ghostflow-language/issues/314))
 
 문서 및 배선 선언 파서는 파일 첫머리의 UTF-8 표시를 인식하고 원문상의 위치를 유지합니다. 패키지를 다시 검증할 때 이 표시와 줄바꿈을 포함한 서명 당시의 마크다운 바이트를 그대로 사용합니다.

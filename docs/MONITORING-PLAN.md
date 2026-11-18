@@ -21,3 +21,13 @@ Portable package replay checks an explicit value against the original source.
 An older signed plan that omits the field keeps its original metadata and
 conditional display. Replay checks the rest of that plan and its artifact
 identity. The field leaves the source and GFB bytes unchanged.
+
+A `configured-timed-output` pattern identifies its duration with either
+`configName` for a live operator Duration setting or `durationMs` for a
+positive fixed duration. Each entry in a `sequence` uses the same fields.
+The active stage carries the same duration as the enclosing pattern.
+
+The device projects only later stages of a sequence already in progress.
+The projection ends at the waiting state. An external stop input can still
+cancel the sequence, including when the source unwraps that input with
+`case` and supplies a fallback for a read fault.

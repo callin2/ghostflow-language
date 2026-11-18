@@ -83,11 +83,17 @@ function validateMonitoringPlanManifest(manifest) {
   const outputs = new Map(manifest.outputs.filter(isPlainObject).map(output => [output.name, output]));
   const schedules = new Set(manifest.schedules.filter(isPlainObject).map(schedule => schedule.name));
   const timers = new Map(manifest.timers.filter(isPlainObject).map(timer => [timer.name, timer]));
+  const durationKey = entry => Object.hasOwn(entry, 'configName') ? 'configName' : 'durationMs';
+  const validDuration = entry => durationKey(entry) === 'configName'
+    ? manifest.configs.some(config => config.name === entry.configName && config.type === 'Duration' && config.settings)
+    : Number.isSafeInteger(entry.durationMs) && entry.durationMs > 0;
   const seenOutputs = new Set();
   for (const [index, pattern] of monitoring.patterns.entries()) {
     const path = `manifest.monitoring.patterns[${index}]`;
+    if (!isPlainObject(pattern)) fail('manifest-mismatch', `${path} must be an object`);
+    const limitKey = durationKey(pattern);
     const keys = pattern.kind === 'configured-timed-output'
-      ? ['kind', 'outputName', 'stateName', 'timerId', 'configName', 'activeValue', ...('cycle' in pattern ? ['cycle'] : []), ...('sequence' in pattern ? ['sequence'] : [])]
+      ? ['kind', 'outputName', 'stateName', 'timerId', limitKey, 'activeValue', ...('cycle' in pattern ? ['cycle'] : []), ...('sequence' in pattern ? ['sequence'] : [])]
       : ['kind', 'outputName', 'stateName', 'timerId', 'durationMs', 'scheduleId', ...('startCondition' in pattern ? ['startCondition'] : [])];
     exactObject(pattern, keys, path);
     if (!['scheduled-timed-latch', 'configured-timed-output'].includes(pattern.kind)) fail('manifest-mismatch', `${path}.kind is unsupported`);
@@ -95,43 +101,30 @@ function validateMonitoringPlanManifest(manifest) {
     ghostName(pattern.stateName, `${path}.stateName`);
     ghostName(pattern.timerId, `${path}.timerId`);
     if (pattern.kind === 'configured-timed-output') {
-      ghostName(pattern.configName, `${path}.configName`);
-      if (!(pattern.activeValue === true || Number.isSafeInteger(pattern.activeValue) && pattern.activeValue >= 0)) fail('manifest-mismatch', `${path}.activeValue must be true or a non-negative safe integer`);
+      if (!(pattern.activeValue === true || Number.isInteger(pattern.activeValue) && pattern.activeValue >= 0 && pattern.activeValue <= 0xffff_ffff)) fail('manifest-mismatch', `${path}.activeValue must be true or an unsigned 32-bit integer`);
       if (outputs.get(pattern.outputName)?.type !== 'Bool'
-        || !manifest.configs.some(config => config.name === pattern.configName && config.type === 'Duration')
+        || !validDuration(pattern)
         || timers.get(pattern.timerId)?.state !== pattern.stateName || seenOutputs.has(pattern.outputName)) {
-        fail('manifest-mismatch', `${path} does not match declared output, Duration config and elapsed timer`);
+        fail('manifest-mismatch', `${path} does not match declared output, Duration and elapsed timer`);
       }
-      if ('cycle' in pattern) {
-        if ('sequence' in pattern) fail('manifest-mismatch', `${path} cannot contain both cycle and sequence`);
-        const { cycle, activeValue } = pattern;
-        if (!Array.isArray(cycle) || cycle.length < 2 || cycle.length > 8) fail('manifest-mismatch', `${path}.cycle length is unsupported`);
+      if ('cycle' in pattern && 'sequence' in pattern) fail('manifest-mismatch', `${path} cannot contain both cycle and sequence`);
+      const stageKey = 'cycle' in pattern ? 'cycle' : 'sequence';
+      if (stageKey in pattern) {
+        const stages = pattern[stageKey];
+        const { activeValue } = pattern;
+        if (!Array.isArray(stages) || stages.length < 2 || stages.length > 8) fail('manifest-mismatch', `${path}.${stageKey} length is unsupported`);
         const values = new Set();
-        for (const stage of cycle) {
-          exactObject(stage, ['value', 'configName'], `${path}.cycle stage`);
+        for (const stage of stages) {
+          if (!isPlainObject(stage)) fail('manifest-mismatch', `${path}.${stageKey} has an invalid stage`);
+          exactObject(stage, ['value', durationKey(stage)], `${path}.${stageKey} stage`);
           if (!(typeof activeValue === 'boolean' ? typeof stage.value === 'boolean'
             : Number.isInteger(stage.value) && stage.value >= 0 && stage.value <= 0xffff_ffff)
-            || values.has(stage.value) || !manifest.configs.some(config => config.name === stage.configName && config.type === 'Duration')) {
-            fail('manifest-mismatch', `${path}.cycle has an invalid stage`);
+            || values.has(stage.value) || !validDuration(stage)) {
+            fail('manifest-mismatch', `${path}.${stageKey} has an invalid stage`);
           }
           values.add(stage.value);
         }
-        if (!cycle.some(stage => stage.value === activeValue && stage.configName === pattern.configName)) fail('manifest-mismatch', `${path}.cycle does not include the active stage`);
-      }
-      if ('sequence' in pattern) {
-        const { sequence, activeValue } = pattern;
-        if (!Array.isArray(sequence) || sequence.length < 2 || sequence.length > 8) fail('manifest-mismatch', `${path}.sequence length is unsupported`);
-        const values = new Set();
-        for (const stage of sequence) {
-          exactObject(stage, ['value', 'configName'], `${path}.sequence stage`);
-          if (!(typeof activeValue === 'boolean' ? typeof stage.value === 'boolean'
-            : Number.isInteger(stage.value) && stage.value >= 0 && stage.value <= 0xffff_ffff)
-            || values.has(stage.value) || !manifest.configs.some(config => config.name === stage.configName && config.type === 'Duration')) {
-            fail('manifest-mismatch', `${path}.sequence has an invalid stage`);
-          }
-          values.add(stage.value);
-        }
-        if (!sequence.some(stage => stage.value === activeValue && stage.configName === pattern.configName)) fail('manifest-mismatch', `${path}.sequence does not include the active stage`);
+        if (!stages.some(stage => stage.value === activeValue && stage[limitKey] === pattern[limitKey])) fail('manifest-mismatch', `${path}.${stageKey} does not include the active stage`);
       }
       seenOutputs.add(pattern.outputName);
       continue;

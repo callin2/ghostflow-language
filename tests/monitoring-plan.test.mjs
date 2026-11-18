@@ -228,6 +228,35 @@ test('external cancellation to the waiting boundary preserves finite sequence me
   assert.ok(compiled.manifest.monitoring.patterns.every(pattern => pattern.kind === 'configured-timed-output' && !pattern.cycle));
 });
 
+function fixedCancelledSequence() {
+  return externallyCancelledSequence('stop_pressed')
+    .replace('input start, stop: Bool;',
+      'input start, stop: Bool; let stop_pressed = case stop { ok(pressed) => pressed; fault(_) => false; };')
+    .replace('age >= first then', 'age >= 8s then')
+    .replace('age >= second then', 'age >= 6s then')
+    .replace('age >= rest then', 'age >= 2s then');
+}
+
+test('a case-based stop and fixed stage times retain the full finite sequence', async () => {
+  const source = fixedCancelledSequence();
+  const options = { filename: 'literal-timers.ghost.md' };
+  const compiled = await compileSource(source, options);
+  const sequence = [{ value: 1, durationMs: 8000 }, { value: 2, durationMs: 6000 }, { value: 3, durationMs: 2000 }];
+  assert.deepEqual(compiled.manifest.monitoring.patterns.map(({ outputName, durationMs, sequence }) => ({
+    outputName, durationMs, sequence,
+  })), [
+    { outputName: 'valve_a', durationMs: 8000, sequence },
+    { outputName: 'valve_b', durationMs: 6000, sequence },
+  ]);
+  for (const altered of [
+    source.replace('fault(_) => false;', 'fault(_) => age >= 1s;'),
+    source.replace('age >= 2s then Idle', 'age >= 0s then Idle'),
+  ]) {
+    const { manifest } = await compileSource(altered, options);
+    assert.deepEqual(manifest.monitoring?.patterns ?? [], []);
+  }
+});
+
 test('immutable external Bool aliases and pure Bool composition retain a finite plan', async () => {
   const guards = [
     'external_stop', '!(!external_stop)', 'external_stop || external_stop',
@@ -395,7 +424,7 @@ test('external stop, held stop, new start and live Duration retain their runtime
 });
 
 test('portable replay verifies a guarded finite sequence and rejects a resigned stage substitution', async () => {
-  const compiled = await compileSource(externallyCancelledSequence(), { filename: 'portable-finite.ghost.md' });
+  const compiled = await compileSource(fixedCancelledSequence(), { filename: 'portable-finite.ghost.md' });
   const key = await crypto.subtle.generateKey('Ed25519', true, ['sign', 'verify']);
   const identity = {
     compilerRevision: 'guarded-finite-test', runtimeSemantics: 'GhostFlow/runtime-semantics-v1',

@@ -8,6 +8,10 @@ Daily and DailySlots runtimes can now export and restore exact-Program terminal 
 
 ## Unreleased
 
+### 2026-11-18 - Show fixed stages in finite timed sequences ([#622](https://github.com/callin2/ghostflow-language/issues/622))
+
+Monitoring can describe the later stages of a finite sequence whose timers use literal durations or operator settings. A stop input may use an explicit Result `case` that returns the successful value and handles a fault the same way as `recover`. The projection ends at the waiting state and the executable control does not change.
+
 ### 2026-11-16 - Preserve exact signed source with a UTF-8 BOM ([#314](https://github.com/callin2/ghostflow-language/issues/314))
 
 Literate and hardware readers recognize a leading UTF-8 byte order mark and retain original source positions. Package verification replays the signed Markdown bytes, including the mark and line endings.
