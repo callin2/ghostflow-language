@@ -25,6 +25,12 @@
 이해하는 것입니다. 단순한 물 주기 시스템부터 더 넓은 자동화까지, 제어 프로그램의
 전체 수명 동안 그 이해를 살려 두는 것이 우리의 비전입니다.
 
+GhostFlow와 Farm Studio는 개인이 중앙화된 서비스에 의존하지 않고 작은 자동화를
+직접 만들고 운영하며, 이를 연결해 중·대규모로 확장할 수 있게 하는 것을 목표로
+합니다. 규모가 커져도 사용자가 자신의 자동화를 통제할 수 있어야 합니다.
+[공통 목적과 원칙](https://github.com/callin2/farm_studio_system/blob/dev/docs/vision/README.md#individual-autonomy-and-composable-scale)은
+이러한 선택의 기준이며, 구현 완료를 뜻하지 않는 설계 목표입니다.
+
 **GhostFlow란?** GhostFlow는 제어 언어입니다. 모든 프로그램은 사람이 읽을 수 있는
 **`.ghost.md` 문서**(문서형 Markdown 파일)이며, 의도와 그 설명, 실행 가능한 규칙을
 나란히 담습니다. 컴파일된 코드, 다이어그램, 추적 기록은 모두 이 하나의 소스에서

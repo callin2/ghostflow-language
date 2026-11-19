@@ -24,6 +24,12 @@ describe how it ought to work, check how it behaves, and understand why it acted
 Our vision is to keep that understanding alive for the whole life of a control
 program, from a simple watering system to wider automation.
 
+GhostFlow and Farm Studio aim to let individuals build and operate small
+automations without depending on a centralized service, then connect them to
+work at medium and large scales. Users should retain control of their own
+automation as it grows. The [shared purpose and principles](https://github.com/callin2/farm_studio_system/blob/dev/docs/vision/README.md#individual-autonomy-and-composable-scale)
+guide those choices; they state design goals, not completed implementation.
+
 **What is GhostFlow?** GhostFlow is a control language. Every program is a
 human-readable **`.ghost.md` document** (a literate Markdown file) that holds the
 intent, its explanation, and the executable rules side by side. Compiled code,
