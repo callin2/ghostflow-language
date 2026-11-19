@@ -3,6 +3,10 @@
 
 # GhostFlow言語の所有範囲
 
+## 作業範囲の振り分け
+
+共通の作業原則と適用範囲は、Farm Studioの[WORK-GUIDANCE.ko.md](https://github.com/callin2/farm_studio_system/blob/dev/docs/WORK-GUIDANCE.ko.md)に従います。このリポジトリではGhostFlowの構文、パーサー、型、コンパイル、VM・WASMの意味論だけを変更し、Authoring・API・Simulator・Deviceの利用側の振る舞いは、それぞれのリポジトリで変更します。
+
 このリポジトリで作業するAIコーディングエージェントとその他のコントリビューターのためのルールです。どのタスクでも、始める前に最初のセクションを読んでください。
 
 **ドキュメントを探して保守する**

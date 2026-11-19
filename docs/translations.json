@@ -953,31 +953,31 @@
       "files": {
         "en": {
           "path": "AGENTS.md",
-          "sha256": "10f3335e740f40a43a0999d413a62990de3cd1df8c3d0ce79a3aa86d34d7f399"
+          "sha256": "1f7f759e645f1179e3231a08db31405e81182d6481ccac899efeef80d2f85985"
         },
         "ko": {
           "path": "AGENTS.ko.md",
-          "sha256": "b90a188d8493e1a03e3ec922fed609a335e8be15ca1372044192fd63b3d0c462",
+          "sha256": "6c4078e116cd7f1abcd31f9c2cf9601779ea722bd9c5a9748410da1ce45faece",
           "from": "en",
-          "sourceSha256": "10f3335e740f40a43a0999d413a62990de3cd1df8c3d0ce79a3aa86d34d7f399"
+          "sourceSha256": "1f7f759e645f1179e3231a08db31405e81182d6481ccac899efeef80d2f85985"
         },
         "zh": {
           "path": "AGENTS.zh.md",
-          "sha256": "452fe8bfef860a743afee294f0c9fd511fe5d83c0c45b60328a5392f78c9bc6e",
+          "sha256": "f43c529b6182ae6992e1690ef2d7380646788140f3d7be45f1424dd13d7fbc0b",
           "from": "en",
-          "sourceSha256": "10f3335e740f40a43a0999d413a62990de3cd1df8c3d0ce79a3aa86d34d7f399"
+          "sourceSha256": "1f7f759e645f1179e3231a08db31405e81182d6481ccac899efeef80d2f85985"
         },
         "es": {
           "path": "AGENTS.es.md",
-          "sha256": "a2d245836eef5e93a0440a0ecc69717b8f4f0f204b51000167aa623802c7ce63",
+          "sha256": "623d3349533706a645cb7b3d68a261d56b4ab4e5d4642c6ff8063d290458703f",
           "from": "en",
-          "sourceSha256": "10f3335e740f40a43a0999d413a62990de3cd1df8c3d0ce79a3aa86d34d7f399"
+          "sourceSha256": "1f7f759e645f1179e3231a08db31405e81182d6481ccac899efeef80d2f85985"
         },
         "ja": {
           "path": "AGENTS.ja.md",
-          "sha256": "ff8a08ed38d3d3b76881d5474564d3bead1276b98611c6b7c2d394db5b919a03",
+          "sha256": "3607a125ef4e9f9fd7427eca79f34c91feffffd798550d4ca5fca54ee35ab419",
           "from": "en",
-          "sourceSha256": "10f3335e740f40a43a0999d413a62990de3cd1df8c3d0ce79a3aa86d34d7f399"
+          "sourceSha256": "1f7f759e645f1179e3231a08db31405e81182d6481ccac899efeef80d2f85985"
         }
       }
     },
