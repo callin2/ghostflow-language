@@ -24,6 +24,8 @@
 
 理解一个工艺过程的人，应当能够做到三件事：描述它应该如何运作，检查它实际如何表现，并理解它为什么这样动作。我们的愿景是在控制程序的整个生命周期中保持这种理解，从简单的浇水系统到更广泛的自动化。
 
+GhostFlow 和 Farm Studio 的目标是让个人无需依赖中心化服务，就能自行构建和运行小规模自动化，再将它们连接起来，扩展到中、大规模。规模扩大后，用户仍应掌握对自身自动化的控制权。[共同目标与原则](https://github.com/callin2/farm_studio_system/blob/dev/docs/vision/README.md#individual-autonomy-and-composable-scale)为这些选择提供依据；它们是设计目标，并不表示相关功能已经实现。
+
 **GhostFlow 是什么？** GhostFlow 是一种控制语言。每个程序都是一份人类可读的 **`.ghost.md` 文档**（一个文学式（literate）Markdown 文件），把意图、对意图的解释和可执行规则并排放在一起。编译后的代码、图表和追踪都是这一份源的*派生视图*。
 
 **它如何工作？**

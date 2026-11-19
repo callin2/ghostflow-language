@@ -3,6 +3,15 @@
 
 # Titularidad del lenguaje GhostFlow
 
+## Enrutamiento por ámbito de trabajo
+
+Los principios comunes de trabajo y su ámbito de aplicación siguen
+[WORK-GUIDANCE.ko.md](https://github.com/callin2/farm_studio_system/blob/dev/docs/WORK-GUIDANCE.ko.md)
+de Farm Studio. En este repositorio solo se modifican la sintaxis, el parser,
+los tipos, la compilación y la semántica de VM y WASM de GhostFlow. El
+comportamiento de los consumidores Authoring, API, Simulator y Device se
+modifica en sus respectivos repositorios.
+
 Estas son las reglas para los agentes de codificación con IA y demás
 colaboradores que trabajan en este repositorio. Lea la primera sección antes de
 cualquier tarea.

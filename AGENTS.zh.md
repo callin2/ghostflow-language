@@ -3,6 +3,10 @@
 
 # GhostFlow 语言所有权
 
+## 工作范围路由
+
+共同的工作原则及其适用范围遵循 Farm Studio 的 [WORK-GUIDANCE.ko.md](https://github.com/callin2/farm_studio_system/blob/dev/docs/WORK-GUIDANCE.ko.md)。本仓库只修改 GhostFlow 的语法、解析器、类型、编译、VM 和 WASM 语义；Authoring、API、Simulator 和 Device 的消费端行为在各自的仓库中修改。
+
 这些是在本仓库中工作的 AI 编码代理和其他贡献者需要遵守的规则。开始任何任务之前，请先阅读第一部分。
 
 **查找与维护文档**

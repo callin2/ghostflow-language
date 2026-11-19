@@ -953,31 +953,31 @@
       "files": {
         "en": {
           "path": "AGENTS.md",
-          "sha256": "10f3335e740f40a43a0999d413a62990de3cd1df8c3d0ce79a3aa86d34d7f399"
+          "sha256": "1f7f759e645f1179e3231a08db31405e81182d6481ccac899efeef80d2f85985"
         },
         "ko": {
           "path": "AGENTS.ko.md",
-          "sha256": "b90a188d8493e1a03e3ec922fed609a335e8be15ca1372044192fd63b3d0c462",
+          "sha256": "6c4078e116cd7f1abcd31f9c2cf9601779ea722bd9c5a9748410da1ce45faece",
           "from": "en",
-          "sourceSha256": "10f3335e740f40a43a0999d413a62990de3cd1df8c3d0ce79a3aa86d34d7f399"
+          "sourceSha256": "1f7f759e645f1179e3231a08db31405e81182d6481ccac899efeef80d2f85985"
         },
         "zh": {
           "path": "AGENTS.zh.md",
-          "sha256": "452fe8bfef860a743afee294f0c9fd511fe5d83c0c45b60328a5392f78c9bc6e",
+          "sha256": "f43c529b6182ae6992e1690ef2d7380646788140f3d7be45f1424dd13d7fbc0b",
           "from": "en",
-          "sourceSha256": "10f3335e740f40a43a0999d413a62990de3cd1df8c3d0ce79a3aa86d34d7f399"
+          "sourceSha256": "1f7f759e645f1179e3231a08db31405e81182d6481ccac899efeef80d2f85985"
         },
         "es": {
           "path": "AGENTS.es.md",
-          "sha256": "a2d245836eef5e93a0440a0ecc69717b8f4f0f204b51000167aa623802c7ce63",
+          "sha256": "623d3349533706a645cb7b3d68a261d56b4ab4e5d4642c6ff8063d290458703f",
           "from": "en",
-          "sourceSha256": "10f3335e740f40a43a0999d413a62990de3cd1df8c3d0ce79a3aa86d34d7f399"
+          "sourceSha256": "1f7f759e645f1179e3231a08db31405e81182d6481ccac899efeef80d2f85985"
         },
         "ja": {
           "path": "AGENTS.ja.md",
-          "sha256": "ff8a08ed38d3d3b76881d5474564d3bead1276b98611c6b7c2d394db5b919a03",
+          "sha256": "3607a125ef4e9f9fd7427eca79f34c91feffffd798550d4ca5fca54ee35ab419",
           "from": "en",
-          "sourceSha256": "10f3335e740f40a43a0999d413a62990de3cd1df8c3d0ce79a3aa86d34d7f399"
+          "sourceSha256": "1f7f759e645f1179e3231a08db31405e81182d6481ccac899efeef80d2f85985"
         }
       }
     },
@@ -4225,31 +4225,31 @@
       "files": {
         "en": {
           "path": "README.md",
-          "sha256": "c6e79df9eaad2c2bc673c131fe9b4d65c5c4b8c1e185c2ff104628bd7019fa96"
+          "sha256": "768b1637612aef9e9b0bb0ad4cb1939a64a69e5d4094e1519552fb2d13f38af8"
         },
         "ko": {
           "path": "README.ko.md",
-          "sha256": "d69b523d2f77d7b4fd6015e62b7b8ba5480ffdd4568e22cb60a45e1fa4a3cf80",
+          "sha256": "a479c2a2a00a383331f0842787b730bc52e5d1842bd651e4df1a40c3aec44bed",
           "from": "en",
-          "sourceSha256": "c6e79df9eaad2c2bc673c131fe9b4d65c5c4b8c1e185c2ff104628bd7019fa96"
+          "sourceSha256": "768b1637612aef9e9b0bb0ad4cb1939a64a69e5d4094e1519552fb2d13f38af8"
         },
         "zh": {
           "path": "README.zh.md",
-          "sha256": "6807d8c74dea171f8f7b18461e01beb9a1c227865ac7174337c4ec937aa4aa60",
+          "sha256": "6304a9066bf2fa2e3b8cb612826c15fa85cafa210f1b45e856580ff5a4b19bc8",
           "from": "en",
-          "sourceSha256": "c6e79df9eaad2c2bc673c131fe9b4d65c5c4b8c1e185c2ff104628bd7019fa96"
+          "sourceSha256": "768b1637612aef9e9b0bb0ad4cb1939a64a69e5d4094e1519552fb2d13f38af8"
         },
         "es": {
           "path": "README.es.md",
-          "sha256": "d36790ecc2e82d105e18294504e020d2c29c9606fcc3371afa17a10ac680e5d7",
+          "sha256": "607a3e22abb8c64c88ac14ba98835c53709856cb99d2341cba5c8a43d10c950d",
           "from": "en",
-          "sourceSha256": "c6e79df9eaad2c2bc673c131fe9b4d65c5c4b8c1e185c2ff104628bd7019fa96"
+          "sourceSha256": "768b1637612aef9e9b0bb0ad4cb1939a64a69e5d4094e1519552fb2d13f38af8"
         },
         "ja": {
           "path": "README.ja.md",
-          "sha256": "a21df3b42ed9a0f26a902862b42ad8a91ad14aedb85e39824e365248d18bbb8a",
+          "sha256": "d8739fe7e29ab53a728abdc3f5becb4d0a5d2fe89da73bbc2e8316e13467274d",
           "from": "en",
-          "sourceSha256": "c6e79df9eaad2c2bc673c131fe9b4d65c5c4b8c1e185c2ff104628bd7019fa96"
+          "sourceSha256": "768b1637612aef9e9b0bb0ad4cb1939a64a69e5d4094e1519552fb2d13f38af8"
         }
       }
     },
