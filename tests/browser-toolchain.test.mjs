@@ -212,3 +212,9 @@ test('descriptor corpus retains prior authored states on unavailable input witho
     assert.equal(failed.sensors.sample.quality, 'NotReady');
   } finally { runtime.dispose(); }
 });
+
+test('browser and Node expose the same direct sensor block explanation producer', async () => {
+  const [browser, node] = await Promise.all([import(browserEntry), import('../tools/toolchain.mjs')]);
+  assert.equal(typeof browser.prepareDirectSensorBlockExplanation, 'function', 'browser explanation entry is missing');
+  assert.equal(browser.prepareDirectSensorBlockExplanation, node.prepareDirectSensorBlockExplanation);
+});

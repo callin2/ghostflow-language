@@ -13,7 +13,9 @@ export { emitInteractionSchema };
 export { inspectSourceChanges, sourceChangeInventory } from './source-changes.mjs';
 export { planSourceUpdate, verifySourceUpdate } from './update-request.mjs';
 export { previewLegacyScalarMigration, inspectLegacyAdmissionSource, assertLegacyAdmissionTarget, validateLegacyAdmission, preflightLegacyAdmission, LegacyAdmissionError } from './legacy-admission.mjs';
-export { prepareOutputExplanation, joinOutputExplanation, EXPLANATION_LIMITS } from './explanation.mjs';
+export {
+  prepareOutputExplanation, joinOutputExplanation, prepareDirectSensorBlockExplanation, EXPLANATION_LIMITS,
+} from './explanation.mjs';
 export { intentInterpretationDigest, intentConditionDigest, INTENT_EVIDENCE_LIMITS } from './intent-evidence.mjs';
 
 const SOURCE_LIMIT = 1024 * 1024;

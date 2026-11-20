@@ -231,3 +231,78 @@ pump <- request |> recover(false);`);
   assert.ok(large.explanationArtifact.strategies[0].outputs.some(output => output.unsupportedKind === 'resource-bounds'));
   assert.throws(() => compileControl('state no: Bool = false;\noutput pump: Bool;\npump <- ' + '!'.repeat(64) + 'no;'), /nesting exceeds 64/);
 });
+
+test('direct sensor recovery reports the executed round-zero pump block, not a coincidental false value', async t => {
+  const { prepareDirectSensorBlockExplanation } = await import('../tools/explanation.mjs');
+  const { ControlRuntime } = await import('../runtimes/wasm/control-runtime.mjs');
+  const bytes = fs.readFileSync(path.join(root, 'target/wasm32-unknown-unknown/release/ghostflow_wasm.wasm'));
+  const prepare = async (expression, revisionId, hostRunId = runId) => {
+    const source = '# Synthetic sensor block\n\n```ghost\ncontrol Permit {\n' +
+      'input permit_ok: Bool;\noutput permit, pump: Bool;\npump <- true;\n' +
+      'permit <- ' + expression + ';\nrequire pump => permit;\n}\n```\n';
+    const compilation = compileSourceSync(source, { filename: 'sensor-block.ghost.md',
+      interactionSourceIdentity: { documentId: 'source.sensor-block', revisionId } });
+    const runtime = await ControlRuntime.instantiateFramed(bytes, compilation, {
+      capabilities: [{ kind: 'sensor', name: 'permit_ok', type: 'Bool' }],
+    });
+    t.after(() => runtime.dispose());
+    const scan = (id, value, quality = 'Good') => {
+      const { frame, vm } = runtime.step({ nowMs: 100 * id,
+        samples: { permit_ok: { epoch: 1, id, timestampMs: 100 * id, quality, value } } });
+      const trace = { ...vm, scanFrame: { ...frame, runEpoch: hostRunId.slice(4) } };
+      const result = { accepted: true, outcome: { ...frame, format: 'GhostFlow/scan-outcome-v1', trace } };
+      const snapshot = emitCompletedScanSnapshot({ compilation, runId: hostRunId, completion: { kind: 'completed-scan', ...frame }, trace });
+      return { result, snapshot };
+    };
+    return { compilation, scan };
+  };
+
+  const { compilation, scan } = await prepare('permit_ok |> recover(false)', 'revision.sensor-block.direct');
+  const good = scan(1, false), allowed = scan(2, true), disconnected = scan(3, true, 'Disconnected');
+  assert.equal(proofFor(compilation, good.result, 'output.permit').reason, 'unsupported-kind:result_trace');
+  assert.equal(good.result.outcome.trace.instructionWitnesses, undefined);
+  assert.equal(typeof prepareDirectSensorBlockExplanation, 'function', 'verified direct safe-stage explanation is missing');
+  const producer = prepareDirectSensorBlockExplanation({ compilation, runId, outputId: 'output.pump' });
+  const emit = observation => producer.emit({ runId, ...observation });
+  const proof = emit(good);
+  assert.equal(proof.format, 'GhostFlow/direct-sensor-block-v1');
+  assert.equal(proof.stage, 'safe');
+  assert.equal(proof.status, 'ready');
+  assert.deepEqual(proof.completion, good.snapshot.completion);
+  assert.deepEqual(proof.sensor, { name: 'permit_ok', branch: 'sensor-ok', value: false });
+  assert.deepEqual(proof.permit, { outputId: 'output.permit', requested: false });
+  assert.deepEqual(proof.blocked, { outputId: 'output.pump', requested: true, safe: false });
+  assert.equal(proof.constraint.round, 0);
+  assert.doesNotMatch(JSON.stringify(proof), /__gf_/);
+
+  assert.equal(emit(allowed).reason, 'no-round-zero-block');
+  assert.deepEqual(emit(disconnected).sensor, { name: 'permit_ok', branch: 'fallback', fault: 'Disconnected' });
+  const missing = structuredClone(good);
+  missing.result.outcome.trace.resultTrace = [];
+  assert.equal(emit(missing).reason, 'missing-result-witness');
+  const mismatched = structuredClone(good);
+  mismatched.result.outcome.trace.resultTrace = disconnected.result.outcome.trace.resultTrace;
+  assert.equal(emit(mismatched).reason, 'result-witness-mismatch');
+  const duplicate = structuredClone(good);
+  duplicate.result.outcome.trace.resultTrace.push(...duplicate.result.outcome.trace.resultTrace);
+  assert.equal(emit(duplicate).reason, 'result-witness-mismatch');
+  const roundOne = structuredClone(good);
+  roundOne.result.outcome.trace.safetyTrace.constraints[0].firstViolation.round = 1;
+  assert.equal(emit(roundOne).reason, 'no-round-zero-block');
+  assert.throws(() => emit({ result: good.result, snapshot: allowed.snapshot }), /accepted snapshot mismatch/);
+  const oldRuntime = await prepare('permit_ok |> recover(false)', 'revision.sensor-block.direct', 'run.old-epoch');
+  const old = oldRuntime.scan(1, true, 'Disconnected');
+  assert.deepEqual(old.snapshot.completion, good.snapshot.completion);
+  assert.deepEqual(old.snapshot.observations, good.snapshot.observations);
+  assert.notDeepEqual(old.result.outcome.trace.resultTrace, good.result.outcome.trace.resultTrace);
+  assert.throws(() => emit({ result: old.result, snapshot: good.snapshot }), /scan frame identity mismatch/);
+  assert.throws(() => producer.emit({ runId: 'run.old', ...good }), /epoch mismatch/);
+
+  const skipped = await prepare('false && (permit_ok |> recover(false))', 'revision.sensor-block.skipped');
+  const neverEvaluated = skipped.scan(1, false);
+  assert.deepEqual(neverEvaluated.result.outcome.trace.resultTrace, []);
+  assert.deepEqual(neverEvaluated.result.outcome.trace.safetyTrace.constraints[0].firstViolation,
+    good.result.outcome.trace.safetyTrace.constraints[0].firstViolation);
+  assert.equal(prepareDirectSensorBlockExplanation({ compilation: skipped.compilation, runId, outputId: 'output.pump' })
+    .emit({ runId, ...neverEvaluated }).reason, 'unsupported-direct-sensor-block');
+});
