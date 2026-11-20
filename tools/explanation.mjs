@@ -4,6 +4,7 @@ import { replaySourceProvenance, emitInteractionSchema } from './compile-source.
 import { extractLiterate } from './literate.mjs';
 import { parseControl } from './control.mjs';
 import { prepareCompletedScanSnapshot, joinRuntimeSnapshot } from './interaction-runtime-snapshot.mjs';
+import { observeSourceTrace } from './source-trace.mjs';
 
 export const EXPLANATION_LIMITS = Object.freeze({ nodes: 512, edges: 1024, depth: 64, instructions: 8192 });
 const childrenOf = node => ['left', 'right', 'operand', 'condition', 'whenTrue', 'whenFalse']
@@ -138,7 +139,7 @@ export function emitExplanationArtifact(compilation) {
 /** Verification reconstructs the bounded DAG and every exit from canonical
  * source. Equality rejects malformed/cyclic/oversized sidecars, forged bounds,
  * offsets into operands and mappings for another artifact before projection. */
-export function prepareOutputExplanation({ compilation, runId } = {}) {
+function replayExplanationCompilation(compilation) {
   const owned = own(compilation);
   const identity = owned.interactionSourceIdentity;
   if (!owned.sourceDocument || !identity) fail('canonical source and Interaction identity required');
@@ -150,6 +151,11 @@ export function prepareOutputExplanation({ compilation, runId } = {}) {
   for (const field of ['sourceMap', 'traceMetadata', 'manifest', ...(owned.sourceClosure ? ['sourceClosure'] : [])]) {
     if (!same(owned[field], rebuilt[field])) fail(`${field} mapping mismatch`);
   }
+  return rebuilt;
+}
+
+export function prepareOutputExplanation({ compilation, runId } = {}) {
+  const rebuilt = replayExplanationCompilation(compilation);
   const descriptor = freeze(own(rebuilt.explanationArtifact));
   const snapshotProducer = prepareCompletedScanSnapshot({ compilation: rebuilt, runId });
   return Object.freeze({ descriptor, expected: snapshotProducer.expected,
@@ -160,6 +166,92 @@ export function prepareOutputExplanation({ compilation, runId } = {}) {
       return projectVerifiedProof(descriptor, snapshot, trace, outputId);
     },
   });
+}
+
+// Use the compiler parser and its replay-checked result sites, not a host
+// reconstruction of arbitrary dependency or safety graphs.
+function directSensorBlock(compilation, outputId) {
+  const metadata = compilation.traceMetadata;
+  const strategies = compilation.explanationArtifact.strategies;
+  if (compilation.sourceClosure || strategies.length !== 1) return null;
+  const strategy = strategies[0];
+  const target = strategy.outputs.find(output => output.outputId === outputId && output.type === 'Bool');
+  if (!target) return null;
+  const rules = metadata.constraints.filter(rule => rule.kind === 'requires'
+    && rule.names.length === 2 && rule.names[0] === target.name);
+  if (rules.length !== 1) return null;
+  const [rule] = rules, permitName = rule.names[1];
+  const permit = strategy.outputs.find(output => output.name === permitName && output.type === 'Bool'
+    && output.unsupportedKind === 'result_trace');
+  if (!permit) return null;
+
+  const { text, filename } = compilation.sourceDocument;
+  const ast = parseControl(extractLiterate(text, { filename }).code, { filename });
+  if (ast.kind !== 'control' || ast.body.some(node => node.kind === 'strategy')) return null;
+  const connections = ast.body.filter(node => node.kind === 'connection' && node.name === permitName);
+  if (connections.length !== 1) return null;
+  const [connection] = connections, root = connection.value;
+  if (root.kind !== 'binary' || root.op !== '|>' || root.left.kind !== 'reference'
+    || root.right.kind !== 'call' || root.right.name !== 'recover'
+    || root.right.named.length !== 0 || root.right.args.length !== 1
+    || root.right.args[0].kind !== 'literal' || root.right.args[0].raw !== 'false') return null;
+
+  const sensor = compilation.manifest.sensors?.find(item => item.name === root.left.name && item.type === 'Bool');
+  const declaration = ast.body.find(node => node.kind === 'sensor' && node.name === root.left.name);
+  const site = metadata.resultSites.find(item => item.nodeId === root.right.id && item.kind === 'recover'
+    && item.errorType === 'SensorFault' && item.origins.length === 1);
+  const origin = site?.origins[0];
+  if (!sensor || !declaration || origin?.kind !== 'sensor' || origin.name !== sensor.name
+    || origin.nodeId !== declaration.id) return null;
+  return { target, permit, rule, site, sensor, origin, strategy: strategy.name };
+}
+
+/** Host-only, opt-in proof for a direct Bool sensor recovery and its round-zero block.
+ * Supply the accepted outcome and its current snapshot from the same trusted host.
+ * This emits no physical feedback and never evaluates another scan. */
+export function prepareDirectSensorBlockExplanation({ compilation, runId, outputId } = {}) {
+  const rebuilt = replayExplanationCompilation(compilation);
+  const producer = prepareCompletedScanSnapshot({ compilation: rebuilt, runId });
+  const mapping = directSensorBlock(rebuilt, outputId);
+  return Object.freeze({ expected: producer.expected, emit({ runId: actualRunId, result, snapshot } = {}) {
+    if (actualRunId !== runId) fail('run epoch mismatch');
+    const { completion, trace, settingsState } = completedResult(result, producer.expected, rebuilt.manifest.configs ?? []);
+    const frame = trace.scanFrame;
+    if (typeof frame?.runEpoch !== 'string' || !frame.runEpoch || `run.${frame.runEpoch}` !== runId
+      || frame.scanId !== completion.scanId || frame.logicalTimeMs !== completion.logicalTimeMs) {
+      fail('accepted scan frame identity mismatch');
+    }
+    const accepted = producer.emit({ completion, trace, ...(settingsState ? { settingsState } : {}) });
+    if (!snapshot || !same(accepted, snapshot)) fail('accepted snapshot mismatch');
+    const shell = { format: 'GhostFlow/direct-sensor-block-v1', stage: 'safe', outputId,
+      schema: accepted.schema, module: accepted.module, source: accepted.source, runId, completion: accepted.completion };
+    const unavailable = reason => freeze({ ...shell, status: 'unavailable', reason });
+    if (!mapping || trace.strategy !== mapping.strategy) return unavailable('unsupported-direct-sensor-block');
+    const { target, permit, rule, site, sensor, origin } = mapping;
+    if (!Array.isArray(trace.resultTrace)) return unavailable('missing-result-witness');
+    const observation = observeSourceTrace(rebuilt.traceMetadata, trace);
+    const violation = observation.constraints[rule.index]?.observed?.firstViolation;
+    if (violation?.round !== 0 || violation.values?.[permit.name] !== false
+      || violation.values?.[target.name] !== true || !Array.isArray(violation.blocked) || !violation.blocked.includes(target.name)
+      || trace.requested[permit.name] !== false || trace.requested[target.name] !== true || trace.safe[target.name] !== false) {
+      return unavailable('no-round-zero-block');
+    }
+    const events = observation.resultEvents.filter(event => event.site === site.site);
+    if (!events.length) return unavailable('missing-result-witness');
+    if (events.length !== 1) return unavailable('result-witness-mismatch');
+    const [event] = events;
+    const ok = trace.inputs?.[sensor.okInput], value = trace.inputs?.[sensor.valueInput];
+    const faultCode = trace.inputs?.[sensor.faultInput];
+    let input;
+    if (event.choice === 0 && ok === true && value === false) {
+      input = { name: sensor.name, branch: 'sensor-ok', value };
+    } else if (event.choice > 0 && ok === false && event.choice === faultCode + 1 && event.origin === origin.tag) {
+      input = { name: sensor.name, branch: 'fallback', fault: event.fault };
+    } else return unavailable('result-witness-mismatch');
+    return freeze({ ...shell, status: 'ready', sensor: input, permit: { outputId: permit.outputId, requested: false },
+      constraint: { nodeId: rule.nodeId, source: rule.source, round: 0 },
+      blocked: { outputId: target.outputId, requested: true, safe: false } });
+  } });
 }
 
 function completedResult(result, expected, configs = []) {
